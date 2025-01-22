@@ -10,6 +10,7 @@
 ## Latest News:
 
 - 🔥 LLMStack is released! Checkout our [release blogs](https://blog.lmcache.ai/2025-01-22-stack-release/) [01-22-2025]
+- Join us at #production-stack of the vLLM channel!
 
 ## Architecture
 
