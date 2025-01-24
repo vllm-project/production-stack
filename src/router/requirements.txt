@@ -4,3 +4,4 @@ httpx
 uvicorn
 kubernetes
 prometheus_client
+uhashring

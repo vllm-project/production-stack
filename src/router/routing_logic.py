@@ -2,7 +2,9 @@ from typing import List, Optional, Dict
 import hashlib
 import abc
 import enum
+
 from fastapi import Request
+from uhashring import HashRing
 
 from service_discovery import EndpointInfo
 from engine_stats import EngineStats
@@ -73,8 +75,9 @@ class SessionRouter(RoutingInterface):
     in the request headers
     """
     def __init__(self, session_key: str):
-        self.key_to_server_id = {}
         self.session_key = session_key
+        # Map from session ID to engine URL
+        self.hash_ring = HashRing()
 
     def _qps_routing(self, 
                      endpoints: List[EndpointInfo], 
@@ -99,6 +102,27 @@ class SessionRouter(RoutingInterface):
                 ret = url
         return ret
 
+    def _update_hash_ring(self, endpoints: List['EndpointInfo']):
+        """
+        Update the hash ring with the current list of endpoints.
+        """
+        # Extract endpoint URLs
+        endpoint_urls = [endpoint.url for endpoint in endpoints]
+
+        # Get the current nodes in the hash ring
+        current_nodes = set(self.hash_ring.get_nodes())
+
+        # Convert the new endpoint URLs to a set for easy comparison
+        new_nodes = set(endpoint_urls)
+
+        # Remove nodes that are no longer in the list
+        for node in current_nodes - new_nodes:
+            self.hash_ring.remove_node(node)
+
+        # Add new nodes that are not already in the hash ring
+        for node in new_nodes - current_nodes:
+            self.hash_ring.add_node(node)
+
     def route_request(
             self, 
             endpoints: List[EndpointInfo],
@@ -122,17 +146,16 @@ class SessionRouter(RoutingInterface):
         session_id = request.headers.get(self.session_key, None)
         logger.debug(f"Got session id: {session_id}")
 
+        # Update the hash ring with the current list of endpoints
+        self._update_hash_ring(endpoints)
+
         if session_id is None:
+            # Route based on QPS if no session ID is present
             url = self._qps_routing(endpoints, request_stats)
-            if session_id is not None: 
-                self.key_to_server_id[session_id] = url
-        elif session_id not in self.key_to_server_id:
-            hash_digest = hashlib.sha256(session_id.encode()).hexdigest()
-            index = int(hash_digest, 16) % len(endpoints)
-            url = endpoints[index].url
-            self.key_to_server_id[session_id] = url
         else:
-            url = self.key_to_server_id[session_id]
+            # Use the hash ring to get the endpoint for the session ID
+            url = self.hash_ring.get_node(session_id)
+
         return url
 
 def InitializeRoutingLogic(
