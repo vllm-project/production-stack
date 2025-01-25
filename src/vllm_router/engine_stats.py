@@ -5,8 +5,8 @@ import requests
 from dataclasses import dataclass
 from prometheus_client.parser import text_string_to_metric_families
 
-from service_discovery import GetServiceDiscovery
-from log import init_logger
+from vllm_router.service_discovery import GetServiceDiscovery
+from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 _global_engine_stats_scraper: "Optional[EngineStatsScraper]" = None

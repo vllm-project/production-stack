@@ -7,7 +7,7 @@ import requests
 from kubernetes import client, config, watch
 from dataclasses import dataclass
 
-from log import init_logger
+from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 _global_service_discovery: "Optional[ServiceDiscovery]" = None

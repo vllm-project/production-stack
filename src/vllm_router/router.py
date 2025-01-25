@@ -8,13 +8,13 @@ import uvicorn
 import argparse
 import logging
 
-from utils import validate_url
-from routing_logic import InitializeRoutingLogic, RoutingLogic
-from service_discovery import InitializeServiceDiscovery, GetServiceDiscovery, ServiceDiscoveryType
-from request_stats import InitializeRequestStatsMonitor, GetRequestStatsMonitor
-from engine_stats import InitializeEngineStatsScraper, GetEngineStatsScraper
-from protocols import ErrorResponse, ModelCard, ModelList
-from httpx_client import HTTPXClientWrapper
+from vllm_router.utils import validate_url
+from vllm_router.routing_logic import InitializeRoutingLogic, RoutingLogic
+from vllm_router.service_discovery import InitializeServiceDiscovery, GetServiceDiscovery, ServiceDiscoveryType
+from vllm_router.request_stats import InitializeRequestStatsMonitor, GetRequestStatsMonitor
+from vllm_router.engine_stats import InitializeEngineStatsScraper, GetEngineStatsScraper
+from vllm_router.protocols import ModelCard, ModelList
+from vllm_router.httpx_client import HTTPXClientWrapper
 
 httpx_client_wrapper = HTTPXClientWrapper()
 logger = logging.getLogger("uvicorn")
@@ -310,7 +310,8 @@ def log_stats():
         logstr += "="*50 + "\n"
         logger.info(logstr)
 
-if __name__ == "__main__":
+
+def main():
     args = parse_args()
 
     InitializeAll(args)
@@ -319,3 +320,7 @@ if __name__ == "__main__":
         threading.Thread(target=log_stats, daemon=True).start()
 
     uvicorn.run(app, host=args.host, port=args.port)
+
+
+if __name__ == "__main__":
+    main()

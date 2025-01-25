@@ -1,15 +1,9 @@
-from router.routing_logic import SessionRouter
 import pytest
 from unittest.mock import Mock
 from typing import List, Dict
-
 import sys
-print(sys.path)
 
-# Import the Router class and related types
-
-# Mock classes for testing
-
+from vllm_router.routing_logic import SessionRouter
 
 class EndpointInfo:
     def __init__(self, url: str):

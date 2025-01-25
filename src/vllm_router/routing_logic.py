@@ -6,11 +6,11 @@ import enum
 from fastapi import Request
 from uhashring import HashRing
 
-from service_discovery import EndpointInfo
-from engine_stats import EngineStats
-from request_stats import RequestStats
+from vllm_router.service_discovery import EndpointInfo
+from vllm_router.engine_stats import EngineStats
+from vllm_router.request_stats import RequestStats
 
-from log import init_logger
+from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
 

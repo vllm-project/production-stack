@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Deque, Dict
 from collections import deque
 
-from log import init_logger
+from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
 
@@ -240,4 +240,3 @@ def GetRequestStatsMonitor():
         raise ValueError("The global request statistics monitor has not been initialized")
 
     return _global_request_stats_monitor
-

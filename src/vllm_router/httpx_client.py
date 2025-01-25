@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI
 import httpx
 
-from log import init_logger
+from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 class HTTPXClientWrapper:
@@ -27,5 +27,3 @@ class HTTPXClientWrapper:
         # Ensure we don't use it if not started / running
         assert self.async_client is not None
         return self.async_client
-
-

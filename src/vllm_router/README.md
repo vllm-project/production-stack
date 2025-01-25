@@ -47,7 +47,7 @@ The router can be configured using command-line arguments. Below are the availab
 ## Build docker image
 
 ```bash
-docker build -t <image_name>:<tag> .
+docker build -t <image_name>:<tag> -f docker/Dockerfile .
 ```
 
 ## Example commands to run the router
