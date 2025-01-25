@@ -238,7 +238,7 @@ def parse_args():
 
     # Logging
     parser.add_argument("--log-stats", action="store_true", 
-                        help="Log statistics every 30 seconds.")
+                        help="Log statistics every 10 seconds.")
     args = parser.parse_args()
     validate_args(args)
     return args
@@ -270,8 +270,8 @@ def InitializeAll(args):
     else:
         raise ValueError(f"Invalid service discovery type: {args.service_discovery}")
 
-    InitializeEngineStatsScraper(30)
-    InitializeRequestStatsMonitor(60)
+    InitializeEngineStatsScraper(args.engine_stats_interval)
+    InitializeRequestStatsMonitor(args.request_stats_window)
 
     global GLOBAL_ROUTER
     if args.routing_logic == "roundrobin":
