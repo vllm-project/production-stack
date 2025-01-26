@@ -1,0 +1,57 @@
+name: Release vLLM Production Stack Helm Charts
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "helm/**"
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      # Could add Prometheus as a dependent chart here if desired    
+      # - name: Add Dependency Repos
+      #   run: |
+      #     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.7.0
+        with:
+          skip_existing: false
+          packages_with_index: true
+          charts_dir: "."
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${GHCR_REGISTRY_PASSWORD}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
+        env:
+          GHCR_REGISTRY_PASSWORD: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Push Charts to ghcr.io
+        run: |
+          for pkg in .cr-release-packages/*; do
+            if [ -z "${pkg:-}" ]; then
+              echo "No charts to release"
+              break
+            fi
+            REPO=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+            helm push "${pkg}" oci://ghcr.io/$REPO
+          done
+
