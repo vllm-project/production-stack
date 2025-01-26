@@ -84,14 +84,12 @@ servingEngineSpec:
     vllmConfig:
       maxModelLen: 4096
 
-    env:
-      - name: HF_TOKEN
-        value: <YOUR_HF_TOKEN>
+    hf_token: <YOUR HF TOKEN>
 ```
 
 > **Explanation:** The `pvcMatchLabels` field specifies the labels to match an existing Persistent Volume. In this example, it ensures that the deployment uses the PV with the label `model: "llama3-pv"`. This provides a way to link a specific PV to your application.
 
-> **Note:** Make sure to replace `<YOUR_HF_TOKEN>` with your actual Hugging Face token in the `env` section.
+> **Note:** Make sure to replace `<YOUR_HF_TOKEN>` with your actual Hugging Face token in the yaml.
 
 2. Deploy the Helm chart:
 

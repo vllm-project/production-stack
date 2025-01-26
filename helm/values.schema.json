@@ -53,6 +53,9 @@
                 },
                 "required": ["enabled", "cpuOffloadingBufferSize"]
               },
+              "hf_token": {
+                  "type": "string"
+              },
               "env": {
                 "type": "array",
                 "items": {

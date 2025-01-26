@@ -35,6 +35,8 @@ servingEngineSpec:
   #   - enabled: (optional, bool) Enable LMCache, e.g., true
   #   - cpuOffloadingBufferSize: (optional, string) The CPU offloading buffer size, e.g., "30"
   #
+  # - hf_token: (optional, string) the Huggingface tokens for this model
+  #
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
   # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes

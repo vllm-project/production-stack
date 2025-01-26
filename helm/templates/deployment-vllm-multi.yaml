@@ -65,6 +65,13 @@ spec:
           env:
           - name: HF_HOME
             value: /data
+          {{- if $modelSpec.hf_token }}
+          - name: HF_TOKEN
+            valueFrom: 
+              secretKeyRef:
+                name: {{ .Release.Name }}-secrets
+                key: hf_token_{{ $modelSpec.name }}
+          {{- end }}
           {{- with $modelSpec.env }}
           {{- toYaml . | nindent 10 }}
           {{- end }}

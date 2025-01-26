@@ -44,12 +44,10 @@ servingEngineSpec:
       enabled: true
       cpuOffloadingBufferSize: "20"
 
-    env:
-      - name: HF_TOKEN
-        value: <YOUR_HF_TOKEN_HERE>
+    hf_token: <YOUR HF TOKEN>
 ```
 
-> **Note:** Replace `<YOUR_HF_TOKEN_HERE>` with your actual Hugging Face token.
+> **Note:** Replace `<YOUR HF TOKEN>` with your actual Hugging Face token.
 
 The `lmcacheConfig` field enables LMCache and sets the CPU offloading buffer size to `20`GB. You can adjust this value based on your workload.
 

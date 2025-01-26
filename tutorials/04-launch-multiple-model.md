@@ -36,9 +36,7 @@ servingEngineSpec:
     pvcStorage: "50Gi"
     vllmConfig:
       maxModelLen: 4096
-    env:
-      - name: HF_TOKEN
-        value: <YOUR_HF_TOKEN_FOR_LLAMA3.1>
+    hf_token: <YOUR HF TOKEN FOR LLAMA 3.1>
 
   - name: "mistral"
     repository: "vllm/vllm-openai"
@@ -51,12 +49,10 @@ servingEngineSpec:
     pvcStorage: "50Gi"
     vllmConfig:
       maxModelLen: 4096
-    env:
-      - name: HF_TOKEN
-        value: <YOUR_HF_TOKEN_FOR_MISTRAL>
+    hf_token: <YOUR HF TOKEN FOR MISTRAL>
 ```
 
-> **Note:** Replace `<YOUR_HF_TOKEN_FOR_LLAMA3.1>` and `<YOUR_HF_TOKEN_FOR_MISTRAL>` with your Hugging Face tokens.
+> **Note:** Replace `<YOUR HF TOKEN FOR LLAMA 3.1>` and `<YOUR HF TOKEN FOR MISTRAL>` with your Hugging Face tokens.
 
 
 ## Step 2: Deploying the Helm Chart

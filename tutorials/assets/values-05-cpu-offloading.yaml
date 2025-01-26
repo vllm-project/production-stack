@@ -18,6 +18,4 @@ servingEngineSpec:
       enabled: true
       cpuOffloadingBufferSize: "20"
 
-    env:
-      - name: HF_TOKEN
-        value: <YOUR_HF_TOKEN_HERE>
+    hf_token: <YOUR HF TOKEN>

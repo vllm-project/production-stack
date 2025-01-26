@@ -12,13 +12,13 @@ This tutorial guides you through the basic configurations required to deploy a v
 ## Prerequisites
 - A Kubernetes environment with GPU support, as set up in the [00-install-kubernetes-env tutorial](00-install-kubernetes-env.md).
 - Helm installed on your system.
-- Access to a Hugging Face token (`HF_TOKEN`).
+- Access to a HuggingFace token (`HF_TOKEN`).
 
 ## Step 1: Preparing the Configuration File
 
 1. Locate the example configuration file `tutorials/assets/values-02-basic-config.yaml`.
 2. Open the file and update the following fields:
-    - Replace `<USERS SHOULD PUT THEIR HF_TOKEN HERE>` with your actual Hugging Face token.
+    - Write your actual huggingface token in `hf_token: <YOUR HF TOKEN>` in the yaml file.
 
 ### Explanation of Key Items in `values-02-basic-config.yaml`
 
@@ -37,7 +37,8 @@ This tutorial guides you through the basic configurations required to deploy a v
   - `maxModelLen`: The maximum sequence length the model can handle.
   - `dtype`: Data type for computations, e.g., `bfloat16` for faster performance on modern GPUs.
   - `extraArgs`: Additional arguments passed to the vLLM engine for fine-tuning behavior.
-- **`env`**: Environment variables such as `HF_TOKEN` for authentication with Hugging Face.
+- **`hf_token`**: The Hugging Face token for authenticating with the Hugging Face model hub.
+- **`env`**: Extra environment variables to pass to the model-serving engine.
 
 ### Example Snippet
 ```yaml
@@ -62,10 +63,7 @@ servingEngineSpec:
       dtype: "bfloat16"
       extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
 
-    env:
-      - name: HF_TOKEN
-        value: <YOUR_HF_TOKEN>
-
+    hf_token: <YOUR HF TOKEN>
 ```
 
 ## Step 2: Applying the Configuration

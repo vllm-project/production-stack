@@ -17,6 +17,4 @@ servingEngineSpec:
     vllmConfig:
       maxModelLen: 4096
 
-    env:
-      - name: HF_TOKEN
-        value: <YOUR_HF_TOKEN>
+    hf_token: <YOUR HF TOKEN>

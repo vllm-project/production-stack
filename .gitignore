@@ -93,3 +93,4 @@ perf-test.py
 /try
 
 values-*.yaml
+helm/examples
