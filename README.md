@@ -45,8 +45,8 @@ vLLM Production Stack can be deployed via helm charts. Clone the repo to local a
 ```bash
 git clone https://github.com/vllm-project/production-stack.git
 cd production-stack/
-sudo helm repo add llmstack-repo https://lmcache.github.io/helm/
-sudo helm install llmstack llmstack-repo/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
 ```
 
 The deployed stack provides the same [**OpenAI API interface**](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html?ref=blog.mozilla.ai#openai-compatible-server) as vLLM, and can be accessed through kubernetes service.
@@ -59,7 +59,7 @@ For more information about customizing the helm chart, please refer to [values.y
 ### Uninstall
 
 ```bash
-sudo helm uninstall llmstack
+sudo helm uninstall vllm
 ```
 
 
