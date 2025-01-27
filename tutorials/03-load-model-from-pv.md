@@ -94,7 +94,7 @@ servingEngineSpec:
 2. Deploy the Helm chart:
 
 ```bash
-sudo helm install llmstack llmstack-repo/vllm-stack -f tutorials/assets/values-03-match-pv.yaml
+helm install vllm vllm/production-stack -f tutorials/assets/values-03-match-pv.yaml
 ```
 
 3. Verify the deployment:
@@ -140,7 +140,7 @@ models--meta-llama--Llama-3.1-8B-Instruct  version.txt
 ```bash
 sudo helm uninstall llmstack
 sudo kubectl delete -f tutorials/assets/pv-03.yaml && sudo kubectl apply -f tutorials/assets/pv-03.yaml
-sudo helm install llmstack llmstack-repo/vllm-stack -f tutorials/assets/values-03-match-pv.yaml
+helm install vllm vllm/production-stack -f tutorials/assets/values-03-match-pv.yaml
 ```
 
 ### Explanation

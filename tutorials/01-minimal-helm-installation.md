@@ -61,8 +61,8 @@ Explanation of the key fields:
 #### Step 1.2: Deploy the Helm Chart
 Deploy the Helm chart using the predefined configuration file:
 ```bash
-sudo helm repo add llmstack-repo https://lmcache.github.io/helm/
-sudo helm install llmstack llmstack-repo/vllm-stack -f tutorials/assets/values-minimal-example.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/production-stack -f tutorials/assets/values-minimal-example.yaml
 ```
 Explanation of the command:
 - `llmstack-repo`: The Helm repository.

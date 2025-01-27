@@ -60,7 +60,7 @@ servingEngineSpec:
 Deploy the Helm chart using the customized values file:
 
 ```bash
-sudo helm install llmstack llmstack-repo/vllm-stack -f tutorials/assets/values-04-multiple-models.yaml
+helm install vllm vllm/production-stack -f tutorials/assets/values-04-multiple-models.yaml
 ```
 
 ## Step 3: Verifying the Deployment
