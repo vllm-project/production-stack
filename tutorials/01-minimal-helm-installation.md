@@ -88,9 +88,9 @@ _Note_: It may take some time for the containers to download the Docker images a
 ### 3. Send a Query to the Stack
 
 #### Step 3.1: Forward the Service Port
-Expose the `llmstack-router-service` port to the host machine:
+Expose the `vllm-router-service` port to the host machine:
 ```bash
-sudo kubectl port-forward svc/llmstack-router-service 30080:80
+sudo kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 #### Step 3.2: Query the OpenAI-Compatible API to list the available models
