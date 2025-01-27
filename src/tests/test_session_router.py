@@ -5,6 +5,7 @@ import sys
 
 from vllm_router.routing_logic import SessionRouter
 
+
 class EndpointInfo:
     def __init__(self, url: str):
         self.url = url
@@ -117,8 +118,6 @@ def test_consistent_hashing_remove_node_multiple_sessions():
     # Calculate the number of remapped session IDs
     remapped_count = sum(1 for before, after in zip(
         urls_before, urls_after) if before != after)
-    print(f"Remapped {remapped_count} out of {
-          len(session_ids)} session IDs after removing a node.")
 
     # Ensure minimal reassignment
     # Only a fraction should be remapped
@@ -163,12 +162,11 @@ def test_consistent_hashing_add_node_multiple_sessions():
     # Calculate the number of remapped session IDs
     remapped_count = sum(1 for before, after in zip(
         urls_before, urls_after) if before != after)
-    print(f"Remapped {remapped_count} out of {
-          len(session_ids)} session IDs after adding a node.")
 
     # Ensure minimal reassignment
     # Only a fraction should be remapped
     assert remapped_count < len(session_ids)
+
 
 def test_consistent_hashing_add_then_remove_node():
     """
@@ -208,8 +206,6 @@ def test_consistent_hashing_add_then_remove_node():
     # Calculate the number of remapped session IDs after adding
     remapped_count_after_add = sum(1 for before, after in zip(
         urls_before_add, urls_after_add) if before != after)
-    print(f"Remapped {remapped_count_after_add} out of {
-          len(session_ids)} session IDs after adding a node.")
 
     # Ensure minimal reassignment after adding
     assert remapped_count_after_add < len(session_ids)
@@ -229,8 +225,6 @@ def test_consistent_hashing_add_then_remove_node():
     # Calculate the number of remapped session IDs after removing
     remapped_count_after_remove = sum(1 for before, after in zip(
         urls_after_add, urls_after_remove) if before != after)
-    print(f"Remapped {remapped_count_after_remove} out of {
-          len(session_ids)} session IDs after removing a node.")
 
     # Ensure minimal reassignment after removing
     assert remapped_count_after_remove < len(session_ids)
@@ -238,5 +232,4 @@ def test_consistent_hashing_add_then_remove_node():
     # Verify that session IDs mapped to unaffected nodes remain the same
     unaffected_count = sum(1 for before, after in zip(
         urls_before_add, urls_after_remove) if before == after)
-    print(f"{unaffected_count} out of {
-          len(session_ids)} session IDs were unaffected by adding and removing a node.")
+    print(f"{unaffected_count} out of {len(session_ids)} session IDs were unaffected by adding and removing a node.")
