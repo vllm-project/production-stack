@@ -65,8 +65,8 @@ helm repo add vllm https://vllm-project.github.io/production-stack
 helm install vllm vllm/production-stack -f tutorials/assets/values-minimal-example.yaml
 ```
 Explanation of the command:
-- `llmstack-repo`: The Helm repository.
-- `llmstack`: The name of the Helm release.
+- `vllm` in the first command: The Helm repository.
+- `vllm` in the second command: The name of the Helm release.
 - `-f tutorials/assets/values-minimal-example.yaml`: Specifies the predefined configuration file.
 
 ### 2. Validate Installation
