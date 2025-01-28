@@ -28,7 +28,7 @@ This tutorial guides you through a minimal setup of the vLLM Production Stack us
 ### 1. Deploy vLLM Instance
 
 #### Step 1.1: Use Predefined Configuration
-The vLLM Production Stack repository provides a predefined configuration file, `values-minimal-example.yaml`, located at `tutorials/assets/values-01-minimal-example.yaml`. This file contains the following content:
+The vLLM Production Stack repository provides a predefined configuration file, `values-01-minimal-example.yaml`, located at `tutorials/assets/values-01-minimal-example.yaml`. This file contains the following content:
 
 ```yaml
 servingEngineSpec:
@@ -62,12 +62,12 @@ Explanation of the key fields:
 Deploy the Helm chart using the predefined configuration file:
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm vllm/production-stack -f tutorials/assets/values-minimal-example.yaml
+helm install vllm vllm/production-stack -f tutorials/assets/values-01-minimal-example.yaml
 ```
 Explanation of the command:
 - `vllm` in the first command: The Helm repository.
 - `vllm` in the second command: The name of the Helm release.
-- `-f tutorials/assets/values-minimal-example.yaml`: Specifies the predefined configuration file.
+- `-f tutorials/assets/values-01-minimal-example.yaml`: Specifies the predefined configuration file.
 
 ### 2. Validate Installation
 
