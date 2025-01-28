@@ -25,4 +25,4 @@ done
 
 # Start port-forwarding once all pods are running
 echo "Starting port-forwarding..."
-kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80 &
