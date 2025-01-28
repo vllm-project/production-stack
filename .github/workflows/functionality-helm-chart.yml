@@ -2,7 +2,7 @@ name: Functionality test for helm chart
 run-name: ${{ github.actor }} is testing out helm chart functions 🚀
 on: [push]
 jobs:
-  Explore-GitHub-Actions:
+  Check-Health-of-Cluster:
     runs-on: self-hosted
     steps:
       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
@@ -25,8 +25,8 @@ jobs:
         with:
           name: curl-models-query
           path: |
-            ../output/models.json
-            ../output/query.json
+            ../../../output/models.json
+            ../../../output/query.json
       - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
