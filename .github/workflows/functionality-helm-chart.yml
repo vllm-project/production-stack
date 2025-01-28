@@ -1,0 +1,33 @@
+name: Functionality test for helm chart
+run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
+on: [push]
+jobs:
+  Explore-GitHub-Actions:
+    runs-on: self-hosted
+    steps:
+      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+      - name: Deploy via helm charts
+        run: |
+          cd ${{ github.workspace }}
+          sudo helm repo add vllm https://vllm-project.github.io/production-stack
+          sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
+      - name: Validate the installation and send query to the stack
+        run: |
+          sudo bash .github/port-forward.sh 
+      - name: Archive functionality results
+        uses: actions/upload-artifact@v4
+        with:
+          name: curl-models-query
+          path: |
+            output/models.json
+            output/query.json
+      - name: Helm uninstall
+        run: |
+           sudo helm uninstall vllm
+      - run: echo "🍏 This job's status is ${{ job.status }}."
