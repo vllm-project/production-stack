@@ -22,9 +22,7 @@ jobs:
           sudo bash .github/port-forward.sh 
           result_model=$(curl -s http://localhost:30080/models | tee models.json)
           result_query=$(curl -X POST http://localhost:30080/completions -H "Content-Type: application/json" -d '{"model": "facebook/opt-125m", "prompt": "Once upon a time,", "max_tokens": 10}' | tee query.json)
-      - name: Validate the installation and send query to the stack
+      - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
       - run: echo "🍏 This job's status is ${{ job.status }}."
-
-      
