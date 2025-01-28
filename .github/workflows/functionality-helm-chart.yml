@@ -25,8 +25,8 @@ jobs:
         with:
           name: curl-models-query
           path: |
-            output/models.json
-            output/query.json
+            ../output/models.json
+            ../output/query.json
       - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
