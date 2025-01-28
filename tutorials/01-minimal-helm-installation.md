@@ -77,11 +77,11 @@ Monitor the deployment status using:
 sudo kubectl get pods
 ```
 Expected output:
-- Pods for the `llmstack` deployment should transition to the `Running` state.
+- Pods for the `vllm` deployment should transition to `Ready` and the `Running` state.
 ```
 NAME                                               READY   STATUS    RESTARTS   AGE
-llmstack-deployment-router-859d8fb668-2x2b7        1/1     Running   0          2m38s
-llmstack-opt125m-deployment-vllm-84dfc9bd7-vb9bs   1/1     Running   0          2m38s
+vllm-deployment-router-859d8fb668-2x2b7        1/1     Running   0          2m38s
+vllm-opt125m-deployment-vllm-84dfc9bd7-vb9bs   1/1     Running   0          2m38s
 ```
 _Note_: It may take some time for the containers to download the Docker images and LLM weights.
 
@@ -147,6 +147,6 @@ This demonstrates the model generating a continuation for the provided prompt.
 
 To remove the deployment, run:
 ```bash
-sudo helm uninstall llmstack
+sudo helm uninstall vllm
 ```
 
