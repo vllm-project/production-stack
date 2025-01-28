@@ -19,8 +19,7 @@ jobs:
           sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          timestamp=$(date +%Y%m%d_%H%M%S)
-          sudo bash .github/port-forward.sh "$timestamp"
+          sudo bash .github/port-forward.sh
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         with:
