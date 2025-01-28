@@ -15,7 +15,7 @@ while true; do
     pod_ready=$(sudo kubectl get pods --no-headers | grep "vllm" | awk '{print $2}' | sort | uniq)
 
     # If the only unique status is "Running", break the loop and continue
-    if [[ "$pod_status" == "Running" ]] and [[ "$pod_ready" == "1/1" ]]; then
+    if [[ "$pod_status" == "Running" ]] && [[ "$pod_ready" == "1/1" ]]; then
         echo "All llmstack pods are now Ready and in Running state."
         break
     fi
