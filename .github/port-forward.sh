@@ -10,12 +10,13 @@ echo "Waiting for all llmstack pods to be in Running state..."
 
 # Loop to check if all llmstack-related pods are in the Running state
 while true; do
-    # Get all pods containing "llmstack" in their name and extract their STATUS column
-    pod_status=$(kubectl get pods --no-headers | grep "vllm" | awk '{print $3}' | sort | uniq)
+    # Get all pods containing "vllm" in their name and extract their STATUS column
+    pod_status=$(sudo kubectl get pods --no-headers | grep "vllm" | awk '{print $3}' | sort | uniq)
+    pod_ready=$(sudo kubectl get pods --no-headers | grep "vllm" | awk '{print $2}' | sort | uniq)
 
     # If the only unique status is "Running", break the loop and continue
-    if [[ "$pod_status" == "Running" ]]; then
-        echo "All llmstack pods are now in Running state."
+    if [[ "$pod_status" == "Running" ]] and [[ "$pod_ready" == "1/1" ]]; then
+        echo "All llmstack pods are now Ready and in Running state."
         break
     fi
 
