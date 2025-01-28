@@ -20,13 +20,14 @@ jobs:
       - name: Validate the installation and send query to the stack
         run: |
           sudo bash .github/port-forward.sh 
+          ABSOLUTE_PATH=$(realpath ../../../output/models.json)
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         with:
           name: curl-models-query
           path: |
-            ../../../output/models.json
-            ../../../output/query.json
+            $ABSOLUTE_PATH
+            $ABSOLUTE_PATH
       - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
