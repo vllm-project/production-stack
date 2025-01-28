@@ -1,5 +1,5 @@
 name: Functionality test for helm chart
-run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
+run-name: ${{ github.actor }} is testing out helm chart functions 🚀
 on: [push]
 jobs:
   Explore-GitHub-Actions:

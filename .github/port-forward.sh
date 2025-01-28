@@ -41,5 +41,6 @@ echo "Starting port-forwarding..."
 sudo kubectl port-forward svc/vllm-router-service $port1:80 &
 
 sleep 10
+[ ! -d "output" ] && mkdir output
 result_model=$(curl -s http://localhost:$port1/models | tee output/models.json)
 result_query=$(curl -X POST http://localhost:$port1/completions -H "Content-Type: application/json" -d '{"model": "facebook/opt-125m", "prompt": "Once upon a time,", "max_tokens": 10}' | tee output/query.json)
