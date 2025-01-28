@@ -31,3 +31,5 @@ jobs:
         run: |
            sudo helm uninstall vllm
       - run: echo "🍏 This job's status is ${{ job.status }}." 
+
+      
