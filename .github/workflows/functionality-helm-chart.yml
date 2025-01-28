@@ -30,4 +30,4 @@ jobs:
       - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+      - run: echo "🍏 This job's status is ${{ job.status }}." 
