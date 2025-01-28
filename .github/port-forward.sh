@@ -23,6 +23,22 @@ while true; do
     sleep 5
 done
 
+port1=30080
+max_port=30090
+while [ $port1 -le $max_port ]; do
+    netstat -tuln | grep ":$port1 " > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        echo "Port $port1 is available."
+        break
+    else
+        echo "Port $port1 is in use, trying next..."
+        port1=$((port1 + 1))
+    fi
+done
+
 # Start port-forwarding once all pods are running
 echo "Starting port-forwarding..."
-sudo kubectl port-forward svc/vllm-router-service 30080:80 &
+sudo kubectl port-forward svc/vllm-router-service $port1:80 &
+
+result_model=$(curl -s http://localhost:$port1/models | tee models.json)
+result_query=$(curl -X POST http://localhost:$port1/completions -H "Content-Type: application/json" -d '{"model": "facebook/opt-125m", "prompt": "Once upon a time,", "max_tokens": 10}' | tee query.json)
