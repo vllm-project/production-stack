@@ -45,3 +45,12 @@ sleep 10
 [ ! -d "../../../output" ] && mkdir output
 result_model=$(curl -s http://localhost:$port1/models | tee ../../../output/models.json)
 result_query=$(curl -X POST http://localhost:$port1/completions -H "Content-Type: application/json" -d '{"model": "facebook/opt-125m", "prompt": "Once upon a time,", "max_tokens": 10}' | tee ../../../output/query.json)
+
+# Clean the port
+PID=$(sudo netstat -tulnp | grep ':$port1' | awk '{print $7}' | cut -d'/' -f1)
+if [ -n "$PID" ]; then
+  echo "Killing process with PID: $PID"
+  sudo kill -9 "$PID"
+else
+  echo "No process found using port $port1"
+fi
