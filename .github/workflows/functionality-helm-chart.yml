@@ -19,17 +19,15 @@ jobs:
           sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          sudo bash .github/port-forward.sh 
-          ABSOLUTE_PATH_MODEL=$(realpath ../../../output/models.json)
-          ABSOLUTE_PATH_QUERY=$(realpath ../../../output/query.json)
-          echo $ABSOLUTE_PATH_MODEL
+          timestamp=$(date +%Y%m%d_%H%M%S)
+          sudo bash .github/port-forward.sh "$timestamp"
+          export ABSOLUTE_PATH_MODEL=$(realpath ../../../output/models_$timestamp.json)
+          export ABSOLUTE_PATH_QUERY=$(realpath ../../../output/query_$timestamp.json)
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         with:
           name: curl-models-query
-          path: |
-            $ABSOLUTE_PATH_MODEL
-            $ABSOLUTE_PATH_QUERY
+          path: ${{ env.ABSOLUTE_PATH_MODEL }} ${{ env.ABSOLUTE_PATH_QUERY }}
       - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
