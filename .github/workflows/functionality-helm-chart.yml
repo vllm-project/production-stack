@@ -21,13 +21,14 @@ jobs:
         run: |
           timestamp=$(date +%Y%m%d_%H%M%S)
           sudo bash .github/port-forward.sh "$timestamp"
-          export ABSOLUTE_PATH_MODEL=$(realpath ../../../output/models_$timestamp.json)
-          export ABSOLUTE_PATH_QUERY=$(realpath ../../../output/query_$timestamp.json)
+          # export ABSOLUTE_PATH_MODEL=$(realpath ../../../output/models_$timestamp.json)
+          # export ABSOLUTE_PATH_QUERY=$(realpath ../../../output/query_$timestamp.json)
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         with:
           name: curl-models-query
-          path: ${{ env.ABSOLUTE_PATH_MODEL }} ${{ env.ABSOLUTE_PATH_QUERY }}
+          path: |
+            **/**/**/output/*
       - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
