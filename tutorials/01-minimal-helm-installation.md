@@ -28,7 +28,7 @@ This tutorial guides you through a minimal setup of the vLLM Production Stack us
 ### 1. Deploy vLLM Instance
 
 #### Step 1.1: Use Predefined Configuration
-The vLLM Production Stack repository provides a predefined configuration file, `values-minimal-example.yaml`, located at `tutorials/assets/values-minimal-example.yaml`. This file contains the following content:
+The vLLM Production Stack repository provides a predefined configuration file, `values-minimal-example.yaml`, located at `tutorials/assets/values-01-minimal-example.yaml`. This file contains the following content:
 
 ```yaml
 servingEngineSpec:
