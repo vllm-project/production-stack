@@ -47,10 +47,19 @@ spec:
           {{- if .Values.routerSpec.extraArgs }}
           {{- toYaml .Values.routerSpec.extraArgs | nindent 10 }}
           {{- end }}
-        resources: # TODO: update here
+        {{- if .Values.routerSpec.resources }}
+        resources: 
+          {{- if .Values.routerSpec.resources.requests }}
           requests:
-            cpu: "4"
-            memory: "16G"
+            cpu: "{{ .Values.routerSpec.resources.requests.cpu }}"
+            memory: "{{ .Values.routerSpec.resources.requests.memory }}"
+          {{- end }}
+          {{- if .Values.routerSpec.resources.limits }}
+          limits:
+            cpu: "{{ .Values.routerSpec.resources.limits.cpu }}"
+            memory: "{{ .Values.routerSpec.resources.limits.memory }}"
+          {{- end }}
+        {{- end }}
         ports:
           - name: "router-cport"
             containerPort: {{ .Values.routerSpec.containerPort }}
