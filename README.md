@@ -109,6 +109,12 @@ pip install -r requirements-lint.txt
 pre-commit install
 ```
 
+It will run automatically before every commit. You cana also run it manually on all files with:
+
+```bash
+pre-commit run --all-files
+```
+
 > You can read more about `pre-commit` at <https://pre-commit.com>.
 
 ## License
