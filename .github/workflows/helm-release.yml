@@ -52,5 +52,5 @@ jobs:
               break
             fi
             REPO=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
-            helm push "${pkg}" oci://ghcr.io/$REPO
+            helm push "${pkg}" "oci://ghcr.io/$REPO"
           done
