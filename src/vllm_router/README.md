@@ -53,7 +53,8 @@ docker build -t <image_name>:<tag> -f docker/Dockerfile .
 ## Example commands to run the router
 
 **Example 1:** running the router locally at port 8000 in front of multiple serving engines:
-```
+
+```bash
 python3 router.py --port 800 \
     --service-discovery static \
     --static-backends "http://localhost:9001,http://localhost:9002,http://localhost:9003" \

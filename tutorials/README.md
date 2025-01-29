@@ -22,18 +22,15 @@ Welcome to the tutorials for vLLM Production Stack! This series of tutorials is 
 6. [Offload KV Cache](05-offload-kv-cache.md)
    Understand how to offload the KV cache to CPU to improve the performance in production use cases.
 
----
-
 ## Getting Started
 
 These tutorials are designed to be followed sequentially for beginners, but you can also jump to a specific tutorial based on your needs. Each tutorial includes:
+
 - Prerequisites
 - Detailed steps
 - Commands to execute
 - Expected outputs
 - Explanations to enhance your understanding
-
----
 
 ## Feedback and Contributions
 
