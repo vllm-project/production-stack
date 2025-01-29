@@ -241,14 +241,14 @@ def parse_args():
         "--static-backends",
         type=str,
         default=None,
-        help="The urls of static backends, separeted by comma."
+        help="The urls of static backends, separated by comma."
         "E.g., http://localhost:8000,http://localhost:8001",
     )
     parser.add_argument(
         "--static-models",
         type=str,
         default=None,
-        help="The models of static backends, separeted by comma." "E.g., model1,model2",
+        help="The models of static backends, separated by comma." "E.g., model1,model2",
     )
     parser.add_argument(
         "--k8s-port",
