@@ -5,7 +5,7 @@ This helm chart lets users deploy multiple serving engines and a router into the
 ## Key features:
 
 - Support running multiple serving engines with multiple different models
-- Load the model weights directly from the existing PersistentVolumes 
+- Load the model weights directly from the existing PersistentVolumes
 
 ## Prerequisites
 

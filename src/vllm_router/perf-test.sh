@@ -11,7 +11,7 @@ python3 router.py --port $1 \
     --engine-stats-interval 10 \
     --log-stats \
     --routing-logic session \
-    --session-key "x-user-id" 
+    --session-key "x-user-id"
 
     #--routing-logic roundrobin
 

@@ -141,4 +141,3 @@ Please refer to Step 3 in the [01-minimal-helm-installation](01-minimal-helm-ins
 
 ## Conclusion
 In this tutorial, you configured and deployed a vLLM serving engine with GPU support in a Kubernetes environment. You also learned how to verify its deployment and ensure it is running as expected. For further customization, refer to the `values.yaml` file and Helm chart documentation.
-

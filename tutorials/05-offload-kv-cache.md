@@ -1,7 +1,7 @@
 # Tutorial: Offload KV Cache to CPU with LMCache
 
 ## Introduction
-This tutorial demonstrates how to enable KV cache offloading using LMCache in a vLLM deployment. KV cache offloading moves large KV caches from GPU memory to CPU or disk, enabling more potential KV cache hits. 
+This tutorial demonstrates how to enable KV cache offloading using LMCache in a vLLM deployment. KV cache offloading moves large KV caches from GPU memory to CPU or disk, enabling more potential KV cache hits.
 vLLM Production Stack uses LMCache for KV cache offloading. For more details, see the [LMCache GitHub repository](https://github.com/LMCache/LMCache).
 
 
@@ -110,4 +110,3 @@ In this section, we will benchmark the performance improvements when using LMCac
 
 ## Conclusion
 This tutorial demonstrated how to enable KV cache offloading in a vLLM deployment using LMCache. By offloading KV cache to CPU, you can optimize GPU memory usage and improve the scalability of your models. Explore further configurations to tailor LMCache to your workloads.
-

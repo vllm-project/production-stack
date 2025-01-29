@@ -34,5 +34,3 @@ sudo helm install --wait --generate-name \
     -n gpu-operator --create-namespace \
     nvidia/gpu-operator \
     --version=v24.9.1
-
-

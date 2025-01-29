@@ -1,12 +1,13 @@
+from collections import deque
 from dataclasses import dataclass
 from typing import Deque, Dict
-from collections import deque
 
 from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
 
 _global_request_stats_monitor = None
+
 
 @dataclass
 class RequestStats:
@@ -34,6 +35,7 @@ class MovingAverageMonitor:
     """
     Monitors the average of the value of in a sliding window
     """
+
     def __init__(self, sliding_window_size: float):
         self.sliding_window_size = sliding_window_size
         self.timestamps = deque()
@@ -45,8 +47,10 @@ class MovingAverageMonitor:
         """
         self.timestamps.append(timestamp)
         self.values.append(value)
-        while len(self.timestamps) > 0 and \
-                self.timestamps[0] < timestamp - self.sliding_window_size:
+        while (
+            len(self.timestamps) > 0
+            and self.timestamps[0] < timestamp - self.sliding_window_size
+        ):
             self.timestamps.popleft()
             self.values.popleft()
 
@@ -54,7 +58,7 @@ class MovingAverageMonitor:
         """
         Get the throughput in the sliding window
         """
-        return sum(self.values) / len(self.values) 
+        return sum(self.values) / len(self.values)
 
     def get_sum(self) -> float:
         """
@@ -62,18 +66,20 @@ class MovingAverageMonitor:
         """
         return sum(self.values)
 
+
 class RequestStatsMonitor:
     """
     Monitors the request statistics of all serving engines
     """
-    # NOTE (ApostaC): Currently, QPS is calculated based on the number of 
+
+    # NOTE (ApostaC): Currently, QPS is calculated based on the number of
     # arrived requests in the sliding window, but the inter_token_latency and
     # ttft are calculated based on the number of completed requests in the
-    # sliding window. 
+    # sliding window.
     def __init__(self, sliding_window_size: float):
         """
         Args:
-            sliding_window_size: The size of the sliding window (in seconds) 
+            sliding_window_size: The size of the sliding window (in seconds)
                 to store the request statistics
         """
         self.sliding_window_size = sliding_window_size
@@ -109,14 +115,14 @@ class RequestStatsMonitor:
         self.in_prefill_requests[engine_url] += 1
 
         if engine_url not in self.qps_monitors:
-            self.qps_monitors[engine_url] =\
-                    MovingAverageMonitor(self.sliding_window_size)
+            self.qps_monitors[engine_url] = MovingAverageMonitor(
+                self.sliding_window_size
+            )
 
         self.qps_monitors[engine_url].update(timestamp, 1)
 
         if self.first_query_time is None:
             self.first_query_time = timestamp
-            
 
     def on_request_response(self, engine_url: str, request_id: str, timestamp: float):
         """
@@ -137,14 +143,12 @@ class RequestStatsMonitor:
         self.in_decoding_requests[engine_url] += 1
 
         if engine_url not in self.ttft_monitors:
-            self.ttft_monitors[engine_url] = \
-                    MovingAverageMonitor(self.sliding_window_size)
+            self.ttft_monitors[engine_url] = MovingAverageMonitor(
+                self.sliding_window_size
+            )
         self.ttft_monitors[engine_url].update(timestamp, timestamp - coming_time)
 
-    def on_request_complete(self, 
-                            engine_url: str, 
-                            request_id: str, 
-                            timestamp: float):
+    def on_request_complete(self, engine_url: str, request_id: str, timestamp: float):
         """
         Tell the monitor that a request has been completed.
 
@@ -157,11 +161,11 @@ class RequestStatsMonitor:
             self.finished_requests[engine_url] = 0
         self.in_decoding_requests[engine_url] -= 1
         self.finished_requests[engine_url] += 1
-        
+
     def get_request_stats(
-            self, 
-            current_time: float,
-        ) -> Dict[str, RequestStats]:
+        self,
+        current_time: float,
+    ) -> Dict[str, RequestStats]:
         """
         Get the request statistics for each serving engine
 
@@ -176,10 +180,11 @@ class RequestStatsMonitor:
         """
         # Calculate the request statistics
         ret = {}
-        
+
         # Get all urls:
-        urls = set(self.in_prefill_requests.keys())\
-                .union(set(self.in_decoding_requests.keys()))
+        urls = set(self.in_prefill_requests.keys()).union(
+            set(self.in_decoding_requests.keys())
+        )
 
         for engine_url in urls:
             if engine_url not in self.qps_monitors:
@@ -202,17 +207,18 @@ class RequestStatsMonitor:
                 in_prefill_requests=in_prefill_requests,
                 in_decoding_requests=in_decoding_requests,
                 finished_requests=finished_requests,
-                uptime = current_time - self.first_query_time
+                uptime=current_time - self.first_query_time,
             )
 
         return ret
+
 
 def InitializeRequestStatsMonitor(sliding_window_size: float):
     """
     Initialize the global request statistics monitor
 
     Args:
-        sliding_window_size: The size of the sliding window (in seconds) 
+        sliding_window_size: The size of the sliding window (in seconds)
             to store the request
 
     Raises:
@@ -224,6 +230,7 @@ def InitializeRequestStatsMonitor(sliding_window_size: float):
 
     _global_request_stats_monitor = RequestStatsMonitor(sliding_window_size)
     return _global_request_stats_monitor
+
 
 def GetRequestStatsMonitor():
     """
@@ -237,6 +244,8 @@ def GetRequestStatsMonitor():
     """
     global _global_request_stats_monitor
     if _global_request_stats_monitor is None:
-        raise ValueError("The global request statistics monitor has not been initialized")
+        raise ValueError(
+            "The global request statistics monitor has not been initialized"
+        )
 
     return _global_request_stats_monitor

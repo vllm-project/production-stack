@@ -1,4 +1,4 @@
-# vLLM Production Stack: reference stack for production vLLM deployment 
+# vLLM Production Stack: reference stack for production vLLM deployment
 
 
 **vLLM Production Stack** project provides a reference implementation on how to build an inference stack on top of vLLM, which allows you to:
@@ -123,4 +123,3 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 ---
 
 For any issues or questions, feel free to open an issue or contact the maintainers.
-

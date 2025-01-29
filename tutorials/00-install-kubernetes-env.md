@@ -188,5 +188,5 @@ Before you begin, ensure the following:
 
 By following this tutorial, you have successfully set up a Kubernetes environment with GPU support on your server. You are now ready to deploy and test vLLM Production Stack on Kubernetes. For further configuration and workload-specific setups, consult the official documentation for `kubectl`, `helm`, and `minikube`.
 
-What's next: 
+What's next:
 - [01-minimal-helm-installation](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)

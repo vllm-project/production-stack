@@ -20,7 +20,7 @@ This tutorial demonstrates how to deploy multiple vLLM instances that serve diff
 
 ## Step 1: Configuring Multiple Models
 
-Locate the `tutorials/assets/values-04-multiple-models.yaml` with following contents: 
+Locate the `tutorials/assets/values-04-multiple-models.yaml` with following contents:
 
 ```yaml
 servingEngineSpec:
@@ -172,4 +172,3 @@ Completion results from model:  meta-llama/Llama-3.1-8B-Instruct
 
 ## Conclusion
 In this tutorial, you learned how to deploy and query multiple models using vLLM on Kubernetes. This configuration allows you to utilize multiple GPUs efficiently and serve different models in parallel. Continue exploring advanced features to further optimize your deployment.
-

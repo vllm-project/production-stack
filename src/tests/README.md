@@ -39,4 +39,3 @@ Here's an example setup of running the router performance test:
 - **Step 1**: launch the mock-up OpenAI API server by `bash run-multi-server.sh 4 500`
 - **Step 2**: launch the router locally. See `src/router/perf-test.sh`
 - **Step 3**: launch the request generator by `python3 request_generator.py --qps 10 --num-workers 32`
-

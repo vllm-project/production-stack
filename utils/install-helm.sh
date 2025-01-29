@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e 
+set -e
 
 helm_exists() {
     which helm > /dev/null 2>&1

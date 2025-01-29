@@ -149,4 +149,3 @@ To remove the deployment, run:
 ```bash
 sudo helm uninstall vllm
 ```
-

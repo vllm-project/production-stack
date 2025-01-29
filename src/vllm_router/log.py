@@ -1,10 +1,12 @@
 import logging
 from logging import Logger
 
+
 def build_format(color):
     reset = "\x1b[0m"
     underline = "\x1b[3m"
     return f"{color}[%(asctime)s] %(levelname)s:{reset} %(message)s {underline}(%(filename)s:%(lineno)d:%(name)s){reset}"
+
 
 class CustomFormatter(logging.Formatter):
 
@@ -28,6 +30,7 @@ class CustomFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
 
+
 def init_logger(name: str, log_level=logging.DEBUG) -> Logger:
     logger = logging.getLogger(name)
 
@@ -38,4 +41,3 @@ def init_logger(name: str, log_level=logging.DEBUG) -> Logger:
     logger.setLevel(logging.DEBUG)
 
     return logger
-

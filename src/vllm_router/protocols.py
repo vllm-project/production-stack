@@ -1,5 +1,7 @@
 from typing import List, Optional
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 
 class OpenAIBaseModel(BaseModel):
     # OpenAI API does allow extra fields
@@ -13,7 +15,7 @@ class OpenAIBaseModel(BaseModel):
             field_names = set()
             for field_name, field in cls.model_fields.items():
                 field_names.add(field_name)
-                if hasattr(field, 'alias') and field.alias:
+                if hasattr(field, "alias") and field.alias:
                     field_names.add(field.alias)
 
             # Compare against both field names and aliases
@@ -21,8 +23,11 @@ class OpenAIBaseModel(BaseModel):
             if extra_fields:
                 logger.warning(
                     "The following fields were present in the request "
-                    "but ignored: %s", extra_fields)
+                    "but ignored: %s",
+                    extra_fields,
+                )
         return data
+
 
 class ErrorResponse(OpenAIBaseModel):
     object: str = "error"
@@ -31,12 +36,14 @@ class ErrorResponse(OpenAIBaseModel):
     param: Optional[str] = None
     code: int
 
+
 class ModelCard(OpenAIBaseModel):
     id: str
     object: str = "model"
     created: int = Field(default_factory=lambda: int(time.time()))
     owned_by: str = "vllm"
     root: Optional[str] = None
+
 
 class ModelList(OpenAIBaseModel):
     object: str = "list"
