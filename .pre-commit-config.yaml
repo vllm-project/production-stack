@@ -5,6 +5,7 @@ repos:
   - id: check-json
   - id: check-yaml
   - id: end-of-file-fixer
+  - id: requirements-txt-fixer
   - id: trailing-whitespace
 - repo: https://github.com/rhysd/actionlint
   rev: v1.7.7
@@ -22,3 +23,7 @@ repos:
   rev: v0.10.0
   hooks:
   - id: shellcheck
+- repo: https://github.com/markdownlint/markdownlint
+  rev: v0.13.0
+  hooks:
+  - id: markdownlint
