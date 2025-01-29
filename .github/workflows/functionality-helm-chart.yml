@@ -1,6 +1,19 @@
 name: Functionality test for helm chart
 run-name: ${{ github.actor }} is testing out helm chart functions 🚀
-on: [push]
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - '**.py'
+      - 'setup.py'
+  pull_request:
+    paths:
+        - '.github/workflows/**'
+        - '**.py'
+        - 'setup.py'
+  merge_group:
 jobs:
   Check-Health-of-Cluster:
     runs-on: self-hosted
