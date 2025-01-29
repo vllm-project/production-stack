@@ -59,6 +59,7 @@ pip install -e .
 ```
 
 **Example 1:** running the router locally at port 8000 in front of multiple serving engines:
+
 ```bash
 vllm-router --port 8000 \
     --service-discovery static \

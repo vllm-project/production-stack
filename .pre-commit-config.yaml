@@ -1,0 +1,45 @@
+repos:
+- repo: https://github.com/rhysd/actionlint
+  rev: v1.7.7
+  hooks:
+  - id: actionlint
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: check-json
+  - id: check-toml
+  - id: check-yaml
+    exclude: ^helm/templates/
+  - id: end-of-file-fixer
+  - id: requirements-txt-fixer
+  - id: trailing-whitespace
+# TODO: Enable these hooks when environment issues are resolved
+# - repo: https://github.com/hadolint/hadolint
+#   rev: v2.12.0
+#   hooks:
+#   - id: hadolint
+# - repo: https://github.com/gruntwork-io/pre-commit
+#   rev: v0.1.25
+#   hooks:
+#   - id: helmlint
+- repo: https://github.com/psf/black
+  rev: '25.1.0'
+  hooks:
+  - id: black
+- repo: https://github.com/pycqa/isort
+  rev: '6.0.0'
+  hooks:
+  - id: isort
+# TODO: Enable this hook when environment issues are resolved
+# - repo: https://github.com/koalaman/shellcheck-precommit
+#   rev: v0.10.0
+#   hooks:
+#   - id: shellcheck
+- repo: https://github.com/igorshubovych/markdownlint-cli
+  rev: v0.44.0
+  hooks:
+  - id: markdownlint
+- repo: https://github.com/codespell-project/codespell
+  rev: v2.4.1
+  hooks:
+  - id: codespell

@@ -1,15 +1,18 @@
 # Tutorial: Basic vLLM Configurations
 
 ## Introduction
+
 This tutorial guides you through the basic configurations required to deploy a vLLM serving engine in a Kubernetes environment with GPU support. You will learn how to specify the model details, set up necessary environment variables (like `HF_TOKEN`), and launch the vLLM serving engine.
 
 ## Table of Contents
+
 1. [Prerequisites](#prerequisites)
 2. [Step 1: Preparing the Configuration File](#step-1-preparing-the-configuration-file)
 3. [Step 2: Applying the Configuration](#step-2-applying-the-configuration)
 4. [Step 3: Verifying the Deployment](#step-3-verifying-the-deployment)
 
 ## Prerequisites
+
 - A Kubernetes environment with GPU support, as set up in the [00-install-kubernetes-env tutorial](00-install-kubernetes-env.md).
 - Helm installed on your system.
 - Access to a HuggingFace token (`HF_TOKEN`).
@@ -41,6 +44,7 @@ This tutorial guides you through the basic configurations required to deploy a v
 - **`env`**: Extra environment variables to pass to the model-serving engine.
 
 ### Example Snippet
+
 ```yaml
 servingEngineSpec:
   modelSpec:
@@ -68,14 +72,15 @@ servingEngineSpec:
 
 ## Step 2: Applying the Configuration
 
-1. Deploy the configuration using Helm:
+Deploy the configuration using Helm:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
 helm install vllm vllm/production-stack -f tutorials/assets/values-02-basic-config.yaml
 ```
 
-### Expected Output
+Expected output:
+
 You should see output indicating the successful deployment of the Helm chart:
 
 ```plaintext
@@ -91,54 +96,56 @@ REVISION: 1
 
 1. Check the status of the pods:
 
-```bash
-sudo kubectl get pods
-```
+   ```bash
+   sudo kubectl get pods
+   ```
 
-### Expected Output
-You should see the following pods:
+   Expected output:
 
-```plaintext
-NAME                                             READY   STATUS    RESTARTS   AGE
-pod/llmstack-deployment-router-xxxx-xxxx         1/1     Running   0          3m23s
-llmstack-llama3-deployment-vllm-xxxx-xxxx        1/1     Running   0          3m23s
-```
+   You should see the following pods:
 
-- The `llmstack-deployment-router` pod acts as the router, managing requests and routing them to the appropriate model-serving pod.
-- The `llmstack-llama3-deployment-vllm` pod serves the actual model for inference.
+   ```plaintext
+   NAME                                             READY   STATUS    RESTARTS   AGE
+   pod/llmstack-deployment-router-xxxx-xxxx         1/1     Running   0          3m23s
+   llmstack-llama3-deployment-vllm-xxxx-xxxx        1/1     Running   0          3m23s
+   ```
+
+   - The `llmstack-deployment-router` pod acts as the router, managing requests and routing them to the appropriate model-serving pod.
+   - The `llmstack-llama3-deployment-vllm` pod serves the actual model for inference.
 
 2. Verify the service is exposed correctly:
 
-```bash
-sudo kubectl get services
-```
+   ```bash
+   sudo kubectl get services
+   ```
 
-### Expected Output
-Ensure there are services for both the serving engine and the router:
+   Expected output:
 
-```plaintext
-NAME                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
-llmstack-engine-service   ClusterIP   10.103.98.170    <none>        80/TCP    4m
-llmstack-router-service   ClusterIP   10.103.110.107   <none>        80/TCP    4m
-```
+   Ensure there are services for both the serving engine and the router:
 
-- The `llmstack-engine-service` exposes the serving engine.
-- The `llmstack-router-service` handles routing and load balancing across model-serving pods.
+   ```plaintext
+   NAME                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+   llmstack-engine-service   ClusterIP   10.103.98.170    <none>        80/TCP    4m
+   llmstack-router-service   ClusterIP   10.103.110.107   <none>        80/TCP    4m
+   ```
+
+   - The `llmstack-engine-service` exposes the serving engine.
+   - The `llmstack-router-service` handles routing and load balancing across model-serving pods.
 
 3. Test the health endpoint:
 
-```bash
-curl http://<SERVICE_IP>/health
-```
+   ```bash
+   curl http://<SERVICE_IP>/health
+   ```
 
-Replace `<SERVICE_IP>` with the external IP of the service. If everything is configured correctly, you will get:
+   Replace `<SERVICE_IP>` with the external IP of the service. If everything is configured correctly, you will get:
 
-```plaintext
-{"status":"healthy"}
-```
+   ```plaintext
+   {"status":"healthy"}
+   ```
 
 Please refer to Step 3 in the [01-minimal-helm-installation](01-minimal-helm-installation.md) tutorial for querying the deployed vLLM service.
 
 ## Conclusion
-In this tutorial, you configured and deployed a vLLM serving engine with GPU support in a Kubernetes environment. You also learned how to verify its deployment and ensure it is running as expected. For further customization, refer to the `values.yaml` file and Helm chart documentation.
 
+In this tutorial, you configured and deployed a vLLM serving engine with GPU support in a Kubernetes environment. You also learned how to verify its deployment and ensure it is running as expected. For further customization, refer to the `values.yaml` file and Helm chart documentation.

@@ -1,11 +1,12 @@
 # Tutorial: Offload KV Cache to CPU with LMCache
 
 ## Introduction
-This tutorial demonstrates how to enable KV cache offloading using LMCache in a vLLM deployment. KV cache offloading moves large KV caches from GPU memory to CPU or disk, enabling more potential KV cache hits. 
+
+This tutorial demonstrates how to enable KV cache offloading using LMCache in a vLLM deployment. KV cache offloading moves large KV caches from GPU memory to CPU or disk, enabling more potential KV cache hits.
 vLLM Production Stack uses LMCache for KV cache offloading. For more details, see the [LMCache GitHub repository](https://github.com/LMCache/LMCache).
 
-
 ## Table of Contents
+
 1. [Prerequisites](#prerequisites)
 2. [Step 1: Configuring KV Cache Offloading](#step-1-configuring-kv-cache-offloading)
 3. [Step 2: Deploying the Helm Chart](#step-2-deploying-the-helm-chart)
@@ -13,6 +14,7 @@ vLLM Production Stack uses LMCache for KV cache offloading. For more details, se
 5. [Benchmark the Performance Gain of CPU Offloading (Work in Progress)](#benchmark-the-performance-gain-of-cpu-offloading-work-in-progress)
 
 ## Prerequisites
+
 - Completion of the following tutorials:
   - [00-install-kubernetes-env.md](00-install-kubernetes-env.md)
   - [01-minimal-helm-installation.md](01-minimal-helm-installation.md)
@@ -63,51 +65,53 @@ helm install vllm vllm/production-stack -f tutorials/assets/values-05-cpu-offloa
 
 1. Check the pod logs to verify LMCache is active:
 
-```bash
-sudo kubectl get pods
-```
+   ```bash
+   sudo kubectl get pods
+   ```
 
-Identify the pod name for the vLLM deployment (e.g., `llmstack-mistral-deployment-vllm-xxxx-xxxx`). Then run:
+   Identify the pod name for the vLLM deployment (e.g., `llmstack-mistral-deployment-vllm-xxxx-xxxx`). Then run:
 
-```bash
-sudo kubectl logs -f <pod-name>
-```
+   ```bash
+   sudo kubectl logs -f <pod-name>
+   ```
 
-Look for entries in the log indicating LMCache is enabled and operational. An example output is:
+   Look for entries in the log indicating LMCache is enabled and operational. An example output is:
 
-```plaintext
-INFO 01-21 20:16:58 lmcache_connector.py:41] Initializing LMCacheConfig under kv_transfer_config kv_connector='LMCacheConnector' kv_buffer_device='cuda' kv_buffer_size=1000000000.0 kv_role='kv_both' kv_rank=None kv_parallel_size=1 kv_ip='127.0.0.1' kv_port=14579
-INFO LMCache: Creating LMCacheEngine instance vllm-instance [2025-01-21 20:16:58,732] -- /usr/local/lib/python3.12/dist-packages/lmcache/experimental/cache_engine.py:237
-```
+   ```plaintext
+   INFO 01-21 20:16:58 lmcache_connector.py:41] Initializing LMCacheConfig under kv_transfer_config kv_connector='LMCacheConnector' kv_buffer_device='cuda' kv_buffer_size=1000000000.0 kv_role='kv_both' kv_rank=None kv_parallel_size=1 kv_ip='127.0.0.1' kv_port=14579
+   INFO LMCache: Creating LMCacheEngine instance vllm-instance [2025-01-21 20:16:58,732] -- /usr/local/lib/python3.12/dist-packages/lmcache/experimental/cache_engine.py:237
+   ```
 
 2. Forward the router service port to access the stack locally:
 
-```bash
-sudo kubectl port-forward svc/llmstack-router-service 30080:80
-```
+   ```bash
+   sudo kubectl port-forward svc/llmstack-router-service 30080:80
+   ```
 
 3. Send a request to the stack and observe the logs:
 
-```bash
-curl -X POST http://localhost:30080/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "mistralai/Mistral-7B-Instruct-v0.2",
-    "prompt": "Explain the significance of KV cache in language models.",
-    "max_tokens": 10
-  }'
-```
+   ```bash
+   curl -X POST http://localhost:30080/completions \
+     -H "Content-Type: application/json" \
+     -d '{
+       "model": "mistralai/Mistral-7B-Instruct-v0.2",
+       "prompt": "Explain the significance of KV cache in language models.",
+       "max_tokens": 10
+     }'
+   ```
 
-### Expected Output
-The response from the stack should contain the completion result, and the logs should show LMCache activity, for example:
+   Expected output:
 
-```plaintext
-DEBUG LMCache: Store skips 0 tokens and then stores 13 tokens [2025-01-21 20:23:45,113] -- /usr/local/lib/python3.12/dist-packages/lmcache/integration/vllm/vllm_adapter.py:490
-```
+   The response from the stack should contain the completion result, and the logs should show LMCache activity, for example:
+
+   ```plaintext
+   DEBUG LMCache: Store skips 0 tokens and then stores 13 tokens [2025-01-21 20:23:45,113] -- /usr/local/lib/python3.12/dist-packages/lmcache/integration/vllm/vllm_adapter.py:490
+   ```
 
 ## Benchmark the Performance Gain of CPU Offloading (Work in Progress)
+
 In this section, we will benchmark the performance improvements when using LMCache for CPU offloading. Stay tuned for updates.
 
 ## Conclusion
-This tutorial demonstrated how to enable KV cache offloading in a vLLM deployment using LMCache. By offloading KV cache to CPU, you can optimize GPU memory usage and improve the scalability of your models. Explore further configurations to tailor LMCache to your workloads.
 
+This tutorial demonstrated how to enable KV cache offloading in a vLLM deployment using LMCache. By offloading KV cache to CPU, you can optimize GPU memory usage and improve the scalability of your models. Explore further configurations to tailor LMCache to your workloads.

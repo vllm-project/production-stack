@@ -91,7 +91,7 @@
           "useBackend": false
         }
       ],
-      "title": "Available vLLM instaces",
+      "title": "Available vLLM instances",
       "type": "stat"
     },
     {

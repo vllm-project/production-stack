@@ -1,9 +1,11 @@
 # Tutorial: Launching Multiple Models in vLLM Production Stack
 
 ## Introduction
+
 This tutorial demonstrates how to deploy multiple vLLM instances that serve different models on a Kubernetes cluster using vLLM Production Stack. By utilizing the `modelSpec` field in the Helm chart's `values.yaml`, you can configure multiple models to run on different GPUs. You will also learn how to verify the deployment and query the models.
 
 ## Table of Contents
+
 1. [Prerequisites](#prerequisites)
 2. [Step 1: Configuring Multiple Models](#step-1-configuring-multiple-models)
 3. [Step 2: Deploying the Helm Chart](#step-2-deploying-the-helm-chart)
@@ -11,6 +13,7 @@ This tutorial demonstrates how to deploy multiple vLLM instances that serve diff
 5. [Step 4: Querying the Models Using Python](#step-4-querying-the-models-using-python)
 
 ## Prerequisites
+
 - A Kubernetes environment with at least 2 GPUs.
 - Completion of the following tutorials:
   - [00-install-kubernetes-env.md](00-install-kubernetes-env.md)
@@ -20,7 +23,7 @@ This tutorial demonstrates how to deploy multiple vLLM instances that serve diff
 
 ## Step 1: Configuring Multiple Models
 
-Locate the `tutorials/assets/values-04-multiple-models.yaml` with following contents: 
+Locate the `tutorials/assets/values-04-multiple-models.yaml` with following contents:
 
 ```yaml
 servingEngineSpec:
@@ -54,7 +57,6 @@ servingEngineSpec:
 
 > **Note:** Replace `<YOUR HF TOKEN FOR LLAMA 3.1>` and `<YOUR HF TOKEN FOR MISTRAL>` with your Hugging Face tokens.
 
-
 ## Step 2: Deploying the Helm Chart
 
 Deploy the Helm chart using the customized values file:
@@ -67,64 +69,65 @@ helm install vllm vllm/production-stack -f tutorials/assets/values-04-multiple-m
 
 1. Check the running pods to ensure both models are deployed:
 
-```bash
-sudo kubectl get pods
-```
+   ```bash
+   sudo kubectl get pods
+   ```
 
-### Expected Output
+   Expected output:
 
-```plaintext
-NAME                                           READY   STATUS    RESTARTS   AGE
-llmstack-deployment-router-xxxxx-xxxxx         1/1     Running   0          90s
-llmstack-llama3-deployment-vllm-xxxxx-xxxxx    1/1     Running   0          90s
-llmstack-mistral-deployment-vllm-xxxxx-xxxxx   1/1     Running   0          90s
-```
+   ```plaintext
+   NAME                                           READY   STATUS    RESTARTS   AGE
+   llmstack-deployment-router-xxxxx-xxxxx         1/1     Running   0          90s
+   llmstack-llama3-deployment-vllm-xxxxx-xxxxx    1/1     Running   0          90s
+   llmstack-mistral-deployment-vllm-xxxxx-xxxxx   1/1     Running   0          90s
+   ```
 
-> **Note:** It may take some time for the models to be downloaded before the READY changes to "1/1".
+   > **Note:** It may take some time for the models to be downloaded before the READY changes to "1/1".
 
 2. Forward the router service port to access it locally:
 
-```bash
-sudo kubectl port-forward svc/llmstack-router-service 30080:80
-```
+   ```bash
+   sudo kubectl port-forward svc/llmstack-router-service 30080:80
+   ```
 
-> **Explanation:** We are forwarding the port from the router service, which has a global view of all the vLLM engines running different models.
+   > **Explanation:** We are forwarding the port from the router service, which has a global view of all the vLLM engines running different models.
 
 3. Query the `/models` endpoint to verify the models:
 
-```bash
-curl http://localhost:30080/models
-```
+   ```bash
+   curl http://localhost:30080/models
+   ```
 
-For details on the `/models` endpoint, refer to the [README.md](README.md).
+   For details on the `/models` endpoint, refer to the [README.md](README.md).
 
-### Expected Output
+   Expected output:
 
-```json
-{
-  "object": "list",
-  "data": [
-    {
-      "id": "mistralai/Mistral-7B-Instruct-v0.2",
-      "object": "model",
-      "created": 1737516826,
-      "owned_by": "vllm",
-      "root": null
-    },
-    {
-      "id": "meta-llama/Llama-3.1-8B-Instruct",
-      "object": "model",
-      "created": 1737516836,
-      "owned_by": "vllm",
-      "root": null
-    }
-  ]
-}
-```
+   ```json
+   {
+     "object": "list",
+     "data": [
+       {
+         "id": "mistralai/Mistral-7B-Instruct-v0.2",
+         "object": "model",
+         "created": 1737516826,
+         "owned_by": "vllm",
+         "root": null
+       },
+       {
+         "id": "meta-llama/Llama-3.1-8B-Instruct",
+         "object": "model",
+         "created": 1737516836,
+         "owned_by": "vllm",
+         "root": null
+       }
+     ]
+   }
+   ```
 
 ## Step 4: Querying the Models Using Python
 
 Use the OpenAI Python API to query the deployed models. We provide a python script at `tutorials/assets/example-04-openai.py`
+
 ```python
 from openai import OpenAI
 
@@ -155,12 +158,14 @@ for model in models:
 ```
 
 To run the script:
-```
+
+```bash
 pip install openai
 python3 tutorials/assets/example-04-openai.py
 ```
 
 You should see outputs like:
+
 ```plaintext
 Completion results from model:  mistralai/Mistral-7B-Instruct-v0.2
 2, but what is the result of 1
@@ -171,5 +176,5 @@ Completion results from model:  meta-llama/Llama-3.1-8B-Instruct
 ```
 
 ## Conclusion
-In this tutorial, you learned how to deploy and query multiple models using vLLM on Kubernetes. This configuration allows you to utilize multiple GPUs efficiently and serve different models in parallel. Continue exploring advanced features to further optimize your deployment.
 
+In this tutorial, you learned how to deploy and query multiple models using vLLM on Kubernetes. This configuration allows you to utilize multiple GPUs efficiently and serve different models in parallel. Continue exploring advanced features to further optimize your deployment.

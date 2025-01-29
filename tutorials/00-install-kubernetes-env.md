@@ -4,8 +4,6 @@
 
 This tutorial guides you through the process of setting up a Kubernetes environment on a GPU-enabled server. We will install and configure `kubectl`, `helm`, and `minikube`, ensuring GPU compatibility for workloads requiring accelerated computing. By the end of this tutorial, you will have a fully functional Kubernetes environment ready for deploy the vLLM Production Stack.
 
----
-
 ## Table of Contents
 
 - [Introduction](#introduction)
@@ -16,8 +14,6 @@ This tutorial guides you through the process of setting up a Kubernetes environm
   - [Step 2: Installing Helm](#step-2-installing-helm)
   - [Step 3: Installing Minikube with GPU Support](#step-3-installing-minikube-with-gpu-support)
   - [Step 4: Verifying GPU Configuration](#step-4-verifying-gpu-configuration)
-
----
 
 ## Prerequisites
 
@@ -34,8 +30,6 @@ Before you begin, ensure the following:
 3. **Environment Setup:**
    - A Linux-based operating system (e.g., Ubuntu 20.04 or later).
    - Basic understanding of Linux shell commands.
-
----
 
 ## Steps
 
@@ -71,8 +65,6 @@ Before you begin, ensure the following:
    Client Version: v1.32.1
    ```
 
----
-
 ### Step 2: Installing Helm
 
 1. Execute the script `install-helm.sh`:
@@ -99,8 +91,6 @@ Before you begin, ensure the following:
    version.BuildInfo{Version:"v3.17.0", GitCommit:"301108edc7ac2a8ba79e4ebf5701b0b6ce6a31e4", GitTreeState:"clean", GoVersion:"go1.23.4"}
    ```
 
----
-
 ### Step 3: Installing Minikube with GPU Support
 
 1. Execute the script `install-minikube-cluster.sh`:
@@ -116,6 +106,7 @@ Before you begin, ensure the following:
 
 3. **Expected Output:**
    If everything goes smoothly, you should see the example output like following:
+
    ```plaintext
    😄  minikube v1.35.0 on Ubuntu 22.04 (kvm/amd64)
    ❗  minikube skips various validations when --force is supplied; this may lead to unexpected behavior
@@ -135,8 +126,6 @@ Before you begin, ensure the following:
    TEST SUITE: None
    ```
 
----
-
 ### Step 4: Verifying GPU Configuration
 
 1. Ensure Minikube is running:
@@ -145,7 +134,7 @@ Before you begin, ensure the following:
    sudo minikube status
    ```
 
-   Expected Output:
+   Expected output:
 
    ```plaintext
    minikube
@@ -162,7 +151,7 @@ Before you begin, ensure the following:
    sudo kubectl describe nodes | grep -i gpu
    ```
 
-   Expected Output:
+   Expected output:
 
    ```plaintext
      nvidia.com/gpu: 1
@@ -181,12 +170,12 @@ Before you begin, ensure the following:
    sudo kubectl logs gpu-test
    ```
 
-    You should see the nvidia-smi output from the terminal
----
+   You should see the nvidia-smi output from the terminal
 
 ## Conclusion
 
 By following this tutorial, you have successfully set up a Kubernetes environment with GPU support on your server. You are now ready to deploy and test vLLM Production Stack on Kubernetes. For further configuration and workload-specific setups, consult the official documentation for `kubectl`, `helm`, and `minikube`.
 
-What's next: 
+What's next:
+
 - [01-minimal-helm-installation](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)

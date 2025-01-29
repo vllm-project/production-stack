@@ -15,6 +15,7 @@ MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 ```
 
 Then, execute the following command in terminal:
+
 ```bash
 python3 test-openai.py
 ```
@@ -30,7 +31,7 @@ The `perftest/` folder contains the performance test scripts for the router. Spe
 - `run-server.sh` and `run-multi-server.sh`: launches one or multiple mock-up OpenAI API server
 - `clean-up.sh`: kills the mock-up OpenAI API server processes.
 
-### Example router performance test:
+### Example router performance test
 
 Here's an example setup of running the router performance test:
 
@@ -39,4 +40,3 @@ Here's an example setup of running the router performance test:
 - **Step 1**: launch the mock-up OpenAI API server by `bash run-multi-server.sh 4 500`
 - **Step 2**: launch the router locally. See `src/router/perf-test.sh`
 - **Step 3**: launch the request generator by `python3 request_generator.py --qps 10 --num-workers 32`
-

@@ -1,0 +1,5 @@
+MD013: false # line-length
+MD028: false # no-blanks-blockquote
+MD029: # ol-prefix
+  style: ordered
+MD033: false # no-inline-html

@@ -1,5 +1,4 @@
-# vLLM Production Stack: reference stack for production vLLM deployment 
-
+# vLLM Production Stack: reference stack for production vLLM deployment
 
 **vLLM Production Stack** project provides a reference implementation on how to build an inference stack on top of vLLM, which allows you to:
 
@@ -7,7 +6,7 @@
 - 💻 Monitor the  through a web dashboard
 - 😄 Enjoy the performance benefits brought by request routing and KV cache offloading
 
-## Latest News:
+## Latest News
 
 - 🔥 vLLM Production Stack is released! Checkout our [release blogs](https://blog.lmcache.ai/2025-01-21-stack-release) [01-22-2025]
 - ✨Join us at #production-stack channel of vLLM [slack](https://slack.vllm.ai/), LMCache [slack](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ), or fill out this [interest form](https://forms.gle/wSoeNpncmPVdXppg8) for a chat!
@@ -19,7 +18,6 @@ The stack is set up using [Helm](https://helm.sh/docs/), and contains the follow
 - **Serving engine**: The vLLM engines that run different LLMs
 - **Request router**: Directs requests to appropriate backends based on routing keys or session IDs to maximize KV cache reuse.
 - **Observability stack**: monitors the metrics of the backends through [Prometheus](https://github.com/prometheus/prometheus) + [Grafana](https://grafana.com/)
-
 
  <img src="https://github.com/user-attachments/assets/8f05e7b9-0513-40a9-9ba9-2d3acca77c0c" alt="Architecture of the stack" width="800"/>
 
@@ -42,6 +40,7 @@ We are actively working on this project and will release the following features 
 ### Deployment
 
 vLLM Production Stack can be deployed via helm charts. Clone the repo to local and execute the following commands for a minimal deployment:
+
 ```bash
 git clone https://github.com/vllm-project/production-stack.git
 cd production-stack/
@@ -55,20 +54,17 @@ To validate the installation and and send query to the stack, refer to [this tut
 
 For more information about customizing the helm chart, please refer to [values.yaml](https://github.com/vllm-project/production-stack/blob/main/helm/values.yaml) and our other [tutorials](https://github.com/vllm-project/production-stack/tree/main/tutorials).
 
-
 ### Uninstall
 
 ```bash
 sudo helm uninstall vllm
 ```
 
-
 ## Grafana Dashboard
 
 ### Features
 
 The Grafana dashboard provides the following insights:
-
 
 1. **Available vLLM Instances**: Displays the number of healthy instances.
 2. **Request Latency Distribution**: Visualizes end-to-end request latency.
@@ -98,7 +94,6 @@ The router ensures efficient request distribution among backends. It supports:
   - Session-ID based routing
   - (WIP) prefix-aware routing
 
-
 ## Contributing
 
 Contributions are welcome! Please follow the standard GitHub flow:
@@ -107,6 +102,21 @@ Contributions are welcome! Please follow the standard GitHub flow:
 2. Create a feature branch.
 3. Submit a pull request with detailed descriptions.
 
+We use `pre-commit` for formatting, it is installed as follows:
+
+```bash
+pip install -r requirements-lint.txt
+pre-commit install
+```
+
+It will run automatically before every commit. You cana also run it manually on all files with:
+
+```bash
+pre-commit run --all-files
+```
+
+> You can read more about `pre-commit` at <https://pre-commit.com>.
+
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
@@ -114,4 +124,3 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 ---
 
 For any issues or questions, feel free to open an issue or contact the maintainers.
-

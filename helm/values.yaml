@@ -51,13 +51,13 @@ servingEngineSpec:
   #
   #   requestCPU: 10
   #   requestMemory: "64Gi"
-  #   requestGPU: 1 
+  #   requestGPU: 1
   #
   #   pvcStorage: "50Gi"
-  #   pvcMatchLabels: 
+  #   pvcMatchLabels:
   #     model: "mistral"
   #
-  #   vllmConfig: 
+  #   vllmConfig:
   #     enableChunkedPrefill: false
   #     enablePrefixCaching: false
   #     maxModelLen: 16384
@@ -80,14 +80,14 @@ servingEngineSpec:
   #         - "NVIDIA-RTX-A6000"
   modelSpec: []
 
-  # -- Container port 
+  # -- Container port
   containerPort: 8000
-  # -- Service port 
+  # -- Service port
   servicePort: 80
-  
+
   # -- Set other environment variables from config map
   configs: {}
-  
+
   # -- Readiness probe configuration
   startupProbe:
     # -- Number of seconds after the container has started before startup probe is initiated
@@ -102,7 +102,7 @@ servingEngineSpec:
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
       port: 8000
-  
+
   # -- Liveness probe configuration
   livenessProbe:
    # -- Number of seconds after the container has started before liveness probe is initiated
@@ -117,7 +117,7 @@ servingEngineSpec:
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
       port: 8000
-  
+
   # -- Disruption Budget Configuration
   maxUnavailablePodDisruptionBudget: ""
 
@@ -135,7 +135,7 @@ servingEngineSpec:
 routerSpec:
   # -- Number of replicas
   replicaCount: 1
-  
+
   # -- Container port
   containerPort: 8000
 

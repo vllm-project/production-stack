@@ -1,6 +1,6 @@
 ## Create default rules for monitoring the cluster
 #
-# Disable `etcd` and `kubeScheduler` rules (managed by DOKS, so metrics are not accesible)
+# Disable `etcd` and `kubeScheduler` rules (managed by DOKS, so metrics are not accessible)
 defaultRules:
   create: true
   rules:
@@ -102,7 +102,7 @@ prometheus:
           environment: test
           release: test
       namespaceSelector:
-        matchNames: 
+        matchNames:
           - default
       endpoints:
         - port: "service-port"

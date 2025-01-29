@@ -23,4 +23,3 @@ jobs:
       - name: Lint open-webui Helm Chart
         run: |
           helm lint ./helm
-

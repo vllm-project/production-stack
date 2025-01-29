@@ -2,14 +2,14 @@
 
 This helm chart lets users deploy multiple serving engines and a router into the Kubernetes cluster.
 
-## Key features:
+## Key features
 
 - Support running multiple serving engines with multiple different models
-- Load the model weights directly from the existing PersistentVolumes 
+- Load the model weights directly from the existing PersistentVolumes
 
 ## Prerequisites
 
-1. A running Kubernetes cluster with GPU. (You can set it up through `minikube`: https://minikube.sigs.k8s.io/docs/tutorials/nvidia/)
+1. A running Kubernetes cluster with GPU. (You can set it up through `minikube`: <https://minikube.sigs.k8s.io/docs/tutorials/nvidia/>)
 2. [Helm](https://helm.sh/docs/intro/install/)
 
 ## Install the helm chart

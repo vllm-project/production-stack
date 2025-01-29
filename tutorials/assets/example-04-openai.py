@@ -17,8 +17,9 @@ for model in models:
         model=model.id,
         prompt="The result of 1 + 1 is ",
         echo=False,
-        temperature = 0,
-        max_tokens = 10)
+        temperature=0,
+        max_tokens=10,
+    )
 
     print("Completion results from model: ", model.id)
     print(completion.choices[0].text)

@@ -24,7 +24,7 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      # Could add Prometheus as a dependent chart here if desired    
+      # Could add Prometheus as a dependent chart here if desired
       # - name: Add Dependency Repos
       #   run: |
       #     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -52,6 +52,5 @@ jobs:
               break
             fi
             REPO=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
-            helm push "${pkg}" oci://ghcr.io/$REPO
+            helm push "${pkg}" "oci://ghcr.io/$REPO"
           done
-

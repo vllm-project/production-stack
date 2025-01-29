@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e 
+set -e
 
 kubectl_exists() {
     command -v kubectl >/dev/null 2>&1

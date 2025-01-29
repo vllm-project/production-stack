@@ -1,15 +1,18 @@
-from typing import Dict
-import time
 import threading
-import requests
+import time
 from dataclasses import dataclass
+from typing import Dict
+
+import requests
 from prometheus_client.parser import text_string_to_metric_families
 
-from vllm_router.service_discovery import GetServiceDiscovery
 from vllm_router.log import init_logger
+from vllm_router.service_discovery import GetServiceDiscovery
+
 logger = init_logger(__name__)
 
 _global_engine_stats_scraper: "Optional[EngineStatsScraper]" = None
+
 
 @dataclass
 class EngineStats:
@@ -41,9 +44,9 @@ class EngineStats:
         gpu_cache_hit_rate = 0
         for family in text_string_to_metric_families(vllm_scrape):
             for sample in family.samples:
-                if sample.name == 'vllm:num_requests_running':
+                if sample.name == "vllm:num_requests_running":
                     num_running_reqs = sample.value
-                elif sample.name == 'vllm:num_requests_waiting':
+                elif sample.name == "vllm:num_requests_waiting":
                     num_queuing_reqs = sample.value
                 elif sample.name == "vllm:gpu_prefix_cache_hit_rate":
                     gpu_cache_hit_rate = sample.value
@@ -51,38 +54,36 @@ class EngineStats:
         return EngineStats(
             num_running_requests=num_running_reqs,
             num_queuing_requests=num_queuing_reqs,
-            gpu_cache_hit_rate=gpu_cache_hit_rate
+            gpu_cache_hit_rate=gpu_cache_hit_rate,
         )
+
 
 class EngineStatsScraper:
     def __init__(self, scrape_interval: float):
         """
         Args:
-            scrape_interval (float): The interval in seconds 
+            scrape_interval (float): The interval in seconds
                 to scrape the metrics.
 
         Raises:
-            ValueError: if the service discover module is have 
+            ValueError: if the service discover module is have
             not been initialized.
-            
+
         """
         self.service_discovery = GetServiceDiscovery()
         self.engine_stats: Dict[str, EngineStats] = {}
         self.engine_stats_lock = threading.Lock()
 
         self.scrape_interval = scrape_interval
-        self.scrape_thread = threading.Thread(
-            target=self._scrape_worker,
-            daemon=True
-        )
+        self.scrape_thread = threading.Thread(target=self._scrape_worker, daemon=True)
         self.scrape_thread.start()
 
     def _scrape_one_endpoint(self, url: str):
-        """Scrape the metrics and model information from a single 
+        """Scrape the metrics and model information from a single
         serving engine
 
         Args:
-            url (str): The URL of the serving engine 
+            url (str): The URL of the serving engine
                        (does not contain endpoint)
         """
         try:
@@ -103,7 +104,7 @@ class EngineStatsScraper:
             engine_stats = self._scrape_one_endpoint(url)
             if engine_stats:
                 collected_engine_stats[url] = engine_stats
-        
+
         with self.engine_stats_lock:
             old_urls = list(self.engine_stats.keys())
             for old_url in old_urls:
@@ -127,20 +128,19 @@ class EngineStatsScraper:
         Check if the EngineStatsScraper is healthy
 
         Returns:
-            bool: True if the EngineStatsScraper is healthy, 
+            bool: True if the EngineStatsScraper is healthy,
                 False otherwise
         """
         return self.scrape_thread.is_alive()
 
-def InitializeEngineStatsScraper(
-    scrape_interval: float
-) -> EngineStatsScraper:
+
+def InitializeEngineStatsScraper(scrape_interval: float) -> EngineStatsScraper:
     """
-    Initialize the EngineStatsScraper object. This function should be 
+    Initialize the EngineStatsScraper object. This function should be
     called after the service discovery module has been initialized.
 
     Raises:
-        ValueError: if the service discover module is have 
+        ValueError: if the service discover module is have
             not been initialized
 
         ValueError: if the EngineStatsScraper object has already been
@@ -153,12 +153,13 @@ def InitializeEngineStatsScraper(
     _global_engine_stats_scraper = EngineStatsScraper(scrape_interval)
     return _global_engine_stats_scraper
 
+
 def GetEngineStatsScraper() -> EngineStatsScraper:
     """
     Get the EngineStatsScraper object
 
     Raises:
-        ValueError: if the EngineStatsScraper object has not been 
+        ValueError: if the EngineStatsScraper object has not been
             initialized
     """
     global _global_engine_stats_scraper
@@ -167,12 +168,13 @@ def GetEngineStatsScraper() -> EngineStatsScraper:
 
     return _global_engine_stats_scraper
 
-#if __name__ == "__main__":
+
+# if __name__ == "__main__":
 #    from service_discovery import InitializeServiceDiscovery, ServiceDiscoveryType
 #    import time
-#    InitializeServiceDiscovery(ServiceDiscoveryType.K8S, 
-#                               namespace = "default", 
-#                               port = 8000, 
+#    InitializeServiceDiscovery(ServiceDiscoveryType.K8S,
+#                               namespace = "default",
+#                               port = 8000,
 #                               label_selector = "release=test")
 #    time.sleep(1)
 #    InitializeEngineStatsScraper(10.0)

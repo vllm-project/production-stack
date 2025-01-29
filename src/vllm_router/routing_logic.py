@@ -1,31 +1,33 @@
-from typing import List, Optional, Dict
-import hashlib
 import abc
 import enum
+import hashlib
+from typing import Dict, List, Optional
 
 from fastapi import Request
 from uhashring import HashRing
 
-from vllm_router.service_discovery import EndpointInfo
 from vllm_router.engine_stats import EngineStats
-from vllm_router.request_stats import RequestStats
-
 from vllm_router.log import init_logger
+from vllm_router.request_stats import RequestStats
+from vllm_router.service_discovery import EndpointInfo
 
 logger = init_logger(__name__)
+
 
 class RoutingLogic(enum.Enum):
     ROUND_ROBIN = "round-robin"
     SESSION_BASED = "session"
 
-class RoutingInterface(metaclass = abc.ABCMeta):
+
+class RoutingInterface(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def route_request(
-            self, 
-            endpoints: List[EndpointInfo],
-            engine_stats: Dict[str, EngineStats],
-            request_stats: Dict[str, RequestStats],
-            request: Request) -> str:
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+    ) -> str:
         """
         Route the request to the appropriate engine URL
 
@@ -39,18 +41,20 @@ class RoutingInterface(metaclass = abc.ABCMeta):
         """
         raise NotImplementedError
 
+
 class RoundRobinRouter(RoutingInterface):
     # TODO (ApostaC): when available engines in the endpoints changes, the
-    # algorithm may not be "perfectly" round-robin. 
+    # algorithm may not be "perfectly" round-robin.
     def __init__(self):
         self.req_id = 0
 
     def route_request(
-            self, 
-            endpoints: List[EndpointInfo],
-            engine_stats: Dict[str, EngineStats],
-            request_stats: Dict[str, RequestStats],
-            request: Request) -> str:
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+    ) -> str:
         """
         Route the request to the appropriate engine URL using a simple
         round-robin algorithm
@@ -64,24 +68,25 @@ class RoundRobinRouter(RoutingInterface):
             request (Request): The incoming request
         """
         len_engines = len(endpoints)
-        ret = sorted(endpoints, 
-                     key = lambda e: e.url)[self.req_id % len_engines]
+        ret = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
         self.req_id += 1
         return ret.url
+
 
 class SessionRouter(RoutingInterface):
     """
     Route the request to the appropriate engine URL based on the session key
     in the request headers
     """
+
     def __init__(self, session_key: str):
         self.session_key = session_key
         # Map from session ID to engine URL
         self.hash_ring = HashRing()
 
-    def _qps_routing(self, 
-                     endpoints: List[EndpointInfo], 
-                     request_stats: Dict[str, RequestStats]) -> str:
+    def _qps_routing(
+        self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
+    ) -> str:
         """
         Route the request to the appropriate engine URL based on the QPS of
         each engine
@@ -95,14 +100,14 @@ class SessionRouter(RoutingInterface):
         for info in endpoints:
             url = info.url
             if url not in request_stats:
-                return url # This engine does not have any requests
+                return url  # This engine does not have any requests
             request_stat = request_stats[url]
             if request_stat.qps < lowest_qps:
                 lowest_qps = request_stat.qps
                 ret = url
         return ret
 
-    def _update_hash_ring(self, endpoints: List['EndpointInfo']):
+    def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
         """
         Update the hash ring with the current list of endpoints.
         """
@@ -124,11 +129,12 @@ class SessionRouter(RoutingInterface):
             self.hash_ring.add_node(node)
 
     def route_request(
-            self, 
-            endpoints: List[EndpointInfo],
-            engine_stats: Dict[str, EngineStats],
-            request_stats: Dict[str, RequestStats],
-            request: Request) -> str:
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+    ) -> str:
         """
         Route the request to the appropriate engine URL by the 'session id' in
         the request headers.
@@ -158,9 +164,10 @@ class SessionRouter(RoutingInterface):
 
         return url
 
+
 def InitializeRoutingLogic(
-        routing_logic: RoutingLogic,
-        *args, **kwargs) -> RoutingInterface:
+    routing_logic: RoutingLogic, *args, **kwargs
+) -> RoutingInterface:
     """
     Initialize the routing logic based on the routing_logic string
 

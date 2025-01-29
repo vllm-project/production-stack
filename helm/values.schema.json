@@ -140,7 +140,7 @@
             }
           }
         },
-        "runtimeClassName": { 
+        "runtimeClassName": {
             "type": "string"
         }
       }
@@ -170,4 +170,3 @@
     }
   }
 }
-

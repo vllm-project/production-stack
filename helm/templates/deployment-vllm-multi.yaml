@@ -67,7 +67,7 @@ spec:
             value: /data
           {{- if $modelSpec.hf_token }}
           - name: HF_TOKEN
-            valueFrom: 
+            valueFrom:
               secretKeyRef:
                 name: {{ .Release.Name }}-secrets
                 key: hf_token_{{ $modelSpec.name }}
@@ -89,7 +89,7 @@ spec:
             value: "{{ $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}"
           {{-   end }}
           {{-   if $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}
-          - name: LMCACHE_LOCAL_DISK 
+          - name: LMCACHE_LOCAL_DISK
             value: "True"
           - name: LMCACHE_MAX_LOCAL_DISK_SIZE
             value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
@@ -99,7 +99,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: "{{ .Release.Name }}-configs"
-          {{- end }}          
+          {{- end }}
           ports:
             - name: {{ include "chart.container-port-name" . }}
               containerPort: {{ include "chart.container-port" . }}
@@ -123,7 +123,7 @@ spec:
 
       {{- if .Values.servingEngineSpec.runtimeClassName }}
       runtimeClassName: nvidia
-      {{- end }} 
+      {{- end }}
       {{- if $modelSpec.nodeSelectorTerms}}
       affinity:
         nodeAffinity:
@@ -132,7 +132,7 @@ spec:
             {{- with $modelSpec.nodeSelectorTerms }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-      {{- end }} 
+      {{- end }}
 {{- end }}
 ---
 {{- end }}
