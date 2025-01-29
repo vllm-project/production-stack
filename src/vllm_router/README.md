@@ -52,13 +52,19 @@ docker build -t <image_name>:<tag> -f docker/Dockerfile .
 
 ## Example commands to run the router
 
-**Example 1:** running the router locally at port 8000 in front of multiple serving engines:
+You can install the router using the following command:
+
+```bash
+pip install -e .
 ```
-python3 router.py --port 800 \
+
+**Example 1:** running the router locally at port 8000 in front of multiple serving engines:
+```bash
+vllm-router --port 8000 \
     --service-discovery static \
     --static-backends "http://localhost:9001,http://localhost:9002,http://localhost:9003" \
     --static-models "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m" \
     --engine-stats-interval 10 \
     --log-stats \
-    --routing-logic roundrobin \
+    --routing-logic roundrobin
 ```
