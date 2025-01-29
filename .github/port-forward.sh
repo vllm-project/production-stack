@@ -2,7 +2,7 @@
 
 # Ensure the script is run with root privileges
 if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root (use sudo)." 
+   echo "This script must be run as root (use sudo)."
    exit 1
 fi
 
