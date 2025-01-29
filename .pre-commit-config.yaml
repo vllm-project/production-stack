@@ -9,6 +9,7 @@ repos:
   - id: check-json
   - id: check-toml
   - id: check-yaml
+    exclude: ^helm/templates/
   - id: end-of-file-fixer
   - id: requirements-txt-fixer
   - id: trailing-whitespace
