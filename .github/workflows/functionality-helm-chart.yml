@@ -41,7 +41,6 @@ jobs:
             output/
       - name: Helm uninstall
         run: |
-           sudo bash .github/clean-port.sh
            sudo helm uninstall vllm
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
