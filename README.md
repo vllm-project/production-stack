@@ -107,6 +107,15 @@ Contributions are welcome! Please follow the standard GitHub flow:
 2. Create a feature branch.
 3. Submit a pull request with detailed descriptions.
 
+We use `pre-commit` for formatting, it is installed as follows:
+
+```console
+pip install -r requirements-lint.txt
+pre-commit install
+```
+
+> You can read more about `pre-commit` at https://pre-commit.com.
+
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
