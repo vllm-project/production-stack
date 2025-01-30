@@ -136,6 +136,9 @@ routerSpec:
   # -- Number of replicas
   replicaCount: 1
 
+  # -- Type of service
+  serviceType: ClusterIP | LoadBalander | NodePort
+
   # -- Container port
   containerPort: 8000
 
