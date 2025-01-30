@@ -76,7 +76,7 @@ Deploy the configuration using Helm:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm vllm/production-stack -f tutorials/assets/values-02-basic-config.yaml
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-02-basic-config.yaml
 ```
 
 Expected output:
