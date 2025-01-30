@@ -157,6 +157,15 @@ routerSpec:
   # -- Window size in seconds to calculate the request statistics
   requestStatsWindow: 60
 
+  # -- router resource requests and limits
+  resources:
+    requests:
+      cpu: "4"
+      memory: "16G"
+    limits:
+      cpu: "8"
+      memory: "32G"
+
   # -- Customized labels for the router deployment
   labels:
     environment: "router"
@@ -174,4 +183,3 @@ routerSpec:
   #  httpGet:
   #    # -- Path to access on the HTTP server
   #
-  # -- TODO: resource configuration: currently it uses 4 CPUs and 16Gi memory by default
