@@ -157,9 +157,9 @@ routerSpec:
   # -- Window size in seconds to calculate the request statistics
   requestStatsWindow: 60
 
-  # -- router resource requests and limits 
+  # -- router resource requests and limits
   resources:
-    requests: 
+    requests:
       cpu: "4"
       memory: "16G"
     limits:
