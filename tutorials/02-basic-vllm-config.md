@@ -6,10 +6,16 @@ This tutorial guides you through the basic configurations required to deploy a v
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Step 1: Preparing the Configuration File](#step-1-preparing-the-configuration-file)
-3. [Step 2: Applying the Configuration](#step-2-applying-the-configuration)
-4. [Step 3: Verifying the Deployment](#step-3-verifying-the-deployment)
+- [Tutorial: Basic vLLM Configurations](#tutorial-basic-vllm-configurations)
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Step 1: Preparing the Configuration File](#step-1-preparing-the-configuration-file)
+    - [Explanation of Key Items in `values-02-basic-config.yaml`](#explanation-of-key-items-in-values-02-basic-configyaml)
+    - [Example Snippet](#example-snippet)
+  - [Step 2: Applying the Configuration](#step-2-applying-the-configuration)
+  - [Step 3: Verifying the Deployment](#step-3-verifying-the-deployment)
+  - [Conclusion](#conclusion)
 
 ## Prerequisites
 
@@ -76,7 +82,7 @@ Deploy the configuration using Helm:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm vllm/production-stack -f tutorials/assets/values-02-basic-config.yaml
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-02-basic-config.yaml
 ```
 
 Expected output:

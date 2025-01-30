@@ -6,17 +6,21 @@ This tutorial guides you through a minimal setup of the vLLM Production Stack us
 
 ## Table of Contents
 
-- [Introduction](#introduction)
-- [Table of Contents](#table-of-contents)
-- [Prerequisites](#prerequisites)
-- [Steps](#steps)
-  - [1. Deploy vLLM Instance](#1-deploy-vllm-instance)
-  - [2. Validate Installation](#2-validate-installation)
-  - [3. Send a Query to the Stack](#3-send-a-query-to-the-stack)
-    - [3.1. Forward the Service Port](#31-forward-the-service-port)
-    - [3.2. Query the OpenAI-Compatible API to list the available models](#32-query-the-openai-compatible-api-to-list-the-available-models)
-    - [3.3. Query the OpenAI Completion Endpoint](#33-query-the-openai-completion-endpoint)
-  - [4. Uninstall](#4-uninstall)
+- [Tutorial: Minimal Setup of the vLLM Production Stack](#tutorial-minimal-setup-of-the-vllm-production-stack)
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Steps](#steps)
+    - [1. Deploy vLLM Instance](#1-deploy-vllm-instance)
+      - [1.1: Use Predefined Configuration](#11-use-predefined-configuration)
+      - [1.2: Deploy the Helm Chart](#12-deploy-the-helm-chart)
+    - [2. Validate Installation](#2-validate-installation)
+      - [2.1: Monitor Deployment Status](#21-monitor-deployment-status)
+    - [3. Send a Query to the Stack](#3-send-a-query-to-the-stack)
+      - [3.1: Forward the Service Port](#31-forward-the-service-port)
+      - [3.2: Query the OpenAI-Compatible API to list the available models](#32-query-the-openai-compatible-api-to-list-the-available-models)
+      - [3.3: Query the OpenAI Completion Endpoint](#33-query-the-openai-completion-endpoint)
+    - [4. Uninstall](#4-uninstall)
 
 ## Prerequisites
 
@@ -69,7 +73,7 @@ Deploy the Helm chart using the predefined configuration file:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm vllm/production-stack -f tutorials/assets/values-01-minimal-example.yaml
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
 ```
 
 Explanation of the command:
