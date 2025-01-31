@@ -256,8 +256,7 @@ def parse_args():
         "--static-models",
         type=str,
         default=None,
-        help="The models of static backends, separated by comma."
-        "E.g., model1,model2",
+        help="The models of static backends, separated by comma. E.g., model1,model2",
     )
     parser.add_argument(
         "--k8s-port",
