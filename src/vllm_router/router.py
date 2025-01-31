@@ -192,9 +192,6 @@ async def health() -> Response:
 
 
 def validate_args(args):
-    if args.service_discovery not in ["static", "k8s"]:
-        raise ValueError(f"Invalid service discovery type: {args.service_discovery}")
-
     if args.service_discovery == "static":
         if args.static_backends is None:
             raise ValueError(
@@ -204,9 +201,6 @@ def validate_args(args):
             raise ValueError(
                 "Static models must be provided when using static service discovery."
             )
-
-    if args.routing_logic not in ["roundrobin", "session"]:
-        raise ValueError(f"Invalid routing logic: {args.routing_logic}")
 
     if args.service_discovery == "static" and args.static_backends is None:
         raise ValueError(
@@ -235,7 +229,8 @@ def parse_args():
     parser.add_argument(
         "--service-discovery",
         required=True,
-        help="The service discovery type. Options: static, k8s",
+        choices=["static", "k8s"],
+        help="The service discovery type.",
     )
     parser.add_argument(
         "--static-backends",
@@ -274,7 +269,8 @@ def parse_args():
         "--routing-logic",
         type=str,
         required=True,
-        help="The routing logic to use, Options: roundrobin, session",
+        choices=["roundrobin", "session"],
+        help="The routing logic to use",
     )
     parser.add_argument(
         "--session-key",
