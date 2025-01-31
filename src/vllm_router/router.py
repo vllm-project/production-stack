@@ -64,7 +64,6 @@ async def process_request(
         content=body,
         timeout=None,
     ) as backend_response:
-
         yield backend_response.headers, backend_response.status_code
 
         # Stream response content
@@ -221,6 +220,15 @@ def validate_args(args):
             "Session key must be provided when using session routing logic."
         )
 
+    if args.log_stats and args.log_stats_interval <= 0:
+        raise ValueError("Log stats interval must be greater than 0.")
+
+    if args.engine_stats_interval <= 0:
+        raise ValueError("Engine stats interval must be greater than 0.")
+
+    if args.request_stats_window <= 0:
+        raise ValueError("Request stats window must be greater than 0.")
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run the FastAPI app.")
@@ -248,7 +256,7 @@ def parse_args():
         "--static-models",
         type=str,
         default=None,
-        help="The models of static backends, separated by comma." "E.g., model1,model2",
+        help="The models of static backends, separated by comma.E.g., model1,model2",
     )
     parser.add_argument(
         "--k8s-port",
@@ -299,7 +307,15 @@ def parse_args():
 
     # Logging
     parser.add_argument(
-        "--log-stats", action="store_true", help="Log statistics every 10 seconds."
+        "--log-stats", action="store_true", help="Log statistics periodically."
+    )
+
+    parser.add_argument(
+        "--log-stats-interval",
+        type=int,
+        default=10,
+        help="The interval in seconds to log statistics.",
+        hidden=True,
     )
     args = parser.parse_args()
     validate_args(args)
@@ -353,9 +369,9 @@ def InitializeAll(args):
         raise ValueError(f"Invalid routing logic: {args.routing_logic}")
 
 
-def log_stats():
+def log_stats(interval: int = 10):
     while True:
-        time.sleep(10)
+        time.sleep(interval)
         logstr = "\n" + "=" * 50 + "\n"
         endpoints = GetServiceDiscovery().get_endpoint_info()
         engine_stats = GetEngineStatsScraper().get_engine_stats()
@@ -366,12 +382,12 @@ def log_stats():
             if url in engine_stats:
                 logstr += f"  Engine stats: {engine_stats[url]}\n"
             else:
-                logstr += f"  Engine stats: No stats available\n"
+                logstr += "  Engine stats: No stats available\n"
 
             if url in request_stats:
                 logstr += f"  Request Stats: {request_stats[url]}\n"
             else:
-                logstr += f"  Request Stats: No stats available\n"
+                logstr += "  Request Stats: No stats available\n"
 
             logstr += "-" * 50 + "\n"
         logstr += "=" * 50 + "\n"
@@ -384,7 +400,9 @@ def main():
     InitializeAll(args)
 
     if args.log_stats:
-        threading.Thread(target=log_stats, daemon=True).start()
+        threading.Thread(
+            target=log_stats, args=(args.log_stats_interval,), daemon=True
+        ).start()
 
     uvicorn.run(app, host=args.host, port=args.port)
 
