@@ -126,6 +126,30 @@ Before you begin, ensure the following:
    TEST SUITE: None
    ```
 
+4. Some troubleshooting tips for installing gpu-operator:
+
+   If gpu-operator fails to start because of the common seen “too many open files” issue for minikube (and [kind](https://kind.sigs.k8s.io/)), then a quick fix below may be helpful.
+
+   The issue can be observed by one or more gpu-operator pods in `CrashLoopBackOff` status, and be confirmed by checking their logs. For example,
+
+   ```console
+   $ sudo kubectl -n gpu-operator logs daemonset/nvidia-device-plugin-daemonset -c nvidia-device-plugin
+   IS_HOST_DRIVER=true
+   NVIDIA_DRIVER_ROOT=/
+   DRIVER_ROOT_CTR_PATH=/host
+   NVIDIA_DEV_ROOT=/
+   DEV_ROOT_CTR_PATH=/host
+   Starting nvidia-device-plugin
+   I0131 19:35:42.895845       1 main.go:235] "Starting NVIDIA Device Plugin" version=<
+      d475b2cf
+      commit: d475b2cfcf12b983a4975d4fc59d91af432cf28e
+   >
+   I0131 19:35:42.895917       1 main.go:238] Starting FS watcher for /var/lib/kubelet/device-plugins
+   E0131 19:35:42.895933       1 main.go:173] failed to create FS watcher for /var/lib/kubelet/device-plugins/: too many open files
+   ```
+
+   The fix is [well documented](https://kind.sigs.k8s.io/docs/user/known-issues#pod-errors-due-to-too-many-open-files) by kind, it also works for minikube.
+
 ### Step 4: Verifying GPU Configuration
 
 1. Ensure Minikube is running:
