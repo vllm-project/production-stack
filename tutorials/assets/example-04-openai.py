@@ -1,8 +1,25 @@
+import argparse
+
 from openai import OpenAI
 
+# Set up argument parsing
+parser = argparse.ArgumentParser(description="Use OpenAI API with custom base URL")
+parser.add_argument(
+    "--openai_api_base",
+    type=str,
+    default="http://localhost:30080/",
+    help="The base URL for the OpenAI API",
+)
+parser.add_argument(
+    "--openai_api_key", type=str, default="EMPTY", help="The API key for OpenAI"
+)
+
+# Parse the arguments
+args = parser.parse_args()
+
 # Modify OpenAI's API key and API base to use vLLM's API server.
-openai_api_key = "EMPTY"
-openai_api_base = "http://localhost:30080/"
+openai_api_key = args.openai_api_key
+openai_api_base = args.openai_api_base
 
 client = OpenAI(
     api_key=openai_api_key,
