@@ -50,6 +50,7 @@ jobs:
 
   Multiple-Models:
     runs-on: self-hosted
+    needs: Minimal-Example
     steps:
       - name: Deploy via helm charts
         run: |
