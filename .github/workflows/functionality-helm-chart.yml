@@ -39,7 +39,7 @@ jobs:
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         with:
-          name: curl-models-query
+          name: output-01-minimal-example
           path: |
             output-01-minimal-example/
       - name: Helm uninstall
@@ -62,7 +62,7 @@ jobs:
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         with:
-          name: curl-models-query
+          name: output-04-multiple-models
           path: |
             output-04-multiple-models/
       - name: Helm uninstall
