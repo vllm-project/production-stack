@@ -17,7 +17,7 @@ on:
       - 'helm/**'
   merge_group:
 jobs:
-  Check-Health-of-Cluster:
+  Minimal-Example:
     runs-on: self-hosted
     steps:
       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
@@ -34,13 +34,37 @@ jobs:
           sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          sudo bash .github/port-forward.sh
+          sudo bash .github/port-forward.sh curl-01-minimal-example
+        timeout-minutes: 2
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         with:
-          name: curl-models-query
+          name: output-01-minimal-example
           path: |
-            output/
+            output-01-minimal-example/
+      - name: Helm uninstall
+        run: |
+           sudo helm uninstall vllm
+        if: always()
+      - run: echo "🍏 This job's status is ${{ job.status }}."
+
+  Multiple-Models:
+    runs-on: self-hosted
+    needs: Minimal-Example
+    steps:
+      - name: Deploy via helm charts
+        run: |
+          sudo helm install vllm vllm/vllm-stack -f .github/multiple-models.yaml
+      - name: Validate the installation and send query to the stack
+        run: |
+          sudo bash .github/port-forward.sh curl-04-multiple-models
+        timeout-minutes: 2
+      - name: Archive functionality results
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-04-multiple-models
+          path: |
+            output-04-multiple-models/
       - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
