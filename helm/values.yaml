@@ -171,6 +171,32 @@ routerSpec:
     environment: "router"
     release: "router"
 
+  ingress:
+    # -- Enable ingress controller resource
+    enabled: false
+
+    # -- IngressClass that will be used to implement the Ingress
+    className: ""
+
+    # -- Additional annotations for the Ingress resource
+    annotations: {}
+      # kubernetes.io/ingress.class: alb
+      # kubernetes.io/ingress.class: nginx
+      # kubernetes.io/tls-acme: "true"
+
+    # The list of hostnames to be covered with this ingress record.
+    hosts:
+      - host: vllm-router.local
+        paths:
+          - path: /
+            pathType: Prefix
+
+    # --  The tls configuration for hostnames to be covered with this ingress record.
+    tls: []
+    #  - secretName: vllm-router-tls
+    #    hosts:
+    #      - vllm-router.local
+
   # -- TODO: Readiness probe configuration
   #startupProbe:
   #  # -- Number of seconds after the container has started before startup probe is initiated
