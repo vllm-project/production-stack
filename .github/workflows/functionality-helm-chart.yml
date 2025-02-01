@@ -41,7 +41,7 @@ jobs:
         with:
           name: curl-models-query
           path: |
-            output/
+            output-01-minimal-example/
       - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
@@ -64,7 +64,7 @@ jobs:
         with:
           name: curl-models-query
           path: |
-            output/
+            output-04-multiple-models/
       - name: Helm uninstall
         run: |
            sudo helm uninstall vllm
