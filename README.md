@@ -8,8 +8,9 @@
 
 ## Latest News
 
+- 🛤️ 2025 Q1 Road Map Released! Join the discussion [here](https://github.com/vllm-project/production-stack/issues/26)!
 - 🔥 vLLM Production Stack is released! Checkout our [release blogs](https://blog.lmcache.ai/2025-01-21-stack-release) [01-22-2025]
-- ✨Join us at #production-stack channel of vLLM [slack](https://slack.vllm.ai/), LMCache [slack](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ), or fill out this [interest form](https://forms.gle/wSoeNpncmPVdXppg8) for a chat!
+- ✨ Join us at #production-stack channel of vLLM [slack](https://slack.vllm.ai/), LMCache [slack](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ), or fill out this [interest form](https://forms.gle/wSoeNpncmPVdXppg8) for a chat!
 
 ## Architecture
 
