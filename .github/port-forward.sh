@@ -29,10 +29,4 @@ sudo kubectl patch service vllm-router-service -p '{"spec":{"type":"NodePort"}}'
 ip=$(sudo minikube ip)
 port=$(sudo kubectl get svc vllm-router-service -o=jsonpath='{.spec.ports[0].nodePort}')
 
-# Curl and save output
-[ ! -d "output" ] && mkdir output
-chmod -R 777 output
-# shellcheck disable=SC2034  # foo appears unused. Verify it or export it.
-result_model=$(curl -s "http://$ip:$port/models" | tee output/models.json)
-# shellcheck disable=SC2034  # foo appears unused. Verify it or export it.
-result_query=$(curl -X POST "http://$ip:$port/completions" -H "Content-Type: application/json" -d '{"model": "facebook/opt-125m", "prompt": "Once upon a time,", "max_tokens": 10}' | tee output/query.json)
+bash .github/$1.sh $ip $port
