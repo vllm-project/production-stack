@@ -16,20 +16,18 @@ jobs:
     - run: echo "::add-matcher::.github/workflows/matchers/actionlint.json"
     - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
   pre-commit-manual:
+    strategy:
+      matrix:
+        hook: [hadolint-docker, helmlint, shellcheck]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
     - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
       with:
         python-version: "3.12"
-    - uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4.2.0
+    - if: ${{ matrix.hook == 'helmlint' }}
+      uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4.2.0
     - run: echo "::add-matcher::.github/workflows/matchers/actionlint.json"
     - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
       with:
-        extra_args: --all-files --hook-stage manual hadolint-docker
-    - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
-      with:
-        extra_args: --all-files --hook-stage manual helmlint
-    - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
-      with:
-        extra_args: --all-files --hook-stage manual shellcheck
+        extra_args: --all-files --hook-stage manual ${{ matrix.hook }}
