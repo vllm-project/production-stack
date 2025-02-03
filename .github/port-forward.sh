@@ -32,5 +32,7 @@ port=$(sudo kubectl get svc vllm-router-service -o=jsonpath='{.spec.ports[0].nod
 # Curl and save output
 [ ! -d "output" ] && mkdir output
 chmod -R 777 output
-result_model=$(curl -s http://$ip:$port/models | tee output/models.json)
-result_query=$(curl -X POST http://$ip:$port/completions -H "Content-Type: application/json" -d '{"model": "facebook/opt-125m", "prompt": "Once upon a time,", "max_tokens": 10}' | tee output/query.json)
+# shellcheck disable=SC2034  # foo appears unused. Verify it or export it.
+result_model=$(curl -s "http://$ip:$port/models" | tee output/models.json)
+# shellcheck disable=SC2034  # foo appears unused. Verify it or export it.
+result_query=$(curl -X POST "http://$ip:$port/completions" -H "Content-Type: application/json" -d '{"model": "facebook/opt-125m", "prompt": "Once upon a time,", "max_tokens": 10}' | tee output/query.json)

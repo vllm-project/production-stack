@@ -1,2 +1,2 @@
 ignored:
-  - DL3013
+  - DL3013  # Pin versions in pip.

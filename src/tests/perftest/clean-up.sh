@@ -1,1 +1,3 @@
-ps -aux | grep "python3 ./fake-openai" | awk '{print $2}' | xargs kill -9
+#!/bin/bash
+
+pkill -9 -f "python3 ./fake-openai"

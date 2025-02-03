@@ -5,4 +5,4 @@ if [[ $# -eq 0 ]] ; then
     exit 1
 fi
 
-python3 ./fake-openai-server.py --port $1 --speed $2
+python3 ./fake-openai-server.py --port "$1" --speed "$2"

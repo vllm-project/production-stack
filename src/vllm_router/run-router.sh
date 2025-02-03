@@ -4,7 +4,7 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-python3 router.py --port $1 \
+python3 router.py --port "$1" \
     --service-discovery k8s \
     --k8s-label-selector release=test \
     --k8s-namespace default \
@@ -13,7 +13,7 @@ python3 router.py --port $1 \
     --engine-stats-interval 10 \
     --log-stats
 
-#python3 router.py --port $1 \
+#python3 router.py --port "$1" \
 #    --service-discovery k8s \
 #    --k8s-label-selector release=test \
 #    --routing-logic roundrobin \
