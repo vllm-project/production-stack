@@ -18,6 +18,11 @@ repos:
   hooks:
   - id: hadolint-docker
     stages: [manual] # Only run in CI, add to .github/workflows/pre-commit.yml
+- repo: https://github.com/gruntwork-io/pre-commit
+  rev: v0.1.25
+  hooks:
+  - id: helmlint
+    stages: [manual] # Only run in CI, add to .github/workflows/pre-commit.yml
 - repo: https://github.com/psf/black
   rev: '25.1.0'
   hooks:
