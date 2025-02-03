@@ -11,8 +11,9 @@ COPY src/ src/
 
 # Install dependencies (no cache to reduce size)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip && \
-    pip install .
+    pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir .
 
 # Set the entrypoint
 ENTRYPOINT ["vllm-router"]
+CMD []
