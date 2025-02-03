@@ -4,7 +4,7 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-python3 router.py --port $1 \
+python3 router.py --port "$1" \
     --service-discovery static \
     --static-backends "http://localhost:9004,http://localhost:9001,http://localhost:9002,http://localhost:9003" \
     --static-models "fake_model_name,fake_model_name,fake_model_name,fake_model_name" \
