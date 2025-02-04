@@ -130,7 +130,7 @@ servingEngineSpec:
   tolerations: []
 
   # -- RuntimeClassName configuration, set to "nvidia" if the model requires GPU
-  runtimeClassName: ""
+  runtimeClassName: "nvidia"
 
 routerSpec:
   # -- Number of replicas
