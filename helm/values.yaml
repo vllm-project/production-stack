@@ -68,9 +68,7 @@ servingEngineSpec:
   #     enabled: true
   #     cpuOffloadingBufferSize: "30"
   #
-  #   env:
-  #     - name: HF_TOKEN
-  #       value: <HUGGING_FACE_TOKEN>
+  #   hf_token: <HUGGING_FACE_TOKEN>
   #
   #   nodeSelectorTerms:
   #     - matchExpressions:
