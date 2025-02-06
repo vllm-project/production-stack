@@ -1,6 +1,6 @@
 # vLLM Production Stack: reference stack for production vLLM deployment
 
-| [**Blog**](https://blog.lmcache.ai/2025-01-21-stack-release) | [**Join vLLM production-stack channel**](https://slack.vllm.ai/) | [**Join LMCache Slack**](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ) | [**Interest Form**](https://forms.gle/mQfQDUXbKfp2St1z7) | [**Official Email**](contact@lmcache.ai) |
+| [**Blog**](https://blog.lmcache.ai/2025-01-21-stack-release) | [**Join vLLM #production-stack channel**](https://slack.vllm.ai/) | [**Join LMCache Slack**](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ) | [**Interest Form**](https://forms.gle/mQfQDUXbKfp2St1z7) | [**Official Email**](contact@lmcache.ai) |
 
 **vLLM Production Stack** project provides a reference implementation on how to build an inference stack on top of vLLM, which allows you to:
 
