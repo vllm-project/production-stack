@@ -1,18 +1,16 @@
 # vLLM Production Stack: reference stack for production vLLM deployment
 
-| [**Blog**](https://blog.lmcache.ai/2025-01-21-stack-release) | [**Join vLLM production-stack channel**](https://slack.vllm.ai/) | [**Join LMCache Slack**](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ) | [**Interest Form**](https://forms.gle/mQfQDUXbKfp2St1z7) | [**Official Email**](contact@lmcache.ai) |
+## Latest News
+
+- ✨ Join us at #production-stack channel of vLLM [slack](https://slack.vllm.ai/), LMCache [slack](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ), or fill out this [interest form](https://forms.gle/wSoeNpncmPVdXppg8) for a chat!
+- 🛤️ 2025 Q1 Road Map Released! Join the discussion [here](https://github.com/vllm-project/production-stack/issues/26)!
+- 🔥 vLLM Production Stack is released! Checkout our [release blogs](https://blog.lmcache.ai/2025-01-21-stack-release) [01-22-2025]
 
 **vLLM Production Stack** project provides a reference implementation on how to build an inference stack on top of vLLM, which allows you to:
 
 - 🚀 Scale from single vLLM instance to distributed vLLM deployment without changing any application code
 - 💻 Monitor the  through a web dashboard
 - 😄 Enjoy the performance benefits brought by request routing and KV cache offloading
-
-## Latest News
-
-- ✨ Join us at #production-stack channel of vLLM [slack](https://slack.vllm.ai/), LMCache [slack](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ), or fill out this [interest form](https://forms.gle/wSoeNpncmPVdXppg8) for a chat!
-- 🛤️ 2025 Q1 Road Map Released! Join the discussion [here](https://github.com/vllm-project/production-stack/issues/26)!
-- 🔥 vLLM Production Stack is released! Checkout our [release blogs](https://blog.lmcache.ai/2025-01-21-stack-release) [01-22-2025]
 
 ## Architecture
 
