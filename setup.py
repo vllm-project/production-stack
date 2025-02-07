@@ -14,6 +14,8 @@ setup(
         "kubernetes",
         "prometheus_client",
         "uhashring",
+        "aiofiles",
+        "python-multipart",
     ],
     entry_points={
         "console_scripts": [
