@@ -12,14 +12,14 @@
 - 💻 Monitor the  through a web dashboard
 - 😄 Enjoy the performance benefits brought by request routing and KV cache offloading
 
-## Step-By-Step Guide
+## Step-By-Step Tutorials
 
-0. How To [*Install Kubernetes Environment*](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)?
-1. How To [*Setup a Minimal vLLM Production Stack*](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)?
-2. How To [*Setup Basic vLLM Configuration*](https://github.com/vllm-project/production-stack/blob/main/tutorials/02-basic-vllm-config.md)?
-3. How to [*Load Model Weights from Persistent Volume*](https://github.com/vllm-project/production-stack/blob/main/tutorials/03-load-model-from-pv.md)?
-4. How to [*Launch Multiple Models in vLLM Production Stack*](https://github.com/vllm-project/production-stack/blob/main/tutorials/04-launch-multiple-model.md)?
-5. How to [*Offload KV Cache to CPU with LMCache*](https://github.com/vllm-project/production-stack/blob/main/tutorials/05-offload-kv-cache.md)?
+0. How To [*Install Kubernetes (kubectl, helm, minikube, etc)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)?
+1. How To [*Setup a Minimal Production Stack with Multiple vLLM Instances*](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)?
+2. How To [*Customize vLLM Configs (optional)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/02-basic-vllm-config.md)?
+3. How to [*Load Your LLM Weights*](https://github.com/vllm-project/production-stack/blob/main/tutorials/03-load-model-from-pv.md)?
+4. How to [*Launch Different LLMs in vLLM Production Stack*](https://github.com/vllm-project/production-stack/blob/main/tutorials/04-launch-multiple-model.md)?
+5. How to [*Enable KV Cache Offloading with LMCache*](https://github.com/vllm-project/production-stack/blob/main/tutorials/05-offload-kv-cache.md)?
 
 ## Architecture
 
