@@ -59,11 +59,11 @@ class Storage(ABC):
 
         Args:
             file_id (str): The unique identifier for the file being uploaded.
-            user_id (str, optional): The ID of the user uploading the file. 
+            user_id (str, optional): The ID of the user uploading the file.
                 Defaults to DEFAULT_USER_ID.
-            chunk (bytes, optional): The binary data chunk to be saved. 
+            chunk (bytes, optional): The binary data chunk to be saved.
                 Defaults to None.
-            purpose (str, optional): The intended use of the file. 
+            purpose (str, optional): The intended use of the file.
                 Defaults to DEFAULT_PURPOSE.
             offset (int, optional): The position in the file where this chunk should be written.
                 Defaults to 0.
@@ -87,7 +87,7 @@ class Storage(ABC):
 
         Args:
             file_id (str): The unique identifier for the file.
-            user_id (str, optional): The ID of the user who owns the file. 
+            user_id (str, optional): The ID of the user who owns the file.
                 Defaults to DEFAULT_USER_ID.
 
         Returns:
@@ -104,7 +104,7 @@ class Storage(ABC):
 
         Args:
             file_id (str): The unique identifier for the file.
-            user_id (str, optional): The ID of the user who owns the file. 
+            user_id (str, optional): The ID of the user who owns the file.
                 Defaults to DEFAULT_USER_ID.
 
         Returns:
@@ -118,7 +118,7 @@ class Storage(ABC):
         List all files stored for a given user.
 
         Args:
-            user_id (str, optional): The ID of the user whose files should be listed. 
+            user_id (str, optional): The ID of the user whose files should be listed.
                 Defaults to DEFAULT_USER_ID.
 
         Returns:
@@ -133,7 +133,7 @@ class Storage(ABC):
 
         Args:
             file_id (str): The unique identifier for the file to be deleted.
-            user_id (str, optional): The ID of the user who owns the file. 
+            user_id (str, optional): The ID of the user who owns the file.
                 Defaults to DEFAULT_USER_ID.
         """
         pass
