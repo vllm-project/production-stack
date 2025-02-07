@@ -16,7 +16,7 @@ from vllm_router.request_stats import (
     GetRequestStatsMonitor,
     InitializeRequestStatsMonitor,
 )
-from vllm_router.routing_logic import InitializeRoutingLogic, RoutingLogic
+from vllm_router.routing_logic import GetRoutingLogic, InitializeRoutingLogic
 from vllm_router.service_discovery import (
     GetServiceDiscovery,
     InitializeServiceDiscovery,
@@ -27,7 +27,6 @@ from vllm_router.utils import validate_url
 httpx_client_wrapper = HTTPXClientWrapper()
 logger = logging.getLogger("uvicorn")
 
-GLOBAL_ROUTER = None
 REQUEST_ID = 0
 STACK_VERSION = "0.0.1"
 
@@ -112,7 +111,7 @@ async def route_general_request(request: Request, endpoint: str):
             status_code=400, content={"error": f"Model {requested_model} not found."}
         )
 
-    server_url = GLOBAL_ROUTER.route_request(
+    server_url = GetRoutingLogic().route_request(
         endpoints, engine_stats, request_stats, request
     )
 
@@ -429,16 +428,7 @@ def InitializeAll(args):
     global FILE_STORAGE
     FILE_STORAGE = initialize_storage(args.file_storage_class, args.file_storage_path)
 
-    # TODO(gaocegege): Wrap it to a factory function.
-    global GLOBAL_ROUTER
-    if args.routing_logic == "roundrobin":
-        GLOBAL_ROUTER = InitializeRoutingLogic(RoutingLogic.ROUND_ROBIN)
-    elif args.routing_logic == "session":
-        GLOBAL_ROUTER = InitializeRoutingLogic(
-            RoutingLogic.SESSION_BASED, session_key=args.session_key
-        )
-    else:
-        raise ValueError(f"Invalid routing logic: {args.routing_logic}")
+    InitializeRoutingLogic(args.routing_logic, session_key=args.session_key)
 
 
 def log_stats(interval: int = 10):
