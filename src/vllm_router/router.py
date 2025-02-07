@@ -149,12 +149,13 @@ async def route_files(request: Request):
         # Unlike openai, we do not support fine-tuning, so we do not need to
         # check for 'purpose`.`
         purpose = "unknown"
+    else:
+        purpose = form["purpose"]
     if "file" not in form:
         return JSONResponse(
             status_code=400, content={"error": "Missing required parameter 'file'"}
         )
 
-    purpose = form["purpose"]
     file_obj: UploadFile = form["file"]
     file_content = await file_obj.read()
 
