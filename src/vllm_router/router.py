@@ -4,12 +4,12 @@ import threading
 import time
 from contextlib import asynccontextmanager
 
-import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from vllm_router.engine_stats import GetEngineStatsScraper, InitializeEngineStatsScraper
+from vllm_router.files import initialize_storage
 from vllm_router.httpx_client import HTTPXClientWrapper
 from vllm_router.protocols import ModelCard, ModelList
 from vllm_router.request_stats import (
@@ -137,6 +137,61 @@ async def route_general_request(request: Request, endpoint: str):
         status_code=status_code,
         headers={key: value for key, value in headers.items()},
     )
+
+
+@app.post("/files")
+async def route_files(request: Request):
+    """Handle file upload requests that include a purpose and file data."""
+    form = await request.form()
+
+    # Validate required fields
+    if "purpose" not in form:
+        # Unlike openai, we do not support fine-tuning, so we do not need to
+        # check for 'purpose`.`
+        purpose = "unknown"
+    else:
+        purpose = form["purpose"]
+    if "file" not in form:
+        return JSONResponse(
+            status_code=400, content={"error": "Missing required parameter 'file'"}
+        )
+
+    file_obj: UploadFile = form["file"]
+    file_content = await file_obj.read()
+
+    try:
+        file_info = await FILE_STORAGE.save_file(
+            file_name=file_obj.filename, content=file_content, purpose=purpose
+        )
+        return JSONResponse(content=file_info.metadata())
+    except Exception as e:
+        return JSONResponse(
+            status_code=500, content={"error": f"Failed to save file: {str(e)}"}
+        )
+
+
+@app.get("/files/{file_id}")
+async def route_get_file(file_id: str):
+    try:
+        file = await FILE_STORAGE.get_file(file_id)
+        return JSONResponse(content=file.metadata())
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=404, content={"error": f"File {file_id} not found"}
+        )
+
+
+@app.get("/files/{file_id}/content")
+async def route_get_file_content(file_id: str):
+    try:
+        # TODO(gaocegege): Stream the file content with chunks to support
+        # openai uploads interface.
+        file_content = await FILE_STORAGE.get_file_content(file_id)
+        return Response(content=file_content)
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=404, content={"error": f"File {file_id} not found"}
+        )
 
 
 @app.post("/chat/completions")
@@ -287,6 +342,22 @@ def parse_args():
         help="The key (in the header) to identify a session.",
     )
 
+    # Batch API
+    # TODO(gaocegege): Make these batch api related arguments to a separate config.
+    parser.add_argument(
+        "--file-storage-class",
+        type=str,
+        default="local_file",
+        choices=["local_file"],
+        help="The file storage class to use.",
+    )
+    parser.add_argument(
+        "--file-storage-path",
+        type=str,
+        default="/tmp/vllm_files",
+        help="The path to store files.",
+    )
+
     # Monitoring
     parser.add_argument(
         "--engine-stats-interval",
@@ -311,7 +382,6 @@ def parse_args():
         type=int,
         default=10,
         help="The interval in seconds to log statistics.",
-        hidden=True,
     )
     args = parser.parse_args()
     validate_args(args)
@@ -354,6 +424,12 @@ def InitializeAll(args):
     InitializeEngineStatsScraper(args.engine_stats_interval)
     InitializeRequestStatsMonitor(args.request_stats_window)
 
+    # TODO(gaocegege): Try adopting a more general way to initialize the
+    # storage, and global router. Maybe singleton?
+    global FILE_STORAGE
+    FILE_STORAGE = initialize_storage(args.file_storage_class, args.file_storage_path)
+
+    # TODO(gaocegege): Wrap it to a factory function.
     global GLOBAL_ROUTER
     if args.routing_logic == "roundrobin":
         GLOBAL_ROUTER = InitializeRoutingLogic(RoutingLogic.ROUND_ROBIN)
