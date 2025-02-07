@@ -18,7 +18,7 @@ class FileStorage(Storage):
     Files are stored in the following directory structure:
     /tmp/vllm_files/<user_id>/<file_id>
 
-    user_id is not
+    user_id is not used in the current implementation. It is reserved for future use.
     """
 
     def __init__(self, base_path: str = "/tmp/vllm_files"):

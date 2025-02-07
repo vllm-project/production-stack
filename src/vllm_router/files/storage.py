@@ -5,6 +5,13 @@ from vllm_router.files.files import OpenAIFile
 
 
 class Storage(ABC):
+    """
+    Abstract class for file storage.
+
+    The storage should be able to save, retrieve, and delete files.
+    It is used to support file uploads and downloads for batch inference.
+    """
+
     DEFAULT_USER_ID = "uid_default"
     DEFAULT_PURPOSE = "batch"
 

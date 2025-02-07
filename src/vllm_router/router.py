@@ -139,7 +139,7 @@ async def route_general_request(request: Request, endpoint: str):
     )
 
 
-@app.post("/v1/files")
+@app.post("/files")
 async def route_files(request: Request):
     """Handle file upload requests that include a purpose and file data."""
     form = await request.form()
@@ -169,7 +169,7 @@ async def route_files(request: Request):
         )
 
 
-@app.get("/v1/files/{file_id}")
+@app.get("/files/{file_id}")
 async def route_get_file(file_id: str):
     try:
         file = await FILE_STORAGE.get_file(file_id)
@@ -180,7 +180,7 @@ async def route_get_file(file_id: str):
         )
 
 
-@app.get("/v1/files/{file_id}/content")
+@app.get("/files/{file_id}/content")
 async def route_get_file_content(file_id: str):
     try:
         # TODO(gaocegege): Stream the file content with chunks to support
