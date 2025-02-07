@@ -89,7 +89,7 @@ class Storage(ABC):
             file_id (str): The unique identifier for the file.
             user_id (str, optional): The ID of the user who owns the file. 
                 Defaults to DEFAULT_USER_ID.
-        
+
         Returns:
             OpenAIFile: An OpenAIFile object containing the file metadata.
         """
@@ -106,7 +106,7 @@ class Storage(ABC):
             file_id (str): The unique identifier for the file.
             user_id (str, optional): The ID of the user who owns the file. 
                 Defaults to DEFAULT_USER_ID.
-        
+
         Returns:
             bytes: The binary content of the file.
         """
@@ -120,7 +120,7 @@ class Storage(ABC):
         Args:
             user_id (str, optional): The ID of the user whose files should be listed. 
                 Defaults to DEFAULT_USER_ID.
-        
+
         Returns:
             List[str]: A list of file IDs for the user.
         """
