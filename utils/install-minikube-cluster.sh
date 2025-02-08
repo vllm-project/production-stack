@@ -20,8 +20,13 @@ fi
 echo "net.core.bpf_jit_harden=0" | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 
-# Install nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+# Check if nvidia-smi is installed
+if command -v nvidia-smi >/dev/null 2>&1; then
+  echo "nvidia-smi already installed"
+else
+  # Install nvidia-container-toolkit
+  sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+fi
 
 # Start cluster
 sudo minikube start --driver docker --container-runtime docker --gpus all --force --addons=nvidia-device-plugin

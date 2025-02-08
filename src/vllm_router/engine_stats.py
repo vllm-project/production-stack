@@ -1,7 +1,7 @@
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Optional
 
 import requests
 from prometheus_client.parser import text_string_to_metric_families
