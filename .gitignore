@@ -94,5 +94,3 @@ perf-test.py
 
 values-*.yaml
 helm/examples
-.devcontainer
-.github

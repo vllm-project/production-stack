@@ -1,3 +1,5 @@
 fastapi
 httpx
+openai
 uvicorn
+vllm
