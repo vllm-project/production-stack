@@ -2,6 +2,7 @@ import argparse
 import logging
 import threading
 import time
+import uuid
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -27,7 +28,6 @@ from vllm_router.utils import validate_url
 httpx_client_wrapper = HTTPXClientWrapper()
 logger = logging.getLogger("uvicorn")
 
-REQUEST_ID = 0
 STACK_VERSION = "0.0.1"
 
 
@@ -87,9 +87,7 @@ async def route_general_request(request: Request, endpoint: str):
     back to the client.
     """
     in_router_time = time.time()
-    global REQUEST_ID
-    request_id = str(REQUEST_ID)
-    REQUEST_ID += 1
+    request_id = str(uuid.uuid4())
 
     # TODO (ApostaC): merge two awaits into one
     request_body = await request.body()
@@ -117,7 +115,7 @@ async def route_general_request(request: Request, endpoint: str):
 
     curr_time = time.time()
     logger.info(
-        f"Routing request {REQUEST_ID} to {server_url} at {curr_time}, "
+        f"Routing request {request_id} to {server_url} at {curr_time}, "
         f"process time = {curr_time - in_router_time:.4f}"
     )
     stream_generator = process_request(
