@@ -20,20 +20,26 @@ fi
 echo "net.core.bpf_jit_harden=0" | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 
-# Check if nvidia-smi is installed
+# GPU Setup: Only proceed when both nvidia-smi and nvidia-ctk are available.
 if command -v nvidia-smi >/dev/null 2>&1; then
-  echo "nvidia-smi already installed"
+  echo "nvidia-smi already installed. GPU detected."
+  if command -v nvidia-ctk >/dev/null 2>&1; then
+    echo "nvidia-ctk already installed. Configuring runtime..."
+    sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+  else
+    echo "nvidia-ctk not found. Please install the NVIDIA Container Toolkit to enable GPU support."
+    exit 1
+  fi
 else
-  # Install nvidia-container-toolkit
-  sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+  echo "nvidia-smi not found; no NVIDIA GPU detected."
+  exit 1
 fi
 
-# Start cluster
+# Start minikube with GPU support.
 sudo minikube start --driver docker --container-runtime docker --gpus all --force --addons=nvidia-device-plugin
 
 # Install gpu-operator
-sudo helm repo add nvidia https://helm.ngc.nvidia.com/nvidia \
-    && sudo helm repo update
+sudo helm repo add nvidia https://helm.ngc.nvidia.com/nvidia && sudo helm repo update
 
 sudo helm install --wait --generate-name \
     -n gpu-operator --create-namespace \
