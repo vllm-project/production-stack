@@ -1,3 +1,4 @@
+{{- if .Values.routerSpec.enableRouter -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -14,3 +15,4 @@ spec:
       protocol: TCP
   selector:
   {{- include "chart.routerLabels" . | nindent 4 }}
+{{- end }}

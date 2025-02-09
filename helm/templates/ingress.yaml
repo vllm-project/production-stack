@@ -1,4 +1,4 @@
-{{- if .Values.routerSpec.ingress.enabled -}}
+{{- if and (.Values.routerSpec.enableRouter) (.Values.routerSpec.ingress.enabled) -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
