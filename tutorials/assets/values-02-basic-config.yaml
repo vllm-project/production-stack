@@ -1,4 +1,5 @@
 servingEngineSpec:
+  runtimeClassName: ""
   modelSpec:
   - name: "llama3"
     repository: "vllm/vllm-openai"

@@ -6,10 +6,14 @@ servingEngineSpec:
     tag: "latest"
     modelURL: "facebook/opt-125m"
 
-    replicaCount: 1
+    replicaCount: 2
 
     requestCPU: 6
     requestMemory: "16Gi"
-    requestGPU: 1
+    requestGPU: 0.5
 
     pvcStorage: "10Gi"
+
+    vllmConfig:
+      maxModelLen: 1024
+      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.4"]
