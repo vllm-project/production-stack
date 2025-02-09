@@ -41,6 +41,7 @@ repos:
   rev: v0.44.0
   hooks:
   - id: markdownlint
+    exclude: ".github/PULL_REQUEST_TEMPLATE.md"
 - repo: https://github.com/codespell-project/codespell
   rev: v2.4.1
   hooks:
