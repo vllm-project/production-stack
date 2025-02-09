@@ -1,4 +1,5 @@
 servingEngineSpec:
+  runtimeClassName: ""
   modelSpec:
   - name: "mistral"
     repository: "lmcache/vllm-openai"
