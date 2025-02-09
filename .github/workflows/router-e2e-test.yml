@@ -25,7 +25,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.10 # Used similar to Dockerfile
+          python-version: "3.10.13"
           cache: pip
 
       - name: Login to Github Container Registry
@@ -42,10 +42,17 @@ jobs:
           pip install -r requirements-test.txt
           pip install -e .
 
+      - name: Make scripts executable
+        run: |
+          chmod +x ./utils/install-minikube-cluster.sh
+          chmod +x ./utils/install-kubectl.sh
+          chmod +x ./utils/install-helm.sh
+          chmod +x src/vllm_router/perf-test.sh
+          chmod +x src/tests/perftest/*.sh
+
       - name: Setup Test environment
         run: |
           ./utils/install-minikube-cluster.sh
-          ./utils/install-kubectl.sh
 
       - name: Build and Load test Image
         run: |
@@ -56,23 +63,27 @@ jobs:
       - name: Start Mock OpenAI servers
         working-directory: src/tests/perftest
         run: |
-          bash run-multi-server.sh 4 500 &
-          # Wait for servers to be ready
+          bash run-multi-server.sh 4 500
           sleep 10
-          # Verify servers are running
-          pgrep -f fake_openai_server.py
 
       - name: Start Router for Testing
         run: |
           bash src/vllm_router/perf-test.sh 8000 &
-          # Wait for router to be ready
           sleep 5
 
       - name: Run Performance tests
         working-directory: src/tests/perftest
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
+          echo "PYTHONPATH=$PYTHONPATH"
           mkdir -p logs
-          python3 request_generator.py --qps 10 --num-workers 32 --duration 300 > logs/request_generator.log 2>&1
+          if [ ! -f "request_generator.py" ]; then
+            echo "Error: request_generator.py not found!"
+            exit 1
+          fi
+          # Run with Python debug option
+          python3 -v request_generator.py --qps 10 --num-workers 32 --duration 300 2>&1 | tee logs/request_generator.log
 
       - name: Run E2E Tests
         run: |
@@ -93,4 +104,3 @@ jobs:
             ~/.kube/config
             /tmp/minikube.log
             src/tests/perftest/logs
-           

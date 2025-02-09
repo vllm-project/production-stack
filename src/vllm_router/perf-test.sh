@@ -4,7 +4,11 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-python3 router.py --port "$1" \
+# Get the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Run router.py from the correct directory
+python3 "$SCRIPT_DIR/router.py" --port "$1" \
     --service-discovery static \
     --static-backends "http://localhost:9004,http://localhost:9001,http://localhost:9002,http://localhost:9003" \
     --static-models "fake_model_name,fake_model_name,fake_model_name,fake_model_name" \
