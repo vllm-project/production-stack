@@ -1,7 +1,9 @@
+aiofiles
 fastapi
 httpx
 kubernetes
 numpy
 prometheus_client
+python-multipart
 uhashring
 uvicorn

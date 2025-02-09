@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, Request, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+from prometheus_client import Gauge, generate_latest
 
 from vllm_router.engine_stats import GetEngineStatsScraper, InitializeEngineStatsScraper
 from vllm_router.files import initialize_storage
@@ -39,6 +40,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Define gauges for engine and request stats
+vnum_requests_running = Gauge(
+    "vllm:num_requests_running", "Number of running requests", ["server"]
+)
 
 # TODO: better request id system
 
@@ -440,20 +446,38 @@ def log_stats(interval: int = 10):
         request_stats = GetRequestStatsMonitor().get_request_stats(time.time())
         for endpoint in endpoints:
             url = endpoint.url
+            print(engine_stats[url])
             logstr += f"Server: {url}\n"
             if url in engine_stats:
-                logstr += f"  Engine stats: {engine_stats[url]}\n"
+                num_running_requests = engine_stats[url].num_running_requests
+                num_queing_requests = engine_stats[url].num_queuing_requests
+                gpu_cache_hit_rate = engine_stats[url].gpu_cache_hit_rate
+                logstr += f"  Engine stats: {num_running_requests} running requests, {num_queing_requests} queuing requests, {gpu_cache_hit_rate:.2f} GPU cache hit rate\n"
+
             else:
                 logstr += "  Engine stats: No stats available\n"
 
             if url in request_stats:
-                logstr += f"  Request Stats: {request_stats[url]}\n"
+                qps = request_stats[url].qps
+                num_requests = request_stats[url].ttft
+                in_prefill_requests = request_stats[url].in_prefill_requests
+                in_decoding_requets = request_stats[url].in_decoding_requests
+                finished_requests = request_stats[url].finished_requests
+                uptime = request_stats[url].uptime
+                logstr += f"  Request Stats: {qps:.2f} QPS, {num_requests} TTFT, {in_prefill_requests} in prefill, {in_decoding_requets} in decoding, {finished_requests} finished, uptime {uptime:.2f} seconds\n"
+
+                vnum_requests_running.labels(server=url).set(qps)
             else:
                 logstr += "  Request Stats: No stats available\n"
 
             logstr += "-" * 50 + "\n"
         logstr += "=" * 50 + "\n"
         logger.info(logstr)
+
+
+@app.get("/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type="text/plain")
 
 
 def main():
