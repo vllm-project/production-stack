@@ -36,9 +36,10 @@ The vLLM Production Stack repository provides a predefined configuration file, `
 
 ```yaml
 servingEngineSpec:
+  runtimeClassName: ""
   modelSpec:
   - name: "opt125m"
-    repository: "lmcache/vllm-openai"
+    repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "facebook/opt-125m"
 
@@ -47,8 +48,6 @@ servingEngineSpec:
     requestCPU: 6
     requestMemory: "16Gi"
     requestGPU: 1
-
-# set replicaCount to 2 or more to set up multiple vLLM instances
 
     pvcStorage: "10Gi"
 ```
@@ -65,13 +64,15 @@ Explanation of the key fields:
 - **`requestGPU`**: Specifies the number of GPUs required.
 - **`pvcStorage`**: Allocates persistent storage for the model.
 
+**Note:** If you intend to set up TWO vllm pods, please refer to `tutorials/assets/values-01-2pods-minimal-example.yaml`.
+
 #### 1.2: Deploy the Helm Chart
 
 Deploy the Helm chart using the predefined configuration file:
 
 ```bash
-helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
+sudo helm repo add vllm https://vllm-project.github.io/production-stack
+sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
 ```
 
 Explanation of the command:
