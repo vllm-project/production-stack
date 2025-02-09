@@ -6,6 +6,8 @@
 - 🛤️ 2025 Q1 Road Map Released! Join the discussion [here](https://github.com/vllm-project/production-stack/issues/26)!
 - 🔥 vLLM Production Stack is released! Checkout our [release blogs](https://blog.lmcache.ai/2025-01-21-stack-release) [01-22-2025]
 
+## Introduction
+
 **vLLM Production Stack** project provides a reference implementation on how to build an inference stack on top of vLLM, which allows you to:
 
 - 🚀 Scale from single vLLM instance to distributed vLLM deployment without changing any application code
@@ -29,7 +31,9 @@ The stack is set up using [Helm](https://helm.sh/docs/), and contains the follow
 - **Request router**: Directs requests to appropriate backends based on routing keys or session IDs to maximize KV cache reuse.
 - **Observability stack**: monitors the metrics of the backends through [Prometheus](https://github.com/prometheus/prometheus) + [Grafana](https://grafana.com/)
 
- <img src="https://github.com/user-attachments/assets/8f05e7b9-0513-40a9-9ba9-2d3acca77c0c" alt="Architecture of the stack" width="800"/>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/8f05e7b9-0513-40a9-9ba9-2d3acca77c0c" alt="Architecture of the stack" width="80%"/>
+</p>
 
 ## Roadmap
 
@@ -84,15 +88,15 @@ The Grafana dashboard provides the following insights:
 6. **GPU KV Usage Percent**: Monitors GPU KV cache usage.
 7. **GPU KV Cache Hit Rate**: Displays the hit rate for the GPU KV cache.
 
- <img src="https://github.com/user-attachments/assets/05766673-c449-4094-bdc8-dea6ac28cb79" alt="Grafana dashboard to monitor the deployment" width="500"/>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/05766673-c449-4094-bdc8-dea6ac28cb79" alt="Grafana dashboard to monitor the deployment" width="80%"/>
+</p>
 
 ### Configuration
 
-See the details in `observability/README.md`
+See the details in [`observability/README.md`](./observability/README.md)
 
 ## Router
-
-### Overview
 
 The router ensures efficient request distribution among backends. It supports:
 
@@ -103,6 +107,8 @@ The router ensures efficient request distribution among backends. It supports:
   - Round-robin routing
   - Session-ID based routing
   - (WIP) prefix-aware routing
+
+Please refer to the [router documentation](./router/README.md) for more details.
 
 ## Contributing
 

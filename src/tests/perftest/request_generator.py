@@ -3,6 +3,7 @@ import multiprocessing
 import os
 import threading
 import time
+import uuid
 
 import openai
 
@@ -33,7 +34,6 @@ def response_consumer(response_stream, start_time):
 
 
 def worker(api_key, base_url, model, qps_per_worker):
-    request_id = 0
     client = openai.OpenAI(api_key=api_key, base_url=base_url)
     interval = 1 / qps_per_worker
 
@@ -41,12 +41,12 @@ def worker(api_key, base_url, model, qps_per_worker):
         start = time.time()
         print("Send request at ", start)
         try:
+            request_id = str(uuid.uuid4())
             custom_headers = {
                 "x-user-id": str(os.getpid()),  # Unique user ID for each process
                 "x-request-id": str(os.getpid())
                 + f"req-{request_id}",  # Unique session ID for each process
             }
-            request_id += 1
             response_stream = client.chat.completions.create(
                 messages=[
                     {

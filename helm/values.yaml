@@ -131,6 +131,9 @@ servingEngineSpec:
   runtimeClassName: "nvidia"
 
 routerSpec:
+  # -- Whether to enable the router service
+  enableRouter: true
+
   # -- Number of replicas
   replicaCount: 1
 

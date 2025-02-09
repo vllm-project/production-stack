@@ -14,8 +14,8 @@ from vllm_router.service_discovery import EndpointInfo
 logger = init_logger(__name__)
 
 
-class RoutingLogic(enum.Enum):
-    ROUND_ROBIN = "round-robin"
+class RoutingLogic(str, enum.Enum):
+    ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
 
 
@@ -165,26 +165,56 @@ class SessionRouter(RoutingInterface):
         return url
 
 
+_global_router = None
+
+
 def InitializeRoutingLogic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
     """
-    Initialize the routing logic based on the routing_logic string
+    Initialize the global routing logic
 
     Args:
-        routing_logic (str): The routing logic string
-        **kwargs: The keyword arguments to pass to the routing
+        routing_logic (RoutingLogic): The routing logic enum
+        *args, **kwargs: The arguments to pass to the routing logic
 
     Returns:
         RoutingInterface: The router object
 
     Raises:
-        ValueError: If the routing_logic parameter is invalid
+        ValueError: If the global router has been initialized or if routing_logic is invalid
     """
+    global _global_router
+    if _global_router is not None:
+        raise ValueError("The global router has been initialized")
 
     if routing_logic == RoutingLogic.ROUND_ROBIN:
-        return RoundRobinRouter()
+        logger.info("Initializing round-robin routing logic")
+        _global_router = RoundRobinRouter()
     elif routing_logic == RoutingLogic.SESSION_BASED:
-        return SessionRouter(*args, **kwargs)
+        logger.info(
+            "Initializing session-based routing logic"
+            f" with args: {args}, kwargs: {kwargs}"
+        )
+        _global_router = SessionRouter(*args, **kwargs)
     else:
-        raise ValueError("Invalid routing logic")
+        raise ValueError(f"Invalid routing logic {routing_logic}")
+
+    return _global_router
+
+
+def GetRoutingLogic() -> RoutingInterface:
+    """
+    Get the global routing logic
+
+    Returns:
+        RoutingInterface: The router object
+
+    Raises:
+        ValueError: If the global router has not been initialized
+    """
+    global _global_router
+    if _global_router is None:
+        raise ValueError("The global router has not been initialized")
+
+    return _global_router
