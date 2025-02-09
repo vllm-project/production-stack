@@ -1,3 +1,4 @@
+{{- if .Values.routerSpec.enableRouter -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -11,3 +12,4 @@ roleRef:
   kind: Role
   name: {{ .Release.Name }}-pod-reader
   apiGroup: rbac.authorization.k8s.io
+{{- end }}

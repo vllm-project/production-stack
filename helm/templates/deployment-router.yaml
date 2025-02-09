@@ -1,3 +1,4 @@
+{{- if .Values.routerSpec.enableRouter -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -71,3 +72,4 @@ spec:
           httpGet:
             path: /health
             port: {{ .Values.routerSpec.containerPort }}
+{{- end }}
