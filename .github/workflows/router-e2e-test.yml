@@ -1,0 +1,96 @@
+name: Router E2E tests
+
+on:
+  pull_request:
+    types: [ready_for_review]
+    paths:
+      - 'src/vllm_router/**'
+      - 'docker/**'
+      - 'setup.py'
+  workflow_dispatch:
+    
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.10 # Used similar to Dockerfile
+          cache: pip
+
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: | 
+          python -m pip install --upgrade pip
+          pip install -r src/tests/requirements.txt
+          pip install -r requirements-test.txt
+          pip install -e .
+
+      - name: Setup Test environment
+        run: |
+          ./utils/install-minikube-cluster.sh
+          ./utils/install-kubectl.sh
+
+      - name: Build and Load test Image
+        run: | 
+          REPO=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/$REPO/router:test -f docker/Dockerfile .
+          minikube image load ghcr.io/$REPO/router:test
+
+      - name: Start Mock OpenAI servers
+        working-directory: src/tests/perftest
+        run: |
+          bash run-multi-server.sh 4 500 &
+          # Wait for servers to be ready
+          sleep 10
+          # Verify servers are running
+          ps aux | grep fake_openai_server.py
+
+      - name: Start Router for Testing
+        run: | 
+          bash src/vllm_router/perf-test.sh 8000 &
+          # Wait for router to be ready
+          sleep 5
+
+      - name: Run Performance tests
+        working-directory: src/tests/perftest
+        run: |
+          mkdir -p logs
+          python3 request_generator.py --qps 10 --num-workers 32 --duration 300 > logs/request_generator.log 2>&1
+
+      - name: Run E2E Tests
+        run: | 
+          pytest src/tests/test_*.py
+      
+      - name: Cleanup Test Environment
+        if: always()
+        working-directory: src/tests/perftest
+        run: | 
+          bash clean-up.sh
+
+      - name: Upload Test logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-logs-pr-${{ github.event.pull_request.number || 'manual' }}
+          path: |
+            ~/.kube/config
+            /tmp/minikube.log
+            src/tests/perftest/logs
+           
