@@ -9,6 +9,7 @@ Args:
 import argparse
 import asyncio
 import time
+import uuid
 from typing import AsyncGenerator, AsyncIterator, Callable, Dict, Final, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
@@ -41,7 +42,6 @@ from vllm.entrypoints.openai.protocol import (
 )
 
 app = FastAPI()
-REQUEST_ID = 0
 GLOBAL_ARGS = None
 MODEL_NAME = "fake_model_name"
 NUM_RUNNING_REQUESTS = 0
@@ -143,9 +143,8 @@ async def generate_fake_response(
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest, raw_request: Request):
-    global REQUEST_ID, MODEL_NAME
-    REQUEST_ID += 1
-    request_id = raw_request.get("x-request-id", f"fake_request_id_{REQUEST_ID}")
+    global MODEL_NAME
+    request_id = raw_request.get("x-request-id", f"fake_request_id_{uuid.uuid4()}")
     print(f"Received request with id: {request_id} at {time.time()}")
     model_name = MODEL_NAME
     num_tokens = request.max_tokens if request.max_tokens else 100
