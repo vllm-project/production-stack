@@ -30,9 +30,7 @@ jobs:
       - name: Deploy via helm charts
         run: |
           cd ${{ github.workspace }}
-          sudo helm repo add vllm https://vllm-project.github.io/production-stack
-          sudo helm repo update
-          sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
+          sudo helm install vllm ./helm -f tutorials/assets/values-01-minimal-example.yaml
       - name: Validate the installation and send query to the stack
         run: |
           sudo bash .github/port-forward.sh curl-01-minimal-example
@@ -55,9 +53,7 @@ jobs:
     steps:
       - name: Deploy via helm charts
         run: |
-          sudo helm repo add vllm https://vllm-project.github.io/production-stack
-          sudo helm repo update
-          sudo helm install vllm vllm/vllm-stack -f .github/multiple-models.yaml
+          sudo helm install vllm ./helm -f .github/multiple-models.yaml
       - name: Validate the installation and send query to the stack
         run: |
           sudo bash .github/port-forward.sh curl-04-multiple-models
