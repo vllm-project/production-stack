@@ -1,4 +1,5 @@
 servingEngineSpec:
+  runtimeClassName: ""
   modelSpec:
   - name: "opt125m"
     repository: "vllm/vllm-openai"
