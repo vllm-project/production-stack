@@ -31,6 +31,7 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           sudo helm repo add vllm https://vllm-project.github.io/production-stack
+          sudo helm repo update
           sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
       - name: Validate the installation and send query to the stack
         run: |
@@ -54,6 +55,8 @@ jobs:
     steps:
       - name: Deploy via helm charts
         run: |
+          sudo helm repo add vllm https://vllm-project.github.io/production-stack
+          sudo helm repo update
           sudo helm install vllm vllm/vllm-stack -f .github/multiple-models.yaml
       - name: Validate the installation and send query to the stack
         run: |
