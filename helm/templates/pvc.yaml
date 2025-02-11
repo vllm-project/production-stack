@@ -6,8 +6,7 @@ metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
   namespace: {{ .Release.Namespace }}
 spec:
-  accessModes:
-    - {{ $modelSpec.pvcAccessMode }}
+  accessModes: {{ toYaml $modelSpec.pvcAccessMode | nindent 4 }}
   resources:
     requests:
       storage: {{ $modelSpec.pvcStorage }}

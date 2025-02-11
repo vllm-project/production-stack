@@ -10,6 +10,8 @@ servingEngineSpec:
     requestMemory: "16Gi"
     requestGPU: 1
     pvcStorage: "10Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
 
   - name: "smol135m"
     repository: "vllm/vllm-openai"
@@ -20,3 +22,5 @@ servingEngineSpec:
     requestMemory: "16Gi"
     requestGPU: 1
     pvcStorage: "10Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
