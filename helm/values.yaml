@@ -42,6 +42,8 @@ servingEngineSpec:
   #
   # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes
   #
+  # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
+  #
   # Example:
   # modelSpec:
   # - name: "mistral"
