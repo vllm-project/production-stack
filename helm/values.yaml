@@ -29,6 +29,7 @@ servingEngineSpec:
   #   - enableChunkedPrefill: (optional, bool) Enable chunked prefill, e.g., false
   #   - maxModelLen: (optional, int) The maximum model length, e.g., 16384
   #   - dtype: (optional, string) The data type, e.g., "bfloat16"
+  #   - tensorParallelSize: (optional, int) The degree of tensor parallelism, e.g., 2
   #   - extraArgs: (optional, list) Extra command line arguments to pass to vLLM, e.g., ["--disable-log-requests"]
   #
   # - lmcacheConfig: (optional, map) The configuration of the LMCache for KV offloading, supported options are:
@@ -40,6 +41,8 @@ servingEngineSpec:
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
   # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes
+  #
+  # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   #
   # Example:
   # modelSpec:
