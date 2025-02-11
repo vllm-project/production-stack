@@ -20,17 +20,25 @@ spec:
       containers:
       - name: router-container
         image: lmcache/lmstack-router:latest
-        args: # TODO: update here
+        args:
           - "--host"
           - "0.0.0.0"
           - "--port"
           - "{{ .Values.routerSpec.containerPort }}"
           - "--service-discovery"
-          - "k8s"
+          - "{{ default "k8s" .Values.routerSpec.serviceDiscovery }}"
+          {{- if eq .Values.routerSpec.serviceDiscovery "k8s" }}
           - "--k8s-namespace"
           - "{{ .Release.Namespace }}"
           - "--k8s-label-selector"
           - {{ include "labels.toCommaSeparatedList" .Values.servingEngineSpec.labels }}
+          {{- end }}
+          {{- if eq .Values.routerSpec.serviceDiscovery "static" }}
+          - "--static-backends"
+          - "{{ required "When using static service discovery, .Values.routerSpec.staticBackends is a required value" .Values.routerSpec.staticBackends }}"
+          - "--static-models"
+          - "{{ required "When using static service discovery, .Values.routerSpec.staticModels is a required value" .Values.routerSpec.staticModels }}"
+          {{- end }}
           - "--routing-logic"
           - "{{ .Values.routerSpec.routingLogic }}"
           {{- if .Values.routerSpec.sessionKey }}

@@ -149,6 +149,13 @@ routerSpec:
   # -- Service port
   servicePort: 80
 
+  # -- Service discovery mode, supports "k8s" or "static". Defaults to "k8s" if not set.
+  serviceDiscovery: "k8s"
+
+  # -- If serviceDiscovery is set to "static", the comma-separated values below are required. There needs to be the same number of backends and models
+  staticBackends: "http://endpoint1.local:8080,http://endpoint2.local:8080"
+  staticModels: "meta-llama/llama3.2:3b,mistralai/Mistral-Small-24B-Instruct-2501"
+
   # -- routing logic, could be "roundrobin" or "session"
   routingLogic: "roundrobin"
 
