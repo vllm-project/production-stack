@@ -12,7 +12,8 @@ servingEngineSpec:
     requestGPU: 1
 
     pvcStorage: "50Gi"
-    pvcAccessMode: "ReadWriteOnce"
+    pvcAccessMode:
+      - ReadWriteOnce
     pvcMatchLabels:
       model: "llama3-pv"
 

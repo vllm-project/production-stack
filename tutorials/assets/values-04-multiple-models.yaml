@@ -10,7 +10,8 @@ servingEngineSpec:
     requestMemory: "16Gi"
     requestGPU: 1
     pvcStorage: "50Gi"
-    pvcAccessMode: "ReadWriteOnce"
+    pvcAccessMode:
+      - ReadWriteOnce
     vllmConfig:
       maxModelLen: 4096
     hf_token: <YOUR HF TOKEN FOR LLAMA3.1>
@@ -24,7 +25,8 @@ servingEngineSpec:
     requestMemory: "16Gi"
     requestGPU: 1
     pvcStorage: "50Gi"
-    pvcAccessMode: "ReadWriteOnce"
+    pvcAccessMode:
+      - ReadWriteOnce
     vllmConfig:
       maxModelLen: 4096
     hf_token: <YOUR HF TOKEN FOR MISTRAL>

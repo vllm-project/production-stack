@@ -13,4 +13,5 @@ servingEngineSpec:
     requestGPU: 1
 
     pvcStorage: "10Gi"
-    pvcAccessMode: "ReadWriteOnce"
+    pvcAccessMode:
+      - ReadWriteOnce

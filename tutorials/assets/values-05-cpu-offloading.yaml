@@ -10,7 +10,8 @@ servingEngineSpec:
     requestMemory: "40Gi"
     requestGPU: 1
     pvcStorage: "50Gi"
-    pvcAccessMode: "ReadWriteOnce"
+    pvcAccessMode:
+      - ReadWriteOnce
     vllmConfig:
       enableChunkedPrefill: false
       enablePrefixCaching: false
