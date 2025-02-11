@@ -12,6 +12,7 @@ servingEngineSpec:
     requestGPU: 1
 
     pvcStorage: "50Gi"
+    pvcAccessMode: "ReadWriteOnce"
 
     vllmConfig:
       enableChunkedPrefill: false
