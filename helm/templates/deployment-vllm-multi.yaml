@@ -47,6 +47,10 @@ spec:
           - "--dtype"
           - {{ .dtype | quote }}
           {{-   end }}
+          {{-   if hasKey . "tensorParallelSize" }}
+          - "--tensor-parallel-size"
+          - {{ .tensorParallelSize | quote }}
+          {{-   end }}
           {{-   if .extraArgs }}
           {{-     range .extraArgs }}
           - {{ . | quote }}
@@ -108,12 +112,20 @@ spec:
           volumeMounts:
           - name: {{ .Release.Name }}-storage
             mountPath: /data
-
+          {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
+          - name: shm
+            mountPath: /dev/shm
+          {{- end}}
       volumes:
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
-
+        {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: "20Gi"
+        {{- end}}
       {{- if .Values.servingEngineSpec.tolerations }}
       {{-   with .Values.servingEngineSpec.tolerations }}
       tolerations:

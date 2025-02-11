@@ -29,6 +29,7 @@ servingEngineSpec:
   #   - enableChunkedPrefill: (optional, bool) Enable chunked prefill, e.g., false
   #   - maxModelLen: (optional, int) The maximum model length, e.g., 16384
   #   - dtype: (optional, string) The data type, e.g., "bfloat16"
+  #   - tensorParallelSize: (optional, int) The degree of tensor parallelism, e.g., 2
   #   - extraArgs: (optional, list) Extra command line arguments to pass to vLLM, e.g., ["--disable-log-requests"]
   #
   # - lmcacheConfig: (optional, map) The configuration of the LMCache for KV offloading, supported options are:
