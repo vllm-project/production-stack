@@ -28,9 +28,12 @@ minikube_exists() {
   command -v minikube >/dev/null 2>&1
 }
 
-# Install kubectl and helm.
-bash ./install-kubectl.sh
-bash ./install-helm.sh
+# Get script directory for relative paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Install kubectl and helm
+bash "$SCRIPT_DIR/install-kubectl.sh"
+bash "$SCRIPT_DIR/install-helm.sh"
 
 # Install minikube if it's not already installed.
 if minikube_exists; then
@@ -41,9 +44,13 @@ else
   sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
 fi
 
-# Apply sysctl changes.
-echo "net.core.bpf_jit_harden=0" | sudo tee -a /etc/sysctl.conf
-sudo sysctl -p
+# Configure BPF if available
+if [ -f /proc/sys/net/core/bpf_jit_harden ]; then
+    echo "net.core.bpf_jit_harden=0" | sudo tee -a /etc/sysctl.conf
+    sudo sysctl -p
+else
+    echo "BPF JIT hardening configuration not available, skipping..."
+fi
 
 # --- GPU Setup Section ---
 

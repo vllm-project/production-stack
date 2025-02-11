@@ -1,0 +1,106 @@
+name: Router E2E tests
+
+on:
+  pull_request:
+    types: [ready_for_review]
+    paths:
+      - 'src/vllm_router/**'
+      - 'docker/**'
+      - 'setup.py'
+  workflow_dispatch:
+
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10.13"
+          cache: pip
+
+      - name: Login to Github Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r src/tests/requirements.txt
+          pip install -r requirements-test.txt
+          pip install -e .
+
+      - name: Make scripts executable
+        run: |
+          chmod +x ./utils/install-minikube-cluster.sh
+          chmod +x ./utils/install-kubectl.sh
+          chmod +x ./utils/install-helm.sh
+          chmod +x src/vllm_router/perf-test.sh
+          chmod +x src/tests/perftest/*.sh
+
+      - name: Setup Test environment
+        run: |
+          ./utils/install-minikube-cluster.sh
+
+      - name: Build and Load test Image
+        run: |
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker build -t "ghcr.io/$REPO/router:test" -f docker/Dockerfile .
+          minikube image load "ghcr.io/$REPO/router:test"
+
+      - name: Start Mock OpenAI servers
+        working-directory: src/tests/perftest
+        run: |
+          bash run-multi-server.sh 4 500
+          sleep 10
+
+      - name: Start Router for Testing
+        run: |
+          bash src/vllm_router/perf-test.sh 8000 &
+          sleep 5
+
+      - name: Run Performance tests
+        working-directory: src/tests/perftest
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          echo "PYTHONPATH=$PYTHONPATH"
+          mkdir -p logs
+          if [ ! -f "request_generator.py" ]; then
+            echo "Error: request_generator.py not found!"
+            exit 1
+          fi
+          # Run with Python debug option
+          python3 -v request_generator.py --qps 10 --num-workers 32 --duration 300 2>&1 | tee logs/request_generator.log
+
+      - name: Run E2E Tests
+        run: |
+          pytest src/tests/test_*.py
+
+      - name: Cleanup Test Environment
+        if: always()
+        working-directory: src/tests/perftest
+        run: |
+          bash clean-up.sh
+
+      - name: Upload Test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-pr-${{ github.event.pull_request.number || 'manual' }}
+          path: |
+            ~/.kube/config
+            /tmp/minikube.log
+            src/tests/perftest/logs
