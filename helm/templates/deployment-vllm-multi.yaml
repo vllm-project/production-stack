@@ -9,7 +9,7 @@ metadata:
   {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
   replicas: {{ $modelSpec.replicaCount }}
-  {{- include "chart.strategy" . | nindent 2 }}
+  {{- include "chart.engineStrategy" . | nindent 2 }}
   selector:
     matchLabels:
     {{- include "chart.engineLabels" . | nindent 6 }}

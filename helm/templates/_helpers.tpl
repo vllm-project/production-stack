@@ -31,13 +31,35 @@ Define container port name
 {{- end }}
 
 {{/*
-Define deployment strategy
+Define engine deployment strategy.
+If .Values.engineStrategy is defined, use it.
+Otherwise, fall back to the default rolling update strategy.
 */}}
-{{- define "chart.strategy" -}}
+{{- define "chart.engineStrategy" -}}
+{{- if .Values.servingEngineSpec.strategy }}
+{{ toYaml .Values.servingEngineSpec.strategy | nindent 2 }}
+{{- else }}
 strategy:
   rollingUpdate:
     maxSurge: 100%
     maxUnavailable: 0
+{{- end }}
+{{- end }}
+
+{{/*
+Define router deployment strategy.
+If .Values.routerStrategy is defined, use it.
+Otherwise, fall back to the default rolling update strategy.
+*/}}
+{{- define "chart.routerStrategy" -}}
+{{- if .Values.routerSpec.strategy }}
+{{ toYaml .Values.routerSpec.strategy | nindent 2 }}
+{{- else }}
+strategy:
+  rollingUpdate:
+    maxSurge: 100%
+    maxUnavailable: 0
+{{- end }}
 {{- end }}
 
 {{/*

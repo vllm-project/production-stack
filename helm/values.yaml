@@ -92,6 +92,9 @@ servingEngineSpec:
   # -- Set other environment variables from config map
   configs: {}
 
+  # -- deployment strategy
+  strategy: {}
+
   # -- Readiness probe configuration
   startupProbe:
     # -- Number of seconds after the container has started before startup probe is initiated
@@ -163,6 +166,9 @@ routerSpec:
 
   # -- Window size in seconds to calculate the request statistics
   requestStatsWindow: 60
+
+  # -- deployment strategy
+  strategy: {}
 
   # -- router resource requests and limits
   resources:

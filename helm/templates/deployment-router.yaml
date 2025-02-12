@@ -7,7 +7,8 @@ metadata:
   labels:
   {{- include "chart.routerLabels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.routerSpec.replicaCount }}
+  {{- include "chart.routerStrategy" . | nindent 2 }}
   selector:
     matchLabels:
     {{- include "chart.routerLabels" . | nindent 6 }}
