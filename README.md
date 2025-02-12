@@ -108,7 +108,7 @@ The router ensures efficient request distribution among backends. It supports:
   - Session-ID based routing
   - (WIP) prefix-aware routing
 
-Please refer to the [router documentation](./router/README.md) for more details.
+Please refer to the [router documentation](./src/vllm_router/README.md) for more details.
 
 ## Contributing
 
