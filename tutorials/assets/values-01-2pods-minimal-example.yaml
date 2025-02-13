@@ -1,4 +1,6 @@
 servingEngineSpec:
+  strategy:
+    type: Recreate
   runtimeClassName: ""
   modelSpec:
   - name: "opt125m"

@@ -36,10 +36,10 @@ If .Values.engineStrategy is defined, use it.
 Otherwise, fall back to the default rolling update strategy.
 */}}
 {{- define "chart.engineStrategy" -}}
-{{- if .Values.servingEngineSpec.strategy }}
-{{ toYaml .Values.servingEngineSpec.strategy | nindent 2 }}
-{{- else }}
 strategy:
+{{- if .Values.servingEngineSpec.strategy }}
+{{- toYaml .Values.servingEngineSpec.strategy | nindent 2 }}
+{{- else }}
   rollingUpdate:
     maxSurge: 100%
     maxUnavailable: 0
@@ -52,10 +52,10 @@ If .Values.routerStrategy is defined, use it.
 Otherwise, fall back to the default rolling update strategy.
 */}}
 {{- define "chart.routerStrategy" -}}
-{{- if .Values.routerSpec.strategy }}
-{{ toYaml .Values.routerSpec.strategy | nindent 2 }}
-{{- else }}
 strategy:
+{{- if .Values.routerSpec.strategy }}
+{{- toYaml .Values.routerSpec.strategy | nindent 2 }}
+{{- else }}
   rollingUpdate:
     maxSurge: 100%
     maxUnavailable: 0

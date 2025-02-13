@@ -47,6 +47,36 @@ jobs:
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
 
+  Two-Pods-Minimal-Example:
+    runs-on: self-hosted
+    steps:
+      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+      - name: Deploy via helm charts
+        run: |
+          cd ${{ github.workspace }}
+          sudo helm install vllm ./helm -f tutorials/assets/values-01-2pods-minimal-example.yaml
+      - name: Validate the installation and send query to the stack
+        run: |
+          sudo bash .github/port-forward.sh curl-02-two-pods
+        timeout-minutes: 2
+      - name: Archive functionality results
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-02-two-pods
+          path: |
+            output-02-two-pods/
+      - name: Helm uninstall
+        run: |
+          sudo helm uninstall vllm
+        if: always()
+      - run: echo "🍏 This job's status is ${{ job.status }}."
+
   Multiple-Models:
     runs-on: self-hosted
     needs: Minimal-Example
