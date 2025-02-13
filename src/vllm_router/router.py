@@ -136,7 +136,7 @@ async def route_general_request(request: Request, endpoint: str):
     )
 
 
-@app.post("/files")
+@app.post("/v1/files")
 async def route_files(request: Request):
     """Handle file upload requests that include a purpose and file data."""
     form = await request.form()
@@ -167,7 +167,7 @@ async def route_files(request: Request):
         )
 
 
-@app.get("/files/{file_id}")
+@app.get("/v1/files/{file_id}")
 async def route_get_file(file_id: str):
     try:
         file = await FILE_STORAGE.get_file(file_id)
@@ -178,7 +178,7 @@ async def route_get_file(file_id: str):
         )
 
 
-@app.get("/files/{file_id}/content")
+@app.get("/v1/files/{file_id}/content")
 async def route_get_file_content(file_id: str):
     try:
         # TODO(gaocegege): Stream the file content with chunks to support
@@ -191,12 +191,12 @@ async def route_get_file_content(file_id: str):
         )
 
 
-@app.post("/chat/completions")
+@app.post("/v1/chat/completions")
 async def route_chat_completition(request: Request):
     return await route_general_request(request, "/v1/chat/completions")
 
 
-@app.post("/completions")
+@app.post("/v1/completions")
 async def route_completition(request: Request):
     return await route_general_request(request, "/v1/completions")
 
@@ -207,7 +207,7 @@ async def show_version():
     return JSONResponse(content=ver)
 
 
-@app.get("/models")
+@app.get("/v1/models")
 async def show_models():
     endpoints = GetServiceDiscovery().get_endpoint_info()
     existing_models = set()

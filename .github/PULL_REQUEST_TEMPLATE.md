@@ -6,9 +6,13 @@ FIX #xxxx (*link existing issues this PR will resolve*)
 
 ---
 
+- [ ] Make sure the code changes pass the [pre-commit](CONTRIBUTING.md) checks.
+- [ ] Sign-off your commit by using <code>-s</code> when doing <code>git commit</code>
+- [ ] Try to classify PRs for easy understanding of the type of changes, such as `[Bugfix]`, `[Feat]`, and `[CI]`.
+
 <details>
 <!-- inside this <details> section, markdown rendering does not work, so we use raw html here. -->
-<summary><b> PR Checklist (Click to Expand) </b></summary>
+<summary><b> Detailed Checklist (Click to Expand) </b></summary>
 
 <p>Thank you for your contribution to production-stack! Before submitting the pull request, please ensure the PR meets the following criteria. This helps us maintain the code quality and improve the efficiency of the review process.</p>
 

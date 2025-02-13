@@ -112,46 +112,7 @@ Please refer to the [router documentation](./src/vllm_router/README.md) for more
 
 ## Contributing
 
-Contributions are welcome! Please follow the standard GitHub flow:
-
-1. Fork the repository.
-2. Create a feature branch.
-3. Submit a pull request with detailed descriptions.
-
-### Formatting
-
-We use `pre-commit` for formatting, it is installed as follows:
-
-```bash
-pip install -r requirements-lint.txt
-pre-commit install
-```
-
-It will run automatically before every commit. You can also run it manually on
-all files with:
-
-```bash
-pre-commit run --all-files
-```
-
-There are a subset of hooks which require additional dependencies that you may
-not have installed in your development environment (i.e. Docker and non-Python
-packages). These are configured to only run in the `manual` `pre-commit` stage.
-In CI they are run in the `pre-commit-manual` job, and locally they can be run
-with:
-
-```bash
-# Runs all hooks including manual stage hooks
-pre-commit run --all-files --hook-stage manual
-# Runs only the manual stage hook shellcheck
-pre-commit run --all-files --hook-stage manual shellcheck
-```
-
-If any of these hooks are failing in CI but you cannot run them locally, you
-can identify what needs changing by examining the GitHub Actions logs in your
-pull request.
-
-> You can read more about `pre-commit` at <https://pre-commit.com>.
+We welcome and value any contributions and collaborations.  Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved.
 
 ## License
 
@@ -159,4 +120,4 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 
 ---
 
-For any issues or questions, feel free to open an issue or contact the maintainers.
+For any issues or questions, feel free to open an issue or contact us ([@ApostaC](https://github.com/ApostaC), [@YuhanLiu11](https://github.com/YuhanLiu11), [@Shaoting-Feng](https://github.com/Shaoting-Feng)).
