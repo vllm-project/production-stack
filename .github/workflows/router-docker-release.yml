@@ -5,9 +5,9 @@ on:
     branches:
       - main
     paths:
-      - 'src/vllm_router/**'
-      - 'docker/**'
-      - 'setup.py'
+      - "src/vllm_router/**"
+      - "docker/**"
+      - "setup.py"
 
 jobs:
   release:
@@ -45,3 +45,16 @@ jobs:
             ghcr.io/${{ github.repository }}/router:${{ steps.version.outputs.version }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache,mode=max
+      - name: Login to LMCache Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.LMCache_GITHUB_TOKEN }} #《.....
+
+      - name: Push image to LMCache repository
+        run: |
+          docker tag ghcr.io/${{ github.repository }}/router:latest ghcr.io/LMCache/LMCache/router:latest
+          docker tag ghcr.io/${{ github.repository }}/router:${{ steps.version.outputs.version }} ghcr.io/LMCache/LMCache/router:${{ steps.version.outputs.version }}
+          docker push ghcr.io/LMCache/LMCache/router:latest
+          docker push ghcr.io/LMCache/LMCache/router:${{ steps.version.outputs.version }}
