@@ -37,20 +37,3 @@ jobs:
           charts_dir: "."
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Login to GitHub Container Registry
-        run: |
-          echo "${GHCR_REGISTRY_PASSWORD}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
-        env:
-          GHCR_REGISTRY_PASSWORD: "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Push Charts to ghcr.io
-        run: |
-          for pkg in .cr-release-packages/*; do
-            if [ -z "${pkg:-}" ]; then
-              echo "No charts to release"
-              break
-            fi
-            REPO=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
-            helm push "${pkg}" "oci://ghcr.io/$REPO"
-          done
