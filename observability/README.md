@@ -1,6 +1,8 @@
 # Observability dashboard
 
-![image](https://github.com/user-attachments/assets/225feb01-ac0f-4bf9-9da3-7bf955b2aa56)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/05766673-c449-4094-bdc8-dea6ac28cb79" alt="Grafana dashboard to monitor the deployment" width="80%"/>
+</p>
 
 ## Deploy the observability stack
 
