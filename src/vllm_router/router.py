@@ -4,6 +4,7 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 import uvicorn
 from fastapi import FastAPI, Request, UploadFile
@@ -23,7 +24,7 @@ from vllm_router.service_discovery import (
     InitializeServiceDiscovery,
     ServiceDiscoveryType,
 )
-from vllm_router.utils import validate_url
+from vllm_router.utils import set_ulimit, validate_url
 
 httpx_client_wrapper = HTTPXClientWrapper()
 logger = logging.getLogger("uvicorn")
@@ -56,10 +57,13 @@ async def process_request(
     GetRequestStatsMonitor().on_new_request(backend_url, request_id, start_time)
 
     client = httpx_client_wrapper()
+    header_dict = dict(header)
+    # Overwrite the host if the backend server is behind a reverse proxy that routes requests based on the host.
+    header_dict["host"] = urlparse(backend_url).netloc
     async with client.stream(
         method=method,
         url=backend_url + endpoint,
-        headers=dict(header),
+        headers=header_dict,
         content=body,
         timeout=None,
     ) as backend_response:
@@ -133,6 +137,7 @@ async def route_general_request(request: Request, endpoint: str):
         stream_generator,
         status_code=status_code,
         headers={key: value for key, value in headers.items()},
+        media_type="text/event-stream",
     )
 
 
@@ -464,6 +469,9 @@ def main():
             target=log_stats, args=(args.log_stats_interval,), daemon=True
         ).start()
 
+    # Workaround to avoid footguns where uvicorn drops requests with too
+    # many concurrent requests active.
+    set_ulimit()
     uvicorn.run(app, host=args.host, port=args.port)
 
 

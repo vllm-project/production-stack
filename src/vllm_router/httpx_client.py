@@ -14,7 +14,10 @@ class HTTPXClientWrapper:
 
     def start(self):
         """Instantiate the client. Call from the FastAPI startup hook."""
-        self.async_client = httpx.AsyncClient()
+        # To fully leverage the router's concurrency capabilities,
+        # we set the maximum number of connections to be unlimited.
+        limits = httpx.Limits(max_connections=None)
+        self.async_client = httpx.AsyncClient(limits=limits)
         logger.info(f"httpx AsyncClient instantiated. Id {id(self.async_client)}")
 
     async def stop(self):
