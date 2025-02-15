@@ -23,7 +23,7 @@ class FileStorage(Storage):
 
     def __init__(self, base_path: str = "/tmp/vllm_files"):
         self.base_path = base_path
-        logger.info(f"Using local file storage at {base_path}")
+        logger.info("Initialize FileStorage with base path %s", base_path)
         os.makedirs(base_path, exist_ok=True)
 
     def _get_user_path(self, user_id: str) -> str:

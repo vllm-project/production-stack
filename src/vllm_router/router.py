@@ -9,8 +9,9 @@ import uvicorn
 from fastapi import FastAPI, Request, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from vllm_router.batch import BatchProcessor, initialize_batch_processor
 from vllm_router.engine_stats import GetEngineStatsScraper, InitializeEngineStatsScraper
-from vllm_router.files import initialize_storage
+from vllm_router.files import Storage, initialize_storage
 from vllm_router.httpx_client import HTTPXClientWrapper
 from vllm_router.protocols import ModelCard, ModelList
 from vllm_router.request_stats import (
@@ -34,6 +35,8 @@ STACK_VERSION = "0.0.1"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     httpx_client_wrapper.start()
+    if hasattr(app.state, "batch_processor"):
+        await app.state.batch_processor.initialize()
     yield
     await httpx_client_wrapper.stop()
 
@@ -157,7 +160,8 @@ async def route_files(request: Request):
     file_content = await file_obj.read()
 
     try:
-        file_info = await FILE_STORAGE.save_file(
+        storage: Storage = app.state.batch_storage
+        file_info = await storage.save_file(
             file_name=file_obj.filename, content=file_content, purpose=purpose
         )
         return JSONResponse(content=file_info.metadata())
@@ -170,7 +174,8 @@ async def route_files(request: Request):
 @app.get("/v1/files/{file_id}")
 async def route_get_file(file_id: str):
     try:
-        file = await FILE_STORAGE.get_file(file_id)
+        storage: Storage = app.state.batch_storage
+        file = await storage.get_file(file_id)
         return JSONResponse(content=file.metadata())
     except FileNotFoundError:
         return JSONResponse(
@@ -183,11 +188,105 @@ async def route_get_file_content(file_id: str):
     try:
         # TODO(gaocegege): Stream the file content with chunks to support
         # openai uploads interface.
-        file_content = await FILE_STORAGE.get_file_content(file_id)
+        storage: Storage = app.state.batch_storage
+        file_content = await storage.get_file_content(file_id)
         return Response(content=file_content)
     except FileNotFoundError:
         return JSONResponse(
             status_code=404, content={"error": f"File {file_id} not found"}
+        )
+
+
+@app.post("/v1/batches")
+async def route_batches(request: Request):
+    """Handle batch requests that process files with specified endpoints."""
+    try:
+        request_json = await request.json()
+
+        # Validate required fields
+        if "input_file_id" not in request_json:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Missing required parameter 'input_file_id'"},
+            )
+        if "endpoint" not in request_json:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Missing required parameter 'endpoint'"},
+            )
+
+        # Verify file exists
+        storage: Storage = app.state.batch_storage
+        file_id = request_json["input_file_id"]
+        try:
+            await storage.get_file(file_id)
+        except FileNotFoundError:
+            return JSONResponse(
+                status_code=404, content={"error": f"File {file_id} not found"}
+            )
+
+        batch_processor: BatchProcessor = app.state.batch_processor
+        batch = await batch_processor.create_batch(
+            input_file_id=file_id,
+            endpoint=request_json["endpoint"],
+            completion_window=request_json.get("completion_window", "5s"),
+            metadata=request_json.get("metadata", None),
+        )
+
+        # Return metadata as attribute, not a callable.
+        return JSONResponse(content=batch.to_dict())
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to process batch request: {str(e)}"},
+        )
+
+
+@app.get("/v1/batches/{batch_id}")
+async def route_get_batch(batch_id: str):
+    try:
+        batch_processor: BatchProcessor = app.state.batch_processor
+        batch = await batch_processor.retrieve_batch(batch_id)
+        return JSONResponse(content=batch.to_dict())
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=404, content={"error": f"Batch {batch_id} not found"}
+        )
+
+
+@app.get("/v1/batches")
+async def route_list_batches(limit: int = 20, after: str = None):
+    try:
+        batch_processor: BatchProcessor = app.state.batch_processor
+        batches = await batch_processor.list_batches(limit=limit, after=after)
+
+        # Convert batches to response format
+        batch_data = [batch.to_dict() for batch in batches]
+
+        response = {
+            "object": "list",
+            "data": batch_data,
+            "first_id": batch_data[0]["id"] if batch_data else None,
+            "last_id": batch_data[-1]["id"] if batch_data else None,
+            "has_more": len(batch_data)
+            == limit,  # If we got limit items, there may be more
+        }
+
+        return JSONResponse(content=response)
+    except FileNotFoundError:
+        return JSONResponse(status_code=404, content={"error": "No batches found"})
+
+
+@app.delete("/v1/batches/{batch_id}")
+async def route_cancel_batch(batch_id: str):
+    try:
+        batch_processor: BatchProcessor = app.state.batch_processor
+        batch = await batch_processor.cancel_batch(batch_id)
+        return JSONResponse(content=batch.to_dict())
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=404, content={"error": f"Batch {batch_id} not found"}
         )
 
 
@@ -342,6 +441,11 @@ def parse_args():
     # Batch API
     # TODO(gaocegege): Make these batch api related arguments to a separate config.
     parser.add_argument(
+        "--enable-batch-api",
+        action="store_true",
+        help="Enable the batch API for processing files.",
+    )
+    parser.add_argument(
         "--file-storage-class",
         type=str,
         default="local_file",
@@ -353,6 +457,13 @@ def parse_args():
         type=str,
         default="/tmp/vllm_files",
         help="The path to store files.",
+    )
+    parser.add_argument(
+        "--batch-processor",
+        type=str,
+        default="local",
+        choices=["local"],
+        help="The batch processor to use.",
     )
 
     # Monitoring
@@ -421,10 +532,14 @@ def InitializeAll(args):
     InitializeEngineStatsScraper(args.engine_stats_interval)
     InitializeRequestStatsMonitor(args.request_stats_window)
 
-    # TODO(gaocegege): Try adopting a more general way to initialize the
-    # storage, and global router. Maybe singleton?
-    global FILE_STORAGE
-    FILE_STORAGE = initialize_storage(args.file_storage_class, args.file_storage_path)
+    if args.enable_batch_api:
+        logger.info("Initializing batch API")
+        app.state.batch_storage = initialize_storage(
+            args.file_storage_class, args.file_storage_path
+        )
+        app.state.batch_processor = initialize_batch_processor(
+            args.batch_processor, args.file_storage_path, app.state.batch_storage
+        )
 
     InitializeRoutingLogic(args.routing_logic, session_key=args.session_key)
 
