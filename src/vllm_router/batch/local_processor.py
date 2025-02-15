@@ -176,6 +176,7 @@ class LocalBatchProcessor(BatchProcessor):
                     await db.commit()
             try:
                 logger.info("Processing batch %s", batch_id)
+                # TODO(gaocegege): Replace with actual processing logic
                 # Simulate processing delay
                 await asyncio.sleep(1)
                 # Simulate generating output file via storage
