@@ -740,6 +740,7 @@ def InitializeAll(args):
         )
     else:
         raise ValueError(f"Invalid service discovery type: {args.service_discovery}")
+    # Initialize singletons by calling their constructors with required parameters.
     InitializeEngineStatsScraper(args.engine_stats_interval)
     InitializeRequestStatsMonitor(args.request_stats_window)
 

@@ -19,7 +19,17 @@ class RoutingLogic(str, enum.Enum):
     SESSION_BASED = "session"
 
 
-class RoutingInterface(metaclass=abc.ABCMeta):
+class SingletonABCMeta(abc.ABCMeta):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
+
+
+class RoutingInterface(metaclass=SingletonABCMeta):
     @abc.abstractmethod
     def route_request(
         self,
@@ -46,7 +56,10 @@ class RoundRobinRouter(RoutingInterface):
     # TODO (ApostaC): when available engines in the endpoints changes, the
     # algorithm may not be "perfectly" round-robin.
     def __init__(self):
+        if hasattr(self, "_initialized"):
+            return
         self.req_id = 0
+        self._initialized = True
 
     def route_request(
         self,
@@ -68,9 +81,9 @@ class RoundRobinRouter(RoutingInterface):
             request (Request): The incoming request
         """
         len_engines = len(endpoints)
-        ret = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
+        chosen = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
         self.req_id += 1
-        return ret.url
+        return chosen.url
 
 
 class SessionRouter(RoutingInterface):
@@ -79,10 +92,14 @@ class SessionRouter(RoutingInterface):
     in the request headers
     """
 
-    def __init__(self, session_key: str):
+    def __init__(self, session_key: str = None):
+        if hasattr(self, "_initialized"):
+            return
+        if session_key is None:
+            raise ValueError("SessionRouter must be initialized with a session_key")
         self.session_key = session_key
-        # Map from session ID to engine URL
         self.hash_ring = HashRing()
+        self._initialized = True
 
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
@@ -165,56 +182,23 @@ class SessionRouter(RoutingInterface):
         return url
 
 
-_global_router = None
-
-
+# Instead of managing a global _global_router, we can define the initialization functions as:
 def InitializeRoutingLogic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
-    """
-    Initialize the global routing logic
-
-    Args:
-        routing_logic (RoutingLogic): The routing logic enum
-        *args, **kwargs: The arguments to pass to the routing logic
-
-    Returns:
-        RoutingInterface: The router object
-
-    Raises:
-        ValueError: If the global router has been initialized or if routing_logic is invalid
-    """
-    global _global_router
-    if _global_router is not None:
-        raise ValueError("The global router has been initialized")
-
     if routing_logic == RoutingLogic.ROUND_ROBIN:
         logger.info("Initializing round-robin routing logic")
-        _global_router = RoundRobinRouter()
+        return RoundRobinRouter()
     elif routing_logic == RoutingLogic.SESSION_BASED:
-        logger.info(
-            "Initializing session-based routing logic"
-            f" with args: {args}, kwargs: {kwargs}"
-        )
-        _global_router = SessionRouter(*args, **kwargs)
+        logger.info(f"Initializing session-based routing logic with kwargs: {kwargs}")
+        return SessionRouter(kwargs.get("session_key"))
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
-    return _global_router
-
 
 def GetRoutingLogic() -> RoutingInterface:
-    """
-    Get the global routing logic
-
-    Returns:
-        RoutingInterface: The router object
-
-    Raises:
-        ValueError: If the global router has not been initialized
-    """
-    global _global_router
-    if _global_router is None:
-        raise ValueError("The global router has not been initialized")
-
-    return _global_router
+    # Look up in our singleton registry which router (if any) has been created.
+    for cls in (SessionRouter, RoundRobinRouter):
+        if cls in SingletonABCMeta._instances:
+            return cls()
+    raise ValueError("The global router has not been initialized")

@@ -11,7 +11,15 @@ from vllm_router.service_discovery import GetServiceDiscovery
 
 logger = init_logger(__name__)
 
-_global_engine_stats_scraper: "Optional[EngineStatsScraper]" = None
+
+class SingletonMeta(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
 
 
 @dataclass
@@ -63,7 +71,7 @@ class EngineStats:
         )
 
 
-class EngineStatsScraper:
+class EngineStatsScraper(metaclass=SingletonMeta):
     def __init__(self, scrape_interval: float):
         """
         Initialize the scraper to periodically fetch metrics from all serving engines.
@@ -77,19 +85,27 @@ class EngineStatsScraper:
             not been initialized.
 
         """
-        self.service_discovery = GetServiceDiscovery()
+        # Allow multiple calls but require the first call provide scrape_interval.
+        if hasattr(self, "_initialized"):
+            return
+        if scrape_interval is None:
+            raise ValueError(
+                "EngineStatsScraper must be initialized with scrape_interval"
+            )
+        self.service_discovery = GetServiceDiscovery()  # (remains unchanged)
         self.engine_stats: Dict[str, EngineStats] = {}
         self.engine_stats_lock = threading.Lock()
         self.scrape_interval = scrape_interval
         self.scrape_thread = threading.Thread(target=self._scrape_worker, daemon=True)
         self.scrape_thread.start()
+        self._initialized = True
 
     def _scrape_one_endpoint(self, url: str):
         """
         Scrape metrics from a single serving engine.
 
         Args:
-            url (str): The base URL of the serving engine.
+            url (str): The URL of the serving engine (does not contain endpoint)
         """
         try:
             response = requests.get(url + "/metrics")
@@ -161,50 +177,9 @@ class EngineStatsScraper:
 
 
 def InitializeEngineStatsScraper(scrape_interval: float) -> EngineStatsScraper:
-    """
-    Initialize the EngineStatsScraper.
-
-    Args:
-        scrape_interval (float): The interval (in seconds) to scrape metrics.
-
-    Raises:
-        ValueError: if the service discover module is have
-            not been initialized
-
-        ValueError: if the EngineStatsScraper object has already been
-            initialized
-    """
-    global _global_engine_stats_scraper
-    if _global_engine_stats_scraper:
-        raise ValueError("EngineStatsScraper object has already been initialized")
-    _global_engine_stats_scraper = EngineStatsScraper(scrape_interval)
-    return _global_engine_stats_scraper
+    return EngineStatsScraper(scrape_interval)
 
 
 def GetEngineStatsScraper() -> EngineStatsScraper:
-    """
-    Retrieve the EngineStatsScraper.
-
-    Raises:
-        ValueError: If not initialized.
-    """
-    global _global_engine_stats_scraper
-    if not _global_engine_stats_scraper:
-        raise ValueError("EngineStatsScraper object has not been initialized")
-    return _global_engine_stats_scraper
-
-
-# if __name__ == "__main__":
-#    from service_discovery import InitializeServiceDiscovery, ServiceDiscoveryType
-#    import time
-#    InitializeServiceDiscovery(ServiceDiscoveryType.K8S,
-#                               namespace = "default",
-#                               port = 8000,
-#                               label_selector = "release=test")
-#    time.sleep(1)
-#    InitializeEngineStatsScraper(10.0)
-#    engine_scraper = GetEngineStatsScraper()
-#    while True:
-#        engine_stats = engine_scraper.get_engine_stats()
-#        print(engine_stats)
-#        time.sleep(2.0)
+    # This call returns the already-initialized instance (or raises an error if not yet initialized)
+    return EngineStatsScraper()
