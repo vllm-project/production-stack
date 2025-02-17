@@ -97,7 +97,7 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
 2. Deploy the Helm chart:
 
    ```bash
-   helm install vllm vllm/production-stack -f tutorials/assets/values-03-match-pv.yaml
+   helm install vllm vllm/vllm-stack -f tutorials/assets/values-03-match-pv.yaml
    ```
 
 3. Verify the deployment:
@@ -110,8 +110,8 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
 
    ```plaintext
    NAME                                             READY   STATUS    RESTARTS   AGE
-   llmstack-deployment-router-xxxx-xxxx             1/1     Running   0          1m
-   llmstack-llama3-deployment-vllm-xxxx-xxxx        1/1     Running   0          1m
+   vllm-deployment-router-xxxx-xxxx             1/1     Running   0          1m
+   vllm-llama3-deployment-vllm-xxxx-xxxx        1/1     Running   0          1m
    ```
 
 ## Step 3: Verifying the Deployment
@@ -142,9 +142,9 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
 2. Uninstall and reinstall the deployment to observe faster startup:
 
    ```bash
-   sudo helm uninstall llmstack
+   sudo helm uninstall vllm
    sudo kubectl delete -f tutorials/assets/pv-03.yaml && sudo kubectl apply -f tutorials/assets/pv-03.yaml
-   helm install vllm vllm/production-stack -f tutorials/assets/values-03-match-pv.yaml
+   helm install vllm vllm/vllm-stack -f tutorials/assets/values-03-match-pv.yaml
    ```
 
 ### Explanation

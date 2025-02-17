@@ -62,7 +62,7 @@ servingEngineSpec:
 Deploy the Helm chart using the customized values file:
 
 ```bash
-helm install vllm vllm/production-stack -f tutorials/assets/values-04-multiple-models.yaml
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-04-multiple-models.yaml
 ```
 
 ## Step 3: Verifying the Deployment
@@ -77,9 +77,9 @@ helm install vllm vllm/production-stack -f tutorials/assets/values-04-multiple-m
 
    ```plaintext
    NAME                                           READY   STATUS    RESTARTS   AGE
-   llmstack-deployment-router-xxxxx-xxxxx         1/1     Running   0          90s
-   llmstack-llama3-deployment-vllm-xxxxx-xxxxx    1/1     Running   0          90s
-   llmstack-mistral-deployment-vllm-xxxxx-xxxxx   1/1     Running   0          90s
+   vllm-deployment-router-xxxxx-xxxxx         1/1     Running   0          90s
+   vllm-llama3-deployment-vllm-xxxxx-xxxxx    1/1     Running   0          90s
+   vllm-mistral-deployment-vllm-xxxxx-xxxxx   1/1     Running   0          90s
    ```
 
    > **Note:** It may take some time for the models to be downloaded before the READY changes to "1/1".
@@ -87,7 +87,7 @@ helm install vllm vllm/production-stack -f tutorials/assets/values-04-multiple-m
 2. Forward the router service port to access it locally:
 
    ```bash
-   sudo kubectl port-forward svc/llmstack-router-service 30080:80
+   sudo kubectl port-forward svc/vllm-router-service 30080:80
    ```
 
    > **Explanation:** We are forwarding the port from the router service, which has a global view of all the vLLM engines running different models.

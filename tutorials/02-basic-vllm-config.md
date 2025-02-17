@@ -84,8 +84,8 @@ Expected output:
 You should see output indicating the successful deployment of the Helm chart:
 
 ```plaintext
-Release "llmstack" has been deployed. Happy Helming!
-NAME: llmstack
+Release "vllm" has been deployed. Happy Helming!
+NAME: vllm
 LAST DEPLOYED: <timestamp>
 NAMESPACE: default
 STATUS: deployed
@@ -106,12 +106,12 @@ REVISION: 1
 
    ```plaintext
    NAME                                             READY   STATUS    RESTARTS   AGE
-   pod/llmstack-deployment-router-xxxx-xxxx         1/1     Running   0          3m23s
-   llmstack-llama3-deployment-vllm-xxxx-xxxx        1/1     Running   0          3m23s
+   pod/vllm-deployment-router-xxxx-xxxx         1/1     Running   0          3m23s
+   vllm-llama3-deployment-vllm-xxxx-xxxx        1/1     Running   0          3m23s
    ```
 
-   - The `llmstack-deployment-router` pod acts as the router, managing requests and routing them to the appropriate model-serving pod.
-   - The `llmstack-llama3-deployment-vllm` pod serves the actual model for inference.
+   - The `vllm-deployment-router` pod acts as the router, managing requests and routing them to the appropriate model-serving pod.
+   - The `vllm-llama3-deployment-vllm` pod serves the actual model for inference.
 
 2. Verify the service is exposed correctly:
 
@@ -125,12 +125,12 @@ REVISION: 1
 
    ```plaintext
    NAME                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
-   llmstack-engine-service   ClusterIP   10.103.98.170    <none>        80/TCP    4m
-   llmstack-router-service   ClusterIP   10.103.110.107   <none>        80/TCP    4m
+   vllm-engine-service   ClusterIP   10.103.98.170    <none>        80/TCP    4m
+   vllm-router-service   ClusterIP   10.103.110.107   <none>        80/TCP    4m
    ```
 
-   - The `llmstack-engine-service` exposes the serving engine.
-   - The `llmstack-router-service` handles routing and load balancing across model-serving pods.
+   - The `vllm-engine-service` exposes the serving engine.
+   - The `vllm-router-service` handles routing and load balancing across model-serving pods.
 
 3. Test the health endpoint:
 
