@@ -58,7 +58,7 @@ The `lmcacheConfig` field enables LMCache and sets the CPU offloading buffer siz
 Deploy the Helm chart using the customized values file:
 
 ```bash
-helm install vllm vllm/production-stack -f tutorials/assets/values-05-cpu-offloading.yaml
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-05-cpu-offloading.yaml
 ```
 
 ## Step 3: Verifying the Installation
