@@ -23,6 +23,7 @@ servingEngineSpec:
   #
   # - pvcStorage: (string) The amount of storage requested for the model, e.g., "50Gi"
   # - pvcAccessMode: (list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
+  # - storageClass: (String) The storage class of the PVC e.g., "", default is ""
   # - pvcMatchLabels: (optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
   #
   # - vllmConfig: (optional, map) The configuration for the VLLM model, supported options are:

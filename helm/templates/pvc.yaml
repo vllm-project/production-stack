@@ -6,10 +6,20 @@ metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
   namespace: {{ .Release.Namespace }}
 spec:
-  accessModes: {{ toYaml $modelSpec.pvcAccessMode | nindent 4 }}
+  accessModes:
+    {{- if $modelSpec.pvcAccessMode }}
+    {{- toYaml $modelSpec.pvcAccessMode | nindent 4 }}
+    {{- else }}
+    - ReadWriteOnce
+    {{- end }}
   resources:
     requests:
-      storage: {{ $modelSpec.pvcStorage }}
+      storage: {{ $modelSpec.pvcStorage | default "40Gi" }}  # Default to 40Gi if not set
+  {{- if $modelSpec.storageClass }}
+  storageClassName: "{{ $modelSpec.storageClass }}"  # Allow user-defined storageClass
+  {{- else}}
+  storageClassName: ""
+  {{- end }}
   {{- if not (empty $modelSpec.pvcMatchLabels) }}
   selector:
     matchLabels:
