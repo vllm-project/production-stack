@@ -10,6 +10,7 @@ This tutorial guides you through the basic configurations required to deploy a v
 2. [Step 1: Preparing the Configuration File](#step-1-preparing-the-configuration-file)
 3. [Step 2: Applying the Configuration](#step-2-applying-the-configuration)
 4. [Step 3: Verifying the Deployment](#step-3-verifying-the-deployment)
+5. [Step 4 (Optional): Multi-GPU Deployment](#step-4-optional-multi-gpu-deployment)
 
 ## Prerequisites
 
@@ -146,6 +147,38 @@ REVISION: 1
 
 Please refer to Step 3 in the [01-minimal-helm-installation](01-minimal-helm-installation.md) tutorial for querying the deployed vLLM service.
 
+## Step 4 (Optional): Multi-GPU Deployment
+
+So far, you have configured and deployment vLLM serving engine with a single GPU. You may also deploy a serving engine on multiple GPUs with the following example configuration snippet:
+
+```yaml
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "llama3"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+    replicaCount: 1
+    requestCPU: 10
+    requestMemory: "16Gi"
+    requestGPU: 2
+    pvcStorage: "50Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      maxModelLen: 4096
+      tensorParallelSize: 2
+      dtype: "bfloat16"
+      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+    hf_token: <YOUR HF TOKEN>
+    shmSize: "20Gi"
+```
+
+Note that only tensor parallelism is supported for now. The field ``shmSize`` has to be configured if you are requesting ``requestGPU`` to be more than one, to enable appropriate shared memory across multiple processes used to run tensor parallelism.
+
 ## Conclusion
 
-In this tutorial, you configured and deployed a vLLM serving engine with GPU support in a Kubernetes environment. You also learned how to verify its deployment and ensure it is running as expected. For further customization, refer to the `values.yaml` file and Helm chart documentation.
+In this tutorial, you configured and deployed a vLLM serving engine with GPU support (both on a single GPU or multiple GPUs) in a Kubernetes environment. You also learned how to verify its deployment and ensure it is running as expected. For further customization, refer to the `values.yaml` file and Helm chart documentation.
