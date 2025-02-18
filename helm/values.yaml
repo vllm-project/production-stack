@@ -158,6 +158,29 @@ routerSpec:
   # -- Service port
   servicePort: 80
 
+  # -- Node selector configuration for router pods
+  nodeSelector: {}
+
+  # -- Affinity configuration for router pods
+  affinity: {}
+  # -- Tolerations configuration for router pods
+  tolerations: []
+
+  # -- Service port name
+  servicePortName: "router-port"
+
+  # -- ServiceMonitor configuration for Prometheus operator
+  serviceMonitor:
+    # -- Enable ServiceMonitor resource
+    enabled: false
+    # -- Path to scrape metrics from
+    path: "/metrics"
+    # -- Interval at which metrics should be scraped
+    interval: "30s"
+    # -- Timeout for scraping metrics
+    scrapeTimeout: "10s"
+    # -- labels for the ServiceMonitor resource
+    labels: {}
   # -- Service discovery mode, supports "k8s" or "static". Defaults to "k8s" if not set.
   serviceDiscovery: "k8s"
 

@@ -96,6 +96,7 @@
         },
         "containerPort": { "type": "integer" },
         "servicePort": { "type": "integer" },
+        "servicePortName": { "type": "string" },
         "startupProbe": {
           "type": "object",
           "properties": {
@@ -142,6 +143,263 @@
         },
         "runtimeClassName": {
             "type": "string"
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "affinity": {
+          "type": "object",
+          "properties": {
+            "nodeAffinity": {
+              "type": "object",
+              "properties": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "type": "object",
+                  "properties": {
+                    "nodeSelectorTerms": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "matchExpressions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": { "type": "string" },
+                                "operator": { "type": "string" },
+                                "values": {
+                                  "type": "array",
+                                  "items": { "type": "string" }
+                                }
+                              },
+                              "required": ["key", "operator"]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "preferredDuringSchedulingIgnoredDuringExecution": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "weight": { "type": "integer" },
+                      "preference": {
+                        "type": "object",
+                        "properties": {
+                          "matchExpressions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": { "type": "string" },
+                                "operator": { "type": "string" },
+                                "values": {
+                                  "type": "array",
+                                  "items": { "type": "string" }
+                                }
+                              },
+                              "required": ["key", "operator"]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "podAffinity": {
+              "type": "object",
+              "properties": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "labelSelector": {
+                        "type": "object",
+                        "properties": {
+                          "matchExpressions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": { "type": "string" },
+                                "operator": { "type": "string" },
+                                "values": {
+                                  "type": "array",
+                                  "items": { "type": "string" }
+                                }
+                              },
+                              "required": ["key", "operator"]
+                            }
+                          },
+                          "matchLabels": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "namespaces": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      },
+                      "topologyKey": { "type": "string" }
+                    },
+                    "required": ["topologyKey"]
+                  }
+                },
+                "preferredDuringSchedulingIgnoredDuringExecution": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "weight": { "type": "integer" },
+                      "podAffinityTerm": {
+                        "type": "object",
+                        "properties": {
+                          "labelSelector": {
+                            "type": "object",
+                            "properties": {
+                              "matchExpressions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "key": { "type": "string" },
+                                    "operator": { "type": "string" },
+                                    "values": {
+                                      "type": "array",
+                                      "items": { "type": "string" }
+                                    }
+                                  },
+                                  "required": ["key", "operator"]
+                                }
+                              },
+                              "matchLabels": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "namespaces": {
+                            "type": "array",
+                            "items": { "type": "string" }
+                          },
+                          "topologyKey": { "type": "string" }
+                        },
+                        "required": ["topologyKey"]
+                      }
+                    },
+                    "required": ["weight", "podAffinityTerm"]
+                  }
+                }
+              }
+            },
+            "podAntiAffinity": {
+              "type": "object",
+              "properties": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "labelSelector": {
+                        "type": "object",
+                        "properties": {
+                          "matchExpressions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": { "type": "string" },
+                                "operator": { "type": "string" },
+                                "values": {
+                                  "type": "array",
+                                  "items": { "type": "string" }
+                                }
+                              },
+                              "required": ["key", "operator"]
+                            }
+                          },
+                          "matchLabels": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "namespaces": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      },
+                      "topologyKey": { "type": "string" }
+                    },
+                    "required": ["topologyKey"]
+                  }
+                },
+                "preferredDuringSchedulingIgnoredDuringExecution": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "weight": { "type": "integer" },
+                      "podAffinityTerm": {
+                        "type": "object",
+                        "properties": {
+                          "labelSelector": {
+                            "type": "object",
+                            "properties": {
+                              "matchExpressions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "key": { "type": "string" },
+                                    "operator": { "type": "string" },
+                                    "values": {
+                                      "type": "array",
+                                      "items": { "type": "string" }
+                                    }
+                                  },
+                                  "required": ["key", "operator"]
+                                }
+                              },
+                              "matchLabels": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "namespaces": {
+                            "type": "array",
+                            "items": { "type": "string" }
+                          },
+                          "topologyKey": { "type": "string" }
+                        },
+                        "required": ["topologyKey"]
+                      }
+                    },
+                    "required": ["weight", "podAffinityTerm"]
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -164,6 +422,56 @@
           "properties": {
             "environment": { "type": "string" },
             "release": { "type": "string" }
+          }
+        },
+        "nodeSelector": {
+          "type": "object",
+          "properties": {
+            "key": { "type": "string" },
+            "value": { "type": "string" }
+          }
+        },
+        "affinity": {
+          "type": "object",
+          "properties": {
+            "key": { "type": "string" },
+            "value": { "type": "string" }
+          }
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": { "type": "string" },
+              "operator": { "type": "string" },
+              "effect": { "type": "string" }
+            }
+          }
+        },
+        "serviceMonitor": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable ServiceMonitor for Prometheus operator"
+            },
+            "path": {
+              "type": "string",
+              "description": "Path to scrape metrics from"
+            },
+            "interval": {
+              "type": "string",
+              "description": "Interval at which metrics should be scraped"
+            },
+            "scrapeTimeout": {
+              "type": "string",
+              "description": "Timeout for scraping metrics"
+            },
+            "labels": {
+              "type": "object",
+              "description": "Labels for the ServiceMonitor resource"
+            }
           }
         }
       }
