@@ -74,7 +74,7 @@ spec:
             {{- if kindIs "string" $modelSpec.hf_token }}
             valueFrom:
               secretKeyRef:
-                name: {{ $.Release.Name }}-secrets
+                name: {{ .Release.Name }}-secrets
                 key: hf_token_{{ $modelSpec.name }}
             {{- else }}
             valueFrom:
