@@ -1,7 +1,7 @@
 # Setting up EKS vLLM stack with one command
 
 This script automatically configures a EKS LLM inference cluster.
-Make sure your AWS cli is set up, logged in, and region set up. You have eksctl, kubectl, helm installed.
+Make sure your AWS cli (v2) is installed, logged in, and region set up. You have eksctl, kubectl, helm installed.
 
 Modify fields production_stack_specification.yaml and execute as:
 
@@ -9,7 +9,7 @@ Modify fields production_stack_specification.yaml and execute as:
 bash entry_point.sh YOUR_AWSREGION YAML_FILE_PATH
 ```
 
-Clean up the service (not the VPC) with:
+Clean up the service with:
 
 ```bash
 bash clean_up.sh production-stack YOUR_AWSREGION
