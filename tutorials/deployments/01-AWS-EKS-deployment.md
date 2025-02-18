@@ -6,14 +6,14 @@ This guide walks you through the script that sets up a vLLM production-stack on 
 
 Before running this setup, ensure you have:
 
-1. AWS CLI installed and configured with credential and region set up.
+1. AWS CLI (version higher than v2) installed and configured with credential and region.
 2. AWS eksctl
 3. Kubectl
 4. Helm
 
 ## TLDR
 
-To run the service
+To run the service, go into the "deployment_on_cloud/aws" folder and run:
 
 ```bash
 bash entry_point.sh YOUR_AWSREGION EXAMPLE_YAML_PATH

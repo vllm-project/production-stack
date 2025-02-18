@@ -113,32 +113,28 @@ aws eks delete-cluster --name "$CLUSTER_NAME" --region "$REGION"
 echo "Waiting for cluster $CLUSTER_NAME to be deleted..."
 aws eks wait cluster-deleted --name "$CLUSTER_NAME" --region "$REGION"
 
-# Delete CloudFormation Stack
-echo "Checking if CloudFormation stack exists for EKS cluster..."
-STACK_NAME="eksctl-${CLUSTER_NAME}-cluster"
-STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null)
-
-if [ -n "$STACK_STATUS" ]; then
-  echo "Deleting CloudFormation stack: $STACK_NAME"
-  aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION"
-  echo "Waiting for CloudFormation stack $STACK_NAME to be deleted..."
-  aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION"
-  echo "CloudFormation stack $STACK_NAME has been deleted successfully!"
+# Clean up VPC
+echo "Cleaning up VPC..."
+VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:eks:cluster-name,Values=$CLUSTER_NAME" --query "Vpcs[0].VpcId" --output text --region "$REGION")
+if [ -n "$VPC_ID" ]; then
+  echo "Deleting VPC: $VPC_ID"
+  aws ec2 delete-vpc --vpc-id "$VPC_ID" --region "$REGION"
 else
-  echo "CloudFormation stack $STACK_NAME not found, skipping..."
+  echo "VPC not found, skipping..."
 fi
 
-STACK_NAME="eksctl-${CLUSTER_NAME}-cluster-nodegroup-gpu-nodegroup"
-STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null)
-
-if [ -n "$STACK_STATUS" ]; then
-  echo "Deleting CloudFormation stack: $STACK_NAME"
-  aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION"
-  echo "Waiting for CloudFormation stack $STACK_NAME to be deleted..."
-  aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION"
-  echo "CloudFormation stack $STACK_NAME has been deleted successfully!"
-else
-  echo "CloudFormation stack $STACK_NAME not found, skipping..."
-fi
+# Delete CloudFormation Stackecho "Deleting CloudFormation stacks..."
+STACKS=( "eksctl-${CLUSTER_NAME}-cluster" "eksctl-${CLUSTER_NAME}-cluster-nodegroup-gpu-nodegroup" )
+for STACK_NAME in "${STACKS[@]}"; do
+  STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null)
+  if [ -n "$STACK_STATUS" ]; then
+    echo "Deleting CloudFormation stack: $STACK_NAME"
+    aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION"
+    echo "Waiting for CloudFormation stack $STACK_NAME to be deleted..."
+    aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION"
+  else
+    echo "CloudFormation stack $STACK_NAME not found, skipping..."
+  fi
+done
 
 echo "EKS cluster $CLUSTER_NAME cleanup completed successfully!"
