@@ -57,13 +57,10 @@ async def process_request(
     GetRequestStatsMonitor().on_new_request(backend_url, request_id, start_time)
 
     client = httpx_client_wrapper()
-    header_dict = dict(header)
-    # Overwrite the host if the backend server is behind a reverse proxy that routes requests based on the host.
-    header_dict["host"] = urlparse(backend_url).netloc
     async with client.stream(
         method=method,
         url=backend_url + endpoint,
-        headers=header_dict,
+        headers=dict(header),
         content=body,
         timeout=None,
     ) as backend_response:
