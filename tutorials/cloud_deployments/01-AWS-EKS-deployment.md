@@ -6,10 +6,9 @@ This guide walks you through the script that sets up a vLLM production-stack on 
 
 Before running this setup, ensure you have:
 
-1. AWS CLI (version higher than v2) installed and configured with credential and region.
-2. AWS eksctl
-3. Kubectl
-4. Helm
+1. AWS CLI (version higher than v2) installed and configured with credential and region [[Link]](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+2. AWS eksctl [[Link]](https://eksctl.io/installation/)
+3. Kubectl and Helm [[Link]](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)
 
 ## TLDR
 
@@ -242,6 +241,8 @@ This step cleans up EKS, mount-points, created security groups, EFS.
 ```bash
 bash clean_up.sh "$CLUSTER_NAME" "$AWS_REGION"
 ```
+
+You may also want to manually delete the VPC and clean up the cloud formation in the AWS Console.
 
 ## Summary
 

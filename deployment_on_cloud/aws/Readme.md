@@ -14,3 +14,5 @@ Clean up the service with:
 ```bash
 bash clean_up.sh production-stack YOUR_AWSREGION
 ```
+
+You may also want to manually delete the VPC and clean up the cloud formation in the AWS Console.

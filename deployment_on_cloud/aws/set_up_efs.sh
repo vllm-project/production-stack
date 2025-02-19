@@ -70,4 +70,4 @@ done
 
 echo "EFS setup complete!"
 echo "File System ID: $EFS_ID"
-echo "$EFS_ID" > temp.text
+echo "$EFS_ID" > temp.txt

@@ -54,9 +54,9 @@ for TG_ARN in $TG_ARNs; do
   aws elbv2 delete-target-group --target-group-arn "$TG_ARN" --region "$REGION"
 done
 
-# Delete NAT Gateways
+# # Delete NAT Gateways
 echo "Deleting NAT Gateways..."
-NAT_GATEWAYS=$(aws ec2 describe-nat-gateways --filter "Name=tag:eks:cluster-name,Values=$CLUSTER_NAME" --query "NatGateways[].NatGatewayId" --output text --region "$REGION")
+NAT_GATEWAYS=$(aws ec2 describe-nat-gateways --filter "Name=tag:Name,Values=eksctl-${CLUSTER_NAME}-cluster/NATGateway" --query "NatGateways[].NatGatewayId" --output text --region "$REGION")
 for NAT_ID in $NAT_GATEWAYS; do
   aws ec2 delete-nat-gateway --nat-gateway-id "$NAT_ID" --region "$REGION"
   echo "Waiting for NAT Gateway $NAT_ID to be deleted..."
@@ -72,30 +72,28 @@ for EIP in $EIP_ALLOCS; do
 done
 
 # Release EFS and the created security group
-while read -r fs_id; do
-    echo "Processing File System: $fs_id"
+read -r fs_id < temp.txt
+echo "Processing File System: $fs_id"
 
-    # Get the list of mount targets
-    mount_targets=$(aws efs describe-mount-targets --file-system-id "$fs_id" --query "MountTargets[*].MountTargetId" --output text)
+# Get the list of mount targets
+mount_targets=$(aws efs describe-mount-targets --file-system-id "$fs_id" --query "MountTargets[*].MountTargetId" --output text)
 
-    # Delete each mount target
-    for mt_id in $mount_targets; do
-        echo "Deleting Mount Target: $mt_id"
-        aws efs delete-mount-target --mount-target-id "$mt_id"
-    done
+# Delete each mount target
+for mt_id in $mount_targets; do
+    echo "Deleting Mount Target: $mt_id"
+    aws efs delete-mount-target --mount-target-id "$mt_id"
+done
 
-    # Wait for mount targets to be deleted (optional, prevents API conflicts)
-    while [[ -n $(aws efs describe-mount-targets --file-system-id "$fs_id" --query "MountTargets[*].MountTargetId" --output text) ]]; do
-        echo "Waiting for mount targets to be deleted..."
-        sleep 10
-    done
+# Wait for mount targets to be deleted (optional, prevents API conflicts)
+while [[ -n $(aws efs describe-mount-targets --file-system-id "$fs_id" --query "MountTargets[*].MountTargetId" --output text) ]]; do
+    echo "Waiting for mount targets to be deleted..."
+    sleep 10
+done
 
-    # Delete the file system
-    echo "Deleting File System: $fs_id"
-    aws efs delete-file-system --file-system-id "$fs_id"
-
-done < temp.txt
-
+# Delete the file system
+echo "Deleting File System: $fs_id"
+aws efs delete-file-system --file-system-id "$fs_id"
+echo $fs_id
 
 for sg in $(aws ec2 describe-security-groups --filters "Name=group-name,Values=efs-sg" --query "SecurityGroups[*].GroupId" --output text); do
 
@@ -114,27 +112,31 @@ echo "Waiting for cluster $CLUSTER_NAME to be deleted..."
 aws eks wait cluster-deleted --name "$CLUSTER_NAME" --region "$REGION"
 
 # Clean up VPC
-echo "Cleaning up VPC..."
-VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:eks:cluster-name,Values=$CLUSTER_NAME" --query "Vpcs[0].VpcId" --output text --region "$REGION")
-if [ -n "$VPC_ID" ]; then
-  echo "Deleting VPC: $VPC_ID"
-  aws ec2 delete-vpc --vpc-id "$VPC_ID" --region "$REGION"
-else
-  echo "VPC not found, skipping..."
-fi
+# echo "Cleaning up VPC..."
+# VPC_ID=$(aws ec2 describe-vpcs \
+#   --filters "Name=tag:Name,Values=eksctl-${CLUSTER_NAME}-cluster/VPC" \
+#   --query "Vpcs[0].VpcId" \
+#   --output text \
+#   --region "$REGION")
+# if [ -n "$VPC_ID" ]; then
+#   echo "Deleting VPC: $VPC_ID"
+#   aws ec2 delete-vpc --vpc-id "$VPC_ID" --region "$REGION"
+# else
+#   echo "VPC not found, skipping..."
+# fi
 
 # Delete CloudFormation Stackecho "Deleting CloudFormation stacks..."
-STACKS=( "eksctl-${CLUSTER_NAME}-cluster" "eksctl-${CLUSTER_NAME}-cluster-nodegroup-gpu-nodegroup" )
-for STACK_NAME in "${STACKS[@]}"; do
-  STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null)
-  if [ -n "$STACK_STATUS" ]; then
-    echo "Deleting CloudFormation stack: $STACK_NAME"
-    aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION"
-    echo "Waiting for CloudFormation stack $STACK_NAME to be deleted..."
-    aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION"
-  else
-    echo "CloudFormation stack $STACK_NAME not found, skipping..."
-  fi
-done
+# STACKS=( "eksctl-${CLUSTER_NAME}-cluster" "eksctl-${CLUSTER_NAME}-cluster-nodegroup-gpu-nodegroup" )
+# for STACK_NAME in "${STACKS[@]}"; do
+#   STACK_STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null)
+#   if [ -n "$STACK_STATUS" ]; then
+#     echo "Deleting CloudFormation stack: $STACK_NAME"
+#     aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION"
+#     echo "Waiting for CloudFormation stack $STACK_NAME to be deleted..."
+#     aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$REGION"
+#   else
+#     echo "CloudFormation stack $STACK_NAME not found, skipping..."
+#   fi
+# done
 
 echo "EKS cluster $CLUSTER_NAME cleanup completed successfully!"

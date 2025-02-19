@@ -37,7 +37,7 @@ eksctl create iamserviceaccount \
 
 #create pv after modify the filesys id to be the filesys id
 #storage needed is based on model weights
-EFS_ID=$(cat temp.text)
+EFS_ID=$(cat temp.txt)
 
 cat <<EOF > efs-pv.yaml
 apiVersion: v1
