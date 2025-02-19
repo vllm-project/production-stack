@@ -1,0 +1,27 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+    - name: "opt125m"
+      repository: "eaminchan/opt-125m-cpu"
+      tag: "latest"
+      modelURL: "facebook/opt-125m"
+
+      replicaCount: 1
+
+      requestCPU: 1.5
+      requestMemory: "6Gi"
+      requestGPU: 0
+
+      pvcStorage: "10Gi"
+      pvcAccessMode:
+        - ReadWriteOnce
+      device: "cpu"
+
+routerSpec:
+  resources:
+    requests:
+      cpu: "1"
+      memory: "6G"
+    limits:
+      cpu: "1"
+      memory: "6G"
