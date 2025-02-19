@@ -93,7 +93,6 @@ done
 # Delete the file system
 echo "Deleting File System: $fs_id"
 aws efs delete-file-system --file-system-id "$fs_id"
-echo $fs_id
 
 for sg in $(aws ec2 describe-security-groups --filters "Name=group-name,Values=efs-sg" --query "SecurityGroups[*].GroupId" --output text); do
 
