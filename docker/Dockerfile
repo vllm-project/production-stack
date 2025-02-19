@@ -1,5 +1,4 @@
-# Stage 1: Build
-FROM python:3.10-slim as builder
+FROM python:3.10-slim
 
 WORKDIR /app
 
@@ -11,7 +10,7 @@ COPY src/ src/
 
 # Install dependencies (no cache to reduce size)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --upgrade pip setuptools_scm && \
     pip install --no-cache-dir .
 
 # Set the entrypoint
