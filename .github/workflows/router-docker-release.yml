@@ -43,5 +43,6 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/router:latest
             ghcr.io/${{ github.repository }}/router:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}/router:${{ github.sha }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache,mode=max
