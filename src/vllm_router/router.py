@@ -27,11 +27,10 @@ from vllm_router.service_discovery import (
     ServiceDiscoveryType,
 )
 from vllm_router.utils import set_ulimit, validate_url
+from vllm_router.version import __version__
 
 httpx_client_wrapper = HTTPXClientWrapper()
 logger = logging.getLogger("uvicorn")
-
-STACK_VERSION = "0.0.1"
 
 
 @asynccontextmanager
@@ -460,7 +459,8 @@ async def route_completition(request: Request):
 
 @app.get("/version")
 async def show_version():
-    return JSONResponse(content={"version": STACK_VERSION})
+    ver = {"version": __version__}
+    return JSONResponse(content=ver)
 
 
 @app.get("/v1/models")
@@ -699,6 +699,15 @@ def parse_args():
         default=10,
         help="The interval in seconds to log statistics.",
     )
+
+    # Add --version argument
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Show version and exit",
+    )
+
     args = parser.parse_args()
     validate_args(args)
     return args
