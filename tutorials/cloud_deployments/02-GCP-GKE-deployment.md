@@ -6,13 +6,13 @@ This guide walks you through the script that sets up a vLLM production stack on 
 
 Before running this setup, ensure you have:
 
-1. GCP CLI installed and configured with credential and region set up.
+1. GCP CLI installed and configured with credential and region set up [[Link]](https://cloud.google.com/sdk/docs/install)
 2. Kubectl
 3. Helm
 
 ## TLDR
 
-To run the service
+To run the service, go to "deployment_on_cloud/gcp" and run:
 
 ```bash
 sudo bash entry_point.sh YAML_FILE_PATH
