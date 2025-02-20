@@ -12,7 +12,7 @@ Before running this setup, ensure you have:
 
 ## TLDR
 
-To run the service
+To run the service, go to "deployment_on_cloud/gcp" and run:
 
 ```bash
 sudo bash entry_point.sh YAML_FILE_PATH
