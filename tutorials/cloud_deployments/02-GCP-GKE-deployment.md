@@ -1,4 +1,4 @@
-# Deploying vLLM production-stack on GCp GKE
+# Deploying vLLM production-stack on GCP GKE
 
 This guide walks you through the script that sets up a vLLM production stack on Google Kubernetes Engine (GKE) on Google Cloud Platform (GCP). It includes configuring a GKE cluster, setting up persistent storage, and deploying the production AI inference stack using Helm.
 
