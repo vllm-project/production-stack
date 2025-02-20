@@ -44,7 +44,7 @@ jobs:
         id: version
         run: |
           raw_version=$(python setup.py --version)
-          sanitized_version=$(echo "$raw_version" | sed 's/+/-/g')
+          sanitized_version=${raw_version//+/-}
           echo "version=$sanitized_version" >> "$GITHUB_ENV"
           echo "Sanitized version: $sanitized_version"
 
