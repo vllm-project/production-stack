@@ -96,7 +96,7 @@ def main():
 
     processes = []
     api_key = "YOUR_API_KEY_HERE"
-    base_url = "http://localhost:8000/"
+    base_url = "http://localhost:8000/v1"
     model = "fake_model_name"
 
     for _ in range(args.num_workers):

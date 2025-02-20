@@ -114,5 +114,4 @@ aws eks wait cluster-deleted --name "$CLUSTER_NAME" --region "$REGION"
 # Clean up VPC
 # Delete CloudFormation Stackecho "Deleting CloudFormation stacks..."
 
-
 echo "EKS cluster $CLUSTER_NAME cleanup completed successfully!"

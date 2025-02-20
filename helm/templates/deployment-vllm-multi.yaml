@@ -69,6 +69,12 @@ spec:
           env:
           - name: HF_HOME
             value: /data
+          {{- with $modelSpec.vllmConfig}}
+          {{- if hasKey . "v1" }}
+          - name: VLLM_USE_V1
+            value: {{ default 0 $modelSpec.vllmConfig.v1 | quote }}
+          {{- end}}
+          {{- end}}
           {{- if $modelSpec.hf_token }}
           - name: HF_TOKEN
             valueFrom:

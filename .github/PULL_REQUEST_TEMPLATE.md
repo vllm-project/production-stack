@@ -6,7 +6,7 @@ FIX #xxxx (*link existing issues this PR will resolve*)
 
 ---
 
-- [ ] Make sure the code changes pass the [pre-commit](CONTRIBUTING.md) checks.
+- [ ] Make sure the code changes pass the [pre-commit](../CONTRIBUTING.md) checks.
 - [ ] Sign-off your commit by using <code>-s</code> when doing <code>git commit</code>
 - [ ] Try to classify PRs for easy understanding of the type of changes, such as `[Bugfix]`, `[Feat]`, and `[CI]`.
 
