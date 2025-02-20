@@ -12,6 +12,8 @@ Before running this setup, ensure you have:
 
 ## TLDR
 
+Disclaimer: This script requires GPU resources and will incur costs. Please make sure all resources are shut down properly.
+
 To run the service, go into the "deployment_on_cloud/aws" folder and run:
 
 ```bash
