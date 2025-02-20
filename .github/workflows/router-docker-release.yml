@@ -59,7 +59,7 @@ jobs:
             ghcr.io/${{ github.repository }}/router:latest
             ghcr.io/${{ github.repository }}/router:${{ env.version }}
             ghcr.io/${{ github.repository }}/router:${{ github.sha }}
-            lmcache/lmcache-router:latest
-            lmcache/lmcache-router:${{ env.version }}
+            lmcache/lmstack-router:latest
+            lmcache/lmstack-router:${{ env.version }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache,mode=max
