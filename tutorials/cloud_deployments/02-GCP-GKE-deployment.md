@@ -12,6 +12,8 @@ Before running this setup, ensure you have:
 
 ## TLDR
 
+Disclaimer: This script requires cloud resources and will incur costs. Please make sure all resources are shut down properly.
+
 To run the service, go to "deployment_on_cloud/gcp" and run:
 
 ```bash
