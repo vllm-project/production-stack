@@ -32,7 +32,7 @@ Deploy the Helm chart using the predefined configuration file:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-ingress-controller.md
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-ingress-controller.yaml
 ```
 
 Looking at the example values file, you will notice that the `routerSpec` section contains the configuration for the ingress. The default values in this example are below:
