@@ -49,7 +49,6 @@ servingEngineSpec:
     requestMemory: "16Gi"
     requestGPU: 1
 
-    pvcStorage: "10Gi"
 ```
 
 Explanation of the key fields:
@@ -62,7 +61,6 @@ Explanation of the key fields:
 - **`replicaCount`**: Sets the number of replicas to deploy.
 - **`requestCPU` and `requestMemory`**: Specifies the CPU and memory resource requests for the pod.
 - **`requestGPU`**: Specifies the number of GPUs required.
-- **`pvcStorage`**: Allocates persistent storage for the model.
 
 **Note:** If you intend to set up TWO vllm pods, please refer to `tutorials/assets/values-01-2pods-minimal-example.yaml`.
 

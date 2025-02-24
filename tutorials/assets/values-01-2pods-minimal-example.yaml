@@ -14,10 +14,6 @@ servingEngineSpec:
     requestMemory: "16Gi"
     requestGPU: 0.5
 
-    pvcStorage: "10Gi"
-    pvcAccessMode:
-      - ReadWriteMany
-
     vllmConfig:
       maxModelLen: 1024
       extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.4"]
