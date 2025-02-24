@@ -68,7 +68,11 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
           - name: HF_HOME
+            {{- if hasKey $modelSpec "pvcStorage" }}
             value: /data
+            {{- else }}
+            value: /tmp
+            {{- end }}
           {{- with $modelSpec.vllmConfig}}
           {{- if hasKey . "v1" }}
           - name: VLLM_USE_V1
@@ -115,9 +119,11 @@ spec:
               containerPort: {{ include "chart.container-port" . }}
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
+          {{- if hasKey $modelSpec "pvcStorage" }}
           volumeMounts:
           - name: {{ .Release.Name }}-storage
             mountPath: /data
+          {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
           - name: shm
@@ -125,9 +131,11 @@ spec:
           {{- end}}
           {{- end}}
       volumes:
+        {{- if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
+        {{- end }}
         {{- with $modelSpec.vllmConfig }}
         {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
         - name: shm
