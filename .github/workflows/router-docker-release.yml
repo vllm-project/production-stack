@@ -9,6 +9,8 @@ on:
       - 'docker/**'
       - 'setup.py'
 
+  workflow_dispatch:
+
 jobs:
   release:
     permissions:
