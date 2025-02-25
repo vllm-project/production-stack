@@ -56,7 +56,6 @@ class ServiceDiscovery(metaclass=abc.ABCMeta):
 
 class StaticServiceDiscovery(ServiceDiscovery):
     def __init__(self, urls: List[str], models: List[str]):
-        assert len(urls) == len(models), "URLs and models should have the same length"
         self.urls = urls
         self.models = models
         self.added_timestamp = int(time.time())
