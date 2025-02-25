@@ -71,6 +71,17 @@ class MovingAverageMonitor:
             self.timestamps.popleft()
             self.values.popleft()
 
+    def update_no_value(self, timestamp: float):
+        """
+        Update the throughput monitor with a new timestamp with no value
+        """
+        while (
+            len(self.timestamps) > 0
+            and self.timestamps[0] < timestamp - self.sliding_window_size
+        ):
+            self.timestamps.popleft()
+            self.values.popleft()
+
     def get_average(self) -> float:
         return sum(self.values) / len(self.values) if self.values else -1
 
@@ -221,11 +232,15 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             if engine_url not in self.qps_monitors:
                 qps = -1
             else:
+                # Update the monitors
+                self.qps_monitors[engine_url].update_no_value(current_time)
                 qps = self.qps_monitors[engine_url].get_sum() / self.sliding_window_size
 
             if engine_url not in self.ttft_monitors:
                 ttft = -1
             else:
+                # Update the monitors
+                self.ttft_monitors[engine_url].update_no_value(current_time)
                 ttft = self.ttft_monitors[engine_url].get_average()
 
             in_prefill = self.in_prefill_requests.get(engine_url, 0)
