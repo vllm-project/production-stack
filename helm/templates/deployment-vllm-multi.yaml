@@ -124,6 +124,10 @@ spec:
             mountPath: /dev/shm
           {{- end}}
           {{- end}}
+      {{- if $modelSpec.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ $modelSpec.imagePullSecret }}
+      {{- end }}
       volumes:
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
