@@ -81,10 +81,17 @@ spec:
           {{- end}}
           {{- if $modelSpec.hf_token }}
           - name: HF_TOKEN
+            {{- if kindIs "string" $modelSpec.hf_token }}
             valueFrom:
               secretKeyRef:
                 name: {{ .Release.Name }}-secrets
                 key: hf_token_{{ $modelSpec.name }}
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $modelSpec.hf_token.secretName }}
+                key: {{ $modelSpec.hf_token.secretKey }}
+            {{- end }}
           {{- end }}
           {{- with $modelSpec.env }}
           {{- toYaml . | nindent 10 }}

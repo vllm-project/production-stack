@@ -38,7 +38,11 @@ servingEngineSpec:
   #   - enabled: (optional, bool) Enable LMCache, e.g., true
   #   - cpuOffloadingBufferSize: (optional, string) The CPU offloading buffer size, e.g., "30"
   #
-  # - hf_token: (optional, string) the Huggingface tokens for this model
+  # - hf_token: (optional) Hugging Face token configuration. Can be either:
+  #   - A string containing the token directly (will be stored in a generated secret)
+  #   - An object referencing an existing secret:
+  #     secretName: "my-existing-secret"
+  #     secretKey: "hf-token-key"
   #
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
@@ -75,7 +79,7 @@ servingEngineSpec:
   #     enabled: true
   #     cpuOffloadingBufferSize: "30"
   #
-  #   hf_token: <HUGGING_FACE_TOKEN>
+  #   hf_token: "hf_xxxxxxxxxxxxx"
   #
   #   nodeSelectorTerms:
   #     - matchExpressions:
