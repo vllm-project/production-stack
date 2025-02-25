@@ -1,5 +1,6 @@
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- with $ -}}
+{{- if and (hasKey $modelSpec "pvcStorage") (not (empty $modelSpec.pvcStorage)) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -23,6 +24,7 @@ spec:
     matchLabels:
       {{- toYaml $modelSpec.pvcMatchLabels | nindent 8 }}
   {{- end }}
+{{- end }}
 {{- end }}
 ---
 {{- end }}
