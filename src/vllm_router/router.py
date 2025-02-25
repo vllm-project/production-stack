@@ -457,6 +457,31 @@ async def route_completition(request: Request):
     return await route_general_request(request, "/v1/completions")
 
 
+@app.post("/v1/embeddings")
+async def route_embeddings(request: Request):
+    return await route_general_request(request, "/v1/embeddings")
+
+
+@app.post("/v1/rerank")
+async def route_v1_rerank(request: Request):
+    return await route_general_request(request, "/v1/rerank")
+
+
+@app.post("/rerank")
+async def route_rerank(request: Request):
+    return await route_general_request(request, "/rerank")
+
+
+@app.post("/v1/score")
+async def route_v1_score(request: Request):
+    return await route_general_request(request, "/v1/score")
+
+
+@app.post("/score")
+async def route_score(request: Request):
+    return await route_general_request(request, "/score")
+
+
 @app.get("/version")
 async def show_version():
     ver = {"version": __version__}
