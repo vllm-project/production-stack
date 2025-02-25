@@ -4,6 +4,8 @@
 
 This repository contains benchmarking tools for evaluating vLLM Production Stack's performance (e.g., latency, throughput). The initial focus of this benchmark is on the multi-round QA (Question Answering) use case. The script `multi-round-qa.py` simulates multiple users interacting with a language model concurrently for multiple rounds, allowing you to analyze the serving engine's throughput and latency.
 
+The overall workflow of this script is shown below ![Illustration](multi-round.png)
+
 ## Setup
 
 Installing the required packages needed to run the benchmark by:
@@ -47,8 +49,8 @@ sudo kubectl port-forward svc/vllm-router-service 30080:80
 
 #### Configuring the workload
 
-- `--num-users <int>`: The maximum number of concurrent users in the system.
-- `--num-rounds <int>`: The number of rounds per user.
+- `--num-users <int>`: The maximum number of concurrent users in the system (N in the above figure).
+- `--num-rounds <int>`: The number of rounds per user (M in the above figure).
 - `--qps <float>`: The overall queries per second (QPS) rate for the system.
 - `--shared-system-prompt <int>`: Length of the system prompt shared across all users (in tokens).
 - `--user-history-prompt <int>`: Length of the user-specific context (simulating existing chat history) (in tokens).
