@@ -1,0 +1,26 @@
+{{- if .Values.routerSpec.enableRouter -}}
+{{- if .Values.routerSpec.serviceMonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-router-service-monitor
+  namespace: {{ .Release.Namespace }}
+  labels:
+    release: {{ .Release.Name }}
+    {{- if .Values.routerSpec.serviceMonitor.labels }}
+    {{- toYaml .Values.routerSpec.serviceMonitor.labels | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "{{ .Release.Name }}-router-service"
+  endpoints:
+    - port: {{ .Values.routerSpec.servicePortName }}
+      path: {{ .Values.routerSpec.serviceMonitor.path | default "/metrics" }}
+      interval: {{ .Values.routerSpec.serviceMonitor.interval | default "30s" }}
+      scrapeTimeout: {{ .Values.routerSpec.serviceMonitor.scrapeTimeout | default "10s" }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+{{- end }}
+{{- end }}
