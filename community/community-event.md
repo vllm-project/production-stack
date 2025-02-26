@@ -11,4 +11,4 @@ Time: Weekly, starting from Feb 25th, 2025
 Please download and import the following iCalendar (.ics) files to your calendar system:
 
 - On odd week numbers, we will meet on **4-4:30pm PT**: [Zoom link](https://uchicago.zoom.us/j/6603596916?pwd=Z1E5MDRWUSt2am5XbEt4dTFkNGx6QT09), [Calendar Invite](community_meeting_4pm.ics)
-- On even week numbers, we will meet on **8-8:30am PT**: [Zoom link](https://uchicago.zoom.us/j/6603596916?pwd=Z1E5MDRWUSt2am5XbEt4dTFkNGx6QT09), [Calendar Invite](community_meeting_10am.ics)
+- On even week numbers, we will meet on **8-8:30am PT**: [Zoom link](https://uchicago.zoom.us/j/6603596916?pwd=Z1E5MDRWUSt2am5XbEt4dTFkNGx6QT09), [Calendar Invite](community_meeting_8am.ics)
