@@ -147,14 +147,11 @@ spec:
           - name: {{ .Release.Name }}-chat-templates
             mountPath: /chat_templates
           {{- end}}
-<<<<<<< HEAD
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
-=======
       {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
->>>>>>> 078d5c2 (fix check for volumes and volumeMounts)
       volumes:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
