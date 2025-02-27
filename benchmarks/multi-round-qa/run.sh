@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 #!/bin/bash
 
 if [[ $# -ne 4 ]]; then
@@ -7,7 +8,6 @@ fi
 
 MODEL=$1
 BASE_URL=$2
-QPS=$3
 
 # CONFIGURATION
 NUM_USERS=320
@@ -17,29 +17,27 @@ SYSTEM_PROMPT=1000 # Shared system prompt length
 CHAT_HISTORY=20000 # User specific chat history length
 ANSWER_LEN=100 # Generation length per round
 
-OUTPUT_FILE=$4
-
 run_benchmark() {
     # $1: qps
     # $2: output file
     python3 ./multi-round-qa.py \
         --num-users $NUM_USERS \
         --num-rounds $NUM_ROUNDS \
-        --qps $1 \
+        --qps "$1" \
         --shared-system-prompt "$SYSTEM_PROMPT" \
         --user-history-prompt "$CHAT_HISTORY" \
         --answer-len $ANSWER_LEN \
         --model "$MODEL" \
         --base-url "$BASE_URL" \
-        --output $2 \
+        --output "$2" \
         --log-interval 30 \
         --time 100
 }
 
-key=$3
+KEY=$3
 
 # Run benchmarks for different QPS values
 for qps in 0.1 0.3 0.5 0.7 0.9 1.1; do
-    output_file="${key}_output_${qps}.csv"
+    output_file="${KEY}_output_${qps}.csv"
     run_benchmark "$qps" "$output_file"
 done
