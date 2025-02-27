@@ -69,7 +69,7 @@ if [ "$GPU_AVAILABLE" = true ]; then
 
     # Start minikube with GPU support.
     echo "Starting minikube with GPU support..."
-    sudo minikube start --driver=docker --container-runtime=docker --gpus=all --force --addons=nvidia-device-plugin
+    sudo minikube start --memory=max --driver=docker --container-runtime=docker --gpus=all --force --addons=nvidia-device-plugin
 
     # Update kubeconfig context.
     echo "Updating kubeconfig context..."
@@ -85,7 +85,7 @@ else
     echo "Starting minikube without GPU support..."
     # Fix potential permission issues.
     sudo sysctl fs.protected_regular=0
-    minikube start --driver=docker --force
+    minikube start --memory=max --driver=docker --force
 fi
 
 echo "Minikube cluster installation complete."
