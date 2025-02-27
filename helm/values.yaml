@@ -7,7 +7,12 @@ servingEngineSpec:
   labels:
     environment: "test"
     release: "test"
-
+  # vllmApiKey: (optional) api key for securing the VLMM models. Can be either:
+  #   - A string containing the token directly (will be stored in a generated secret)
+  #   - An object referencing an existing secret:
+  #     secretName: "my-existing-secret"
+  #     secretKey: "vllm-api-key"
+  #
   # modelSpec - configuring multiple serving engines deployments that runs different models
   # Each entry in the modelSpec array should contain the following fields:
   # - name: (string) The name of the model, e.g., "example-model"
@@ -60,6 +65,7 @@ servingEngineSpec:
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   #
   # Example:
+  # vllmApiKey: "vllm_xxxxxxxxxxxxx"
   # modelSpec:
   # - name: "mistral"
   #   repository: "lmcache/vllm-openai"
@@ -97,6 +103,7 @@ servingEngineSpec:
   #     cpuOffloadingBufferSize: "30"
   #
   #   hf_token: "hf_xxxxxxxxxxxxx"
+  #
   #
   #   nodeSelectorTerms:
   #     - matchExpressions:
