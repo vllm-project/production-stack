@@ -8,7 +8,7 @@ fi
 
 MODEL=$1
 BASE_URL=$2
-
+NUM_USERS=400
 # CONFIGURATION
 SYSTEM_PROMPT=1000  # Shared system prompt length
 CHAT_HISTORY=20000  # User-specific chat history length

@@ -1,41 +1,40 @@
 #!/bin/bash
 
-# Ensure correct number of arguments
-if [[ $# -ne 3 ]]; then
-    echo "Usage: $0 <model> <base url> <output file key>"
+if [[ $# -ne 4 ]]; then
+    echo "Usage: $0 <model> <base url> <save file key>"
     exit 1
 fi
 
 MODEL=$1
 BASE_URL=$2
+QPS=$3
 
 # CONFIGURATION
-NUM_USERS=15
-NUM_ROUNDS=20
+NUM_USERS=320
+NUM_ROUNDS=10
 
-SYSTEM_PROMPT=1000  # Shared system prompt length
-CHAT_HISTORY=20000  # User-specific chat history length
-ANSWER_LEN=100      # Generation length per round
+SYSTEM_PROMPT=1000 # Shared system prompt length
+CHAT_HISTORY=20000 # User specific chat history length
+ANSWER_LEN=100 # Generation length per round
 
-# Function to run the benchmark
+OUTPUT_FILE=$4
+
 run_benchmark() {
-    local qps=$1
-    local output_file=$2
-
+    # $1: qps
+    # $2: output file
     python3 ./multi-round-qa.py \
-        --num-users "$NUM_USERS" \
-        --num-rounds "$NUM_ROUNDS" \
-        --qps "$qps" \
-        --shared-system-prompt "$SYSTEM_PROMPT" \
-        --user-history-prompt "$CHAT_HISTORY" \
-        --answer-len "$ANSWER_LEN" \
+        --num-users $NUM_USERS \
+        --num-rounds $NUM_ROUNDS \
+        --qps $1 \
+        --shared-system-prompt $SYSTEM_PROMPT \
+        --user-history-prompt $CHAT_HISTORY \
+        --answer-len $ANSWER_LEN \
         --model "$MODEL" \
         --base-url "$BASE_URL" \
-        --output "$output_file" \
+        --output $2 \
         --log-interval 30 \
         --time 100
 }
-
 
 key=$3
 
