@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 #!/bin/bash
 
 if [[ $# -ne 4 ]]; then
