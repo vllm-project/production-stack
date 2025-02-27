@@ -163,7 +163,7 @@ async def route_general_request(request: Request, endpoint: str):
 
     # TODO (ApostaC): merge two awaits into one
     endpoints = GetServiceDiscovery().get_endpoint_info()
-    engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
+    engine_etats = request.app.state.engine_stats_scraper.get_engine_stats()
     request_stats = request.app.state.request_stats_monitor.get_request_stats(
         time.time()
     )
@@ -636,11 +636,18 @@ def parse_args():
         help="The label selector to filter vLLM pods when using K8s service discovery.",
     )
     parser.add_argument(
-        "--routing-logic",
+        "--request-endpoint-affinity",
         type=str,
         required=True,
         choices=["roundrobin", "session"],
-        help="The routing logic to use",
+        help="The request endpoint affinity to use",
+    )
+    parser.add_argument(
+        "--load-metric",
+        type=str,
+        default="num_queueing_request",
+        choices=["num_queueing_request"],
+        help="The load metric to use",
     )
     parser.add_argument(
         "--session-key",
