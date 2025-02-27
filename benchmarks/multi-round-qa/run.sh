@@ -2,7 +2,7 @@
 
 # Ensure correct number of arguments
 if [[ $# -ne 3 ]]; then
-    echo "Usage: $0 <model> <base url>"
+    echo "Usage: $0 <model> <base url> <output file key>"
     exit 1
 fi
 
