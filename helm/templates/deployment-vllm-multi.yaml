@@ -137,6 +137,10 @@ spec:
             mountPath: /dev/shm
           {{- end}}
           {{- end}}
+      {{- if $modelSpec.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ $modelSpec.imagePullSecret }}
+      {{- end }}
       volumes:
         {{- if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
