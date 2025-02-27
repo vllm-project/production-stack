@@ -52,7 +52,41 @@ jobs:
             sudo helm uninstall vllm
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
-
+  Secure-Minimal-Example:
+    runs-on: self-hosted
+    steps:
+      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+      - name: Deploy via helm charts
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          cd ${{ github.workspace }}
+          sudo docker build -t localhost:5000/git-act-router -f docker/Dockerfile .
+          sudo docker push localhost:5000/git-act-router
+          sudo sysctl fs.protected_regular=0
+          sudo minikube image load localhost:5000/git-act-router
+          sudo helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
+      - name: Validate the installation and send query to the stack
+        run: |
+          sudo bash .github/port-forward.sh curl-05-secure-vllm
+        timeout-minutes: 4
+      - name: Archive functionality results
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-05-secure-vllm
+          path: |
+            output-05-secure-vllm/
+      - name: Helm uninstall
+        run: |
+            sudo helm uninstall vllm
+        if: always()
+      - run: echo "🍏 This job's status is ${{ job.status }}."
   Two-Pods-Minimal-Example:
     runs-on: self-hosted
     needs: Minimal-Example
