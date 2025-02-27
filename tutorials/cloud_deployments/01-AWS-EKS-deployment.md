@@ -67,7 +67,7 @@ SUBNET_IDS=($(aws eks describe-cluster --name "$CLUSTER_NAME" --query "cluster.r
 echo "Subnets: ${SUBNET_IDS[@]}"
 
 ## Fetch Security Group used by EKS
-INSTANCE_ID=$(aws ec2 describe-instances --filters Name=tag:eks:cluster-name,Values=production-stack --query "Reservations[*].Instances[*].InstanceId" --output text | head -n 1)
+INSTANCE_ID=$(aws ec2 describe-instances --filters Name=tag:eks:cluster-name,Values="$CLUSTER_NAME" --query "Reservations[*].Instances[*].InstanceId" --output text | head -n 1)
 EKS_SG_ID=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[0].Instances[0].SecurityGroups[*].GroupId" --output text)
 echo "EKS Security Group ID: $EKS_SG_ID"
 

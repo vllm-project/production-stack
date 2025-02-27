@@ -28,6 +28,8 @@ jobs:
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
       - name: Deploy via helm charts
+        env:
+          DOCKER_BUILDKIT: 1
         run: |
           cd ${{ github.workspace }}
           sudo docker build -t localhost:5000/git-act-router -f docker/Dockerfile .

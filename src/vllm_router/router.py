@@ -27,11 +27,10 @@ from vllm_router.service_discovery import (
     ServiceDiscoveryType,
 )
 from vllm_router.utils import set_ulimit, validate_url
+from vllm_router.version import __version__
 
 httpx_client_wrapper = HTTPXClientWrapper()
 logger = logging.getLogger("uvicorn")
-
-STACK_VERSION = "0.0.1"
 
 
 @asynccontextmanager
@@ -458,9 +457,35 @@ async def route_completition(request: Request):
     return await route_general_request(request, "/v1/completions")
 
 
+@app.post("/v1/embeddings")
+async def route_embeddings(request: Request):
+    return await route_general_request(request, "/v1/embeddings")
+
+
+@app.post("/v1/rerank")
+async def route_v1_rerank(request: Request):
+    return await route_general_request(request, "/v1/rerank")
+
+
+@app.post("/rerank")
+async def route_rerank(request: Request):
+    return await route_general_request(request, "/rerank")
+
+
+@app.post("/v1/score")
+async def route_v1_score(request: Request):
+    return await route_general_request(request, "/v1/score")
+
+
+@app.post("/score")
+async def route_score(request: Request):
+    return await route_general_request(request, "/score")
+
+
 @app.get("/version")
 async def show_version():
-    return JSONResponse(content={"version": STACK_VERSION})
+    ver = {"version": __version__}
+    return JSONResponse(content=ver)
 
 
 @app.get("/v1/models")
@@ -699,6 +724,15 @@ def parse_args():
         default=10,
         help="The interval in seconds to log statistics.",
     )
+
+    # Add --version argument
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Show version and exit",
+    )
+
     args = parser.parse_args()
     validate_args(args)
     return args

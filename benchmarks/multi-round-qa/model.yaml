@@ -1,0 +1,29 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "llama3"
+    repository: "lmcache/vllm-openai"
+    tag: "latest"
+    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+    replicaCount: 1
+
+    requestCPU: 10
+    requestMemory: "50Gi"
+    requestGPU: 1
+
+    pvcStorage: "50Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
+
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      maxModelLen: 4096
+      dtype: "bfloat16"
+      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "30"
+
+    hf_token: <YOUR HUGGINGFACE TOKEN>

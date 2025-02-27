@@ -94,3 +94,6 @@ perf-test.py
 
 values-*.yaml
 helm/examples
+
+# version files
+src/vllm_router/_version.py

@@ -54,7 +54,17 @@
                 "required": ["enabled", "cpuOffloadingBufferSize"]
               },
               "hf_token": {
-                  "type": "string"
+                "oneOf": [
+                  { "type": "string" },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "secretName": { "type": "string" },
+                      "secretKey": { "type": "string" }
+                    },
+                    "required": ["secretName", "secretKey"]
+                  }
+                ]
               },
               "env": {
                 "type": "array",
