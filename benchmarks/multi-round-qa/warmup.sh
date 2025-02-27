@@ -10,9 +10,6 @@ MODEL=$1
 BASE_URL=$2
 
 # CONFIGURATION
-NUM_USERS=20
-NUM_ROUNDS=5
-
 SYSTEM_PROMPT=1000  # Shared system prompt length
 CHAT_HISTORY=20000  # User-specific chat history length
 ANSWER_LEN=100      # Generation length per round
