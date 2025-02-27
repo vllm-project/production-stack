@@ -32,7 +32,7 @@ warmup() {
         --base-url "$BASE_URL" \
         --output /tmp/warmup.csv \
         --log-interval 30 \
-        --time $(($NUM_USERS / 2 + 2))
+        --time $($NUM_USERS / 2 + 2)
 }
 
 warmup
