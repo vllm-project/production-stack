@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Ensure correct number of arguments
-if [[ $# -ne 2 ]]; then
-    echo "Usage: $0 <model> <base url>"
+if [[ $# -ne 3 ]]; then
+    echo "Usage: $0 <model> <base url> <output file key>"
     exit 1
 fi
 
@@ -36,16 +36,11 @@ run_benchmark() {
         --time 100
 }
 
-# Validate if a key argument is provided
-if [[ -z "$3" ]]; then
-    echo "Error: Missing key argument"
-    exit 1
-fi
 
 key=$3
 
 # Run benchmarks for different QPS values
-for qps in 0.3 0.5 0.7 0.9 1.1; do
+for qps in 0.1 0.3 0.5 0.7 0.9 1.1; do
     output_file="${key}_output_${qps}.csv"
     run_benchmark "$qps" "$output_file"
 done
