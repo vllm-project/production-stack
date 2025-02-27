@@ -26,8 +26,8 @@ run_benchmark() {
         --num-users $NUM_USERS \
         --num-rounds $NUM_ROUNDS \
         --qps $1 \
-        --shared-system-prompt $SYSTEM_PROMPT \
-        --user-history-prompt $CHAT_HISTORY \
+        --shared-system-prompt "$SYSTEM_PROMPT" \
+        --user-history-prompt "$CHAT_HISTORY" \
         --answer-len $ANSWER_LEN \
         --model "$MODEL" \
         --base-url "$BASE_URL" \
