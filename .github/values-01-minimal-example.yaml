@@ -12,10 +12,6 @@ servingEngineSpec:
     requestMemory: "16Gi"
     requestGPU: 1
 
-    pvcStorage: "10Gi"
-    pvcAccessMode:
-      - ReadWriteOnce
-
 routerSpec:
   repository: "localhost:5000/git-act-router"
   imagePullPolicy: "IfNotPresent"
