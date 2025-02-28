@@ -87,7 +87,7 @@ To begin with, create a `naive.yaml` configuration file:
 servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
-  - name: "llama"
+  - name: "llama3"
     repository: "lmcache/vllm-openai"
     tag: "latest"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
@@ -97,7 +97,7 @@ servingEngineSpec:
     requestGPU: 1
     pvcStorage: "50Gi"
     pvcMatchLabels:
-      model: "llama"
+      model: "llama3"
     pvcAccessMode:
       - ReadWriteOnce
     vllmConfig:
