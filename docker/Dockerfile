@@ -8,8 +8,8 @@ RUN --mount=type=cache,target=/var/lib/apt --mount=type=cache,target=/var/cache/
     apt-get install -y --no-install-recommends git && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy the setup.dot py and the git metadata first (leverage Docker layer caching)
-COPY setup.py .
+# Copy the pyproject.toml and the git metadata first (leverage Docker layer caching)
+COPY pyproject.toml .
 COPY .git/ .git/
 
 # Copy the rest of the application code
