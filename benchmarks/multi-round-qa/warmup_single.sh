@@ -4,7 +4,7 @@ MODEL=$1
 BASE_URL=$2
 
 # CONFIGURATION
-NUM_USERS_WARMUP=400
+NUM_USERS_WARMUP=20
 
 SYSTEM_PROMPT=1000 # Shared system prompt length
 CHAT_HISTORY=20000 # User specific chat history length
