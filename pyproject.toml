@@ -1,3 +1,34 @@
+[project]
+name = "production-stack"
+dynamic = ["version"]
+description = "The router for vLLM"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Apache-2.0"}
+classifiers = [
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+]
+# Should be the same as src/router/requirements.txt
+dependencies = [
+    "aiofiles==24.1.0",
+    "fastapi==0.115.8",
+    "httpx==0.28.1",
+    "kubernetes==32.0.0",
+    "numpy==1.26.4",
+    "prometheus-client==0.21.1",
+    "python-multipart==0.0.20",
+    "uhashring==2.3",
+    "uvicorn==0.34.0",
+]
+
+[project.scripts]
+vllm-router = "vllm_router.router:main"
+
+[project.urls]
+Repository = "ttps://github.com/vllm-project/production-stack"
+
 [build-system]
 requires = ["setuptools>=68", "setuptools_scm[toml]>=8.0"]
 
@@ -6,3 +37,12 @@ write_to = "src/vllm_router/_version.py"
 
 [tool.isort]
 profile = "black"
+
+[dependency-groups]
+lint = [
+    "pre-commit>=4.1.0",
+]
+test = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.3",
+]
