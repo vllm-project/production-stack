@@ -93,20 +93,22 @@ servingEngineSpec:
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
     requestCPU: 10
-    requestMemory: "80Gi"
+    requestMemory: "150Gi"
     requestGPU: 1
     pvcStorage: "50Gi"
+    pvcMatchLabels:
+      model: "llama3"
     pvcAccessMode:
       - ReadWriteOnce
     vllmConfig:
       enableChunkedPrefill: false
-      enablePrefixCaching: true
       maxModelLen: 32000
-      dtype: "bfloat16"
       extraArgs: ["--disable-log-requests", "--swap-space", 0]
+
     lmcacheConfig:
       enabled: false
-    hf_token: <YOUR_HUGGINGFACE_TOKEN>
+
+    hf_token: <YOUR HUGGINGFACE TOKEN>
 ```
 
 Deploy the Naive K8s stack server:
