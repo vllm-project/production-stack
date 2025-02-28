@@ -1,4 +1,4 @@
-# Tutorial: Multi-Round QA Benchmark (Multi-GPU)
+# Tutorial: Multi-Round QA Benchmark (Single-GPU)
 
 ## Introduction
 
@@ -73,8 +73,8 @@ sudo kubectl port-forward svc/vllm-router-service 30080:80
 Finally, run the benchmarking code by:
 
 ```bash
-bash warmup.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/
-bash run.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/ stack
+bash warmup_single.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/
+bash run_single.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/ stack
 ```
 
 ## Step 2: Running Benchmarks with Naive Kubernetes
@@ -133,8 +133,8 @@ sudo kubectl port-forward svc/vllm-router-service 30080:80
 Finally, run the benchmarking code by:
 
 ```bash
-bash warmup.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/
-bash run.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/ native
+bash warmup_single.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/
+bash run_single.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/ naive
 ```
 
 ## Step 3: Running Benchmarks with AIBrix
@@ -150,8 +150,8 @@ We also changed the CPU memory limit in AIBrix's KV cache server config: At line
 Finally, we follow the steps in [AIBrix's official repo](https://aibrix.readthedocs.io/latest/getting_started/installation/lambda.html) to start AIBrix server and then run the benchmarking code by:
 
 `bash
-bash warmup.sh llama3 http://localhost:8888/v1/
-bash run.sh llama3 http://localhost:8888/v1/ aibrix
+bash warmup_single.sh llama3-1-8b http://localhost:8888/v1/
+bash run_single.sh llama3-1-8b http://localhost:8888/v1/ aibrix
 `
 
 ## Conclusion

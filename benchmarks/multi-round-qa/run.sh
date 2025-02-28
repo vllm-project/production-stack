@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [[ $# -ne 4 ]]; then
+if [[ $# -ne 3 ]]; then
     echo "Usage: $0 <model> <base url> <save file key>"
     exit 1
 fi
