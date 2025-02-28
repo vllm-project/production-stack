@@ -63,6 +63,10 @@ spec:
           - '{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}'
           {{-   end }}
           {{- end }}
+          {{- if $modelSpec.chatTemplate }}
+          - "--chat-template"
+          - "/chat_templates/chat-template.jinga"
+          {{- end }}
           securityContext:
             runAsNonRoot: false
           imagePullPolicy: IfNotPresent
@@ -126,8 +130,10 @@ spec:
               containerPort: {{ include "chart.container-port" . }}
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
-          {{- if hasKey $modelSpec "pvcStorage" }}
+          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
           volumeMounts:
+          {{- end }}
+          {{- if hasKey $modelSpec "pvcStorage" }}
           - name: {{ .Release.Name }}-storage
             mountPath: /data
           {{- end }}
@@ -137,11 +143,17 @@ spec:
             mountPath: /dev/shm
           {{- end}}
           {{- end}}
+          {{- if $modelSpec.chatTemplate }}
+          - name: {{ .Release.Name }}-chat-templates
+            mountPath: /chat_templates
+          {{- end}}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
       volumes:
+      {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
@@ -154,6 +166,11 @@ spec:
             medium: Memory
             sizeLimit: {{ default "20Gi" $modelSpec.shmSize }}
         {{- end}}
+        {{- end}}
+        {{- if $modelSpec.chatTemplate}}
+        - name: {{ .Release.Name }}-chat-templates
+          configMap:
+            name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
         {{- end}}
       {{- if .Values.servingEngineSpec.tolerations }}
       {{-   with .Values.servingEngineSpec.tolerations }}
@@ -174,6 +191,17 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
+{{- if $modelSpec.chatTemplate }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
+  namespace: "{{ .Release.Namespace }}"
+data:
+  chat-template.jinga: |-
+    {{ $modelSpec.chatTemplate}}
+{{- end }}
 {{- end }}
 ---
 {{- end }}
