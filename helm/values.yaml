@@ -14,6 +14,7 @@ servingEngineSpec:
   # - name: (string) The name of the model, e.g., "example-model"
   # - repository: (string) The repository of the model, e.g., "vllm/vllm-openai"
   # - tag: (string) The tag of the model, e.g., "latest"
+  # - imagePullSecret: (Optional, string) Name of secret with credentials to private container repository, e.g. "secret"
   # - modelURL: (string) The URL of the model, e.g., "facebook/opt-125m"
   #
   # - replicaCount: (int) The number of replicas for the model, e.g. 1
