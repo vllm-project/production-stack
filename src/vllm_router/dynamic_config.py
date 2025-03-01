@@ -107,6 +107,9 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         self.watcher_thread.start()
         assert hasattr(self.app, "state")
 
+    def get_current_config(self) -> DynamicRouterConfig:
+        return self.current_config
+
     def reconfigure_service_discovery(self, config: DynamicRouterConfig):
         """
         Reconfigures the router with the given config.

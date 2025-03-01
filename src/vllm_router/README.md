@@ -105,3 +105,20 @@ Here is an example dynamic config file:
     "static_models": "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m"
 }
 ```
+
+### Get current dynamic config
+
+If the dynamic config is enabled, the router will reflect the current dynamic config in the `/health` endpoint.
+
+```bash
+curl http://<router_host>:<router_port>/health
+```
+
+The response will be a JSON object with the current dynamic config.
+
+```json
+{
+    "status": "healthy",
+    "dynamic_config": <current_dynamic_config (JSON object)>
+}
+```

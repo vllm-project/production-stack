@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import threading
 import time
@@ -569,7 +570,18 @@ async def health() -> Response:
         return JSONResponse(
             content={"status": "Engine stats scraper is down."}, status_code=503
         )
-    return Response(status_code=200)
+
+    if GetDynamicConfigWatcher() is not None:
+        dynamic_config = GetDynamicConfigWatcher().get_current_config()
+        return JSONResponse(
+            content={
+                "status": "healthy",
+                "dynamic_config": json.loads(dynamic_config.to_json_str()),
+            },
+            status_code=200,
+        )
+    else:
+        return JSONResponse(content={"status": "healthy"}, status_code=200)
 
 
 # --- Prometheus Metrics Endpoint ---
