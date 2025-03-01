@@ -1,0 +1,9 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: StaticRoute
+metadata:
+  labels:
+    app.kubernetes.io/name: router-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: staticroute-sample
+spec:
+  # TODO(user): Add fields here

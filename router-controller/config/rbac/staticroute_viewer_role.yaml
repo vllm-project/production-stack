@@ -1,0 +1,23 @@
+# permissions for end users to view staticroutes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: router-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: staticroute-viewer-role
+rules:
+- apiGroups:
+  - production-stack.vllm.ai
+  resources:
+  - staticroutes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - production-stack.vllm.ai
+  resources:
+  - staticroutes/status
+  verbs:
+  - get
