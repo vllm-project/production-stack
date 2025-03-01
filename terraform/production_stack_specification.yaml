@@ -1,29 +1,35 @@
 servingEngineSpec:
+  strategy:
+    type: Recreate
   runtimeClassName: ""
   modelSpec:
-    - name: "opt125m"
-      repository: "eaminchan/opt-125m-cpu"
-      tag: "latest"
-      modelURL: "facebook/opt-125m"
+  - name: "opt125m"
+    repository: "eaminchan/opt-125m-cpu"
+    tag: "latest"
+    # repository: "vllm/vllm-openai"
+    modelURL: "facebook/opt-125m"
+    
+    replicaCount: 1
+    device: "cpu"
 
-      replicaCount: 1
+    requestCPU: 1.5
+    requestMemory: "6Gi"
+    requestGPU: 0
 
-      requestCPU: 1.5
-      requestMemory: "6Gi"
-      requestGPU: 0
-
-      pvcStorage: "10Gi"
-      pvcAccessMode:
-        - ReadWriteOnce
-      device: "cpu"
+    pvcStorage: "10Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
 
 routerSpec:
   resources:
     requests:
       cpu: "1"
-      memory: "6G"
+      memory: "6Gi"
     limits:
       cpu: "1"
-      memory: "6G"
+      memory: "6Gi"
 
-# gcloud container clusters get-credentials CLUSTER_NAME --region=COMPUTE_REGION
+
+# gcloud container clusters get-credentials production-stack --region=us-central1-a
+# helm install vllm vllm/vllm-stack -f production_stack_specification.yaml
+# helm uninstall vllm

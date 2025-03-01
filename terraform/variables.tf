@@ -14,7 +14,7 @@ variable "zone" {
   description = "zone name"
   type = string
   default = "us-central1-a" // a c
-  # default = "asia-northeast3-a"
+  # default = "asia-northeast3-b"
 }
 
 variable "cluster_name" {
