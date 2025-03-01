@@ -10,6 +10,7 @@ from vllm_router.engine_stats import EngineStats
 from vllm_router.log import init_logger
 from vllm_router.request_stats import RequestStats
 from vllm_router.service_discovery import EndpointInfo
+from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)
 
@@ -17,16 +18,6 @@ logger = init_logger(__name__)
 class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
-
-
-class SingletonABCMeta(abc.ABCMeta):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            instance = super().__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-        return cls._instances[cls]
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -194,6 +185,16 @@ def InitializeRoutingLogic(
         return SessionRouter(kwargs.get("session_key"))
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
+
+
+def ReconfigureRoutingLogic(
+    routing_logic: RoutingLogic, *args, **kwargs
+) -> RoutingInterface:
+    # Remove the existing routers from the singleton registry
+    for cls in (SessionRouter, RoundRobinRouter):
+        if cls in SingletonABCMeta._instances:
+            del SingletonABCMeta._instances[cls]
+    return InitializeRoutingLogic(routing_logic, *args, **kwargs)
 
 
 def GetRoutingLogic() -> RoutingInterface:

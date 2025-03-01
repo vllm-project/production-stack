@@ -1,25 +1,16 @@
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import requests
 from prometheus_client.parser import text_string_to_metric_families
 
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import GetServiceDiscovery
+from vllm_router.utils import SingletonMeta
 
 logger = init_logger(__name__)
-
-
-class SingletonMeta(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            instance = super().__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-        return cls._instances[cls]
 
 
 @dataclass
@@ -92,10 +83,12 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             raise ValueError(
                 "EngineStatsScraper must be initialized with scrape_interval"
             )
-        self.service_discovery = GetServiceDiscovery()  # (remains unchanged)
         self.engine_stats: Dict[str, EngineStats] = {}
         self.engine_stats_lock = threading.Lock()
         self.scrape_interval = scrape_interval
+
+        # scrape thread
+        self.running = True
         self.scrape_thread = threading.Thread(target=self._scrape_worker, daemon=True)
         self.scrape_thread.start()
         self._initialized = True
@@ -108,7 +101,7 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             url (str): The URL of the serving engine (does not contain endpoint)
         """
         try:
-            response = requests.get(url + "/metrics")
+            response = requests.get(url + "/metrics", timeout=self.scrape_interval)
             response.raise_for_status()
             engine_stats = EngineStats.FromVllmScrape(response.text)
         except Exception as e:
@@ -126,7 +119,7 @@ class EngineStatsScraper(metaclass=SingletonMeta):
 
         """
         collected_engine_stats = {}
-        endpoints = self.service_discovery.get_endpoint_info()
+        endpoints = GetServiceDiscovery().get_endpoint_info()
         logger.info(f"Scraping metrics from {len(endpoints)} serving engine(s)")
         for info in endpoints:
             url = info.url
@@ -142,6 +135,16 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             for url, stats in collected_engine_stats.items():
                 self.engine_stats[url] = stats
 
+    def _sleep_or_break(self, check_interval: float = 1):
+        """
+        Sleep for self.scrape_interval seconds if self.running is True.
+        Otherwise, break the loop.
+        """
+        for _ in range(int(self.scrape_interval / check_interval)):
+            if not self.running:
+                break
+            time.sleep(check_interval)
+
     def _scrape_worker(self):
         """
         Periodically scrape metrics from all serving engines in the background.
@@ -151,9 +154,9 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         metrics from all serving engines and store them in self.engine_stats.
 
         """
-        while True:
+        while self.running:
             self._scrape_metrics()
-            time.sleep(self.scrape_interval)
+            self._sleep_or_break()
 
     def get_engine_stats(self) -> Dict[str, EngineStats]:
         """
@@ -174,6 +177,13 @@ class EngineStatsScraper(metaclass=SingletonMeta):
                 False otherwise
         """
         return self.scrape_thread.is_alive()
+
+    def close(self):
+        """
+        Stop the background thread and cleanup resources.
+        """
+        self.running = False
+        self.scrape_thread.join()
 
 
 def InitializeEngineStatsScraper(scrape_interval: float) -> EngineStatsScraper:

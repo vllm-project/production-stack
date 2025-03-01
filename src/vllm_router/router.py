@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import threading
 import time
@@ -12,6 +13,11 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 
 from vllm_router.batch import BatchProcessor, initialize_batch_processor
+from vllm_router.dynamic_config import (
+    DynamicRouterConfig,
+    GetDynamicConfigWatcher,
+    InitializeDynamicConfigWatcher,
+)
 from vllm_router.engine_stats import GetEngineStatsScraper, InitializeEngineStatsScraper
 from vllm_router.files import Storage, initialize_storage
 from vllm_router.httpx_client import HTTPXClientWrapper
@@ -26,7 +32,12 @@ from vllm_router.service_discovery import (
     InitializeServiceDiscovery,
     ServiceDiscoveryType,
 )
-from vllm_router.utils import set_ulimit, validate_url
+from vllm_router.utils import (
+    parse_static_model_names,
+    parse_static_urls,
+    set_ulimit,
+    validate_url,
+)
 from vllm_router.version import __version__
 
 httpx_client_wrapper = HTTPXClientWrapper()
@@ -40,6 +51,21 @@ async def lifespan(app: FastAPI):
         await app.state.batch_processor.initialize()
     yield
     await httpx_client_wrapper.stop()
+
+    # Close the threaded-components
+    logger.info("Closing engine stats scraper")
+    engine_stats_scraper = GetEngineStatsScraper()
+    engine_stats_scraper.close()
+
+    logger.info("Closing service discovery module")
+    service_discovery = GetServiceDiscovery()
+    service_discovery.close()
+
+    # Close the optional dynamic config watcher
+    dyn_cfg_watcher = GetDynamicConfigWatcher()
+    if dyn_cfg_watcher is not None:
+        logger.info("Closing dynamic config watcher")
+        dyn_cfg_watcher.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -544,7 +570,18 @@ async def health() -> Response:
         return JSONResponse(
             content={"status": "Engine stats scraper is down."}, status_code=503
         )
-    return Response(status_code=200)
+
+    if GetDynamicConfigWatcher() is not None:
+        dynamic_config = GetDynamicConfigWatcher().get_current_config()
+        return JSONResponse(
+            content={
+                "status": "healthy",
+                "dynamic_config": json.loads(dynamic_config.to_json_str()),
+            },
+            status_code=200,
+        )
+    else:
+        return JSONResponse(content={"status": "healthy"}, status_code=200)
 
 
 # --- Prometheus Metrics Endpoint ---
@@ -725,6 +762,13 @@ def parse_args():
         help="The interval in seconds to log statistics.",
     )
 
+    parser.add_argument(
+        "--dynamic-config-json",
+        type=str,
+        default=None,
+        help="The path to the json file containing the dynamic configuration.",
+    )
+
     # Add --version argument
     parser.add_argument(
         "--version",
@@ -736,22 +780,6 @@ def parse_args():
     args = parser.parse_args()
     validate_args(args)
     return args
-
-
-def parse_static_urls(args):
-    urls = args.static_backends.split(",")
-    backend_urls = []
-    for url in urls:
-        if validate_url(url):
-            backend_urls.append(url)
-        else:
-            logger.warning(f"Skipping invalid URL: {url}")
-    return backend_urls
-
-
-def parse_static_model_names(args):
-    models = args.static_models.split(",")
-    return models
 
 
 def InitializeAll(args):
@@ -767,8 +795,8 @@ def InitializeAll(args):
     if args.service_discovery == "static":
         InitializeServiceDiscovery(
             ServiceDiscoveryType.STATIC,
-            urls=parse_static_urls(args),
-            models=parse_static_model_names(args),
+            urls=parse_static_urls(args.static_backends),
+            models=parse_static_model_names(args.static_models),
         )
     elif args.service_discovery == "k8s":
         InitializeServiceDiscovery(
@@ -799,6 +827,11 @@ def InitializeAll(args):
     app.state.engine_stats_scraper = GetEngineStatsScraper()
     app.state.request_stats_monitor = GetRequestStatsMonitor()
     app.state.router = GetRoutingLogic()
+
+    # Initialize dynamic config watcher
+    if args.dynamic_config_json:
+        init_config = DynamicRouterConfig.from_args(args)
+        InitializeDynamicConfigWatcher(args.dynamic_config_json, 10, init_config, app)
 
 
 def log_stats(interval: int = 10):
