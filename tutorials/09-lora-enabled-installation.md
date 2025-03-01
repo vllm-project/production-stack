@@ -36,10 +36,10 @@ servingEngineSpec:
     repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "meta-llama/Llama-2-7b-hf"
-    
+
     # Enable LoRA support
     enableLoRA: true
-    
+
     # Mount Hugging Face credentials and configure LoRA settings
     env:
       - name: HUGGING_FACE_HUB_TOKEN
@@ -173,6 +173,7 @@ kubectl get pods
 ```
 
 Expected output should show the pods running:
+
 ```plaintext
 NAME                                            READY   STATUS    RESTARTS   AGE
 vllm-lora-deployment-router-xxxxxx-yyyy        1/1     Running   0          2m38s
@@ -208,4 +209,4 @@ kubectl delete secret huggingface-credentials
 
 - [vLLM LoRA Documentation](https://docs.vllm.ai)
 - [Llama-2 Model Card](https://huggingface.co/meta-llama/Llama-2-7b-hf)
-- [LoRA Paper](https://arxiv.org/abs/2106.09685) 
+- [LoRA Paper](https://arxiv.org/abs/2106.09685)
