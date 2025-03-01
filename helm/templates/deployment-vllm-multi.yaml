@@ -119,6 +119,12 @@ spec:
           - name: LMCACHE_MAX_LOCAL_DISK_SIZE
             value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
           {{-   end }}
+          {{-   if .Values.cacheserverSpec }}
+          - name: LMCACHE_REMOTE_URL
+            value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
+          - name: LMCACHE_REMOTE_SERDE
+            value: "{{ .Values.cacheserverSpec.serde }}"
+          {{-   end }}
           {{- end }}
           {{- if .Values.servingEngineSpec.configs }}
           envFrom:

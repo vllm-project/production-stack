@@ -1,0 +1,54 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "mistral"
+    repository: "lmcache/vllm-openai"
+    tag: "latest"
+    modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+    replicaCount: 2
+    requestCPU: 10
+    requestMemory: "40Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      maxModelLen: 16384
+
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "20"
+
+    hf_token: <YOUR HF TOKEN>
+
+cacheserverSpec:
+  # -- Number of replicas
+  replicaCount: 1
+
+  # -- Container port
+  containerPort: 8080
+
+  # -- Service port
+  servicePort: 81
+
+  # -- Serializer/Deserializer type
+  serde: "naive"
+
+  # -- Cache server image (reusing the vllm image)
+  repository: "lmcache/vllm-openai"
+  tag: "latest"
+
+  # TODO (Jiayi): please adjust this once we have evictor
+  # -- router resource requests and limits
+  resources:
+    requests:
+      cpu: "4"
+      memory: "8G"
+    limits:
+      cpu: "4"
+      memory: "10G"
+
+  # -- Customized labels for the cache server deployment
+  labels:
+    environment: "cacheserver"
+    release: "cacheserver"

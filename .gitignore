@@ -98,9 +98,10 @@ helm/examples
 # version files
 src/vllm_router/_version.py
 
-
 # credentials.json
 credentials.json
 **/*.terraform
 **/*.tfstate.*
 **/*.tfstate
+
+/tutorials/assets/private.yaml
