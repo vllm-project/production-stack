@@ -132,7 +132,7 @@ sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-stor
 
 ## Benchmark the Performance Gain of Remote Shared Storage (Work in Progress)
 
-In this section, we will benchmark the performance improvements when using LMCache for remote KV cache shared storage. Stay tuned for updates.
+In this section, we will benchmark the performance improvement when using LMCache for remote KV cache shared storage. Stay tuned for updates.
 
 ## Conclusion
 
