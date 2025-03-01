@@ -26,7 +26,8 @@ call_openai() {
                 # Process each line of the streamed response
                 if [[ "$line" == "data: "* ]]; then
                     # Extract content from the line if it exists
-                    local chunk=$(echo "$line" | sed 's/^data: //' | jq -r '.choices[0].delta.content // empty' 2>/dev/null)
+                    local chunk
+                    chunk=$(echo "$line" | sed 's/^data: //' | jq -r '.choices[0].delta.content // empty' 2>/dev/null)
                     if [ -n "$chunk" ]; then
                         echo -n "$chunk"
                     fi
