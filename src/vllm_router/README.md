@@ -81,20 +81,26 @@ The router will watch the json file for changes and update the configuration acc
 
 Currently, the dynamic config supports the following fields:
 
-- `service_discovery_type`: The service discovery type. Options are `static` or `k8s`.
-- (When using `static` service discovery type) `static_backends`: The URLs of static serving engines, separated by commas (e.g., `http://localhost:9001,http://localhost:9002,http://localhost:9003`).
-- (When using `static` service discovery type) `static_models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
-- (When using `k8s` service discovery type) `k8s_port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
-- (When using `k8s` service discovery type) `k8s_namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
-- (When using `k8s` service discovery type) `k8s_label_selector`: The label selector to filter vLLM pods when using K8s service discovery.
+**Required fields:**
+
+- `service_discovery`: The service discovery type. Options are `static` or `k8s`.
 - `routing_logic`: The routing logic to use. Options are `roundrobin` or `session`.
-- `session_key`: The key (in the header) to identify a session.
+
+**Optional fields:**
+
+- (When using `static` service discovery) `static_backends`: The URLs of static serving engines, separated by commas (e.g., `http://localhost:9001,http://localhost:9002,http://localhost:9003`).
+- (When using `static` service discovery) `static_models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
+- (When using `k8s` service discovery) `k8s_port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
+- (When using `k8s` service discovery) `k8s_namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
+- (When using `k8s` service discovery) `k8s_label_selector`: The label selector to filter vLLM pods when using K8s service discovery.
+- `session_key`: The key (in the header) to identify a session when using session-based routing.
 
 Here is an example dynamic config file:
 
 ```json
 {
-    "service_discovery_type": "static",
+    "service_discovery": "static",
+    "routing_logic": "roundrobin",
     "static_backends": "http://localhost:9001,http://localhost:9002,http://localhost:9003",
     "static_models": "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m"
 }

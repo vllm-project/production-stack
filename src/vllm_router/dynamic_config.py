@@ -2,6 +2,7 @@ import json
 import threading
 import time
 from dataclasses import dataclass
+from typing import Optional
 
 from fastapi import FastAPI
 
@@ -22,17 +23,20 @@ class DynamicRouterConfig:
     Re-configurable configurations for the VLLM router.
     """
 
+    # Required configurations
+    service_discovery: str
+    routing_logic: str
+
+    # Optional configurations
     # Service discovery configurations
-    service_discovery_type: str
-    static_backends: str
-    static_models: str
-    k8s_port: int
-    k8s_namespace: str
-    k8s_label_selector: str
+    static_backends: Optional[str] = None
+    static_models: Optional[str] = None
+    k8s_port: Optional[int] = None
+    k8s_namespace: Optional[str] = None
+    k8s_label_selector: Optional[str] = None
 
     # Routing logic configurations
-    routing_logic: str
-    session_key: str
+    session_key: Optional[str] = None
 
     # Batch API configurations
     # TODO (ApostaC): Support dynamic reconfiguration of batch API
@@ -51,7 +55,7 @@ class DynamicRouterConfig:
     @staticmethod
     def from_args(args) -> "DynamicRouterConfig":
         return DynamicRouterConfig(
-            service_discovery_type=args.service_discovery_type,
+            service_discovery=args.service_discovery,
             static_backends=args.static_backends,
             static_models=args.static_models,
             k8s_port=args.k8s_port,
@@ -94,7 +98,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         """
         self.config_json = config_json
         self.watch_interval = watch_interval
-        self.init_config = init_config
+        self.current_config = init_config
         self.app = app
 
         # Watcher thread
@@ -107,14 +111,13 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         """
         Reconfigures the router with the given config.
         """
-
-        if config.service_discovery_type == "static":
+        if config.service_discovery == "static":
             ReconfigureServiceDiscovery(
                 ServiceDiscoveryType.STATIC,
                 urls=parse_static_urls(config.static_backends),
                 models=parse_static_model_names(config.static_models),
             )
-        elif config.service_discovery_type == "k8s":
+        elif config.service_discovery == "k8s":
             ReconfigureServiceDiscovery(
                 ServiceDiscoveryType.K8S,
                 namespace=config.k8s_namespace,
@@ -123,7 +126,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
             )
         else:
             raise ValueError(
-                f"Invalid service discovery type: {config.service_discovery_type}"
+                f"Invalid service discovery type: {config.service_discovery}"
             )
 
         logger.info(f"DynamicConfigWatcher: Service discovery reconfiguration complete")
@@ -161,6 +164,16 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         self.reconfigure_batch_api(config)
         self.reconfigure_stats(config)
 
+    def _sleep_or_break(self, check_interval: float = 1):
+        """
+        Sleep for self.watch_interval seconds if self.running is True.
+        Otherwise, break the loop.
+        """
+        for _ in range(int(self.watch_interval / check_interval)):
+            if not self.running:
+                break
+            time.sleep(check_interval)
+
     def _watch_worker(self):
         """
         Watches the config file for changes and updates the DynamicRouterConfig accordingly.
@@ -169,8 +182,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         """
         while self.running:
             try:
-                with open(self.config_json, "r") as f:
-                    config = json.load(f)
+                config = DynamicRouterConfig.from_json(self.config_json)
                 if config != self.current_config:
                     logger.info(
                         f"DynamicConfigWatcher: Config changed, reconfiguring..."
@@ -182,7 +194,8 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                     self.current_config = config
             except Exception as e:
                 logger.warning(f"DynamicConfigWatcher: Error loading config file: {e}")
-                time.sleep(self.watch_interval)
+
+            self._sleep_or_break()
 
     def close(self):
         """
@@ -209,4 +222,4 @@ def GetDynamicConfigWatcher() -> DynamicConfigWatcher:
     """
     Returns the DynamicConfigWatcher singleton.
     """
-    return DynamicConfigWatcher()
+    return DynamicConfigWatcher(_create=False)

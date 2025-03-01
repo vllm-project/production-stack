@@ -14,6 +14,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 from vllm_router.batch import BatchProcessor, initialize_batch_processor
 from vllm_router.dynamic_config import (
     DynamicRouterConfig,
+    GetDynamicConfigWatcher,
     InitializeDynamicConfigWatcher,
 )
 from vllm_router.engine_stats import GetEngineStatsScraper, InitializeEngineStatsScraper
@@ -49,6 +50,21 @@ async def lifespan(app: FastAPI):
         await app.state.batch_processor.initialize()
     yield
     await httpx_client_wrapper.stop()
+
+    # Close the threaded-components
+    logger.info("Closing engine stats scraper")
+    engine_stats_scraper = GetEngineStatsScraper()
+    engine_stats_scraper.close()
+
+    logger.info("Closing service discovery module")
+    service_discovery = GetServiceDiscovery()
+    service_discovery.close()
+
+    # Close the optional dynamic config watcher
+    dyn_cfg_watcher = GetDynamicConfigWatcher()
+    if dyn_cfg_watcher is not None:
+        logger.info("Closing dynamic config watcher")
+        dyn_cfg_watcher.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -767,8 +783,8 @@ def InitializeAll(args):
     if args.service_discovery == "static":
         InitializeServiceDiscovery(
             ServiceDiscoveryType.STATIC,
-            urls=parse_static_urls(args),
-            models=parse_static_model_names(args),
+            urls=parse_static_urls(args.static_backends),
+            models=parse_static_model_names(args.static_models),
         )
     elif args.service_discovery == "k8s":
         InitializeServiceDiscovery(
@@ -802,7 +818,7 @@ def InitializeAll(args):
 
     # Initialize dynamic config watcher
     if args.dynamic_config_json:
-        init_config = DynamicRouterConfig.from_json(args.dynamic_config_json)
+        init_config = DynamicRouterConfig.from_args(args)
         InitializeDynamicConfigWatcher(args.dynamic_config_json, 10, init_config, app)
 
 

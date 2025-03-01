@@ -112,6 +112,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         self.k8s_watcher = watch.Watch()
 
         # Start watching engines
+        self.running = True
         self.watcher_thread = threading.Thread(target=self._watch_engines, daemon=True)
         self.watcher_thread.start()
 
@@ -149,25 +150,31 @@ class K8sServiceDiscovery(ServiceDiscovery):
         return model_name
 
     def _watch_engines(self):
-        # TODO (ApostaC): Add error handling
+        # TODO (ApostaC): remove the hard-coded timeouts
 
-        for event in self.k8s_watcher.stream(
-            self.k8s_api.list_namespaced_pod,
-            namespace=self.namespace,
-            label_selector=self.label_selector,
-        ):
-            pod = event["object"]
-            event_type = event["type"]
-            pod_name = pod.metadata.name
-            pod_ip = pod.status.pod_ip
-            is_pod_ready = self._check_pod_ready(pod.status.container_statuses)
-            if is_pod_ready:
-                model_name = self._get_model_name(pod_ip)
-            else:
-                model_name = None
-            self._on_engine_update(
-                pod_name, pod_ip, event_type, is_pod_ready, model_name
-            )
+        while self.running:
+            try:
+                for event in self.k8s_watcher.stream(
+                    self.k8s_api.list_namespaced_pod,
+                    namespace=self.namespace,
+                    label_selector=self.label_selector,
+                    timeout_seconds=30,
+                ):
+                    pod = event["object"]
+                    event_type = event["type"]
+                    pod_name = pod.metadata.name
+                    pod_ip = pod.status.pod_ip
+                    is_pod_ready = self._check_pod_ready(pod.status.container_statuses)
+                    if is_pod_ready:
+                        model_name = self._get_model_name(pod_ip)
+                    else:
+                        model_name = None
+                    self._on_engine_update(
+                        pod_name, pod_ip, event_type, is_pod_ready, model_name
+                    )
+            except Exception as e:
+                logger.error(f"K8s watcher error: {e}")
+                time.sleep(0.5)
 
     def _add_engine(self, engine_name: str, engine_ip: str, model_name: str):
         logger.info(
@@ -250,6 +257,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         """
         Close the service discovery module.
         """
+        self.running = False
         self.k8s_watcher.stop()
         self.watcher_thread.join()
 

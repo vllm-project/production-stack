@@ -2,12 +2,22 @@ import abc
 import re
 import resource
 
+from vllm_router.log import init_logger
+
+logger = init_logger(__name__)
+
 
 class SingletonMeta(type):
     _instances = {}
 
     def __call__(cls, *args, **kwargs):
+        """
+        Note: if the class is called with _create=False, it will return None
+        if the instance does not exist.
+        """
         if cls not in cls._instances:
+            if kwargs.get("_create") is False:
+                return None
             instance = super().__call__(*args, **kwargs)
             cls._instances[cls] = instance
         return cls._instances[cls]
@@ -17,7 +27,13 @@ class SingletonABCMeta(abc.ABCMeta):
     _instances = {}
 
     def __call__(cls, *args, **kwargs):
+        """
+        Note: if the class is called with _create=False, it will return None
+        if the instance does not exist.
+        """
         if cls not in cls._instances:
+            if kwargs.get("create") is False:
+                return None
             instance = super().__call__(*args, **kwargs)
             cls._instances[cls] = instance
         return cls._instances[cls]
@@ -63,8 +79,8 @@ def set_ulimit(target_soft_limit=65535):
             )
 
 
-def parse_static_urls(args):
-    urls = args.static_backends.split(",")
+def parse_static_urls(static_backends: str):
+    urls = static_backends.split(",")
     backend_urls = []
     for url in urls:
         if validate_url(url):
@@ -74,6 +90,6 @@ def parse_static_urls(args):
     return backend_urls
 
 
-def parse_static_model_names(args):
-    models = args.static_models.split(",")
+def parse_static_model_names(static_models: str):
+    models = static_models.split(",")
     return models
