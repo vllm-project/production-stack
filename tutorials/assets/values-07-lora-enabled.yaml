@@ -6,20 +6,20 @@ servingEngineSpec:
     tag: "latest"
     modelURL: "meta-llama/Llama-2-7b-hf"
     enableLoRA: true
-
+    
     # Option 1: Direct token
     # hf_token: "your_huggingface_token_here"
-
+    
     # OR Option 2: Secret reference
     hf_token:
       secretName: "huggingface-credentials"
       secretKey: "HUGGING_FACE_HUB_TOKEN"
-
+    
     # Other vLLM configs if needed
     vllmConfig:
       maxModelLen: 4096
       dtype: "bfloat16"
-
+    
     # Mount Hugging Face credentials and configure LoRA settings
     env:
       - name: HUGGING_FACE_HUB_TOKEN
@@ -46,3 +46,4 @@ servingEngineSpec:
       initialDelaySeconds: 60
       periodSeconds: 30
       failureThreshold: 120  # Allow up to 1 hour for startup
+
