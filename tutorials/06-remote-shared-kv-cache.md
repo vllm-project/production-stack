@@ -80,7 +80,7 @@ The `CacheserverSpec` starts a remote shared KV cache storage.
 Deploy the Helm chart using the customized values file:
 
 ```bash
-helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-storage.yaml
+sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-storage.yaml
 ```
 
 ## Step 3: Verifying the Installation
@@ -97,7 +97,7 @@ helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-storage.y
    sudo kubectl logs -f <pod-name>
    ```
 
-   Look for entries in the log indicating LMCache is enabled and operational. An example output is:
+   Look for entries in the log indicating LMCache is enabled and operational. An example output (indicating KV cache is stored) is:
 
    ```plaintext
    INFO 01-21 20:16:58 lmcache_connector.py:41] Initializing LMCacheConfig under kv_transfer_config kv_connector='LMCacheConnector' kv_buffer_device='cuda' kv_buffer_size=1000000000.0 kv_role='kv_both' kv_rank=None kv_parallel_size=1 kv_ip='127.0.0.1' kv_port=14579
