@@ -3,7 +3,7 @@ import threading
 import time
 from dataclasses import dataclass
 
-import FastAPI
+from fastapi import FastAPI
 
 from vllm_router.log import init_logger
 from vllm_router.routing_logic import ReconfigureRoutingLogic
@@ -126,6 +126,8 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 f"Invalid service discovery type: {config.service_discovery_type}"
             )
 
+        logger.info(f"DynamicConfigWatcher: Service discovery reconfiguration complete")
+
     def reconfigure_routing_logic(self, config: DynamicRouterConfig):
         """
         Reconfigures the router with the given config.
@@ -134,6 +136,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
             config.routing_logic, session_key=config.session_key
         )
         self.app.state.router = routing_logic
+        logger.info(f"DynamicConfigWatcher: Routing logic reconfiguration complete")
 
     def reconfigure_batch_api(self, config: DynamicRouterConfig):
         """
@@ -169,7 +172,13 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 with open(self.config_json, "r") as f:
                     config = json.load(f)
                 if config != self.current_config:
+                    logger.info(
+                        f"DynamicConfigWatcher: Config changed, reconfiguring..."
+                    )
                     self.reconfigure_all(config)
+                    logger.info(
+                        f"DynamicConfigWatcher: Config reconfiguration complete"
+                    )
                     self.current_config = config
             except Exception as e:
                 logger.warning(f"DynamicConfigWatcher: Error loading config file: {e}")
