@@ -2,6 +2,26 @@ import re
 import resource
 
 
+class SingletonMeta(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
+
+
+class SingletonABCMeta(abc.ABCMeta):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
+
+
 def validate_url(url: str) -> bool:
     """
     Validates the format of the given URL.
@@ -40,3 +60,19 @@ def set_ulimit(target_soft_limit=65535):
                 current_soft,
                 e,
             )
+
+
+def parse_static_urls(args):
+    urls = args.static_backends.split(",")
+    backend_urls = []
+    for url in urls:
+        if validate_url(url):
+            backend_urls.append(url)
+        else:
+            logger.warning(f"Skipping invalid URL: {url}")
+    return backend_urls
+
+
+def parse_static_model_names(args):
+    models = args.static_models.split(",")
+    return models

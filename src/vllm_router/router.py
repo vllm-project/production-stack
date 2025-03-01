@@ -12,6 +12,10 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 
 from vllm_router.batch import BatchProcessor, initialize_batch_processor
+from vllm_router.dynamic_config import (
+    DynamicRouterConfig,
+    InitializeDynamicConfigWatcher,
+)
 from vllm_router.engine_stats import GetEngineStatsScraper, InitializeEngineStatsScraper
 from vllm_router.files import Storage, initialize_storage
 from vllm_router.httpx_client import HTTPXClientWrapper
@@ -26,7 +30,12 @@ from vllm_router.service_discovery import (
     InitializeServiceDiscovery,
     ServiceDiscoveryType,
 )
-from vllm_router.utils import set_ulimit, validate_url
+from vllm_router.utils import (
+    parse_static_model_names,
+    parse_static_urls,
+    set_ulimit,
+    validate_url,
+)
 from vllm_router.version import __version__
 
 httpx_client_wrapper = HTTPXClientWrapper()
@@ -725,6 +734,13 @@ def parse_args():
         help="The interval in seconds to log statistics.",
     )
 
+    parser.add_argument(
+        "--dynamic-config-json",
+        type=str,
+        default=None,
+        help="The path to the json file containing the dynamic configuration.",
+    )
+
     # Add --version argument
     parser.add_argument(
         "--version",
@@ -736,22 +752,6 @@ def parse_args():
     args = parser.parse_args()
     validate_args(args)
     return args
-
-
-def parse_static_urls(args):
-    urls = args.static_backends.split(",")
-    backend_urls = []
-    for url in urls:
-        if validate_url(url):
-            backend_urls.append(url)
-        else:
-            logger.warning(f"Skipping invalid URL: {url}")
-    return backend_urls
-
-
-def parse_static_model_names(args):
-    models = args.static_models.split(",")
-    return models
 
 
 def InitializeAll(args):
@@ -799,6 +799,11 @@ def InitializeAll(args):
     app.state.engine_stats_scraper = GetEngineStatsScraper()
     app.state.request_stats_monitor = GetRequestStatsMonitor()
     app.state.router = GetRoutingLogic()
+
+    # Initialize dynamic config watcher
+    if args.dynamic_config_json:
+        init_config = DynamicRouterConfig.from_json(args.dynamic_config_json)
+        InitializeDynamicConfigWatcher(args.dynamic_config_json, 10, init_config, app)
 
 
 def log_stats(interval: int = 10):

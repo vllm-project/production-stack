@@ -1,25 +1,16 @@
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import requests
 from prometheus_client.parser import text_string_to_metric_families
 
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import GetServiceDiscovery
+from vllm_router.utils import SingletonMeta
 
 logger = init_logger(__name__)
-
-
-class SingletonMeta(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            instance = super().__call__(*args, **kwargs)
-            cls._instances[cls] = instance
-        return cls._instances[cls]
 
 
 @dataclass

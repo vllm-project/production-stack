@@ -53,6 +53,12 @@ class ServiceDiscovery(metaclass=abc.ABCMeta):
         """
         return True
 
+    def close(self) -> None:
+        """
+        Close the service discovery module.
+        """
+        pass
+
 
 class StaticServiceDiscovery(ServiceDiscovery):
     def __init__(self, urls: List[str], models: List[str]):
@@ -240,6 +246,36 @@ class K8sServiceDiscovery(ServiceDiscovery):
         """
         return self.watcher_thread.is_alive()
 
+    def close(self):
+        """
+        Close the service discovery module.
+        """
+        self.k8s_watcher.stop()
+        self.watcher_thread.join()
+
+
+def _create_service_discovery(
+    service_discovery_type: ServiceDiscoveryType, *args, **kwargs
+) -> ServiceDiscovery:
+    """
+    Create a service discovery module with the given type and arguments.
+
+    Args:
+        service_discovery_type: the type of service discovery module
+        *args: positional arguments for the service discovery module
+        **kwargs: keyword arguments for the service discovery module
+
+    Returns:
+        the created service discovery module
+    """
+
+    if service_discovery_type == ServiceDiscoveryType.STATIC:
+        return StaticServiceDiscovery(*args, **kwargs)
+    elif service_discovery_type == ServiceDiscoveryType.K8S:
+        return K8sServiceDiscovery(*args, **kwargs)
+    else:
+        raise ValueError("Invalid service discovery type")
+
 
 def InitializeServiceDiscovery(
     service_discovery_type: ServiceDiscoveryType, *args, **kwargs
@@ -263,13 +299,28 @@ def InitializeServiceDiscovery(
     if _global_service_discovery is not None:
         raise ValueError("Service discovery module already initialized")
 
-    if service_discovery_type == ServiceDiscoveryType.STATIC:
-        _global_service_discovery = StaticServiceDiscovery(*args, **kwargs)
-    elif service_discovery_type == ServiceDiscoveryType.K8S:
-        _global_service_discovery = K8sServiceDiscovery(*args, **kwargs)
-    else:
-        raise ValueError("Invalid service discovery type")
+    _global_service_discovery = _create_service_discovery(
+        service_discovery_type, *args, **kwargs
+    )
+    return _global_service_discovery
 
+
+def ReconfigureServiceDiscovery(
+    service_discovery_type: ServiceDiscoveryType, *args, **kwargs
+) -> ServiceDiscovery:
+    """
+    Reconfigure the service discovery module with the given type and arguments.
+    """
+    global _global_service_discovery
+    if _global_service_discovery is None:
+        raise ValueError("Service discovery module not initialized")
+
+    new_service_discovery = _create_service_discovery(
+        service_discovery_type, *args, **kwargs
+    )
+
+    _global_service_discovery.close()
+    _global_service_discovery = new_service_discovery
     return _global_service_discovery
 
 
