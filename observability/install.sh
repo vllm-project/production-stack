@@ -9,4 +9,4 @@ helm upgrade --install kube-prom-stack prometheus-community/kube-prometheus-stac
 
 helm install prometheus-adapter prometheus-community/prometheus-adapter \
     --namespace monitoring \
-    -f $SCRIPT_DIR/prom-adapter.yaml
+    -f "$SCRIPT_DIR/prom-adapter.yaml"
