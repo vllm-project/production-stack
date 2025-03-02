@@ -26,7 +26,7 @@ kubectl create secret generic huggingface-credentials \
 
 #### 2.1: Create Configuration File
 
-Create a file named `values-lora-enabled.yaml` with the following content:
+Locate the file under path tutorial/assets/values-07-lora-enabled.yaml with the following content:
 
 ```yaml
 servingEngineSpec:
@@ -84,6 +84,7 @@ First, download a LoRA adapter from HuggingFace to your persistent volume:
 kubectl exec -it $(kubectl get pods | grep vllm-lora-llama2-7b-deployment-vllm | awk '{print $1}') -- bash
 
 # Inside the pod, download the adapter using Python
+mkdir -p /data/lora-adapters
 cd /data/lora-adapters
 python3 -c "
 from huggingface_hub import snapshot_download
@@ -118,15 +119,15 @@ Note: The service forwards port 80 internally to port 8000 in the pod, so we map
 In a new terminal, forward the port to the vLLM service instead of the router service, as the engine service is where the LoRA adapter is loaded.
 
 ```bash
-kubectl port-forward svc/vllm-lora-engine-service 8000:80
+kubectl port-forward svc/vllm-lora-engine-service 8001:80
 ```
 
 ```bash
 # List available models before loading adapter
-curl http://localhost:8000/v1/models
+curl http://localhost:8001/v1/models
 
 # Load the SQL LoRA adapter
-curl -X POST http://localhost:8000/v1/load_lora_adapter \
+curl -X POST http://localhost:8001/v1/load_lora_adapter \
   -H "Content-Type: application/json" \
   -d '{
     "lora_name": "sql_adapter",
@@ -155,7 +156,7 @@ curl -X POST http://localhost:8000/v1/completions \
 When finished, you can unload the adapter:
 
 ```bash
-curl -X POST http://localhost:8000/v1/unload_lora_adapter \
+curl -X POST http://localhost:8001/v1/unload_lora_adapter \
   -H "Content-Type: application/json" \
   -d '{
     "lora_name": "sql_adapter"
