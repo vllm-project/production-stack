@@ -19,6 +19,7 @@ setup(
         "python-multipart==0.0.20",
         "sentence-transformers==2.2.2",
         "faiss-cpu==1.10.0",
+        "huggingface-hub==0.25.2",  # downgrade to 0.25.2 to avoid breaking changes
     ],
     entry_points={
         "console_scripts": [
