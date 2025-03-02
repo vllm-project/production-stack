@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- production-stack_v1alpha1_staticroute.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

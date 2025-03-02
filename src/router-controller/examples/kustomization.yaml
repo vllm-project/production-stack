@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../config/samples/vllm_router_deployment.yaml
+- ../config/samples/production-stack_v1alpha1_staticroute.yaml
