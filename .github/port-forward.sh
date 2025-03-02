@@ -13,7 +13,7 @@ VAR="${1#curl-}"
 [ ! -d "output-$VAR" ] && mkdir "output-$VAR"
 chmod -R 777 "output-$VAR"
 
-sudo kubectl logs -f $(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep '^vllm-deployment-router') > output-$VAR/router.log 2>&1 &
+sudo kubectl logs -f "$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep '^vllm-deployment-router')" 2>&1 | sudo tee "output-$VAR/router.log" &
 
 # Loop to check if all llmstack-related pods are in the Running state
 while true; do
