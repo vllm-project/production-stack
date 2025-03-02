@@ -1,7 +1,7 @@
 import abc
 import enum
 import hashlib
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import Request
 from uhashring import HashRing
@@ -18,6 +18,7 @@ logger = init_logger(__name__)
 class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
+    WEIGHTED = "weighted"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -173,6 +174,86 @@ class SessionRouter(RoutingInterface):
         return url
 
 
+class WeightedRouter(RoutingInterface):
+    """
+    Route requests using Smooth Weighted Round Robin algorithm.
+    This provides proportional distribution of requests across endpoints based on their weights.
+    """
+
+    def __init__(self, weights: Dict[str, int] = None):
+        if hasattr(self, "_initialized"):
+            return
+        if weights is None:
+            raise ValueError("WeightedRouter must be initialized with weights")
+
+        self.static_weights = weights  # The configured static weights
+        self.current_weights = {}  # Dynamic weights used in the algorithm
+        self.last_endpoints = set()  # Track endpoint changes
+        self._initialized = True
+
+    def _initialize_current_weights(self, endpoints: List[EndpointInfo]):
+        """Initialize or reset current weights when endpoints change."""
+        current_endpoints = {endpoint.url for endpoint in endpoints}
+
+        # If endpoints have changed, reset the weights
+        if current_endpoints != self.last_endpoints:
+            self.current_weights = {}
+            for endpoint in endpoints:
+                # Use configured weight or default to 1
+                self.current_weights[endpoint.url] = self.static_weights.get(
+                    endpoint.url, 1
+                )
+            self.last_endpoints = current_endpoints
+
+    def _get_total_weight(self) -> int:
+        """Calculate the total weight of all active endpoints."""
+        return sum(self.static_weights.get(url, 1) for url in self.last_endpoints)
+
+    def _select_endpoint(self) -> str:
+        """Select the next endpoint using SWRR algorithm."""
+        max_weight = float("-inf")
+        selected_url = None
+
+        # Select the server with the highest current weight
+        for url, weight in self.current_weights.items():
+            if weight > max_weight:
+                max_weight = weight
+                selected_url = url
+
+        if selected_url is None:
+            raise RuntimeError("No endpoints available for selection")
+
+        # Decrease the current weight of the selected server by total weight
+        self.current_weights[selected_url] -= self._get_total_weight()
+
+        # Increase all current weights by their static weights
+        for url in self.current_weights:
+            self.current_weights[url] += self.static_weights.get(url, 1)
+
+        return selected_url
+
+    def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+    ) -> str:
+        """
+        Route the request using Smooth Weighted Round Robin algorithm.
+
+        Args:
+            endpoints (List[EndpointInfo]): The list of engine URLs
+            engine_stats (Dict[str, EngineStats]): The engine stats indicating
+                the 'physical' load of each engine
+            request_stats (Dict[str, RequestStats]): The request stats
+                indicating the request-level performance of each engine
+            request (Request): The incoming request
+        """
+        self._initialize_current_weights(endpoints)
+        return self._select_endpoint()
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def InitializeRoutingLogic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -183,6 +264,11 @@ def InitializeRoutingLogic(
     elif routing_logic == RoutingLogic.SESSION_BASED:
         logger.info(f"Initializing session-based routing logic with kwargs: {kwargs}")
         return SessionRouter(kwargs.get("session_key"))
+    elif routing_logic == RoutingLogic.WEIGHTED:
+        logger.info(
+            f"Initializing weighted routing logic with weights: {kwargs.get('weights')}"
+        )
+        return WeightedRouter(kwargs.get("weights"))
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -191,7 +277,7 @@ def ReconfigureRoutingLogic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
     # Remove the existing routers from the singleton registry
-    for cls in (SessionRouter, RoundRobinRouter):
+    for cls in (SessionRouter, RoundRobinRouter, WeightedRouter):
         if cls in SingletonABCMeta._instances:
             del SingletonABCMeta._instances[cls]
     return InitializeRoutingLogic(routing_logic, *args, **kwargs)
@@ -199,7 +285,7 @@ def ReconfigureRoutingLogic(
 
 def GetRoutingLogic() -> RoutingInterface:
     # Look up in our singleton registry which router (if any) has been created.
-    for cls in (SessionRouter, RoundRobinRouter):
+    for cls in (SessionRouter, RoundRobinRouter, WeightedRouter):
         if cls in SingletonABCMeta._instances:
             return cls()
     raise ValueError("The global router has not been initialized")
