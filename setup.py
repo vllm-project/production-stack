@@ -17,6 +17,8 @@ setup(
         "uhashring==2.3",
         "aiofiles==24.1.0",
         "python-multipart==0.0.20",
+        "sentence-transformers==2.2.2",
+        "faiss-cpu==1.7.4",
     ],
     entry_points={
         "console_scripts": [
