@@ -14,17 +14,19 @@ servingEngineSpec:
   # - name: (string) The name of the model, e.g., "example-model"
   # - repository: (string) The repository of the model, e.g., "vllm/vllm-openai"
   # - tag: (string) The tag of the model, e.g., "latest"
+  # - imagePullSecret: (Optional, string) Name of secret with credentials to private container repository, e.g. "secret"
   # - modelURL: (string) The URL of the model, e.g., "facebook/opt-125m"
+  # - chatTemplate: (Optional, string) Chat template (Jinga2) specifying tokenizer configuration, e.g. "{% for message in messages %}\n{% if message['role'] == 'user' %}\n{{ 'Question:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'system' %}\n{{ 'System:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'assistant' %}{{ 'Answer:\n'  + message['content'] + '\n\n' }}{% endif %}\n{% if loop.last and add_generation_prompt %}\n{{ 'Answer:\n' }}{% endif %}{% endfor %}"
   #
   # - replicaCount: (int) The number of replicas for the model, e.g. 1
   # - requestCPU: (int) The number of CPUs requested for the model, e.g. 6
   # - requestMemory: (string) The amount of memory requested for the model, e.g., "16Gi"
   # - requestGPU: (int) The number of GPUs requested for the model, e.g., 1
   #
-  # - pvcStorage: (string) The amount of storage requested for the model, e.g., "50Gi"
-  # - pvcAccessMode: (list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
-  # - storageClass: (String) The storage class of the PVC e.g., "", default is ""
-  # - pvcMatchLabels: (optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
+  # - pvcStorage: (Optional, string) The amount of storage requested for the model, e.g., "50Gi".
+  # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
+  # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
+  # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
   #
   # - vllmConfig: (optional, map) The configuration for the VLLM model, supported options are:
   #   - enablePrefixCaching: (optional, bool) Enable prefix caching, e.g., false
@@ -38,7 +40,11 @@ servingEngineSpec:
   #   - enabled: (optional, bool) Enable LMCache, e.g., true
   #   - cpuOffloadingBufferSize: (optional, string) The CPU offloading buffer size, e.g., "30"
   #
-  # - hf_token: (optional, string) the Huggingface tokens for this model
+  # - hf_token: (optional) Hugging Face token configuration. Can be either:
+  #   - A string containing the token directly (will be stored in a generated secret)
+  #   - An object referencing an existing secret:
+  #     secretName: "my-existing-secret"
+  #     secretKey: "hf-token-key"
   #
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
@@ -75,7 +81,7 @@ servingEngineSpec:
   #     enabled: true
   #     cpuOffloadingBufferSize: "30"
   #
-  #   hf_token: <HUGGING_FACE_TOKEN>
+  #   hf_token: "hf_xxxxxxxxxxxxx"
   #
   #   nodeSelectorTerms:
   #     - matchExpressions:

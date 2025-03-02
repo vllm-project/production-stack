@@ -1,5 +1,6 @@
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- with $ -}}
+{{- if and (hasKey $modelSpec "pvcStorage") (not (empty $modelSpec.pvcStorage)) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -14,7 +15,7 @@ spec:
     {{- end }}
   resources:
     requests:
-      storage: {{ $modelSpec.pvcStorage | default "20Gi" }}  # Default to 40Gi if not set
+      storage: {{ $modelSpec.pvcStorage | default "20Gi" }}  # Default to 20Gi if not set
   {{- if hasKey $modelSpec "storageClass" }}
   storageClassName: "{{ $modelSpec.storageClass }}"
   {{- end }}
@@ -23,6 +24,7 @@ spec:
     matchLabels:
       {{- toYaml $modelSpec.pvcMatchLabels | nindent 8 }}
   {{- end }}
+{{- end }}
 {{- end }}
 ---
 {{- end }}

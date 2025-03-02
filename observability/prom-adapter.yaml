@@ -1,0 +1,20 @@
+loglevel: 1
+
+prometheus:
+  url: http://kube-prom-stack-kube-prome-prometheus.monitoring.svc
+  port: 9090
+
+rules:
+  default: true
+  custom:
+
+  # Example metric to export for HPA
+  - seriesQuery: '{__name__=~"^vllm:num_requests_waiting$"}'
+    resources:
+      overrides:
+        namespace:
+          resource: "namespace"
+    name:
+      matches: ""
+      as: "vllm_num_requests_waiting"
+    metricsQuery: sum by(namespace) (vllm:num_requests_waiting)
