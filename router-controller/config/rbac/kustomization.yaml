@@ -24,4 +24,3 @@ resources:
 # if you do not want those helpers be installed with your Project.
 - staticroute_editor_role.yaml
 - staticroute_viewer_role.yaml
-

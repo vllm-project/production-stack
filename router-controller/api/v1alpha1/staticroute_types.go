@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,14 +29,87 @@ type StaticRouteSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of StaticRoute. Edit staticroute_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// ServiceDiscovery specifies the service discovery method
+	// +kubebuilder:validation:Enum=static
+	// +kubebuilder:default=static
+	ServiceDiscovery string `json:"serviceDiscovery"`
+
+	// RoutingLogic specifies the routing logic to use
+	// +kubebuilder:validation:Enum=roundrobin;least_loaded
+	// +kubebuilder:default=roundrobin
+	RoutingLogic string `json:"routingLogic"`
+
+	// StaticBackends is a comma-separated list of backend URLs
+	// +kubebuilder:validation:Required
+	StaticBackends string `json:"staticBackends"`
+
+	// StaticModels is a comma-separated list of model names
+	// +kubebuilder:validation:Required
+	StaticModels string `json:"staticModels"`
+
+	// RouterRef is a reference to the router service
+	// +optional
+	RouterRef *corev1.ObjectReference `json:"routerRef,omitempty"`
+
+	// RouterSelector is a label selector to identify which vllm_router(s) to configure
+	// +optional
+	// Deprecated: Use RouterRef instead
+	RouterSelector *metav1.LabelSelector `json:"routerSelector,omitempty"`
+
+	// HealthCheck defines the health check configuration for the router
+	// +optional
+	HealthCheck *HealthCheckConfig `json:"healthCheck,omitempty"`
+
+	// ConfigMapName is the name of the ConfigMap to create with the dynamic config
+	// +optional
+	ConfigMapName string `json:"configMapName,omitempty"`
+}
+
+// HealthCheckConfig defines the configuration for health checks
+type HealthCheckConfig struct {
+	// Number of seconds after which the probe times out
+	// +optional
+	// +kubebuilder:default=5
+	// +kubebuilder:validation:Minimum=1
+	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
+
+	// Number of seconds between probe attempts
+	// +optional
+	// +kubebuilder:default=10
+	// +kubebuilder:validation:Minimum=1
+	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
+
+	// Minimum consecutive successes for the probe to be considered successful
+	// +optional
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	SuccessThreshold int32 `json:"successThreshold,omitempty"`
+
+	// Minimum consecutive failures for the probe to be considered failed
+	// +optional
+	// +kubebuilder:default=3
+	// +kubebuilder:validation:Minimum=1
+	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 }
 
 // StaticRouteStatus defines the observed state of StaticRoute
 type StaticRouteStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Conditions represent the latest available observations of the StaticRoute's state
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// ConfigMapRef is a reference to the created ConfigMap
+	// +optional
+	ConfigMapRef string `json:"configMapRef,omitempty"`
+
+	// LastAppliedTime is the last time the configuration was applied to the router
+	// +optional
+	LastAppliedTime *metav1.Time `json:"lastAppliedTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true
