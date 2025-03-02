@@ -51,11 +51,6 @@ type StaticRouteSpec struct {
 	// +optional
 	RouterRef *corev1.ObjectReference `json:"routerRef,omitempty"`
 
-	// RouterSelector is a label selector to identify which vllm_router(s) to configure
-	// +optional
-	// Deprecated: Use RouterRef instead
-	RouterSelector *metav1.LabelSelector `json:"routerSelector,omitempty"`
-
 	// HealthCheck defines the health check configuration for the router
 	// +optional
 	HealthCheck *HealthCheckConfig `json:"healthCheck,omitempty"`

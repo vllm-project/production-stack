@@ -108,11 +108,6 @@ func (in *StaticRouteSpec) DeepCopyInto(out *StaticRouteSpec) {
 		*out = new(v1.ObjectReference)
 		**out = **in
 	}
-	if in.RouterSelector != nil {
-		in, out := &in.RouterSelector, &out.RouterSelector
-		*out = new(metav1.LabelSelector)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.HealthCheck != nil {
 		in, out := &in.HealthCheck, &out.HealthCheck
 		*out = new(HealthCheckConfig)

@@ -214,23 +214,6 @@ func (r *StaticRouteReconciler) checkRouterHealth(ctx context.Context, staticRou
 
 		// Add the service to the list
 		services.Items = append(services.Items, *service)
-	} else if staticRoute.Spec.RouterSelector != nil {
-		// Fallback to using RouterSelector
-		labelSelector, err := metav1.LabelSelectorAsSelector(staticRoute.Spec.RouterSelector)
-		if err != nil {
-			return fmt.Errorf("failed to convert label selector: %w", err)
-		}
-
-		err = r.List(ctx, services, client.InNamespace(staticRoute.Namespace), client.MatchingLabelsSelector{Selector: labelSelector})
-		if err != nil {
-			return fmt.Errorf("failed to list services: %w", err)
-		}
-	} else {
-		// If no selector or reference is provided, look for services with the name containing "router"
-		err := r.List(ctx, services, client.InNamespace(staticRoute.Namespace))
-		if err != nil {
-			return fmt.Errorf("failed to list services: %w", err)
-		}
 	}
 
 	if len(services.Items) == 0 {
