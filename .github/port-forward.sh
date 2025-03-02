@@ -8,6 +8,13 @@ fi
 
 echo "Waiting for all llmstack pods to be in Running state..."
 
+# Save output
+VAR="${1#curl-}"
+[ ! -d "output-$VAR" ] && mkdir "output-$VAR"
+chmod -R 777 "output-$VAR"
+
+sudo kubectl logs -f $(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep '^vllm-deployment-router') > output-$VAR/router.log 2>&1 &
+
 # Loop to check if all llmstack-related pods are in the Running state
 while true; do
     # Get all pods containing "vllm" in their name and extract their STATUS column
