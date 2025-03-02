@@ -1,6 +1,6 @@
 # Router Controller
 
-This is the controller for the Router CRD. It is responsible for creating and updating the ConfigMap for the vllm_router.
+This is the controller for the Router CRDs. It is responsible for creating and updating the ConfigMap for the vllm_router.
 
 ## Description
 
@@ -96,6 +96,67 @@ Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project
 kubectl apply -f https://raw.githubusercontent.com/<org>/router-controller/<tag or branch>/dist/install.yaml
 ```
 
+## Architecture and Component Relationships
+
+### CRD Relationships
+```mermaid
+graph LR
+    B[Backend CRD] -->|references| S[Secret]
+    R[Route CRD] -->|references| B
+    R -->|creates| RC[Route ConfigMap]
+    SR[StaticRoute CRD] -->|creates| SRC[StaticRoute ConfigMap]
+    
+    RC -->|consumed by| Router
+    SRC -->|consumed by| Router
+
+    subgraph "Router Controller"
+        B
+        R
+        SR
+    end
+
+    subgraph "Generated Resources"
+        SRC
+    end
+
+    subgraph "vLLM Router"
+        Router
+    end
+
+    classDef crd fill:#f9f,stroke:#333,stroke-width:2px
+    classDef config fill:#bbf,stroke:#333,stroke-width:2px
+    classDef component fill:#bfb,stroke:#333,stroke-width:2px
+    class B,R,SR crd
+    class RC,SRC config
+    class Router component
+```
+
+### Configuration Flow
+```mermaid
+sequenceDiagram
+    participant User
+    participant RC as Router Controller
+    participant K8s as Kubernetes API
+    participant VR as vllm_router
+
+    User->>K8s: Apply Backend CRD
+    User->>K8s: Apply Route CRD
+    User->>K8s: Apply StaticRoute CRD
+    
+    RC->>K8s: Watch for CRD changes
+    
+    K8s-->>RC: Notify CRD creation/update
+    
+    RC->>K8s: Create/Update ConfigMaps
+    Note over RC,K8s: Generates dynamic_config.json
+    
+    VR->>K8s: Mount ConfigMap
+    Note over VR,K8s: Uses --dynamic-config-json flag
+    
+    VR->>VR: Load configuration
+    Note over VR: Apply routing rules<br/>Handle requests based on configuration
+```
+
 ## StaticRoute CRD
 
 The StaticRoute CRD allows you to configure the vllm_router with static backends and models. The controller reads the CRD and creates a ConfigMap that can be used by the vllm_router with the `--dynamic-config-json` option.
@@ -129,6 +190,128 @@ spec:
 
   # Optional: Name of the ConfigMap to create
   configMapName: vllm-router-config
+```
+
+## Backend CRD
+
+The Backend CRD allows you to configure the vllm_router with a backend. The controller reads the CRD and creates a ConfigMap that can be used by the vllm_router with the `--dynamic-config-json` option.
+
+### Example
+
+```yaml
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: Backend
+metadata:
+  name: backend-sample
+spec:
+  # Type of backend
+  type: vllm
+
+  # Endpoint URL
+  endpoint:
+    url: "http://10.100.245.131:8000"
+
+  # Comma-separated list of model names
+  models: "facebook/opt-6.7b"
+
+  # Secret reference for API key
+  secretRef:
+    name: openai-api-key
+    key: api-key
+    # namespace: default  # Optional, defaults to the same namespace as the Backend
+
+  # Health check configuration
+  healthCheck:
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 30
+
+    # Number of seconds between probe attempts
+    periodSeconds: 10
+
+    # Minimum consecutive successes for the probe to be considered successful
+    successThreshold: 1
+
+    # Minimum consecutive failures for the probe to be considered failed
+    failureThreshold: 3
+
+  # Maximum number of concurrent requests
+  maxConcurrentRequests: 100
+
+  # Request timeout in seconds
+  timeout: 300 
+```
+
+### Secret Reference for API Keys
+
+When using the OpenAI API schema, a secret reference is required to provide the API key. The secret reference consists of:
+
+- `name`: The name of the Kubernetes Secret resource
+- `key`: The key within the Secret that contains the API key
+- `namespace`: (Optional) The namespace of the Secret. If not specified, it defaults to the same namespace as the Route.
+
+Example Secret resource:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openai-api-key
+  namespace: default
+type: Opaque
+data:
+  # Base64 encoded API key
+  api-key: c2stZXhhbXBsZS1vcGVuYWktYXBpLWtleQ==
+```
+
+The controller will read the API key from the Secret and include it in the dynamic configuration for the vllm_router.
+
+## Route CRD
+
+The Route CRD allows you to configure dynamic routing based on URL paths and API schemas. It references a Backend resource and creates a ConfigMap with the routing configuration.
+
+### Example
+
+```yaml
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: Route
+metadata:
+  name: route-sample
+spec:
+  # Reference to the Backend resource
+  backendRef:
+    kind: Backend
+    apiVersion: production-stack.vllm.ai/v1alpha1
+    name: backend-sample
+    namespace: default
+
+  # URL path to match for this route
+  path: "/v1/completions"
+
+  # API schema supported by this route
+  apiSchema: "openai"
+
+  # Routing weight for this route (0-100)
+  weight: 100
+
+  # Semantic caching configuration (optional)
+  semanticCachingEnabled: false
+
+  # Reference to the ConfigMap to create
+  configMapRef:
+    kind: ConfigMap
+    apiVersion: v1
+    name: route-sample-config
+    namespace: default
+
+  # Request timeout in seconds
+  timeout: 300
+
+  # Rate limit per minute (0 means no limit)
+  rateLimitPerMinute: 0
+
+  # Additional headers can be configured (optional)
+  #headers:
+  #  X-API-Key: "${API_KEY}"
 ```
 
 ### How it works

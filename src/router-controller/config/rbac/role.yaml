@@ -20,6 +20,7 @@ rules:
   - ""
   resources:
   - pods
+  - secrets
   - services
   verbs:
   - get
@@ -28,6 +29,8 @@ rules:
 - apiGroups:
   - production-stack.vllm.ai
   resources:
+  - backends
+  - routes
   - staticroutes
   verbs:
   - create
@@ -40,12 +43,16 @@ rules:
 - apiGroups:
   - production-stack.vllm.ai
   resources:
+  - backends/finalizers
+  - routes/finalizers
   - staticroutes/finalizers
   verbs:
   - update
 - apiGroups:
   - production-stack.vllm.ai
   resources:
+  - backends/status
+  - routes/status
   - staticroutes/status
   verbs:
   - get

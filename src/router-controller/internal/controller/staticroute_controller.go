@@ -148,16 +148,10 @@ func (r *StaticRouteReconciler) reconcileConfigMap(ctx context.Context, staticRo
 		return nil, fmt.Errorf("failed to marshal dynamic configuration: %w", err)
 	}
 
-	// Determine the ConfigMap name
-	configMapName := staticRoute.Spec.ConfigMapName
-	if configMapName == "" {
-		configMapName = fmt.Sprintf("%s-config", staticRoute.Name)
-	}
-
 	// Create or update the ConfigMap
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapName,
+			Name:      staticRoute.Spec.ConfigMapRef.Name,
 			Namespace: staticRoute.Namespace,
 		},
 	}

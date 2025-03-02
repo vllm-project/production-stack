@@ -1,0 +1,43 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: Backend
+metadata:
+  labels:
+    app.kubernetes.io/name: router-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: backend-sample
+spec:
+  # Type of backend
+  type: vllm
+
+  # Endpoint URL
+  endpoint:
+    url: "http://10.100.245.131:8000"
+
+  # Comma-separated list of model names
+  models: "facebook/opt-6.7b"
+
+  # Secret reference for API key
+  secretRef:
+    name: openai-api-key
+    key: api-key
+    # namespace: default  # Optional, defaults to the same namespace as the Backend
+
+  # Health check configuration
+  healthCheck:
+    # Number of seconds after which the probe times out
+    timeoutSeconds: 30
+
+    # Number of seconds between probe attempts
+    periodSeconds: 10
+
+    # Minimum consecutive successes for the probe to be considered successful
+    successThreshold: 1
+
+    # Minimum consecutive failures for the probe to be considered failed
+    failureThreshold: 3
+
+  # Maximum number of concurrent requests
+  maxConcurrentRequests: 100
+
+  # Request timeout in seconds
+  timeout: 300 

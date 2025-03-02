@@ -55,9 +55,9 @@ type StaticRouteSpec struct {
 	// +optional
 	HealthCheck *HealthCheckConfig `json:"healthCheck,omitempty"`
 
-	// ConfigMapName is the name of the ConfigMap to create with the dynamic config
-	// +optional
-	ConfigMapName string `json:"configMapName,omitempty"`
+	// ConfigMapRef is a reference to the ConfigMap to create with the dynamic config
+	// +kubebuilder:validation:Required
+	ConfigMapRef corev1.ObjectReference `json:"configMapRef"`
 }
 
 // HealthCheckConfig defines the configuration for health checks
