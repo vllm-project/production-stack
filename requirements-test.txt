@@ -1,2 +1,4 @@
+faiss-cpu>=1.7.4
 pytest
 pytest-asyncio
+sentence-transformers>=2.2.2
