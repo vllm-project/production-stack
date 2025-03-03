@@ -1,6 +1,7 @@
 import abc
 import enum
 import threading
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -312,7 +313,7 @@ def initialize_service_discovery(
     return _global_service_discovery
 
 
-def ReconfigureServiceDiscovery(
+def reconfigure_service_discovery(
     service_discovery_type: ServiceDiscoveryType, *args, **kwargs
 ) -> ServiceDiscovery:
     """
@@ -359,7 +360,6 @@ if __name__ == "__main__":
     )
 
     k8s_sd = get_service_discovery()
-    import time
 
     time.sleep(1)
     while True:

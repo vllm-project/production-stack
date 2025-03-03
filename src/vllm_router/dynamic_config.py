@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import reconfigure_routing_logic
 from vllm_router.service_discovery import (
-    ReconfigureServiceDiscovery,
+    reconfigure_service_discovery,
     ServiceDiscoveryType,
 )
 from vllm_router.utils import SingletonMeta, parse_static_model_names, parse_static_urls
@@ -115,13 +115,13 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         Reconfigures the router with the given config.
         """
         if config.service_discovery == "static":
-            ReconfigureServiceDiscovery(
+            reconfigure_service_discovery(
                 ServiceDiscoveryType.STATIC,
                 urls=parse_static_urls(config.static_backends),
                 models=parse_static_model_names(config.static_models),
             )
         elif config.service_discovery == "k8s":
-            ReconfigureServiceDiscovery(
+            reconfigure_service_discovery(
                 ServiceDiscoveryType.K8S,
                 namespace=config.k8s_namespace,
                 port=config.k8s_port,
