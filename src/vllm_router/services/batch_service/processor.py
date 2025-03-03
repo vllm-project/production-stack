@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from vllm_router.batch.batch import BatchInfo
-from vllm_router.files import Storage
+from vllm_router.services.batch_service.batch import BatchInfo
+from vllm_router.services.files_service.storage import Storage
 
 
 class BatchProcessor(ABC):

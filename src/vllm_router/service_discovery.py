@@ -1,7 +1,6 @@
 import abc
 import enum
 import threading
-import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -285,7 +284,7 @@ def _create_service_discovery(
         raise ValueError("Invalid service discovery type")
 
 
-def InitializeServiceDiscovery(
+def initialize_service_discovery(
     service_discovery_type: ServiceDiscoveryType, *args, **kwargs
 ) -> ServiceDiscovery:
     """
@@ -332,7 +331,7 @@ def ReconfigureServiceDiscovery(
     return _global_service_discovery
 
 
-def GetServiceDiscovery() -> ServiceDiscovery:
+def get_service_discovery() -> ServiceDiscovery:
     """
     Get the initialized service discovery module.
 
@@ -352,14 +351,14 @@ def GetServiceDiscovery() -> ServiceDiscovery:
 if __name__ == "__main__":
     # Test the service discovery
     # k8s_sd = K8sServiceDiscovery("default", 8000, "release=test")
-    InitializeServiceDiscovery(
+    initialize_service_discovery(
         ServiceDiscoveryType.K8S,
         namespace="default",
         port=8000,
         label_selector="release=test",
     )
 
-    k8s_sd = GetServiceDiscovery()
+    k8s_sd = get_service_discovery()
     import time
 
     time.sleep(1)
