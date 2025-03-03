@@ -1,0 +1,25 @@
+import React, { useState } from "react";
+
+function VideoPlayer() {
+  const [playing, setPlaying] = useState(false);
+
+  const togglePlay = () => {
+    setPlaying(!playing);
+  };
+
+  return (
+    <div className="video-container">
+      <video
+        width="100%"
+        controls={false}
+        autoPlay={playing}
+        src="path/to/video.mp4"
+      />
+      <button onClick={togglePlay}>
+        {playing ? "Pause" : "Play"}
+      </button>
+    </div>
+  );
+}
+
+export default VideoPlayer;
