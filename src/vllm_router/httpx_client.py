@@ -1,7 +1,4 @@
-import logging
-
 import httpx
-from fastapi import FastAPI
 
 from vllm_router.log import init_logger
 

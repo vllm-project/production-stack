@@ -1,6 +1,5 @@
-from vllm_router.batch.batch import BatchEndpoint, BatchInfo, BatchRequest, BatchStatus
-from vllm_router.batch.processor import BatchProcessor
-from vllm_router.files import Storage
+from vllm_router.services.batch_service.processor import BatchProcessor
+from vllm_router.services.files_service import Storage
 
 
 def initialize_batch_processor(
