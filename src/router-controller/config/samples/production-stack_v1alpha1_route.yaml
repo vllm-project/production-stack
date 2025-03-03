@@ -1,0 +1,43 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: Route
+metadata:
+  labels:
+    app.kubernetes.io/name: router-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: route-sample
+spec:
+  # Reference to the Backend resource
+  backendRef:
+    kind: Backend
+    apiVersion: production-stack.vllm.ai/v1alpha1
+    name: backend-sample
+    namespace: default
+
+  # URL path to match for this route
+  path: "/v1/completions"
+
+  # API schema supported by this route
+  apiSchema: "openai"
+
+  # Routing weight for this route (0-100)
+  weight: 100
+
+  # Semantic caching configuration (optional)
+  semanticCachingEnabled: false
+
+  # Reference to the ConfigMap to create
+  configMapRef:
+    kind: ConfigMap
+    apiVersion: v1
+    name: route-sample-config
+    namespace: default
+
+  # Request timeout in seconds
+  timeout: 300
+
+  # Rate limit per minute (0 means no limit)
+  rateLimitPerMinute: 0
+
+  # Additional headers to add to the request
+  #headers:
+  #  X-API-Key: "${API_KEY}" 

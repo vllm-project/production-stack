@@ -151,6 +151,30 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "StaticRoute")
 		os.Exit(1)
 	}
+
+	if err = (&controller.BackendReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Backend")
+		os.Exit(1)
+	}
+
+	if err = (&controller.RouteReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Route")
+		os.Exit(1)
+	}
+
+	if err = (&controller.CombinedReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "CombinedController")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
