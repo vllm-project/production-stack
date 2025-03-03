@@ -1,4 +1,6 @@
 import argparse
+
+from vllm_router.experimental.semantic_cache_integration import add_semantic_cache_args
 from vllm_router.version import __version__
 
 
@@ -149,6 +151,26 @@ def parse_args():
         action="version",
         version=f"%(prog)s {__version__}",
         help="Show version and exit",
+    )
+
+    # Add semantic cache arguments
+    add_semantic_cache_args(parser)
+
+    # Add feature gates argument
+    parser.add_argument(
+        "--feature-gates",
+        type=str,
+        default="",
+        help="Comma-separated list of feature gates (e.g., 'SemanticCache=true')",
+    )
+
+    # Add log level argument
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="info",
+        choices=["critical", "error", "warning", "info", "debug", "trace"],
+        help="Log level for uvicorn. Default is 'info'.",
     )
 
     args = parser.parse_args()

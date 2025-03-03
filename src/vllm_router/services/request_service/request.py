@@ -1,11 +1,13 @@
 # --- Request Processing & Routing ---
 # TODO: better request id system
+import json
 import time
 import uuid
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from vllm_router.experimental.semantic_cache_integration import store_in_semantic_cache
 from vllm_router.httpx_client import HTTPXClientWrapper
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import get_service_discovery
@@ -40,6 +42,17 @@ async def process_request(
     request.app.state.request_stats_monitor.on_new_request(
         backend_url, request_id, start_time
     )
+    # Check if this is a streaming request
+    is_streaming = False
+    try:
+        request_json = json.loads(body)
+        is_streaming = request_json.get("stream", False)
+    except:
+        # If we can't parse the body as JSON, assume it's not streaming
+        pass
+
+    # For non-streaming requests, collect the full response to cache it properly
+    full_response = bytearray() if not is_streaming else None
 
     client = HTTPXClientWrapper()
     async with client.stream(
@@ -59,6 +72,9 @@ async def process_request(
                 request.app.state.request_stats_monitor.on_request_response(
                     backend_url, request_id, time.time()
                 )
+                # For non-streaming requests, collect the full response
+                if full_response is not None:
+                    full_response.extend(chunk)
             yield chunk
 
     request.app.state.request_stats_monitor.on_request_complete(
@@ -67,6 +83,12 @@ async def process_request(
 
     # if debug_request:
     #    logger.debug(f"Finished the request with request id: {debug_request.headers.get('x-request-id', None)} at {time.time()}")
+    # Store in semantic cache if applicable
+    # Use the full response for non-streaming requests, or the last chunk for streaming
+    cache_chunk = bytes(full_response) if full_response is not None else chunk
+    await store_in_semantic_cache(
+        endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
+    )
 
 
 async def route_general_request(request: Request, endpoint: str):

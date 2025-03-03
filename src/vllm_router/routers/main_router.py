@@ -1,19 +1,33 @@
 import json
 
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse, Response
+
 from vllm_router.dynamic_config import get_dynamic_config_watcher
+from vllm_router.experimental.semantic_cache_integration import check_semantic_cache
+from vllm_router.log import init_logger
 from vllm_router.protocols import ModelCard, ModelList
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.request import route_general_request
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
 from vllm_router.version import __version__
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, Response
 
 main_router = APIRouter()
+
+logger = init_logger(__name__)
 
 
 @main_router.post("/v1/chat/completions")
 async def route_chat_completion(request: Request):
+    # Check if the request can be served from the semantic cache
+    logger.debug("Received chat completion request, checking semantic cache")
+    cache_response = await check_semantic_cache(request=request)
+
+    if cache_response:
+        logger.info("Serving response from semantic cache")
+        return cache_response
+
+    logger.debug("No cache hit, forwarding request to backend")
     return await route_general_request(request, "/v1/chat/completions")
 
 
