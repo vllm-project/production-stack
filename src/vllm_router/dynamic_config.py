@@ -37,6 +37,9 @@ class DynamicRouterConfig:
 
     # Routing logic configurations
     session_key: Optional[str] = None
+    weights: Optional[dict] = (
+        None  # Mapping of endpoint URLs to their weights for weighted routing
+    )
 
     # Batch API configurations
     # TODO (ApostaC): Support dynamic reconfiguration of batch API
@@ -64,6 +67,11 @@ class DynamicRouterConfig:
             # Routing logic configurations
             routing_logic=args.routing_logic,
             session_key=args.session_key,
+            weights=(
+                json.loads(args.weights)
+                if hasattr(args, "weights") and args.weights
+                else None
+            ),
         )
 
     @staticmethod
@@ -139,7 +147,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         Reconfigures the router with the given config.
         """
         routing_logic = ReconfigureRoutingLogic(
-            config.routing_logic, session_key=config.session_key
+            config.routing_logic, session_key=config.session_key, weights=config.weights
         )
         self.app.state.router = routing_logic
         logger.info(f"DynamicConfigWatcher: Routing logic reconfiguration complete")

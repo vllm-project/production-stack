@@ -10,6 +10,7 @@ The source code for the request router.
 - Multiple different routing algorithms
   - Round-robin routing
   - Session-ID based routing
+  - Weighted routing (Smooth Weighted Round Robin)
   - (WIP) prefix-aware routing
 
 ## Running the router
@@ -32,8 +33,9 @@ The router can be configured using command-line arguments. Below are the availab
 
 ### Routing Logic Options
 
-- `--routing-logic`: The routing logic to use. Options are `roundrobin` or `session`. This option is required.
-- `--session-key`: The key (in the header) to identify a session.
+- `--routing-logic`: The routing logic to use. Options are `roundrobin`, `session`, or `weighted`. Default is `roundrobin`.
+- `--session-key`: The key (in the header) to identify a session when using session-based routing.
+- `--weights`: JSON string mapping of endpoint URLs to their weights for weighted routing. Example: `{"http://endpoint1:8000": 30, "http://endpoint2:8000": 70}`.
 
 ### Monitoring Options
 
@@ -62,7 +64,7 @@ You can install the router using the following command:
 pip install -e .
 ```
 
-**Example 1:** running the router locally at port 8000 in front of multiple serving engines:
+**Example 1:** running the router locally at port 8000 in front of multiple serving engines with round-robin routing:
 
 ```bash
 vllm-router --port 8000 \
@@ -72,6 +74,17 @@ vllm-router --port 8000 \
     --engine-stats-interval 10 \
     --log-stats \
     --routing-logic roundrobin
+```
+
+**Example 2:** running the router with weighted routing to distribute traffic proportionally:
+
+```bash
+vllm-router --port 8000 \
+    --service-discovery static \
+    --static-backends "http://localhost:9001,http://localhost:9002,http://localhost:9003" \
+    --static-models "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m" \
+    --routing-logic weighted \
+    --weights '{"http://localhost:9001": 50, "http://localhost:9002": 30, "http://localhost:9003": 20}'
 ```
 
 ## Dynamic Router Config
@@ -84,7 +97,7 @@ Currently, the dynamic config supports the following fields:
 **Required fields:**
 
 - `service_discovery`: The service discovery type. Options are `static` or `k8s`.
-- `routing_logic`: The routing logic to use. Options are `roundrobin` or `session`.
+- `routing_logic`: The routing logic to use. Options are `roundrobin`, `session`, or `weighted`.
 
 **Optional fields:**
 
@@ -94,8 +107,9 @@ Currently, the dynamic config supports the following fields:
 - (When using `k8s` service discovery) `k8s_namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
 - (When using `k8s` service discovery) `k8s_label_selector`: The label selector to filter vLLM pods when using K8s service discovery.
 - `session_key`: The key (in the header) to identify a session when using session-based routing.
+- `weights`: A dictionary mapping endpoint URLs to their weights when using weighted routing.
 
-Here is an example dynamic config file:
+Here is an example dynamic config file with round-robin routing:
 
 ```json
 {
@@ -103,6 +117,22 @@ Here is an example dynamic config file:
     "routing_logic": "roundrobin",
     "static_backends": "http://localhost:9001,http://localhost:9002,http://localhost:9003",
     "static_models": "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m"
+}
+```
+
+Here is an example dynamic config file with weighted routing:
+
+```json
+{
+    "service_discovery": "static",
+    "routing_logic": "weighted",
+    "static_backends": "http://localhost:9001,http://localhost:9002,http://localhost:9003",
+    "static_models": "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m",
+    "weights": {
+        "http://localhost:9001": 50,
+        "http://localhost:9002": 30,
+        "http://localhost:9003": 20
+    }
 }
 ```
 

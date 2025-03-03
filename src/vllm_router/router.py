@@ -709,7 +709,11 @@ def validate_args(args):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run the FastAPI app.")
+    parser = argparse.ArgumentParser(
+        description="vLLM router that routes requests to vLLM engines."
+    )
+
+    # Service discovery arguments
     parser.add_argument(
         "--host", default="0.0.0.0", help="The host to run the server on."
     )
@@ -752,18 +756,26 @@ def parse_args():
         default="",
         help="The label selector to filter vLLM pods when using K8s service discovery.",
     )
+
+    # Routing logic arguments
     parser.add_argument(
         "--routing-logic",
         type=str,
-        required=True,
-        choices=["roundrobin", "session"],
-        help="The routing logic to use",
+        default="roundrobin",
+        choices=["roundrobin", "session", "weighted"],
+        help="The routing logic to use.",
     )
     parser.add_argument(
         "--session-key",
         type=str,
         default=None,
         help="The key (in the header) to identify a session.",
+    )
+    parser.add_argument(
+        "--weights",
+        type=str,
+        default=None,
+        help='JSON string mapping of endpoint URLs to their weights for weighted routing. Example: {"http://endpoint1:8000": 30, "http://endpoint2:8000": 70}',
     )
 
     # Batch API
