@@ -1,4 +1,4 @@
 .. _router:
 
-Router
-======
+Router Setup
+============

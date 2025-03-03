@@ -53,12 +53,14 @@ Documentation
 
    getting_started/installation
    getting_started/troubleshooting
+   getting_started/examples
 
 .. toctree::
    :maxdepth: 1
-   :caption: Helm Charts
+   :caption: Chart Structure
 
    helm/charts
+   helm/example
 
 .. toctree::
    :maxdepth: 1
@@ -66,18 +68,25 @@ Documentation
 
    vllm_router/router
    vllm_router/router-logic
+   vllm_router/disaggregated-prefill
+   vllm_router/service-discovery
+   vllm_router/dynamic-config
+   vllm_router/engine-stats
 
 .. toctree::
    :maxdepth: 1
    :caption: Router-Controller
 
+   router-controller/setup
    router-controller/controller
+   router-controller/static-route
 
 .. toctree::
    :maxdepth: 1
    :caption: Observability
 
    observability/dashboard
+   observability/export
 
 .. toctree::
    :maxdepth: 1
