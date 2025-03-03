@@ -3,10 +3,10 @@ import unittest
 
 # Import the classes and helper functions from your module.
 from vllm_router.stats.request_stats import (
-    get_request_stats_monitor,
-    initialize_request_stats_monitor,
     RequestStatsMonitor,
     SingletonMeta,
+    get_request_stats_monitor,
+    initialize_request_stats_monitor,
 )
 
 

@@ -5,10 +5,10 @@ from typing import Dict, List
 from fastapi import Request
 from uhashring import HashRing
 
-from vllm_router.stats.engine_stats import EngineStats
 from vllm_router.log import init_logger
-from vllm_router.stats.request_stats import RequestStats
 from vllm_router.service_discovery import EndpointInfo
+from vllm_router.stats.engine_stats import EngineStats
+from vllm_router.stats.request_stats import RequestStats
 from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)

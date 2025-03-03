@@ -1,8 +1,7 @@
 import time
 
-from fastapi import APIRouter
-from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
-from fastapi import Response
+from fastapi import APIRouter, Response
+from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.stats.request_stats import get_request_stats_monitor

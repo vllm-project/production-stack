@@ -1,5 +1,4 @@
-from fastapi import APIRouter
-from fastapi import Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from vllm_router.services.batch_service.processor import BatchProcessor

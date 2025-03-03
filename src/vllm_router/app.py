@@ -6,15 +6,15 @@ import uvicorn
 from fastapi import FastAPI
 
 from vllm_router.dynamic_config import (
-    get_dynamic_config_watcher,
     DynamicRouterConfig,
+    get_dynamic_config_watcher,
     initialize_dynamic_config_watcher,
 )
-from vllm_router.experimental import initialize_feature_gates, get_feature_gates
+from vllm_router.experimental import get_feature_gates, initialize_feature_gates
 from vllm_router.experimental.semantic_cache import (
+    InitializeSemanticCache,
     enable_semantic_cache,
     is_semantic_cache_enabled,
-    InitializeSemanticCache,
 )
 from vllm_router.experimental.semantic_cache_integration import semantic_cache_size
 from vllm_router.httpx_client import HTTPXClientWrapper
@@ -24,13 +24,13 @@ from vllm_router.routers.files_router import files_router
 from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
 from vllm_router.routers.routing_logic import (
-    initialize_routing_logic,
     get_routing_logic,
+    initialize_routing_logic,
 )
 from vllm_router.service_discovery import (
+    ServiceDiscoveryType,
     get_service_discovery,
     initialize_service_discovery,
-    ServiceDiscoveryType,
 )
 from vllm_router.services.batch_service import initialize_batch_processor
 from vllm_router.services.files_service import initialize_storage
@@ -40,10 +40,10 @@ from vllm_router.stats.engine_stats import (
 )
 from vllm_router.stats.log_stats import log_stats
 from vllm_router.stats.request_stats import (
-    initialize_request_stats_monitor,
     get_request_stats_monitor,
+    initialize_request_stats_monitor,
 )
-from vllm_router.utils import set_ulimit, parse_static_urls, parse_static_model_names
+from vllm_router.utils import parse_static_model_names, parse_static_urls, set_ulimit
 
 logger = logging.getLogger("uvicorn")
 
