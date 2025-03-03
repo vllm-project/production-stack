@@ -1,5 +1,10 @@
 name: Functionality test for helm chart
 run-name: ${{ github.actor }} is testing out helm chart functions 🚀
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -50,6 +55,7 @@ jobs:
       - name: Helm uninstall
         run: |
             sudo helm uninstall vllm
+            sudo docker image prune -f
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
 
