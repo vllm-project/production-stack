@@ -1,5 +1,10 @@
 name: Functionality test for helm chart
 run-name: ${{ github.actor }} is testing out helm chart functions 🚀
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
