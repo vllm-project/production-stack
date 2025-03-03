@@ -9,8 +9,8 @@ from fastapi import FastAPI
 from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import reconfigure_routing_logic
 from vllm_router.service_discovery import (
-    reconfigure_service_discovery,
     ServiceDiscoveryType,
+    reconfigure_service_discovery,
 )
 from vllm_router.utils import SingletonMeta, parse_static_model_names, parse_static_urls
 
