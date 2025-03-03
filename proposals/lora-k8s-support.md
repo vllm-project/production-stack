@@ -72,7 +72,7 @@ We propose a Kubernetes operator system with the following components:
 
 #### Architecture / Components
 
-![LoRA Controller Architecture](./imgs/lora-controller.png)
+![LoRA Controller Architecture](./imgs/lora-k8s-arch.png)
 
 The LoRA Controller architecture illustrates the interaction between various components:
 
