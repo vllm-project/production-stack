@@ -5,13 +5,13 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/**'
+      - '.github/**'
       - '**.py'
       - 'setup.py'
       - 'helm/**'
   pull_request:
     paths:
-      - '.github/workflows/**'
+      - '.github/**'
       - '**.py'
       - 'setup.py'
       - 'helm/**'
