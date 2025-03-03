@@ -55,6 +55,7 @@ jobs:
       - name: Helm uninstall
         run: |
             sudo helm uninstall vllm
+            sudo docker image prune -f
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
 
