@@ -910,8 +910,8 @@ def InitializeAll(args):
     initialize_feature_gates(args.feature_gates)
     # Check if the SemanticCache feature gate is enabled
     feature_gates = get_feature_gates()
-    if feature_gates.is_enabled("SemanticCache"):
-        if semantic_cache_available:
+    if semantic_cache_available:
+        if feature_gates.is_enabled("SemanticCache"):
             # The feature gate is enabled, explicitly enable the semantic cache
             enable_semantic_cache()
 
@@ -957,11 +957,11 @@ def InitializeAll(args):
                     "The semantic cache will not be functional without an embedding model. "
                     "Use --semantic-cache-model to specify an embedding model."
                 )
-    elif args.semantic_cache_model:
-        logger.warning(
-            "Semantic cache model specified but SemanticCache feature gate is not enabled. "
-            "Enable the feature gate with --feature-gates=SemanticCache=true"
-        )
+        elif args.semantic_cache_model:
+            logger.warning(
+                "Semantic cache model specified but SemanticCache feature gate is not enabled. "
+                "Enable the feature gate with --feature-gates=SemanticCache=true"
+            )
 
     # --- Hybrid addition: attach singletons to FastAPI state ---
     app.state.engine_stats_scraper = GetEngineStatsScraper()
