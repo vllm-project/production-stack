@@ -107,8 +107,9 @@ The router ensures efficient request distribution among backends. It supports:
 - Exporting observability metrics for each serving engine instance, including QPS, time-to-first-token (TTFT), number of pending/running/finished requests, and uptime
 - Automatic service discovery and fault tolerance by Kubernetes API
 - Multiple different routing algorithms
-  - Round-robin routing
-  - Session-ID based routing
+  - Round-robin routing: Distributes requests evenly across all endpoints
+  - Session-ID based routing: Routes requests from the same session to the same endpoint
+  - Weighted routing: Distributes traffic proportionally based on configured weights using Smooth Weighted Round Robin algorithm
   - (WIP) prefix-aware routing
 
 Please refer to the [router documentation](./src/vllm_router/README.md) for more details.
