@@ -22,6 +22,22 @@ spec:
       - name: router-container
         image: "{{ .Values.routerSpec.repository | default "lmcache/lmstack-router" }}:{{ .Values.routerSpec.tag | default "latest" }}"
         imagePullPolicy: "{{ .Values.routerSpec.imagePullPolicy | default "Always" }}"
+        env:
+          {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
+          {{- if $vllmApiKey }}
+          - name: VLLM_API_KEY
+            {{- if kindIs "string" $vllmApiKey }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-secrets
+                key: vllmApiKey
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $vllmApiKey.secretName }}
+                key: {{ $vllmApiKey.secretKey }}
+            {{- end }}
+          {{- end }}
         args:
           - "--host"
           - "0.0.0.0"
