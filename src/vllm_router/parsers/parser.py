@@ -175,9 +175,7 @@ def parse_args():
         help="Show version and exit",
     )
 
-    if semantic_cache_available:
-        # Add semantic cache arguments
-        add_semantic_cache_args(parser)
+    add_semantic_cache_args(parser)
 
     # Add feature gates argument
     parser.add_argument(
