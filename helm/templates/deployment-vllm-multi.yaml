@@ -19,6 +19,10 @@ spec:
       labels:
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
+      {{- with $modelSpec.initContainers }}
+      initContainers:
+      {{ toYaml . | nindent 2 }}
+      {{- end }}
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"

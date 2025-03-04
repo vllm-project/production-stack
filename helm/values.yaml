@@ -1,7 +1,6 @@
 # -- Default values for llmstack helm chart
 # -- Declare variables to be passed into your templates.
 
-
 # -- Serving engine configuratoon
 servingEngineSpec:
   # -- Customized labels for the serving engine deployment
@@ -27,6 +26,7 @@ servingEngineSpec:
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
   # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
+  # - initContainers: (Optional, list) The list of initcontainers for the model. e.g. [{"image": "busybox", "command": ["sh"]}]
   #
   # - vllmConfig: (optional, map) The configuration for the VLLM model, supported options are:
   #   - enablePrefixCaching: (optional, bool) Enable prefix caching, e.g., false
@@ -69,6 +69,10 @@ servingEngineSpec:
   #     - ReadWriteOnce
   #   pvcMatchLabels:
   #     model: "mistral"
+  #   initContainers:
+  #     - name: init
+  #       image: busybox
+  #       command: ["sh"]
   #
   #   vllmConfig:
   #     enableChunkedPrefill: false
@@ -109,8 +113,9 @@ servingEngineSpec:
     # -- How often (in seconds) to perform the startup probe
     periodSeconds: 10
     # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready
-    failureThreshold: 60
-     # -- Configuration of the Kubelet http request on the server
+    failureThreshold:
+      60
+      # -- Configuration of the Kubelet http request on the server
     httpGet:
       # -- Path to access on the HTTP server
       path: /health
@@ -119,7 +124,7 @@ servingEngineSpec:
 
   # -- Liveness probe configuration
   livenessProbe:
-   # -- Number of seconds after the container has started before liveness probe is initiated
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 15
     # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive
     failureThreshold: 3
@@ -211,7 +216,8 @@ routerSpec:
     className: ""
 
     # -- Additional annotations for the Ingress resource
-    annotations: {}
+    annotations:
+      {}
       # kubernetes.io/ingress.class: alb
       # kubernetes.io/ingress.class: nginx
       # kubernetes.io/tls-acme: "true"
