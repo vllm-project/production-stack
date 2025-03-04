@@ -136,53 +136,58 @@ def initialize_all(app: FastAPI, args):
     initialize_feature_gates(args.feature_gates)
     # Check if the SemanticCache feature gate is enabled
     feature_gates = get_feature_gates()
-    if semantic_cache_available & feature_gates.is_enabled("SemanticCache"):
-        # The feature gate is enabled, explicitly enable the semantic cache
-        enable_semantic_cache()
+    if semantic_cache_available:
+        if feature_gates.is_enabled("SemanticCache"):
+            # The feature gate is enabled, explicitly enable the semantic cache
+            enable_semantic_cache()
 
-        # Verify that the semantic cache was successfully enabled
-        if not is_semantic_cache_enabled():
-            logger.error("Failed to enable semantic cache feature")
+            # Verify that the semantic cache was successfully enabled
+            if not is_semantic_cache_enabled():
+                logger.error("Failed to enable semantic cache feature")
 
-        logger.info("SemanticCache feature gate is enabled")
+            logger.info("SemanticCache feature gate is enabled")
 
-        # Initialize the semantic cache with the model if specified
-        if args.semantic_cache_model:
-            logger.info(
-                f"Initializing semantic cache with model: {args.semantic_cache_model}"
-            )
-            logger.info(
-                f"Semantic cache directory: {args.semantic_cache_dir or 'default'}"
-            )
-            logger.info(f"Semantic cache threshold: {args.semantic_cache_threshold}")
-
-            cache = initialize_semantic_cache(
-                embedding_model=args.semantic_cache_model,
-                cache_dir=args.semantic_cache_dir,
-                default_similarity_threshold=args.semantic_cache_threshold,
-            )
-
-            # Update cache size metric
-            if cache and hasattr(cache, "db") and hasattr(cache.db, "index"):
-                semantic_cache_size.labels(server="router").set(cache.db.index.ntotal)
+            # Initialize the semantic cache with the model if specified
+            if args.semantic_cache_model:
                 logger.info(
-                    f"Semantic cache initialized with {cache.db.index.ntotal} entries"
+                    f"Initializing semantic cache with model: {args.semantic_cache_model}"
+                )
+                logger.info(
+                    f"Semantic cache directory: {args.semantic_cache_dir or 'default'}"
+                )
+                logger.info(
+                    f"Semantic cache threshold: {args.semantic_cache_threshold}"
                 )
 
-            logger.info(
-                f"Semantic cache initialized with model {args.semantic_cache_model}"
-            )
-        else:
+                cache = initialize_semantic_cache(
+                    embedding_model=args.semantic_cache_model,
+                    cache_dir=args.semantic_cache_dir,
+                    default_similarity_threshold=args.semantic_cache_threshold,
+                )
+
+                # Update cache size metric
+                if cache and hasattr(cache, "db") and hasattr(cache.db, "index"):
+                    semantic_cache_size.labels(server="router").set(
+                        cache.db.index.ntotal
+                    )
+                    logger.info(
+                        f"Semantic cache initialized with {cache.db.index.ntotal} entries"
+                    )
+
+                logger.info(
+                    f"Semantic cache initialized with model {args.semantic_cache_model}"
+                )
+            else:
+                logger.warning(
+                    "SemanticCache feature gate is enabled but no embedding model specified. "
+                    "The semantic cache will not be functional without an embedding model. "
+                    "Use --semantic-cache-model to specify an embedding model."
+                )
+        elif args.semantic_cache_model:
             logger.warning(
-                "SemanticCache feature gate is enabled but no embedding model specified. "
-                "The semantic cache will not be functional without an embedding model. "
-                "Use --semantic-cache-model to specify an embedding model."
+                "Semantic cache model specified but SemanticCache feature gate is not enabled. "
+                "Enable the feature gate with --feature-gates=SemanticCache=true"
             )
-    elif args.semantic_cache_model:
-        logger.warning(
-            "Semantic cache model specified but SemanticCache feature gate is not enabled. "
-            "Enable the feature gate with --feature-gates=SemanticCache=true"
-        )
 
     # --- Hybrid addition: attach singletons to FastAPI state ---
     app.state.engine_stats_scraper = get_engine_stats_scraper()
