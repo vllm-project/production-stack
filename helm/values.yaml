@@ -26,7 +26,14 @@ servingEngineSpec:
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
   # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
-  # - initContainers: (Optional, list) The list of initcontainers for the model. e.g. [{"image": "busybox", "command": ["sh"]}]
+  # - initContainer: (optional, list of objects) The configuration for the init container to be run before the main container.
+  #   - name: (string) The name of the init container, e.g., "init"
+  #   - image: (string) The Docker image for the init container, e.g., "busybox:latest"
+  #   - command: (optional, list) The command to run in the init container, e.g., ["sh", "-c"]
+  #   - args: (optional, list) Additional arguments to pass to the command, e.g., ["ls"]
+  #   - env: (optional, list) List of environment variables to set in the container, each being a map with:
+  #   - resources: (optional, map) The resource requests and limits for the container:
+  #   - mountPvcStorage: (optional, bool) Whether to mount the model's volume.
   #
   # - vllmConfig: (optional, map) The configuration for the VLLM model, supported options are:
   #   - enablePrefixCaching: (optional, bool) Enable prefix caching, e.g., false
@@ -69,10 +76,14 @@ servingEngineSpec:
   #     - ReadWriteOnce
   #   pvcMatchLabels:
   #     model: "mistral"
-  #   initContainers:
-  #     - name: init
-  #       image: busybox
-  #       command: ["sh"]
+  #   initContainer:
+  #     name: my-container
+  #     image: busybox
+  #     command: ["sh"]
+  #     env: {}
+  #     args: []
+  #     resources: {}
+  #     mountPvcStorage: true
   #
   #   vllmConfig:
   #     enableChunkedPrefill: false
