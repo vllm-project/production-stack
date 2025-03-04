@@ -5,15 +5,15 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.metrics_service import (
-    current_qps,
     avg_decoding_length,
-    num_prefill_requests,
-    num_decoding_requests,
-    num_requests_running,
-    avg_latency,
     avg_itl,
-    num_requests_swapped,
+    avg_latency,
+    current_qps,
     healthy_pods_total,
+    num_decoding_requests,
+    num_prefill_requests,
+    num_requests_running,
+    num_requests_swapped,
 )
 from vllm_router.stats.request_stats import get_request_stats_monitor
 

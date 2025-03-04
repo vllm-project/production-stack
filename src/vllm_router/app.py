@@ -10,14 +10,14 @@ from vllm_router.dynamic_config import (
     get_dynamic_config_watcher,
     initialize_dynamic_config_watcher,
 )
-from vllm_router.experimental import initialize_feature_gates, get_feature_gates
+from vllm_router.experimental import get_feature_gates, initialize_feature_gates
 
 try:
     # Semantic cache integration
     from vllm_router.experimental.semantic_cache import (
         GetSemanticCache,
-        initialize_semantic_cache,
         enable_semantic_cache,
+        initialize_semantic_cache,
         is_semantic_cache_enabled,
     )
     from vllm_router.experimental.semantic_cache_integration import (
