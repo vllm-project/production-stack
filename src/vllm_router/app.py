@@ -202,7 +202,7 @@ def initialize_all(app: FastAPI, args):
         )
 
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 app.include_router(main_router)
 app.include_router(files_router)
 app.include_router(batches_router)
