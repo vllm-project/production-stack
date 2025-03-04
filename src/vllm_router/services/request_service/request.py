@@ -7,10 +7,32 @@ import uuid
 from fastapi import Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from vllm_router.experimental.semantic_cache_integration import store_in_semantic_cache
-from vllm_router.httpx_client import HTTPXClientWrapper
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import get_service_discovery
+
+try:
+    # Semantic cache integration
+    from vllm_router.experimental.semantic_cache import (
+        GetSemanticCache,
+        enable_semantic_cache,
+        initialize_semantic_cache,
+        is_semantic_cache_enabled,
+    )
+    from vllm_router.experimental.semantic_cache_integration import (
+        add_semantic_cache_args,
+        check_semantic_cache,
+        semantic_cache_hit_ratio,
+        semantic_cache_hits,
+        semantic_cache_latency,
+        semantic_cache_misses,
+        semantic_cache_size,
+        store_in_semantic_cache,
+    )
+
+    semantic_cache_available = True
+except ImportError:
+    semantic_cache_available = False
+
 
 logger = init_logger(__name__)
 
@@ -54,8 +76,7 @@ async def process_request(
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray() if not is_streaming else None
 
-    client = HTTPXClientWrapper()
-    async with client.stream(
+    async with request.app.state.httpx_client_wrapper.stream(
         method=request.method,
         url=backend_url + endpoint,
         headers=dict(request.headers),
