@@ -19,6 +19,31 @@ spec:
       labels:
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
+      {{- if hasKey $modelSpec "initContainer" }}
+      {{- $container := $modelSpec.initContainer }}
+      initContainers:
+        - name: {{ $container.name }}
+          image: {{ $container.image }}
+          {{- if $container.command }}
+          command: {{ toYaml $container.command | nindent 12 }}
+          {{- end }}
+          {{- if $container.args }}
+          args: {{ toYaml $container.args | nindent 12 }}
+          {{- end }}
+          {{- if $container.env }}
+          env: {{ toYaml $container.env | nindent 12 }}
+          {{- end }}
+          {{- if $container.resources }}
+          resources: {{ toYaml $container.resources | nindent 12 }}
+          {{- end }}
+          {{- if hasKey $container "mountPvcStorage" }}
+          volumeMounts:
+          {{- if and $container.volumeMounts.pvcStorage (hasKey $modelSpec "pvcStorage") }}
+            - name: {{ .Release.Name }}-storage
+              mountPath: /data
+          {{- end }}
+          {{- end }}
+      {{- end }}
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
