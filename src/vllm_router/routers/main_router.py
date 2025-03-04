@@ -46,9 +46,9 @@ async def route_chat_completion(request: Request):
         logger.debug("Received chat completion request, checking semantic cache")
         cache_response = await check_semantic_cache(request=request)
 
-    if cache_response:
-        logger.info("Serving response from semantic cache")
-        return cache_response
+        if cache_response:
+            logger.info("Serving response from semantic cache")
+            return cache_response
 
     logger.debug("No cache hit, forwarding request to backend")
     return await route_general_request(request, "/v1/chat/completions")
