@@ -21,7 +21,7 @@ spec:
     spec:
       {{- with $modelSpec.initContainers }}
       initContainers:
-      {{ toYaml . | nindent 2 }}
+      {{ toYaml . | nindent 8 }}
       {{- end }}
       containers:
         - name: "vllm"
