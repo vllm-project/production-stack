@@ -32,6 +32,7 @@ vllm-router = "vllm_router.router:main"
 Repository = "ttps://github.com/vllm-project/production-stack"
 
 [project.optional-dependencies]
+default = []  # leave this empty because pip requires at least one specifier
 transformer = [
     "sentence-transformers==2.2.2",
 ]

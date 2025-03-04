@@ -15,12 +15,12 @@ COPY .git/ .git/
 # Copy the rest of the application code
 COPY src/ src/
 
-ARG INSTALL_SENTENCE_TRANSFORMERS=true
-ENV INSTALL_SENTENCE_TRANSFORMERS=${INSTALL_SENTENCE_TRANSFORMERS}
+ARG INSTALL_OPTIONAL_DEP=transformer
+ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
 
 # Install dependencies (use cache, and delete after install, to speed up the build)
 RUN pip install --upgrade --no-cache-dir pip setuptools_scm && \
-    pip install --no-cache-dir .
+    pip install --no-cache-dir .[$INSTALL_OPTIONAL_DEP]
 
 # Set the entrypoint
 ENTRYPOINT ["vllm-router"]
