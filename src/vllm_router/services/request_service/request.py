@@ -76,7 +76,7 @@ async def process_request(
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray() if not is_streaming else None
 
-    async with request.app.state.httpx_client_wrapper.stream(
+    async with request.app.state.httpx_client_wrapper().stream(
         method=request.method,
         url=backend_url + endpoint,
         headers=dict(request.headers),
