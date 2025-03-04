@@ -1,4 +1,0 @@
-.. _prometheus:
-
-Export (Prometheus)
-===================

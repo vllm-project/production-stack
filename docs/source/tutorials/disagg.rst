@@ -1,4 +1,4 @@
-.. _disaggregated-prefill:
+.. _tutorial_disagg:
 
 Disaggregated Prefill
 =====================

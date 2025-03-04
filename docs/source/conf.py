@@ -76,6 +76,14 @@ html_theme_options = {
     "repository_url": "https://github.com/vllm-project/vllm/production-stack",
     "use_repository_button": True,
     "use_edit_page_button": True,
+    # navigation and sidebar
+    "show_toc_level": 2,
+    "announcement": None,
+    "secondary_sidebar_items": [
+        "page-toc",
+    ],
+    "navigation_depth": 3,
+    "primary_sidebar_end": [],
 }
 
 intersphinx_mapping = {

@@ -57,43 +57,32 @@ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: Chart Structure
+   :caption: Deployment
 
-   helm/charts
-   helm/example
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Router
-
-   vllm_router/router
-   vllm_router/router-logic
-   vllm_router/disaggregated-prefill
-   vllm_router/service-discovery
-   vllm_router/dynamic-config
-   vllm_router/engine-stats
+   deployment/helm
+   deployment/cloud-deployment/index.rst
+   deployment/ray/ray.rst
 
 .. toctree::
    :maxdepth: 1
-   :caption: Router-Controller
+   :caption: User Manual
 
-   router-controller/setup
-   router-controller/controller
-   router-controller/static-route
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Observability
-
-   observability/dashboard
-   observability/export
+   user_manual/router/index.rst
+   user_manual/lora/index.rst
+   user_manual/kv_cache/index.rst
 
 .. toctree::
    :maxdepth: 1
-   :caption: Cloud Deployment
+   :caption: Developer Guide
 
-   cloud-deployment/aws
-   cloud-deployment/gcp
+   dev_guide/peripheral/index.rst
+   dev_guide/dev_api/index.rst
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Tutorials
+
+   tutorials/index.rst
 
 .. toctree::
    :maxdepth: 1

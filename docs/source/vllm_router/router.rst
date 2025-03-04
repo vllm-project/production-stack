@@ -1,4 +1,0 @@
-.. _router:
-
-Router Setup
-============

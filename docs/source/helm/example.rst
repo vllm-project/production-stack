@@ -1,4 +1,0 @@
-.. _exaxmple:
-
-Example YAML
-============
