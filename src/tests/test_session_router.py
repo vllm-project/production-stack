@@ -1,10 +1,6 @@
-import sys
-from typing import Dict, List
-from unittest.mock import Mock
+from typing import Dict
 
-import pytest
-
-from vllm_router.routing_logic import SessionRouter
+from vllm_router.routers.routing_logic import SessionRouter
 
 
 class EndpointInfo:
