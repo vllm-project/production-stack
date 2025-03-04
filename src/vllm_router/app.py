@@ -90,6 +90,7 @@ async def lifespan(app: FastAPI):
         dyn_cfg_watcher.close()
 
 
+# TODO: This method needs refactoring, since it has nested if statements and is too long
 def initialize_all(app: FastAPI, args):
     """
     Initialize all the components of the router with the given arguments.
