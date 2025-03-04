@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import threading
 import time
@@ -12,7 +13,42 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 
 from vllm_router.batch import BatchProcessor, initialize_batch_processor
+from vllm_router.dynamic_config import (
+    DynamicRouterConfig,
+    GetDynamicConfigWatcher,
+    InitializeDynamicConfigWatcher,
+)
 from vllm_router.engine_stats import GetEngineStatsScraper, InitializeEngineStatsScraper
+
+# Import experimental feature gates and semantic cache
+from vllm_router.experimental.feature_gates import (
+    get_feature_gates,
+    initialize_feature_gates,
+)
+
+try:
+    # Semantic cache integration
+    from vllm_router.experimental.semantic_cache import (
+        GetSemanticCache,
+        InitializeSemanticCache,
+        enable_semantic_cache,
+        is_semantic_cache_enabled,
+    )
+    from vllm_router.experimental.semantic_cache_integration import (
+        add_semantic_cache_args,
+        check_semantic_cache,
+        semantic_cache_hit_ratio,
+        semantic_cache_hits,
+        semantic_cache_latency,
+        semantic_cache_misses,
+        semantic_cache_size,
+        store_in_semantic_cache,
+    )
+
+    semantic_cache_available = True
+except ImportError:
+    semantic_cache_available = False
+
 from vllm_router.files import Storage, initialize_storage
 from vllm_router.httpx_client import HTTPXClientWrapper
 from vllm_router.protocols import ModelCard, ModelList
@@ -26,11 +62,18 @@ from vllm_router.service_discovery import (
     InitializeServiceDiscovery,
     ServiceDiscoveryType,
 )
-from vllm_router.utils import set_ulimit, validate_url
+from vllm_router.utils import (
+    parse_static_model_names,
+    parse_static_urls,
+    set_ulimit,
+    validate_url,
+)
 from vllm_router.version import __version__
 
 httpx_client_wrapper = HTTPXClientWrapper()
-logger = logging.getLogger("uvicorn")
+from vllm_router.log import init_logger
+
+logger = init_logger(__name__)
 
 
 @asynccontextmanager
@@ -40,6 +83,21 @@ async def lifespan(app: FastAPI):
         await app.state.batch_processor.initialize()
     yield
     await httpx_client_wrapper.stop()
+
+    # Close the threaded-components
+    logger.info("Closing engine stats scraper")
+    engine_stats_scraper = GetEngineStatsScraper()
+    engine_stats_scraper.close()
+
+    logger.info("Closing service discovery module")
+    service_discovery = GetServiceDiscovery()
+    service_discovery.close()
+
+    # Close the optional dynamic config watcher
+    dyn_cfg_watcher = GetDynamicConfigWatcher()
+    if dyn_cfg_watcher is not None:
+        logger.info("Closing dynamic config watcher")
+        dyn_cfg_watcher.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -104,6 +162,17 @@ async def process_request(
     total_len = 0
     start_time = time.time()
     app.state.request_stats_monitor.on_new_request(backend_url, request_id, start_time)
+    # Check if this is a streaming request
+    is_streaming = False
+    try:
+        request_json = json.loads(body)
+        is_streaming = request_json.get("stream", False)
+    except:
+        # If we can't parse the body as JSON, assume it's not streaming
+        pass
+
+    # For non-streaming requests, collect the full response to cache it properly
+    full_response = bytearray() if not is_streaming else None
 
     client = httpx_client_wrapper()
     async with client.stream(
@@ -123,14 +192,24 @@ async def process_request(
                 app.state.request_stats_monitor.on_request_response(
                     backend_url, request_id, time.time()
                 )
+            # For non-streaming requests, collect the full response
+            if full_response is not None:
+                full_response.extend(chunk)
             yield chunk
 
     app.state.request_stats_monitor.on_request_complete(
         backend_url, request_id, time.time()
     )
 
-    # if debug_request:
-    #    logger.debug(f"Finished the request with request id: {debug_request.headers.get('x-request-id', None)} at {time.time()}")
+    if semantic_cache_available:
+        # if debug_request:
+        #    logger.debug(f"Finished the request with request id: {debug_request.headers.get('x-request-id', None)} at {time.time()}")
+        # Store in semantic cache if applicable
+        # Use the full response for non-streaming requests, or the last chunk for streaming
+        cache_chunk = bytes(full_response) if full_response is not None else chunk
+        await store_in_semantic_cache(
+            endpoint=endpoint, method=method, body=body, chunk=cache_chunk
+        )
 
 
 async def route_general_request(request: Request, endpoint: str):
@@ -449,6 +528,16 @@ async def route_cancel_batch(batch_id: str):
 
 @app.post("/v1/chat/completions")
 async def route_chat_completition(request: Request):
+    if semantic_cache_available:
+        # Check if the request can be served from the semantic cache
+        logger.debug("Received chat completion request, checking semantic cache")
+        cache_response = await check_semantic_cache(request=request)
+
+        if cache_response:
+            logger.info("Serving response from semantic cache")
+            return cache_response
+
+    logger.debug("No cache hit, forwarding request to backend")
     return await route_general_request(request, "/v1/chat/completions")
 
 
@@ -544,7 +633,18 @@ async def health() -> Response:
         return JSONResponse(
             content={"status": "Engine stats scraper is down."}, status_code=503
         )
-    return Response(status_code=200)
+
+    if GetDynamicConfigWatcher() is not None:
+        dynamic_config = GetDynamicConfigWatcher().get_current_config()
+        return JSONResponse(
+            content={
+                "status": "healthy",
+                "dynamic_config": json.loads(dynamic_config.to_json_str()),
+            },
+            status_code=200,
+        )
+    else:
+        return JSONResponse(content={"status": "healthy"}, status_code=200)
 
 
 # --- Prometheus Metrics Endpoint ---
@@ -725,6 +825,13 @@ def parse_args():
         help="The interval in seconds to log statistics.",
     )
 
+    parser.add_argument(
+        "--dynamic-config-json",
+        type=str,
+        default=None,
+        help="The path to the json file containing the dynamic configuration.",
+    )
+
     # Add --version argument
     parser.add_argument(
         "--version",
@@ -733,25 +840,29 @@ def parse_args():
         help="Show version and exit",
     )
 
+    if semantic_cache_available:
+        # Add semantic cache arguments
+        add_semantic_cache_args(parser)
+
+    # Add feature gates argument
+    parser.add_argument(
+        "--feature-gates",
+        type=str,
+        default="",
+        help="Comma-separated list of feature gates (e.g., 'SemanticCache=true')",
+    )
+
+    # Add log level argument
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="info",
+        choices=["critical", "error", "warning", "info", "debug", "trace"],
+        help="Log level for uvicorn. Default is 'info'.",
+    )
     args = parser.parse_args()
     validate_args(args)
     return args
-
-
-def parse_static_urls(args):
-    urls = args.static_backends.split(",")
-    backend_urls = []
-    for url in urls:
-        if validate_url(url):
-            backend_urls.append(url)
-        else:
-            logger.warning(f"Skipping invalid URL: {url}")
-    return backend_urls
-
-
-def parse_static_model_names(args):
-    models = args.static_models.split(",")
-    return models
 
 
 def InitializeAll(args):
@@ -767,8 +878,8 @@ def InitializeAll(args):
     if args.service_discovery == "static":
         InitializeServiceDiscovery(
             ServiceDiscoveryType.STATIC,
-            urls=parse_static_urls(args),
-            models=parse_static_model_names(args),
+            urls=parse_static_urls(args.static_backends),
+            models=parse_static_model_names(args.static_models),
         )
     elif args.service_discovery == "k8s":
         InitializeServiceDiscovery(
@@ -795,10 +906,72 @@ def InitializeAll(args):
 
     InitializeRoutingLogic(args.routing_logic, session_key=args.session_key)
 
+    # Initialize feature gates
+    initialize_feature_gates(args.feature_gates)
+    # Check if the SemanticCache feature gate is enabled
+    feature_gates = get_feature_gates()
+    if semantic_cache_available:
+        if feature_gates.is_enabled("SemanticCache"):
+            # The feature gate is enabled, explicitly enable the semantic cache
+            enable_semantic_cache()
+
+            # Verify that the semantic cache was successfully enabled
+            if not is_semantic_cache_enabled():
+                logger.error("Failed to enable semantic cache feature")
+
+            logger.info("SemanticCache feature gate is enabled")
+
+            # Initialize the semantic cache with the model if specified
+            if args.semantic_cache_model:
+                logger.info(
+                    f"Initializing semantic cache with model: {args.semantic_cache_model}"
+                )
+                logger.info(
+                    f"Semantic cache directory: {args.semantic_cache_dir or 'default'}"
+                )
+                logger.info(
+                    f"Semantic cache threshold: {args.semantic_cache_threshold}"
+                )
+
+                cache = InitializeSemanticCache(
+                    embedding_model=args.semantic_cache_model,
+                    cache_dir=args.semantic_cache_dir,
+                    default_similarity_threshold=args.semantic_cache_threshold,
+                )
+
+                # Update cache size metric
+                if cache and hasattr(cache, "db") and hasattr(cache.db, "index"):
+                    semantic_cache_size.labels(server="router").set(
+                        cache.db.index.ntotal
+                    )
+                    logger.info(
+                        f"Semantic cache initialized with {cache.db.index.ntotal} entries"
+                    )
+
+                logger.info(
+                    f"Semantic cache initialized with model {args.semantic_cache_model}"
+                )
+            else:
+                logger.warning(
+                    "SemanticCache feature gate is enabled but no embedding model specified. "
+                    "The semantic cache will not be functional without an embedding model. "
+                    "Use --semantic-cache-model to specify an embedding model."
+                )
+        elif args.semantic_cache_model:
+            logger.warning(
+                "Semantic cache model specified but SemanticCache feature gate is not enabled. "
+                "Enable the feature gate with --feature-gates=SemanticCache=true"
+            )
+
     # --- Hybrid addition: attach singletons to FastAPI state ---
     app.state.engine_stats_scraper = GetEngineStatsScraper()
     app.state.request_stats_monitor = GetRequestStatsMonitor()
     app.state.router = GetRoutingLogic()
+
+    # Initialize dynamic config watcher
+    if args.dynamic_config_json:
+        init_config = DynamicRouterConfig.from_args(args)
+        InitializeDynamicConfigWatcher(args.dynamic_config_json, 10, init_config, app)
 
 
 def log_stats(interval: int = 10):
@@ -875,7 +1048,7 @@ def main():
     # Workaround to avoid footguns where uvicorn drops requests with too
     # many concurrent requests active.
     set_ulimit()
-    uvicorn.run(app, host=args.host, port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
 
 
 if __name__ == "__main__":

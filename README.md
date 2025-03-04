@@ -119,7 +119,7 @@ We welcome and value any contributions and collaborations.  Please check out [CO
 
 ## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under Apache License 2.0. See the `LICENSE` file for details.
 
 ---
 
