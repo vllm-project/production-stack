@@ -5,7 +5,7 @@ if [[ $# -ne 1 ]]; then
 fi
 
 # Use this command when testing with k8s service discovery
-# python3 -m vllm_router.router --port "$1" \
+# python3 -m vllm_router.app --port "$1" \
 #     --service-discovery k8s \
 #     --k8s-label-selector release=test \
 #     --k8s-namespace default \
@@ -15,7 +15,7 @@ fi
 #     --log-stats
 
 # Use this command when testing with static service discovery
-python3 -m vllm_router.router --port "$1" \
+python3 -m vllm_router.app --port "$1" \
     --service-discovery static \
     --static-backends "http://localhost:9000" \
     --static-models "fake_model_name" \

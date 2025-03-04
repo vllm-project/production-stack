@@ -9,9 +9,9 @@ from uuid import uuid4
 import aiosqlite
 
 from vllm_router.batch.batch import BatchInfo, BatchStatus
-from vllm_router.batch.processor import BatchProcessor
-from vllm_router.files import Storage
 from vllm_router.log import init_logger
+from vllm_router.services.batch_service.processor import BatchProcessor
+from vllm_router.services.files_service import Storage
 
 logger = init_logger(__name__)
 

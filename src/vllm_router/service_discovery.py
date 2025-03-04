@@ -285,7 +285,7 @@ def _create_service_discovery(
         raise ValueError("Invalid service discovery type")
 
 
-def InitializeServiceDiscovery(
+def initialize_service_discovery(
     service_discovery_type: ServiceDiscoveryType, *args, **kwargs
 ) -> ServiceDiscovery:
     """
@@ -313,7 +313,7 @@ def InitializeServiceDiscovery(
     return _global_service_discovery
 
 
-def ReconfigureServiceDiscovery(
+def reconfigure_service_discovery(
     service_discovery_type: ServiceDiscoveryType, *args, **kwargs
 ) -> ServiceDiscovery:
     """
@@ -332,7 +332,7 @@ def ReconfigureServiceDiscovery(
     return _global_service_discovery
 
 
-def GetServiceDiscovery() -> ServiceDiscovery:
+def get_service_discovery() -> ServiceDiscovery:
     """
     Get the initialized service discovery module.
 
@@ -352,15 +352,14 @@ def GetServiceDiscovery() -> ServiceDiscovery:
 if __name__ == "__main__":
     # Test the service discovery
     # k8s_sd = K8sServiceDiscovery("default", 8000, "release=test")
-    InitializeServiceDiscovery(
+    initialize_service_discovery(
         ServiceDiscoveryType.K8S,
         namespace="default",
         port=8000,
         label_selector="release=test",
     )
 
-    k8s_sd = GetServiceDiscovery()
-    import time
+    k8s_sd = get_service_discovery()
 
     time.sleep(1)
     while True:

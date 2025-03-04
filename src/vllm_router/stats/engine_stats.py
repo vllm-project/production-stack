@@ -1,13 +1,13 @@
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict
 
 import requests
 from prometheus_client.parser import text_string_to_metric_families
 
 from vllm_router.log import init_logger
-from vllm_router.service_discovery import GetServiceDiscovery
+from vllm_router.service_discovery import get_service_discovery
 from vllm_router.utils import SingletonMeta
 
 logger = init_logger(__name__)
@@ -25,7 +25,7 @@ class EngineStats:
     gpu_cache_usage_perc: float = 0.0
 
     @staticmethod
-    def FromVllmScrape(vllm_scrape: str):
+    def from_vllm_scrape(vllm_scrape: str):
         """
         Parse the vllm scrape string and return a EngineStats object
 
@@ -103,7 +103,7 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         try:
             response = requests.get(url + "/metrics", timeout=self.scrape_interval)
             response.raise_for_status()
-            engine_stats = EngineStats.FromVllmScrape(response.text)
+            engine_stats = EngineStats.from_vllm_scrape(response.text)
         except Exception as e:
             logger.error(f"Failed to scrape metrics from {url}: {e}")
             return None
@@ -119,7 +119,7 @@ class EngineStatsScraper(metaclass=SingletonMeta):
 
         """
         collected_engine_stats = {}
-        endpoints = GetServiceDiscovery().get_endpoint_info()
+        endpoints = get_service_discovery().get_endpoint_info()
         logger.info(f"Scraping metrics from {len(endpoints)} serving engine(s)")
         for info in endpoints:
             url = info.url
@@ -186,10 +186,10 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         self.scrape_thread.join()
 
 
-def InitializeEngineStatsScraper(scrape_interval: float) -> EngineStatsScraper:
+def initialize_engine_stats_scraper(scrape_interval: float) -> EngineStatsScraper:
     return EngineStatsScraper(scrape_interval)
 
 
-def GetEngineStatsScraper() -> EngineStatsScraper:
+def get_engine_stats_scraper() -> EngineStatsScraper:
     # This call returns the already-initialized instance (or raises an error if not yet initialized)
     return EngineStatsScraper()

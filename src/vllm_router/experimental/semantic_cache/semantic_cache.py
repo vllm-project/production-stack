@@ -8,7 +8,6 @@ from sentence_transformers import SentenceTransformer
 
 from vllm_router.experimental.semantic_cache.db_adapters import (
     FAISSAdapter,
-    VectorDBAdapterBase,
 )
 
 logger = logging.getLogger(__name__)
@@ -318,7 +317,7 @@ class SemanticCache:
 _semantic_cache_instance = None
 
 
-def InitializeSemanticCache(
+def initialize_semantic_cache(
     embedding_model: str = "all-MiniLM-L6-v2",
     cache_dir: str = None,
     default_similarity_threshold: float = 0.95,

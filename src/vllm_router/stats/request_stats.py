@@ -282,9 +282,9 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         return ret
 
 
-def InitializeRequestStatsMonitor(sliding_window_size: float):
+def initialize_request_stats_monitor(sliding_window_size: float):
     return RequestStatsMonitor(sliding_window_size)
 
 
-def GetRequestStatsMonitor():
+def get_request_stats_monitor():
     return RequestStatsMonitor()
