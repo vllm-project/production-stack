@@ -25,7 +25,7 @@ class EngineStats:
     gpu_cache_usage_perc: float = 0.0
 
     @staticmethod
-    def FromVllmScrape(vllm_scrape: str):
+    def from_vllm_scrape(vllm_scrape: str):
         """
         Parse the vllm scrape string and return a EngineStats object
 
@@ -103,7 +103,7 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         try:
             response = requests.get(url + "/metrics", timeout=self.scrape_interval)
             response.raise_for_status()
-            engine_stats = EngineStats.FromVllmScrape(response.text)
+            engine_stats = EngineStats.from_vllm_scrape(response.text)
         except Exception as e:
             logger.error(f"Failed to scrape metrics from {url}: {e}")
             return None

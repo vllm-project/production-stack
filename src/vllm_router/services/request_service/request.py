@@ -85,10 +85,11 @@ async def process_request(
     #    logger.debug(f"Finished the request with request id: {debug_request.headers.get('x-request-id', None)} at {time.time()}")
     # Store in semantic cache if applicable
     # Use the full response for non-streaming requests, or the last chunk for streaming
-    cache_chunk = bytes(full_response) if full_response is not None else chunk
-    await store_in_semantic_cache(
-        endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
-    )
+    if request.app.state.semantic_cache_available:
+        cache_chunk = bytes(full_response) if full_response is not None else chunk
+        await store_in_semantic_cache(
+            endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
+        )
 
 
 async def route_general_request(request: Request, endpoint: str):

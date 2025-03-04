@@ -1,41 +1,21 @@
 import time
 
 from fastapi import APIRouter, Response
-from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from vllm_router.service_discovery import get_service_discovery
+from vllm_router.services.metrics_service import (
+    current_qps,
+    avg_decoding_length,
+    num_prefill_requests,
+    num_decoding_requests,
+    num_requests_running,
+    avg_latency,
+    avg_itl,
+    num_requests_swapped,
+    healthy_pods_total,
+)
 from vllm_router.stats.request_stats import get_request_stats_monitor
-
-# --- Prometheus Gauges ---
-# Existing metrics
-num_requests_running = Gauge(
-    "vllm:num_requests_running", "Number of running requests", ["server"]
-)
-num_requests_waiting = Gauge(
-    "vllm:num_requests_waiting", "Number of waiting requests", ["server"]
-)
-current_qps = Gauge("vllm:current_qps", "Current Queries Per Second", ["server"])
-avg_decoding_length = Gauge(
-    "vllm:avg_decoding_length", "Average Decoding Length", ["server"]
-)
-num_prefill_requests = Gauge(
-    "vllm:num_prefill_requests", "Number of Prefill Requests", ["server"]
-)
-num_decoding_requests = Gauge(
-    "vllm:num_decoding_requests", "Number of Decoding Requests", ["server"]
-)
-
-# New metrics per dashboard update
-healthy_pods_total = Gauge(
-    "vllm:healthy_pods_total", "Number of healthy vLLM pods", ["server"]
-)
-avg_latency = Gauge(
-    "vllm:avg_latency", "Average end-to-end request latency", ["server"]
-)
-avg_itl = Gauge("vllm:avg_itl", "Average Inter-Token Latency", ["server"])
-num_requests_swapped = Gauge(
-    "vllm:num_requests_swapped", "Number of swapped requests", ["server"]
-)
 
 metrics_router = APIRouter()
 

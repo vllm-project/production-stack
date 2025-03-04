@@ -4,6 +4,16 @@ from fastapi import FastAPI
 
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import get_service_discovery
+from vllm_router.services.metrics_service import (
+    current_qps,
+    avg_decoding_length,
+    num_prefill_requests,
+    num_decoding_requests,
+    num_requests_running,
+    avg_latency,
+    avg_itl,
+    num_requests_swapped,
+)
 
 logger = init_logger(__name__)
 

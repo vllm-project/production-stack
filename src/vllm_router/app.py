@@ -10,13 +10,31 @@ from vllm_router.dynamic_config import (
     get_dynamic_config_watcher,
     initialize_dynamic_config_watcher,
 )
-from vllm_router.experimental import get_feature_gates, initialize_feature_gates
-from vllm_router.experimental.semantic_cache import (
-    InitializeSemanticCache,
-    enable_semantic_cache,
-    is_semantic_cache_enabled,
-)
-from vllm_router.experimental.semantic_cache_integration import semantic_cache_size
+from vllm_router.experimental import initialize_feature_gates, get_feature_gates
+
+try:
+    # Semantic cache integration
+    from vllm_router.experimental.semantic_cache import (
+        GetSemanticCache,
+        initialize_semantic_cache,
+        enable_semantic_cache,
+        is_semantic_cache_enabled,
+    )
+    from vllm_router.experimental.semantic_cache_integration import (
+        add_semantic_cache_args,
+        check_semantic_cache,
+        semantic_cache_hit_ratio,
+        semantic_cache_hits,
+        semantic_cache_latency,
+        semantic_cache_misses,
+        semantic_cache_size,
+        store_in_semantic_cache,
+    )
+
+    semantic_cache_available = True
+except ImportError:
+    semantic_cache_available = False
+
 from vllm_router.httpx_client import HTTPXClientWrapper
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
@@ -118,7 +136,7 @@ def initialize_all(app: FastAPI, args):
     initialize_feature_gates(args.feature_gates)
     # Check if the SemanticCache feature gate is enabled
     feature_gates = get_feature_gates()
-    if feature_gates.is_enabled("SemanticCache"):
+    if semantic_cache_available & feature_gates.is_enabled("SemanticCache"):
         # The feature gate is enabled, explicitly enable the semantic cache
         enable_semantic_cache()
 
@@ -138,7 +156,7 @@ def initialize_all(app: FastAPI, args):
             )
             logger.info(f"Semantic cache threshold: {args.semantic_cache_threshold}")
 
-            cache = InitializeSemanticCache(
+            cache = initialize_semantic_cache(
                 embedding_model=args.semantic_cache_model,
                 cache_dir=args.semantic_cache_dir,
                 default_similarity_threshold=args.semantic_cache_threshold,
@@ -185,6 +203,7 @@ app.include_router(files_router)
 app.include_router(batches_router)
 app.include_router(metrics_router)
 httpx_client_wrapper = HTTPXClientWrapper()
+app.state.semantic_cache_available = semantic_cache_available
 
 
 def main():

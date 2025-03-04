@@ -1,7 +1,29 @@
 import argparse
 
-from vllm_router.experimental.semantic_cache_integration import add_semantic_cache_args
 from vllm_router.version import __version__
+
+try:
+    # Semantic cache integration
+    from vllm_router.experimental.semantic_cache import (
+        GetSemanticCache,
+        initialize_semantic_cache,
+        enable_semantic_cache,
+        is_semantic_cache_enabled,
+    )
+    from vllm_router.experimental.semantic_cache_integration import (
+        add_semantic_cache_args,
+        check_semantic_cache,
+        semantic_cache_hit_ratio,
+        semantic_cache_hits,
+        semantic_cache_latency,
+        semantic_cache_misses,
+        semantic_cache_size,
+        store_in_semantic_cache,
+    )
+
+    semantic_cache_available = True
+except ImportError:
+    semantic_cache_available = False
 
 
 # --- Argument Parsing and Initialization ---
@@ -153,8 +175,9 @@ def parse_args():
         help="Show version and exit",
     )
 
-    # Add semantic cache arguments
-    add_semantic_cache_args(parser)
+    if semantic_cache_available:
+        # Add semantic cache arguments
+        add_semantic_cache_args(parser)
 
     # Add feature gates argument
     parser.add_argument(
