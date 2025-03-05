@@ -9,7 +9,7 @@
 Welcome to production-stack!
 ==================================
 
-.. figure:: ./assets/vllm-logo-text-light.png
+.. figure:: ./assets/prodstack.png
   :width: 60%
   :align: center
   :alt: production-stack

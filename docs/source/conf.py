@@ -66,14 +66,14 @@ autodoc.ClassDocumenter = MockedClassDocumenter
 html_title = project
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
-html_logo = "./assets/vllm-logo-text-light.png"
-html_favicon = "./assets/vllm-logo-only-light.ico"
+html_logo = "./assets/prodstack_icon.png"
+html_favicon = "./assets/output.ico"
 html_permalinks_icon = "<span>#</span>"
 pygments_style = "sphinx"
 pygments_style_dark = "fruity"
 html_theme_options = {
     "path_to_docs": "docs/source",
-    "repository_url": "https://github.com/vllm-project/vllm/production-stack",
+    "repository_url": "https://github.com/vllm-project/production-stack",
     "use_repository_button": True,
     "use_edit_page_button": True,
     # navigation and sidebar
