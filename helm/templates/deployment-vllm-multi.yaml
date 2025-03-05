@@ -19,6 +19,31 @@ spec:
       labels:
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
+      {{- if hasKey $modelSpec "initContainer" }}
+      {{- $container := $modelSpec.initContainer }}
+      initContainers:
+        - name: {{ $container.name }}
+          image: {{ $container.image }}
+          {{- if $container.command }}
+          command: {{ toYaml $container.command | nindent 12 }}
+          {{- end }}
+          {{- if $container.args }}
+          args: {{ toYaml $container.args | nindent 12 }}
+          {{- end }}
+          {{- if $container.env }}
+          env: {{ toYaml $container.env | nindent 12 }}
+          {{- end }}
+          {{- if $container.resources }}
+          resources: {{ toYaml $container.resources | nindent 12 }}
+          {{- end }}
+          {{- if hasKey $container "mountPvcStorage" }}
+          volumeMounts:
+          {{- if and $container.volumeMounts.pvcStorage (hasKey $modelSpec "pvcStorage") }}
+            - name: {{ .Release.Name }}-storage
+              mountPath: /data
+          {{- end }}
+          {{- end }}
+      {{- end }}
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
@@ -31,6 +56,9 @@ spec:
           - "0.0.0.0"
           - "--port"
           - {{ include "chart.container-port" . | quote }}
+          {{- if $modelSpec.enableLoRA }}
+          - "--enable-lora"
+          {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{-   if hasKey . "enableChunkedPrefill" }}
           - "--enable-chunked-prefill"
@@ -63,6 +91,10 @@ spec:
           - '{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}'
           {{-   end }}
           {{- end }}
+          {{- if $modelSpec.chatTemplate }}
+          - "--chat-template"
+          - "/chat_templates/chat-template.jinga"
+          {{- end }}
           securityContext:
             runAsNonRoot: false
           imagePullPolicy: IfNotPresent
@@ -81,10 +113,17 @@ spec:
           {{- end}}
           {{- if $modelSpec.hf_token }}
           - name: HF_TOKEN
+            {{- if kindIs "string" $modelSpec.hf_token }}
             valueFrom:
               secretKeyRef:
                 name: {{ .Release.Name }}-secrets
                 key: hf_token_{{ $modelSpec.name }}
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $modelSpec.hf_token.secretName }}
+                key: {{ $modelSpec.hf_token.secretKey }}
+            {{- end }}
           {{- end }}
           {{- with $modelSpec.env }}
           {{- toYaml . | nindent 10 }}
@@ -108,6 +147,12 @@ spec:
           - name: LMCACHE_MAX_LOCAL_DISK_SIZE
             value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
           {{-   end }}
+          {{-   if .Values.cacheserverSpec }}
+          - name: LMCACHE_REMOTE_URL
+            value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
+          - name: LMCACHE_REMOTE_SERDE
+            value: "{{ .Values.cacheserverSpec.serde }}"
+          {{-   end }}
           {{- end }}
           {{- if .Values.servingEngineSpec.configs }}
           envFrom:
@@ -119,8 +164,10 @@ spec:
               containerPort: {{ include "chart.container-port" . }}
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
-          {{- if hasKey $modelSpec "pvcStorage" }}
+          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
           volumeMounts:
+          {{- end }}
+          {{- if hasKey $modelSpec "pvcStorage" }}
           - name: {{ .Release.Name }}-storage
             mountPath: /data
           {{- end }}
@@ -130,7 +177,17 @@ spec:
             mountPath: /dev/shm
           {{- end}}
           {{- end}}
+          {{- if $modelSpec.chatTemplate }}
+          - name: {{ .Release.Name }}-chat-templates
+            mountPath: /chat_templates
+          {{- end}}
+      {{- if $modelSpec.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ $modelSpec.imagePullSecret }}
+      {{- end }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
       volumes:
+      {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
@@ -143,6 +200,11 @@ spec:
             medium: Memory
             sizeLimit: {{ default "20Gi" $modelSpec.shmSize }}
         {{- end}}
+        {{- end}}
+        {{- if $modelSpec.chatTemplate}}
+        - name: {{ .Release.Name }}-chat-templates
+          configMap:
+            name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
         {{- end}}
       {{- if .Values.servingEngineSpec.tolerations }}
       {{-   with .Values.servingEngineSpec.tolerations }}
@@ -163,6 +225,17 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
+{{- if $modelSpec.chatTemplate }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
+  namespace: "{{ .Release.Namespace }}"
+data:
+  chat-template.jinga: |-
+    {{ $modelSpec.chatTemplate}}
+{{- end }}
 {{- end }}
 ---
 {{- end }}

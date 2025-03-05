@@ -2,11 +2,11 @@
 import unittest
 
 # Import the classes and helper functions from your module.
-from vllm_router.request_stats import (
-    GetRequestStatsMonitor,
-    InitializeRequestStatsMonitor,
+from vllm_router.stats.request_stats import (
     RequestStatsMonitor,
     SingletonMeta,
+    get_request_stats_monitor,
+    initialize_request_stats_monitor,
 )
 
 
@@ -19,9 +19,9 @@ class TestRequestStatsMonitorSingleton(unittest.TestCase):
     def test_singleton_initialization(self):
         sliding_window = 10.0
         # First initialization using the helper.
-        monitor1 = InitializeRequestStatsMonitor(sliding_window)
+        monitor1 = initialize_request_stats_monitor(sliding_window)
         # Subsequent retrieval using GetRequestStatsMonitor() should return the same instance.
-        monitor2 = GetRequestStatsMonitor()
+        monitor2 = get_request_stats_monitor()
         self.assertIs(
             monitor1,
             monitor2,
@@ -39,7 +39,7 @@ class TestRequestStatsMonitorSingleton(unittest.TestCase):
     def test_initialization_without_parameter_after_initialized(self):
         sliding_window = 10.0
         # First, initialize with the sliding_window.
-        monitor1 = InitializeRequestStatsMonitor(sliding_window)
+        monitor1 = initialize_request_stats_monitor(sliding_window)
         # Now, calling the constructor without a parameter should not raise an error
         # and should return the already initialized instance.
         monitor2 = RequestStatsMonitor()

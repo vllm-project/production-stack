@@ -53,6 +53,12 @@ class ServiceDiscovery(metaclass=abc.ABCMeta):
         """
         return True
 
+    def close(self) -> None:
+        """
+        Close the service discovery module.
+        """
+        pass
+
 
 class StaticServiceDiscovery(ServiceDiscovery):
     def __init__(self, urls: List[str], models: List[str]):
@@ -106,6 +112,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         self.k8s_watcher = watch.Watch()
 
         # Start watching engines
+        self.running = True
         self.watcher_thread = threading.Thread(target=self._watch_engines, daemon=True)
         self.watcher_thread.start()
 
@@ -143,25 +150,31 @@ class K8sServiceDiscovery(ServiceDiscovery):
         return model_name
 
     def _watch_engines(self):
-        # TODO (ApostaC): Add error handling
+        # TODO (ApostaC): remove the hard-coded timeouts
 
-        for event in self.k8s_watcher.stream(
-            self.k8s_api.list_namespaced_pod,
-            namespace=self.namespace,
-            label_selector=self.label_selector,
-        ):
-            pod = event["object"]
-            event_type = event["type"]
-            pod_name = pod.metadata.name
-            pod_ip = pod.status.pod_ip
-            is_pod_ready = self._check_pod_ready(pod.status.container_statuses)
-            if is_pod_ready:
-                model_name = self._get_model_name(pod_ip)
-            else:
-                model_name = None
-            self._on_engine_update(
-                pod_name, pod_ip, event_type, is_pod_ready, model_name
-            )
+        while self.running:
+            try:
+                for event in self.k8s_watcher.stream(
+                    self.k8s_api.list_namespaced_pod,
+                    namespace=self.namespace,
+                    label_selector=self.label_selector,
+                    timeout_seconds=30,
+                ):
+                    pod = event["object"]
+                    event_type = event["type"]
+                    pod_name = pod.metadata.name
+                    pod_ip = pod.status.pod_ip
+                    is_pod_ready = self._check_pod_ready(pod.status.container_statuses)
+                    if is_pod_ready:
+                        model_name = self._get_model_name(pod_ip)
+                    else:
+                        model_name = None
+                    self._on_engine_update(
+                        pod_name, pod_ip, event_type, is_pod_ready, model_name
+                    )
+            except Exception as e:
+                logger.error(f"K8s watcher error: {e}")
+                time.sleep(0.5)
 
     def _add_engine(self, engine_name: str, engine_ip: str, model_name: str):
         logger.info(
@@ -240,8 +253,39 @@ class K8sServiceDiscovery(ServiceDiscovery):
         """
         return self.watcher_thread.is_alive()
 
+    def close(self):
+        """
+        Close the service discovery module.
+        """
+        self.running = False
+        self.k8s_watcher.stop()
+        self.watcher_thread.join()
 
-def InitializeServiceDiscovery(
+
+def _create_service_discovery(
+    service_discovery_type: ServiceDiscoveryType, *args, **kwargs
+) -> ServiceDiscovery:
+    """
+    Create a service discovery module with the given type and arguments.
+
+    Args:
+        service_discovery_type: the type of service discovery module
+        *args: positional arguments for the service discovery module
+        **kwargs: keyword arguments for the service discovery module
+
+    Returns:
+        the created service discovery module
+    """
+
+    if service_discovery_type == ServiceDiscoveryType.STATIC:
+        return StaticServiceDiscovery(*args, **kwargs)
+    elif service_discovery_type == ServiceDiscoveryType.K8S:
+        return K8sServiceDiscovery(*args, **kwargs)
+    else:
+        raise ValueError("Invalid service discovery type")
+
+
+def initialize_service_discovery(
     service_discovery_type: ServiceDiscoveryType, *args, **kwargs
 ) -> ServiceDiscovery:
     """
@@ -263,17 +307,32 @@ def InitializeServiceDiscovery(
     if _global_service_discovery is not None:
         raise ValueError("Service discovery module already initialized")
 
-    if service_discovery_type == ServiceDiscoveryType.STATIC:
-        _global_service_discovery = StaticServiceDiscovery(*args, **kwargs)
-    elif service_discovery_type == ServiceDiscoveryType.K8S:
-        _global_service_discovery = K8sServiceDiscovery(*args, **kwargs)
-    else:
-        raise ValueError("Invalid service discovery type")
-
+    _global_service_discovery = _create_service_discovery(
+        service_discovery_type, *args, **kwargs
+    )
     return _global_service_discovery
 
 
-def GetServiceDiscovery() -> ServiceDiscovery:
+def reconfigure_service_discovery(
+    service_discovery_type: ServiceDiscoveryType, *args, **kwargs
+) -> ServiceDiscovery:
+    """
+    Reconfigure the service discovery module with the given type and arguments.
+    """
+    global _global_service_discovery
+    if _global_service_discovery is None:
+        raise ValueError("Service discovery module not initialized")
+
+    new_service_discovery = _create_service_discovery(
+        service_discovery_type, *args, **kwargs
+    )
+
+    _global_service_discovery.close()
+    _global_service_discovery = new_service_discovery
+    return _global_service_discovery
+
+
+def get_service_discovery() -> ServiceDiscovery:
     """
     Get the initialized service discovery module.
 
@@ -293,15 +352,14 @@ def GetServiceDiscovery() -> ServiceDiscovery:
 if __name__ == "__main__":
     # Test the service discovery
     # k8s_sd = K8sServiceDiscovery("default", 8000, "release=test")
-    InitializeServiceDiscovery(
+    initialize_service_discovery(
         ServiceDiscoveryType.K8S,
         namespace="default",
         port=8000,
         label_selector="release=test",
     )
 
-    k8s_sd = GetServiceDiscovery()
-    import time
+    k8s_sd = get_service_discovery()
 
     time.sleep(1)
     while True:
