@@ -1,4 +1,6 @@
 .. _examples:
 
-QuickStart Examples
-===================
+Minimal Example
+===============
+
+Add simple tutorial here.
