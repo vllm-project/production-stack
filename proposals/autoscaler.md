@@ -1,14 +1,18 @@
 # vLLM Autoscaler for Production Stack on Kubernetes
 
+* Author(s): Xiangfeng Zhu (@Romero027)
+* Status: Draft
+* Last updated: 2025-03-05
+
 ## Table of Contents
 
-- [Summary](#summary)
-- [Motivation](#motivation)
-- [Proposal](#proposal)
-- [Drawbacks](#drawbacks)
-- [Alternatives](#alternatives)
-- [Implementation Timeline / Phases](#implementation-timeline--phases)
-- [References](#references)
+* [Summary](#summary)
+* [Motivation](#motivation)
+* [Proposal](#proposal)
+* [Drawbacks](#drawbacks)
+* [Alternatives](#alternatives)
+* [Implementation Timeline / Phases](#implementation-timeline--phases)
+* [References](#references)
 
 ## Summary
 
@@ -18,22 +22,21 @@ This proposal introduces a Kubernetes-native autoscaler designed specifically fo
 
 Kubernetes' built-in autoscalers—Horizontal Pod Autoscaler (HPA) and Vertical Pod Autoscaler (VPA)—are insufficient for vLLM workloads because they cannot scale based on custom inference metrics such as GPU utilization, request queue length, and response latency.
 
-- HPA relies on CPU/memory utilization, which is irrelevant for GPU-bound inference workloads.
-- VPA only adjusts resource requests/limits, but does not change the number of replicas dynamically.
+* HPA relies on CPU/memory utilization, which is irrelevant for GPU-bound inference workloads.
+* VPA only adjusts resource requests/limits, but does not change the number of replicas dynamically.
 
 Neither HPA nor VPA can react to inference-specific signals (e.g., queue depth). To address these limitations, the vLLM Autoscaler will use custom metrics to dynamically scale inference workloads based on real-time demand, ensuring optimal resource allocation and responsiveness.
 
-
 ### Goals
 
-- Introduce a Kubernetes-native way to define autoscaling policies for vLLM deployments.
-- Scale vLLM pods dynamically based on inference-specific metrics.
-- Provide a declarative API to customize scaling behavior per model.
+* Introduce a Kubernetes-native way to define autoscaling policies for vLLM deployments.
+* Scale vLLM pods dynamically based on inference-specific metrics.
+* Provide a declarative API to customize scaling behavior per model.
 
 ### Non-Goals
 
-- Implementing a general-purpose autoscaler for non-vLLM workloads.
-- Handling cluster-wide resource scheduling beyond vLLM pods.
+* Implementing a general-purpose autoscaler for non-vLLM workloads.
+* Handling cluster-wide resource scheduling beyond vLLM pods.
 
 ## Proposal
 
@@ -43,20 +46,20 @@ We propose a Kubernetes controller-based autoscaler with the following component
 
 1. **vLLMScalingPolicy CRD**: A custom resource definition for specifying autoscaling policies tailored to vLLM.
 2. **vLLM Autoscaler Controller**: A control plane component that:
-   - Monitors vLLM pods and collects inference-related metrics.
-   - Adjusts pod replicas based on predefined policies.
+   * Monitors vLLM pods and collects inference-related metrics.
+   * Adjusts pod replicas based on predefined policies.
 3. **vLLM Metrics Exporter**: A Prometheus-compatible exporter that exposes GPU utilization, request queue length, and inference latency.
 
 ### Implementation Details/Notes/Constraints
 
 The vLLM autoscaler follows a controller-based architecture with these key components:
 
-- **vLLMScalingPolicy CRD**: Defines scaling thresholds based on GPU utilization, queue depth, and latency.
-- **Autoscaler Controller**:
-  - Watches `vLLMScalingPolicy` resources.
-  - Fetches real-time GPU metrics from the vLLM Metrics Exporter.
-  - Scales vLLM pods up or down based on policy-defined thresholds.
-- **Metrics Exporter**: Exposes inference metrics to Kubernetes via Prometheus.
+* **vLLMScalingPolicy CRD**: Defines scaling thresholds based on GPU utilization, queue depth, and latency.
+* **Autoscaler Controller**:
+  * Watches `vLLMScalingPolicy` resources.
+  * Fetches real-time GPU metrics from the vLLM Metrics Exporter.
+  * Scales vLLM pods up or down based on policy-defined thresholds.
+* **Metrics Exporter**: Exposes inference metrics to Kubernetes via Prometheus.
 
 #### Custom Resources
 
@@ -108,54 +111,57 @@ spec:
     - metric: "queue_length"
       threshold: 10
     - metric: "latency"
-      threshold: 1000 
+      threshold: 1000
 ```
 
 #### Interface Changes
 
 1. **vLLM Helm Chart Modifications**:
-   - Add `autoscaler.enabled` flag.
-   - Expose GPU utilization metrics via Prometheus.
-   - Provide annotation-based discovery for autoscaler.
+   * Add `autoscaler.enabled` flag.
+   * Expose GPU utilization metrics via Prometheus.
+   * Provide annotation-based discovery for autoscaler.
 
 2. **vLLM Autoscaler API**:
-   - `GetScalingMetrics(pod)` - Fetches real-time inference metrics.
-   - `AdjustReplicas(model, targetReplicas)` - Adjusts vLLM replicas dynamically.
-   - `GetScalingPolicy(model)` - Fetches the scaling policy for a given model.
+   * `GetScalingMetrics(pod)` - Fetches real-time inference metrics.
+   * `AdjustReplicas(model, targetReplicas)` - Adjusts vLLM replicas dynamically.
+   * `GetScalingPolicy(model)` - Fetches the scaling policy for a given model.
 
 ### Test Plans
 
-- Unit tests for controller logic.
-- End-to-end tests for scaling behavior validation.
-- Performance tests simulating bursty workloads.
+* Unit tests for controller logic.
+* End-to-end tests for scaling behavior validation.
+* Performance tests simulating bursty workloads.
 
 ## Drawbacks
 
-- **Increased Complexity**: Adds another component to Kubernetes.
-- **Potential Overhead**: Frequent scaling may introduce latency.
-- **Failure Modes**: Scaling decisions must be robust to noisy metrics.
+* **Increased Complexity**: Adds another component to Kubernetes.
+* **Potential Overhead**: Frequent scaling may introduce latency.
+* **Failure Modes**: Scaling decisions must be robust to noisy metrics.
 
 ## Alternatives
 
-- **Kubernetes HPA/VPA**: Lacks inference-specific metrics support.
-- **Do Nothing**: Requires manual adjustments.
+* **Kubernetes HPA/VPA**: Lacks inference-specific metrics support.
+* **Do Nothing**: Requires manual adjustments.
 
 ## Implementation Timeline / Phases
 
-### Phase 1: Core Infrastructure 
-- Implement `vLLMScalingPolicy` CRD.
-- Develop the autoscaler controller.
-- Integrate Prometheus metrics exporter.
+### Phase 1: Core Infrastructure
 
-### Phase 2: Advanced Metrics & Optimization 
-- Implement different scaling policies.
+* Implement `vLLMScalingPolicy` CRD.
+* Develop the autoscaler controller.
+* Integrate Prometheus metrics exporter.
 
-### Phase 3: Production Readiness 
-- Full test coverage.
-- Performance tuning.
-- Documentation.
+### Phase 2: Advanced Metrics & Optimization
+
+* Implement different scaling policies.
+
+### Phase 3: Production Readiness
+
+* Full test coverage.
+* Performance tuning.
+* Documentation.
 
 ## References
 
-- [Kubernetes Custom Resource Definitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
-- [Kubernetes Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/)
+* [Kubernetes Custom Resource Definitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api*extension/custom-resources/)
+* [Kubernetes Autoscaling](https://kubernetes.io/docs/concepts/workloads/autoscaling/)
