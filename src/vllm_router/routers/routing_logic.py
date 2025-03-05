@@ -82,7 +82,7 @@ class SessionRouter(RoutingInterface):
     in the request headers
     """
 
-    def __init__(self, session_key: str = None, session_logic: str = None):
+    def __init__(self, session_key: str = None, session_logic: str = "hashring"):
         if hasattr(self, "_initialized"):
             return
         if session_key is None:
