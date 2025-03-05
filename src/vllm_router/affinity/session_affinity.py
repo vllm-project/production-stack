@@ -6,13 +6,15 @@ from typing import Set
 class SessionAffinity(BaseAffinity):
     def __init__(
         self,
-        session_key: str = None,
+        **kwargs
     ):
         if hasattr(self, "_initialized"):
             return
-        if session_key is None:
-            raise ValueError("SessionRouter must be initialized with a session_key")
-        self.session_key = session_key
+        if "session_key" not in kwargs:
+            raise ValueError("Using session affinity without specifying "
+            "session_key in affinity config. Please specify a session_key.")
+
+        self.session_key = kwargs["session_key"]
         self.hash_ring = HashRing()
         self._initialized = True
 

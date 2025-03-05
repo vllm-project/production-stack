@@ -18,6 +18,7 @@ from vllm_router.affinity.base import BaseAffinity
 class RoundRobinAffinity(BaseAffinity):
     def __init__(
         self,
+        **kwargs
     ):
         self.index = 0
         self.endpoints = set()

@@ -34,9 +34,23 @@ class HashType(str, enum.Enum):
 class SimhashAffinity(BaseAffinity):
     def __init__(
         self,
-        hash_type: HashType = HashType.SIMHASH,  # The hash function to use for hashing the request
-        max_length: int = 512,  # The maximum length of the request to hash
+        **kwargs
     ):
+
+        if "hash_type" not in kwargs:
+            logger.warning("Using simhash affinity without hash_type."
+            "Setting hash_type to default value: SIMHASH")
+            hash_type = HashType.SIMHASH
+        else:
+            hash_type = getattr(HashType, kwargs["hash_type"])
+
+        if "max_length" not in kwargs:
+            logger.warning("Using simhash affinity without max_length."
+            "Setting max_length to default value: 512")
+            max_length = 512
+        else:
+            max_length = kwargs["max_length"]
+
         self.hash_ring = HashRing()
         self.hash_func = hash_type.get_hash_func(max_length=max_length)
         self.endpoints = set()

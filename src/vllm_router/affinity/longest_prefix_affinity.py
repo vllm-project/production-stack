@@ -6,6 +6,8 @@ from typing import Set, Generator, Tuple
 import logging
 import random
 
+logger = logging.getLogger(__name__)
+
 class TrieNode:
     def __init__(self):
         self.children = {}
@@ -89,7 +91,7 @@ class HashTrie:
 
 
 class LongestPrefixAffinity(BaseAffinity):
-    def __init__(self, chunk_size: int = 32):
+    def __init__(self, **kwargs):
         """
         Initialize the LongestPrefixAffinity.
 
@@ -97,6 +99,14 @@ class LongestPrefixAffinity(BaseAffinity):
             chunk_size (int): the string chunk size (in terms of # characters)
             that is used to calculate the string hash of each chunk.
         """
+
+        if "chunk_size" not in kwargs:
+            logger.warning("Using longest prefix affinity without chunk_size."
+            "Setting chunk_size to default value: 128")
+            chunk_size = 128
+        else:
+            chunk_size = kwargs["chunk_size"]
+
         self.trie = HashTrie(chunk_size=chunk_size)
         self.chunk_size = chunk_size
         self.logger = logging.getLogger("LCPMatcher")
