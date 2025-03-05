@@ -23,13 +23,14 @@ class RequestRewriter(abc.ABC, metaclass=SingletonMeta):
     """
 
     @abc.abstractmethod
-    def rewrite_request(self, request_body: str, model: str) -> str:
+    def rewrite_request(self, request_body: str, model: str, endpoint: str) -> str:
         """
         Rewrite the request body.
 
         Args:
             request_body: The original request body as string
             model: The model name from the request
+            endpoint: The target endpoint of this request
 
         Returns:
             The rewritten request body as string
@@ -42,16 +43,17 @@ class NoopRequestRewriter(RequestRewriter):
     A request rewriter that does not modify the request.
     """
 
-    def rewrite_request(self, request_body: str, model: str) -> str:
+    def rewrite_request(self, request_body: str, model: str, endpoint: str) -> str:
         """
         Return the request body unchanged.
 
         Args:
             request_body: The original request body as string
             model: The model name from the request
+            endpoint: The target endpoint of this request
 
         Returns:
-            The original request body
+            The original request body without any modifications
         """
         return request_body
 

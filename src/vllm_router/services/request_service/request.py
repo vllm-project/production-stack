@@ -148,7 +148,9 @@ async def route_general_request(request: Request, endpoint: str):
     # Apply request rewriting if enabled
     if is_request_rewriter_initialized():
         rewriter = get_request_rewriter()
-        rewritten_body = rewriter.rewrite_request(request_body, requested_model)
+        rewritten_body = rewriter.rewrite_request(
+            request_body, requested_model, endpoint
+        )
         logger.info(f"Request for model {requested_model} was rewritten")
         request_body = rewritten_body
         # Update request_json if the body was rewritten
