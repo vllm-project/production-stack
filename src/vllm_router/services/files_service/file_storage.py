@@ -4,9 +4,9 @@ from typing import List
 
 import aiofiles
 
-from vllm_router.files.files import OpenAIFile
-from vllm_router.files.storage import Storage
 from vllm_router.log import init_logger
+from vllm_router.services.files_service.openai_files import OpenAIFile
+from vllm_router.services.files_service.storage import Storage
 
 logger = init_logger(__name__)
 

@@ -7,10 +7,10 @@ from typing import Optional
 from fastapi import FastAPI
 
 from vllm_router.log import init_logger
-from vllm_router.routing_logic import ReconfigureRoutingLogic
+from vllm_router.routers.routing_logic import reconfigure_routing_logic
 from vllm_router.service_discovery import (
-    ReconfigureServiceDiscovery,
     ServiceDiscoveryType,
+    reconfigure_service_discovery,
 )
 from vllm_router.utils import SingletonMeta, parse_static_model_names, parse_static_urls
 
@@ -115,13 +115,13 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         Reconfigures the router with the given config.
         """
         if config.service_discovery == "static":
-            ReconfigureServiceDiscovery(
+            reconfigure_service_discovery(
                 ServiceDiscoveryType.STATIC,
                 urls=parse_static_urls(config.static_backends),
                 models=parse_static_model_names(config.static_models),
             )
         elif config.service_discovery == "k8s":
-            ReconfigureServiceDiscovery(
+            reconfigure_service_discovery(
                 ServiceDiscoveryType.K8S,
                 namespace=config.k8s_namespace,
                 port=config.k8s_port,
@@ -138,7 +138,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         """
         Reconfigures the router with the given config.
         """
-        routing_logic = ReconfigureRoutingLogic(
+        routing_logic = reconfigure_routing_logic(
             config.routing_logic, session_key=config.session_key
         )
         self.app.state.router = routing_logic
@@ -209,7 +209,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         logger.info("DynamicConfigWatcher: Closed")
 
 
-def InitializeDynamicConfigWatcher(
+def initialize_dynamic_config_watcher(
     config_json: str,
     watch_interval: int,
     init_config: DynamicRouterConfig,
@@ -221,7 +221,7 @@ def InitializeDynamicConfigWatcher(
     return DynamicConfigWatcher(config_json, watch_interval, init_config, app)
 
 
-def GetDynamicConfigWatcher() -> DynamicConfigWatcher:
+def get_dynamic_config_watcher() -> DynamicConfigWatcher:
     """
     Returns the DynamicConfigWatcher singleton.
     """

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from vllm_router.files.files import OpenAIFile
+from vllm_router.services.files_service.openai_files import OpenAIFile
 
 
 class Storage(ABC):
@@ -150,7 +150,7 @@ def initialize_storage(storage_type: str, base_path: str = None) -> Storage:
     like base_path should be in a config object.
     """
     if storage_type == "local_file":
-        from vllm_router.files.file_storage import FileStorage
+        from vllm_router.services.files_service.file_storage import FileStorage
 
         return FileStorage(base_path)
     else:
