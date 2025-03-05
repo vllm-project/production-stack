@@ -41,13 +41,14 @@ logger = init_logger(__name__)
 
 @main_router.post("/v1/chat/completions")
 async def route_chat_completion(request: Request):
-    # Check if the request can be served from the semantic cache
-    logger.debug("Received chat completion request, checking semantic cache")
-    cache_response = await check_semantic_cache(request=request)
+    if semantic_cache_available:
+        # Check if the request can be served from the semantic cache
+        logger.debug("Received chat completion request, checking semantic cache")
+        cache_response = await check_semantic_cache(request=request)
 
-    if cache_response:
-        logger.info("Serving response from semantic cache")
-        return cache_response
+        if cache_response:
+            logger.info("Serving response from semantic cache")
+            return cache_response
 
     logger.debug("No cache hit, forwarding request to backend")
     return await route_general_request(request, "/v1/chat/completions")
