@@ -9,12 +9,12 @@ import json
 from typing import Any, Dict
 
 from vllm_router.log import init_logger
-from vllm_router.utils import SingletonMeta
+from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)
 
 
-class RequestRewriter(abc.ABC, metaclass=SingletonMeta):
+class RequestRewriter(metaclass=SingletonABCMeta):
     """
     Abstract base class for request rewriters.
 
