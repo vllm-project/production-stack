@@ -108,6 +108,13 @@ def parse_args():
         default=None,
         help="The key (in the header) to identify a session.",
     )
+    parser.add_argument(
+        "--session-logic",
+        type=str,
+        default="hashring",
+        choices=["roundrobin", "hashring"],
+        help="The routing logic to apply for the initial requests when using session routing.",
+    )
 
     # Batch API
     # TODO(gaocegege): Make these batch api related arguments to a separate config.

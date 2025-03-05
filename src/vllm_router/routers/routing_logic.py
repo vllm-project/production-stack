@@ -82,12 +82,13 @@ class SessionRouter(RoutingInterface):
     in the request headers
     """
 
-    def __init__(self, session_key: str = None):
+    def __init__(self, session_key: str = None, session_logic: str = None):
         if hasattr(self, "_initialized"):
             return
         if session_key is None:
             raise ValueError("SessionRouter must be initialized with a session_key")
         self.session_key = session_key
+        self.session_logic = session_logic
         self.hash_ring = HashRing()
         self._initialized = True
 
@@ -166,8 +167,15 @@ class SessionRouter(RoutingInterface):
             # Route based on QPS if no session ID is present
             url = self._qps_routing(endpoints, request_stats)
         else:
-            # Use the hash ring to get the endpoint for the session ID
-            url = self.hash_ring.get_node(session_id)
+            if self.session_logic == "hashring":
+                # Use the hash ring to get the endpoint for the session ID
+                url = self.hash_ring.get_node(session_id)
+            elif self.session_logic == "roundrobin":
+                len_engines = len(endpoints)
+                chosen = sorted(endpoints, key=lambda e: e.url)[
+                    int(session_id) % len_engines
+                ]
+                url = chosen.url
 
         return url
 
@@ -181,7 +189,7 @@ def initialize_routing_logic(
         return RoundRobinRouter()
     elif routing_logic == RoutingLogic.SESSION_BASED:
         logger.info(f"Initializing session-based routing logic with kwargs: {kwargs}")
-        return SessionRouter(kwargs.get("session_key"))
+        return SessionRouter(kwargs.get("session_key"), kwargs.get("session_logic"))
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
