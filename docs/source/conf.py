@@ -11,7 +11,6 @@ import sys
 from dataclasses import asdict
 
 from sphinx.ext import autodoc
-from sphinxawesome_theme import ThemeOptions
 
 sys.path.insert(0, os.path.abspath("../../src"))
 
@@ -69,8 +68,8 @@ html_static_path = ["_static"]
 html_logo = "./assets/prodstack_icon.png"
 html_favicon = "./assets/output.ico"
 html_permalinks_icon = "<span>#</span>"
-pygments_style = "sphinx"
-pygments_style_dark = "fruity"
+# pygments_style = "sphinx"
+# pygments_style_dark = "fruity"
 html_theme_options = {
     "path_to_docs": "docs/source",
     "repository_url": "https://github.com/vllm-project/production-stack",
@@ -84,6 +83,8 @@ html_theme_options = {
     ],
     "navigation_depth": 3,
     "primary_sidebar_end": [],
+    "pygments_light_style": "tango",
+    "pygments_dark_style": "monokai",
 }
 
 intersphinx_mapping = {
