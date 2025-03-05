@@ -11,12 +11,10 @@ from vllm_router.stats.engine_stats import EngineStats
 from vllm_router.stats.request_stats import RequestStats
 from vllm_router.utils import SingletonABCMeta
 
+from vllm_router.routers.affinity.factory import get_affinity
+from vllm_router.routers.endpoint_filter.factory import get_endpoint_filter
+
 logger = init_logger(__name__)
-
-
-class RoutingLogic(str, enum.Enum):
-    ROUND_ROBIN = "roundrobin"
-    SESSION_BASED = "session"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -27,6 +25,7 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_json: Dict[str, Any],
     ) -> str:
         """
         Route the request to the appropriate engine URL
@@ -42,14 +41,39 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         raise NotImplementedError
 
 
-class RoundRobinRouter(RoutingInterface):
-    # TODO (ApostaC): when available engines in the endpoints changes, the
-    # algorithm may not be "perfectly" round-robin.
-    def __init__(self):
+class Router(RoutingInterface):
+
+    def __init__(
+        self, 
+        **kwargs: Dict[str, Any],
+    ):
+
         if hasattr(self, "_initialized"):
             return
-        self.req_id = 0
+
+        self.reconfigure(**kwargs)
+        self.initialized = True
+
+    def reconfigure(self, **kwargs: Dict[str, Any]):
+
+        # Initialize the affinity module
+        self.affinity = None
+        if "affinity" not in kwargs:
+            logger.warning("No affinity specified, using simple round-robin logic to select endpoints")
+            self.affinity = get_affinity("round_robin", {})
+        else:
+            self.affinity = get_affinity(**kwargs["affinity"])
+
+        # Initialize the endpoint filters
+        self.endpoint_filters = []
+        if "endpoint_filters" not in kwargs:
+            logger.info("No endpoint filters specified.")
+        else:
+            for endpoint_filter_kwargs in kwargs["endpoint_filters"]:
+                self.endpoint_filters.append(get_endpoint_filter(**endpoint_filter_kwargs))
+
         self._initialized = True
+
 
     def route_request(
         self,
@@ -57,45 +81,65 @@ class RoundRobinRouter(RoutingInterface):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_json: Dict[str, Any],
     ) -> str:
-        
-        overload_endpoints = self.overload_detector.get_overload_endpoints(endpoints, request_stats, engine_stats)
-        self.affinity.update_endpoints_stats(overload_endpoints, engine_stats, request_stats)
 
-        url = self.affinity.get_high_affinity_endpoint(request, request_json, overload_endpoints)
+        self.affinity.update_endpoints_stats(endpoints, engine_stats, request_stats)
 
-        self.affinity.on_request_routed(url, request_stats, engine_stats)
+        endpoints = set(endpoint.url for endpoint in endpoints)
+        assert endpoints, "No endpoints provided for the routing logic."
 
-        return url
+        for endpoint_filter in self.endpoint_filters:
+            previous_endpoints = endpoints
+            endpoints = endpoint_filter.get_filtered_endpoints(
+                endpoints, 
+                request_stats, 
+                engine_stats
+            )
+            if not endpoints:
+                logger.warning(f"Endpoint filter {endpoint_filter.name} "
+                               f"removed all endpoints from "
+                               f"{previous_endpoints}. Reverting to previous "
+                               f"endpoints and skipping all remaining "
+                               f"endpoint filters.")
+                endpoints = previous_endpoints
+                break
 
+        selected_endpoint = self.affinity.get_high_affinity_endpoint(
+            request, 
+            request_json, 
+            endpoints
+        )
+
+        self.affinity.on_request_routed(
+            request, 
+            request_json, 
+            selected_endpoint
+        )
+
+        return selected_endpoint
+
+
+_router = None
 
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
-    routing_logic: RoutingLogic, *args, **kwargs
+    **kwargs
 ) -> RoutingInterface:
-    if routing_logic == RoutingLogic.ROUND_ROBIN:
-        logger.info("Initializing round-robin routing logic")
-        return RoundRobinRouter()
-    elif routing_logic == RoutingLogic.SESSION_BASED:
-        logger.info(f"Initializing session-based routing logic with kwargs: {kwargs}")
-        return SessionRouter(kwargs.get("session_key"))
-    else:
-        raise ValueError(f"Invalid routing logic {routing_logic}")
+
+    assert _router is None, "Routing logic already initialized"
+    _router = Router(**kwargs)
+    return _router
 
 
 def reconfigure_routing_logic(
-    routing_logic: RoutingLogic, *args, **kwargs
+    **kwargs
 ) -> RoutingInterface:
-    # Remove the existing routers from the singleton registry
-    for cls in (SessionRouter, RoundRobinRouter):
-        if cls in SingletonABCMeta._instances:
-            del SingletonABCMeta._instances[cls]
-    return initialize_routing_logic(routing_logic, *args, **kwargs)
+    _router.reconfigure(**kwargs)
+    return _router
 
 
 def get_routing_logic() -> RoutingInterface:
-    # Look up in our singleton registry which router (if any) has been created.
-    for cls in (SessionRouter, RoundRobinRouter):
-        if cls in SingletonABCMeta._instances:
-            return cls()
-    raise ValueError("The global router has not been initialized")
+    assert _router is not None, ("Routing logic not initialized. "
+                                 "Please call initialize_routing_logic() first.")
+    return _router

@@ -54,6 +54,7 @@ class SimhashAffinity(BaseAffinity):
         self.hash_ring = HashRing()
         self.hash_func = hash_type.get_hash_func(max_length=max_length)
         self.endpoints = set()
+        self.name = "simhash_affinity"
 
 
     def get_high_affinity_endpoint(

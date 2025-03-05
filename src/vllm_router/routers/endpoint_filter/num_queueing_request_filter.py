@@ -1,26 +1,27 @@
 
-from vllm_router.load_metrics.base import BaseLoadMetric
+from vllm_router.routers.endpoint_filter.base import BaseEndpointFilter
 from vllm_router.types import RequestStats, EngineStats
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-class NumQueueingRequest(BaseOverloadDetector):
+class NumQueueingRequestFilter(BaseEndpointFilter):
 
     def __init__(self, **kwargs):
 
         if "percentile" not in kwargs:
-            logger.warning("Using num_queueing_request overload detector "
-            "without specifying percentile in overload detector config."
+            logger.warning("Using num_queueing_request endpoint filter "
+            "without specifying percentile in endpoint filter config."
             "Setting percentile to default value: 0.9")
             percentile = 0.9
         else:
             percentile = kwargs["percentile"]
 
         self.percentile = percentile
+        self.name = "num_queueing_request_filter"
 
-    def get_overload_endpoints(
+    def get_filtered_endpoints(
         self,
         endpoints: Set[str],
         request_stats: Dict[str, RequestStats],

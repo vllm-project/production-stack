@@ -110,6 +110,7 @@ class LongestPrefixAffinity(BaseAffinity):
         self.trie = HashTrie(chunk_size=chunk_size)
         self.chunk_size = chunk_size
         self.logger = logging.getLogger("LCPMatcher")
+        self.name = "longest_prefix_affinity"
 
     def get_high_affinity_endpoint(
         self,
@@ -155,7 +156,5 @@ class LongestPrefixAffinity(BaseAffinity):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
     ) -> None:
-        """
-        Set the endpoints for the trie.
-        """
-        self.trie.root.endpoints = endpoints
+        pass
+

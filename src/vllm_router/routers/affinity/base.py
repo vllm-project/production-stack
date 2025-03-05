@@ -53,6 +53,6 @@ class BaseAffinityMaintainer(metaclass=abc.ABCMeta):
         request_stats: Dict[str, RequestStats],
     ) -> None:
         """
-        Update the endpoint stats.
+        Update the endpoint stats. This will not remove any endpoints.
         """
         pass

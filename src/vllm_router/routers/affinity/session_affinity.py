@@ -8,32 +8,31 @@ class SessionAffinity(BaseAffinity):
         self,
         **kwargs
     ):
-        if hasattr(self, "_initialized"):
-            return
         if "session_key" not in kwargs:
             raise ValueError("Using session affinity without specifying "
             "session_key in affinity config. Please specify a session_key.")
 
         self.session_key = kwargs["session_key"]
         self.hash_ring = HashRing()
-        self._initialized = True
+        self.name = "session_affinity"
 
     def get_high_affinity_endpoint(
         self,
         request: Request,
         request_json: Dict[str, Any],
-        unavailable_endpoints: Set[str],
+        available_endpoints: Set[str],
     ) -> str:
 
-        assert unavailable_endpoints.issubset(self.endpoints)
-
+        assert available_endpoints.issubset(self.endpoints), (
+            f"Available endpoints must be a subset of the endpoints in the hash"
+            f"ring. \nAvailable endpoints: {available_endpoints} \n"
+            f"Endpoints in hash ring: {self.endpoints}\n"
+        )
 
         session_id = request.headers.get(self.session_key, None)
 
-        # Iterate through nodes starting from the hash position
         for endpoint in self.hash_ring.iterate_nodes(str(session_id), distinct=True):
-
-            if endpoint not in unavailable_endpoints:
+            if endpoint in available_endpoints:
                 return endpoint
 
         raise ValueError(f"No endpoint found for request: {request}")
@@ -57,10 +56,6 @@ class SessionAffinity(BaseAffinity):
 
         # Convert the new endpoint URLs to a set for easy comparison
         new_nodes = endpoints
-
-        # Remove nodes that are no longer in the list
-        for node in current_nodes - new_nodes:
-            self.hash_ring.remove_node(node)
 
         # Add new nodes that are not already in the hash ring
         for node in new_nodes - current_nodes:

@@ -21,21 +21,18 @@ class RoundRobinAffinity(BaseAffinity):
         **kwargs
     ):
         self.index = 0
-        self.endpoints = set()
-
+        self.name = "round_robin_affinity"
 
     def get_high_affinity_endpoint(
         self,
         request: Request,
         request_json: Dict[str, Any],
-        unavailable_endpoints: Set[str],
+        available_endpoints: Set[str],
     ) -> str:
-
-        available_endpoints = list(self.endpoints - unavailable_endpoints)
-
         if not available_endpoints:
             raise ValueError(f"No available endpoints for request: {request}")
 
+        available_endpoints = list(available_endpoints)
         endpoint = available_endpoints[self.index % len(available_endpoints)]
         self.index = self.index + 1
         return endpoint
@@ -49,5 +46,4 @@ class RoundRobinAffinity(BaseAffinity):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
     ) -> None:
-
-        self.endpoints = endpoints
+        pass
