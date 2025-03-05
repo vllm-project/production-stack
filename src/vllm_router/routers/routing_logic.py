@@ -1,15 +1,14 @@
 import abc
 import enum
-import hashlib
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from fastapi import Request
 from uhashring import HashRing
 
-from vllm_router.engine_stats import EngineStats
 from vllm_router.log import init_logger
-from vllm_router.request_stats import RequestStats
 from vllm_router.service_discovery import EndpointInfo
+from vllm_router.stats.engine_stats import EngineStats
+from vllm_router.stats.request_stats import RequestStats
 from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)
@@ -174,7 +173,7 @@ class SessionRouter(RoutingInterface):
 
 
 # Instead of managing a global _global_router, we can define the initialization functions as:
-def InitializeRoutingLogic(
+def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
     if routing_logic == RoutingLogic.ROUND_ROBIN:
@@ -187,17 +186,17 @@ def InitializeRoutingLogic(
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
 
-def ReconfigureRoutingLogic(
+def reconfigure_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
     # Remove the existing routers from the singleton registry
     for cls in (SessionRouter, RoundRobinRouter):
         if cls in SingletonABCMeta._instances:
             del SingletonABCMeta._instances[cls]
-    return InitializeRoutingLogic(routing_logic, *args, **kwargs)
+    return initialize_routing_logic(routing_logic, *args, **kwargs)
 
 
-def GetRoutingLogic() -> RoutingInterface:
+def get_routing_logic() -> RoutingInterface:
     # Look up in our singleton registry which router (if any) has been created.
     for cls in (SessionRouter, RoundRobinRouter):
         if cls in SingletonABCMeta._instances:

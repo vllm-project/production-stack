@@ -4,7 +4,8 @@ import shutil
 
 import pytest
 
-from vllm_router.files import FileStorage, OpenAIFile
+from vllm_router.services.files_service.file_storage import FileStorage
+from vllm_router.services.files_service.openai_files import OpenAIFile
 
 TEST_BASE_PATH = "/tmp/test_vllm_files"
 pytest_plugins = ("pytest_asyncio",)

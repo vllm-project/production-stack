@@ -33,7 +33,7 @@ setup(
     install_requires=install_requires,
     entry_points={
         "console_scripts": [
-            "vllm-router=vllm_router.router:main",
+            "vllm-router=vllm_router.app:main",
         ],
     },
     description="The router for vLLM",

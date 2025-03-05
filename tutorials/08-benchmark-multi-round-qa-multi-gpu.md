@@ -7,10 +7,14 @@ This tutorial provides a step-by-step guide to setting up and running benchmarks
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Step 1: Running Benchmarks with vLLM Production Stack](#step-1-running-benchmarks-with-vllm-production-stack)
-3. [Step 2: Running Benchmarks with Naive Kubernetes](#step-2-running-benchmarks-with-naive-kubernetes)
-4. [Step 3: Running Benchmarks with AIBrix](#step-3-running-benchmarks-with-aibrix)
+- [Tutorial: Multi-Round QA Benchmark (Multi-GPU)](#tutorial-multi-round-qa-benchmark-multi-gpu)
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Step 1: Running Benchmarks with vLLM Production Stack](#step-1-running-benchmarks-with-vllm-production-stack)
+  - [Step 2: Running Benchmarks with Naive Kubernetes](#step-2-running-benchmarks-with-naive-kubernetes)
+  - [Step 3: Running Benchmarks with AIBrix](#step-3-running-benchmarks-with-aibrix)
+  - [Conclusion](#conclusion)
 
 ## Prerequisites
 
@@ -50,6 +54,17 @@ servingEngineSpec:
       enabled: true
       cpuOffloadingBufferSize: "120"
     hf_token: <YOUR_HUGGINGFACE_TOKEN>
+
+routerSpec:
+  resources:
+  requests:
+    cpu: "2"
+    memory: "8G"
+  limits:
+    cpu: "2"
+    memory: "8G"
+  routingLogic: "session"
+  sessionKey: "x-user-id"
 ```
 
 Deploy the vLLM Production Stack server by:
