@@ -104,7 +104,7 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
   - name: "llama3"
-    repository: "lmcache/vllm-openai"
+    repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
