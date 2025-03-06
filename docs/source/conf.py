@@ -19,16 +19,17 @@ copyright = "2025, vLLM Production Stack Team"
 author = "vLLM Production Stack Team"
 
 extensions = [
+    "sphinx_copybutton",
     "sphinx.ext.napoleon",
     "sphinx.ext.linkcode",
     "sphinx.ext.intersphinx",
-    "sphinx_copybutton",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    "myst_parser",
+    # "myst_parser",
     "sphinxarg.ext",
-    "sphinx_design",
-    "sphinx_togglebutton",
+    # "sphinx_design",
+    # "sphinx_togglebutton",
+    "sphinx_click",
 ]
 
 # -- General configuration ---------------------------------------------------
@@ -38,6 +39,9 @@ extensions = []
 
 templates_path = ["_templates"]
 exclude_patterns = []
+
+copybutton_prompt_text = r"\$ "
+copybutton_prompt_is_regexp = True
 
 
 class MockedClassDocumenter(autodoc.ClassDocumenter):
