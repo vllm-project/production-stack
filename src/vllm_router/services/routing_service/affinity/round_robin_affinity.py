@@ -12,7 +12,7 @@ from typing import Set, Callable
 from collections import defaultdict, Counter
 from fastapi import Request
 
-from vllm_router.affinity.base import BaseAffinity
+from vllm_router.services.routing_service.affinity.base import BaseAffinity
 
         
 class RoundRobinAffinity(BaseAffinity):

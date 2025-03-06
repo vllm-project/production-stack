@@ -1,15 +1,15 @@
 
-from vllm_router.routers.affinity.base import BaseAffinity
+from vllm_router.services.routing_service.affinity.base import BaseAffinity
 
 import json
 from logging import getLogger
 
 logger = getLogger(__name__)
 
-from vllm_router.affinity.round_robin_affinity import RoundRobinAffinity
-from vllm_router.affinity.session_based_affinity import SessionBasedAffinity
-from vllm_router.affinity.longest_prefix_affinity import LongestPrefixAffinity
-from vllm_router.affinity.simhash_affinity import SimhashAffinity
+from vllm_router.services.routing_service.affinity.round_robin_affinity import RoundRobinAffinity
+from vllm_router.services.routing_service.affinity.session_based_affinity import SessionBasedAffinity
+from vllm_router.services.routing_service.affinity.longest_prefix_affinity import LongestPrefixAffinity
+from vllm_router.services.routing_service.affinity.simhash_affinity import SimhashAffinity
 
 affinity_name_to_class = {
     "round_robin": RoundRobinAffinity,

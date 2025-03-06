@@ -3,7 +3,8 @@
 """
 
 import abc
-from typing import Set, Dict
+from typing import Set, Dict, Any
+from fastapi import Request
 from vllm_router.types import EngineStats, RequestStats
 
 class BaseAffinityMaintainer(metaclass=abc.ABCMeta):

@@ -1,5 +1,5 @@
 
-from vllm_router.routers.endpoint_filter.base import BaseEndpointFilter
+from vllm_router.services.routing_service.endpoint_filter.base import BaseEndpointFilter
 from vllm_router.types import RequestStats, EngineStats
 
 import logging

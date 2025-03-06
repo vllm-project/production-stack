@@ -1,5 +1,5 @@
 
-from vllm_router.affinity.base import BaseAffinity
+from vllm_router.services.routing_service.affinity.base import BaseAffinity
 from fastapi import Request
 from typing import Set
 

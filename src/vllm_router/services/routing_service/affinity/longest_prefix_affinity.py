@@ -1,6 +1,6 @@
 import xxhash
 
-from vllm_router.affinity.base import BaseAffinity
+from vllm_router.services.routing_service.affinity.base import BaseAffinity
 from collections import defaultdict
 from typing import Set, Generator, Tuple
 import logging

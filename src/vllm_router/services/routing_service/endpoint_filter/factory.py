@@ -1,12 +1,12 @@
 
-from vllm_router.routers.endpoint_filter.base import BaseEndpointFilter
+from vllm_router.services.routing_service.endpoint_filter.base import BaseEndpointFilter
 
 import json
 from logging import getLogger
 
 logger = getLogger(__name__)
 
-from vllm_router.routers.endpoint_filter.num_queueing_request_filter import NumQueueingRequestFilter
+from vllm_router.services.routing_service.endpoint_filter.num_queueing_request_filter import NumQueueingRequestFilter
 
 endpoint_filter_name_to_class = {
     "num_queueing_request_filter": NumQueueingRequestFilter,
