@@ -6,7 +6,7 @@ Minimal Example
 Introduction
 ------------
 
-This is a minimal working example of the vLLM Production Stack using one vLLM instance with the ``facebook/opt-125m`` model. 
+This is a minimal working example of the vLLM Production Stack using one vLLM instance with the ``facebook/opt-125m`` model.
 The goal is to have a working deployment of vLLM on a Kubernetes environment with GPU.
 
 Prerequisites
@@ -27,7 +27,7 @@ Steps to follow
 1.1 Use existing configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The vLLM Production Stack repository provides a predefined configuration file, `values-01-minimal-example.yaml`, located `here <https://github.com/vllm-project/production-stack/blob/main/tutorials/assets/values-01-minimal-example.yaml>`_. 
+The vLLM Production Stack repository provides a predefined configuration file, `values-01-minimal-example.yaml`, located `here <https://github.com/vllm-project/production-stack/blob/main/tutorials/assets/values-01-minimal-example.yaml>`_.
 This file contains the following content:
 
 .. code-block:: yaml
@@ -74,7 +74,7 @@ Monitor the deployment status using:
 Expected output:
 
 .. code-block:: console
-    
+
     NAME                                           READY   STATUS    RESTARTS   AGE
     vllm-deployment-router-859d8fb668-2x2b7        1/1     Running   0          2m38s
     vllm-opt125m-deployment-vllm-84dfc9bd7-vb9bs   1/1     Running   0          2m38s
@@ -168,14 +168,3 @@ To remove the deployment, run:
 .. code-block:: bash
 
     sudo helm uninstall vllm
-
-
-
-
-
-
-
-
-
-
-
