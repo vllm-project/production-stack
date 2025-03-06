@@ -39,7 +39,7 @@ def validate_args(args):
             )
     if args.service_discovery == "k8s" and args.k8s_port is None:
         raise ValueError("K8s port must be provided when using K8s service discovery.")
-    if args.routing_affinity == "session" and args.session_key is None:
+    if args.routing_logic == "session" and args.session_key is None:
         raise ValueError(
             "Session key must be provided when using session routing affinity."
         )
@@ -96,7 +96,7 @@ def parse_args():
         help="The label selector to filter vLLM pods when using K8s service discovery.",
     )
     parser.add_argument(
-        "--routing-affinity",
+        "--routing-logic",
         type=str,
         required=True,
         choices=["roundrobin", "session", "longest_prefix", "simhash"],
@@ -107,11 +107,11 @@ def parse_args():
         type=str,
         default=None,
         help="The key (in the header) to identify a session. This is a shortcut"
-        " for --routing-affinity-config "
+        " for --routing-logic-config "
         '\'{"session_key": "<session_key>"}\'.',
     )
     parser.add_argument(
-        "--routing-affinity-config",
+        "--routing-logic-config",
         type=str,
         default="{}",
         help="The routing configuration in JSON format.",

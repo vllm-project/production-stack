@@ -26,14 +26,14 @@ affinity_name_to_class = {
 }
 
 
-def get_affinity(routing_affinity_name: str, **kwargs) -> BaseAffinity:
+def get_affinity(routing_logic_name: str, **kwargs) -> BaseAffinity:
 
-    if routing_affinity_name not in affinity_name_to_class:
-        raise ValueError(f"Invalid affinity name: {routing_affinity_name}")
+    if routing_logic_name not in affinity_name_to_class:
+        raise ValueError(f"Invalid affinity name: {routing_logic_name}")
 
-    routing_affinity_config = kwargs
+    routing_logic_config = kwargs
 
     logger.info(
-        f"Using affinity type: {routing_affinity_name} with config: {routing_affinity_config}"
+        f"Using affinity type: {routing_logic_name} with config: {routing_logic_config}"
     )
-    return affinity_name_to_class[routing_affinity_name](**routing_affinity_config)
+    return affinity_name_to_class[routing_logic_name](**routing_logic_config)

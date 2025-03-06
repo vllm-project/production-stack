@@ -132,9 +132,9 @@ def initialize_all(app: FastAPI, args):
         )
 
     initialize_routing_logic(
-        args.routing_affinity,
+        args.routing_logic,
         args.session_key,
-        args.routing_affinity_config,
+        args.routing_logic_config,
         args.endpoint_filters,
         args.endpoint_filters_configs,
     )

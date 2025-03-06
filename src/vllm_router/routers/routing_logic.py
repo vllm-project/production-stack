@@ -47,8 +47,8 @@ class Router(RoutingInterface):
 
     def __init__(
         self,
-        routing_affinity: str,
-        routing_affinity_config: Dict[str, Any],
+        routing_logic: str,
+        routing_logic_config: Dict[str, Any],
         endpoint_filters: List[str],
         endpoint_filters_configs: List[Dict[str, Any]],
     ):
@@ -57,8 +57,8 @@ class Router(RoutingInterface):
             return
 
         self.reconfigure(
-            routing_affinity=routing_affinity,
-            routing_affinity_config=routing_affinity_config,
+            routing_logic=routing_logic,
+            routing_logic_config=routing_logic_config,
             endpoint_filters=endpoint_filters,
             endpoint_filters_configs=endpoint_filters_configs,
         )
@@ -66,8 +66,8 @@ class Router(RoutingInterface):
 
     def reconfigure(
         self,
-        routing_affinity: str,
-        routing_affinity_config: str,
+        routing_logic: str,
+        routing_logic_config: str,
         endpoint_filters: List[str],
         endpoint_filters_configs: List[str],
     ):
@@ -75,8 +75,8 @@ class Router(RoutingInterface):
         # Initialize the affinity module
         self.affinity = None
 
-        routing_affinity_config = json.loads(routing_affinity_config)
-        self.affinity = get_affinity(routing_affinity, **routing_affinity_config)
+        routing_logic_config = json.loads(routing_logic_config)
+        self.affinity = get_affinity(routing_logic, **routing_logic_config)
 
         # Initialize the endpoint filters
         self.endpoint_filters = []
@@ -145,20 +145,20 @@ _router = None
 
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
-    routing_affinity: str,
+    routing_logic: str,
     session_key: str,
-    routing_affinity_config: str,
+    routing_logic_config: str,
     endpoint_filters: List[str],
     endpoint_filters_configs: str,
 ) -> RoutingInterface:
 
     global _router
     assert _router is None, "Routing logic already initialized"
-    if routing_affinity == "session":
-        routing_affinity_config.update({"session_key": session_key})
+    if routing_logic == "session":
+        routing_logic_config.update({"session_key": session_key})
     _router = Router(
-        routing_affinity=routing_affinity,
-        routing_affinity_config=routing_affinity_config,
+        routing_logic=routing_logic,
+        routing_logic_config=routing_logic_config,
         endpoint_filters=endpoint_filters,
         endpoint_filters_configs=endpoint_filters_configs,
     )
@@ -166,16 +166,16 @@ def initialize_routing_logic(
 
 
 def reconfigure_routing_logic(
-    routing_affinity: str,
+    routing_logic: str,
     session_key: str,
-    routing_affinity_config: str,
+    routing_logic_config: str,
     endpoint_filters: List[str],
     endpoint_filters_configs: str,
 ) -> RoutingInterface:
     global _router
     _router.reconfigure(
-        routing_affinity=routing_affinity,
-        routing_affinity_config=routing_affinity_config,
+        routing_logic=routing_logic,
+        routing_logic_config=routing_logic_config,
         endpoint_filters=endpoint_filters,
         endpoint_filters_configs=endpoint_filters_configs,
     )
