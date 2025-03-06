@@ -108,6 +108,12 @@ def parse_args():
         default=None,
         help="The key (in the header) to identify a session.",
     )
+    parser.add_argument(
+        "--routing-config",
+        type=str,
+        default="{}",
+        help="The routing configuration in JSON format.",
+    )
 
     # Batch API
     # TODO(gaocegege): Make these batch api related arguments to a separate config.
