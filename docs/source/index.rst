@@ -52,8 +52,8 @@ Documentation
    :caption: Getting Started
 
    getting_started/installation
-   getting_started/troubleshooting
    getting_started/examples
+   getting_started/troubleshooting
 
 .. toctree::
    :maxdepth: 1
