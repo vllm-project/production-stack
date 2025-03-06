@@ -131,7 +131,13 @@ def initialize_all(app: FastAPI, args):
             args.batch_processor, args.file_storage_path, app.state.batch_storage
         )
 
-    initialize_routing_logic(args.routing_logic, session_key=args.session_key)
+    initialize_routing_logic(
+        args.routing_affinity,
+        args.session_key,
+        args.routing_affinity_config,
+        args.endpoint_filters,
+        args.endpoint_filters_configs,
+    )
 
     # Initialize feature gates
     initialize_feature_gates(args.feature_gates)

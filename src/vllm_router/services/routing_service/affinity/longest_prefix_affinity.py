@@ -1,18 +1,24 @@
-import xxhash
-
-from vllm_router.services.routing_service.affinity.base import BaseAffinity
-from collections import defaultdict
-from typing import Set, Generator, Tuple
 import logging
 import random
+from collections import defaultdict
+from typing import Any, Dict, Generator, Set, Tuple
+
+import xxhash
+from fastapi import Request
+
+from vllm_router.services.routing_service.affinity.base import BaseAffinity
+from vllm_router.stats.engine_stats import EngineStats
+from vllm_router.stats.request_stats import RequestStats
 
 logger = logging.getLogger(__name__)
+
 
 class TrieNode:
     def __init__(self):
         self.children = {}
         self.is_end = False
         self.endpoints = set()
+
 
 class HashTrie:
     def __init__(self, chunk_size: int = 128):
@@ -35,9 +41,9 @@ class HashTrie:
         Returns:
             Generator[int, None, None]: A generator that yields hashes of 32-character chunks.
         """
-        
+
         for i in range(0, len(request), self.chunk_size):
-            yield xxhash.xxh64(request[i:i+self.chunk_size]).intdigest()
+            yield xxhash.xxh64(request[i : i + self.chunk_size]).intdigest()
 
     def insert(self, request: str, endpoint: str) -> None:
         """
@@ -56,7 +62,9 @@ class HashTrie:
             node.endpoints.add(endpoint)
         node.is_end = True
 
-    def longest_prefix_match(self, request: str, unavailable_endpoints: Set[str] = set()) -> Tuple[int, Set[str]]:
+    def longest_prefix_match(
+        self, request: str, unavailable_endpoints: Set[str] = set()
+    ) -> Tuple[int, Set[str]]:
         """
         Find the longest matching prefix using hashed chunks.
 
@@ -72,13 +80,13 @@ class HashTrie:
 
         for i, chunk_hash in enumerate(chunk_hashes):
             if chunk_hash in node.children:
-                
+
                 node = node.children[chunk_hash]
-                
+
                 # This line will remove the endpoints that are deleted by
                 # `remove_endpoints` function call of the router.
                 node.endpoints = node.endpoints.intersection(all_endpoints)
-                
+
                 # Check if the current node still contains available endpoints.
                 if not (node.endpoints - unavailable_endpoints):
                     break
@@ -101,15 +109,17 @@ class LongestPrefixAffinity(BaseAffinity):
         """
 
         if "chunk_size" not in kwargs:
-            logger.warning("Using longest prefix affinity without chunk_size."
-            "Setting chunk_size to default value: 128")
+            logger.warning(
+                "Using longest prefix affinity without chunk_size."
+                "Setting chunk_size to default value: 128"
+            )
             chunk_size = 128
         else:
             chunk_size = kwargs["chunk_size"]
 
         self.trie = HashTrie(chunk_size=chunk_size)
         self.chunk_size = chunk_size
-        self.logger = logging.getLogger("LCPMatcher")
+        self.logger = logging.getLogger("longest_prefix_affinity")
         self.name = "longest_prefix_affinity"
 
     def get_high_affinity_endpoint(
@@ -129,16 +139,25 @@ class LongestPrefixAffinity(BaseAffinity):
         assert unavailable_endpoints.issubset(self.trie.root.endpoints)
 
         messages = json.dumps(request_json["messages"])
-        
-        match_length, selected_endpoints = self.trie.longest_prefix_match(messages, unavailable_endpoints)
-        
+
+        match_length, selected_endpoints = self.trie.longest_prefix_match(
+            messages, unavailable_endpoints
+        )
+
         choice = random.choice(list(selected_endpoints))
 
-        self.logger.debug("Match length: %d, matched endpoints: %s, choice: %s", match_length, selected_endpoints, choice)
+        self.logger.debug(
+            "Match length: %d, matched endpoints: %s, choice: %s",
+            match_length,
+            selected_endpoints,
+            choice,
+        )
 
         return choice
 
-    def on_request_routed(self, request: Request, request_json: Dict[str, Any], endpoint: str) -> None:
+    def on_request_routed(
+        self, request: Request, request_json: Dict[str, Any], endpoint: str
+    ) -> None:
         """
         Update the trie with the new request and endpoint.
 
@@ -157,4 +176,3 @@ class LongestPrefixAffinity(BaseAffinity):
         request_stats: Dict[str, RequestStats],
     ) -> None:
         pass
-

@@ -1,7 +1,10 @@
-
-from dataclasses import dataclass
-from typing import Set, Dict
 import abc
+from dataclasses import dataclass
+from typing import Dict, Set
+
+from vllm_router.stats.engine_stats import EngineStats
+from vllm_router.stats.request_stats import RequestStats
+
 
 class BaseEndpointFilter(metaclass=abc.ABCMeta):
     @abc.abstractmethod

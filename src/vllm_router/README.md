@@ -32,7 +32,7 @@ The router can be configured using command-line arguments. Below are the availab
 
 ### Routing Logic Options
 
-- `--routing-logic`: The routing logic to use. Options are `roundrobin` or `session`. This option is required.
+- `--routing-affinity`: The routing logic to use. Options are `roundrobin` or `session`. This option is required.
 - `--session-key`: The key (in the header) to identify a session.
 
 ### Monitoring Options
@@ -71,7 +71,9 @@ vllm-router --port 8000 \
     --static-models "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m" \
     --engine-stats-interval 10 \
     --log-stats \
-    --routing-logic roundrobin
+    --routing-affinity longest_prefix \
+    --endpoint-filters num_queueing_request \
+    --endpoint-filters-configs {}
 ```
 
 ## Dynamic Router Config

@@ -1,17 +1,20 @@
-
-import xxhash
-from simhash import Simhash
-from uhashring import HashRing
 import abc
 import enum
 import random
-from functools import partial
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import Set, Callable
-from collections import defaultdict, Counter
+from functools import partial
+from typing import Any, Callable, Dict, Set
+
+import xxhash
 from fastapi import Request
+from simhash import Simhash
+from uhashring import HashRing
 
 from vllm_router.services.routing_service.affinity.base import BaseAffinity
+from vllm_router.stats.engine_stats import EngineStats
+from vllm_router.stats.request_stats import RequestStats
+
 
 class HashType(str, enum.Enum):
     XXHASH = "xxhash"
@@ -25,28 +28,29 @@ class HashType(str, enum.Enum):
 
         base_funcs = {
             HashType.XXHASH: xxhash.xxh64_intdigest,
-            HashType.SIMHASH: lambda text: Simhash(text).value
+            HashType.SIMHASH: lambda text: Simhash(text).value,
         }
 
         return partial(trim_and_hash, base_funcs[self])
 
-        
+
 class SimhashAffinity(BaseAffinity):
-    def __init__(
-        self,
-        **kwargs
-    ):
+    def __init__(self, **kwargs):
 
         if "hash_type" not in kwargs:
-            logger.warning("Using simhash affinity without hash_type."
-            "Setting hash_type to default value: SIMHASH")
+            logger.warning(
+                "Using simhash affinity without hash_type."
+                "Setting hash_type to default value: SIMHASH"
+            )
             hash_type = HashType.SIMHASH
         else:
             hash_type = getattr(HashType, kwargs["hash_type"])
 
         if "max_length" not in kwargs:
-            logger.warning("Using simhash affinity without max_length."
-            "Setting max_length to default value: 512")
+            logger.warning(
+                "Using simhash affinity without max_length."
+                "Setting max_length to default value: 512"
+            )
             max_length = 512
         else:
             max_length = kwargs["max_length"]
@@ -56,15 +60,14 @@ class SimhashAffinity(BaseAffinity):
         self.endpoints = set()
         self.name = "simhash_affinity"
 
-
     def get_high_affinity_endpoint(
         self,
         request: Request,
         request_json: Dict[str, Any],
-        unavailable_endpoints: Set[str],
+        available_endpoints: Set[str],
     ) -> str:
 
-        assert unavailable_endpoints.issubset(self.endpoints)
+        assert available_endpoints.issubset(self.endpoints)
 
         messages = json.dumps(request_json["messages"])
 
@@ -73,12 +76,14 @@ class SimhashAffinity(BaseAffinity):
         # Iterate through nodes starting from the hash position
         for endpoint in self.hash_ring.iterate_nodes(str(hash_value), distinct=True):
 
-            if endpoint not in unavailable_endpoints:
+            if endpoint in available_endpoints:
                 return endpoint
 
         raise ValueError(f"No endpoint found for request: {request}")
 
-    def on_request_routed(self, request: Request, request_json: Dict[str, Any], endpoint: str) -> None:
+    def on_request_routed(
+        self, request: Request, request_json: Dict[str, Any], endpoint: str
+    ) -> None:
         # In simhash matcher the endpoint state is irrelevant to which request
         # is routed to which endpoint.
         pass
@@ -93,9 +98,6 @@ class SimhashAffinity(BaseAffinity):
         current_nodes = set(self.hash_ring.get_nodes())
 
         new_nodes = endpoints
-
-        for node in current_nodes - new_nodes:
-            self.hash_ring.remove_node(node)
 
         for node in new_nodes - current_nodes:
             self.hash_ring.add_node(node)

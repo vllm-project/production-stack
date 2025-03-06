@@ -1,13 +1,17 @@
 """
-    Abstract class for best endpoint selector.
+Abstract class for best endpoint selector.
 """
 
 import abc
-from typing import Set, Dict, Any
-from fastapi import Request
-from vllm_router.types import EngineStats, RequestStats
+from typing import Any, Dict, Set
 
-class BaseAffinityMaintainer(metaclass=abc.ABCMeta):
+from fastapi import Request
+
+from vllm_router.stats.engine_stats import EngineStats
+from vllm_router.stats.request_stats import RequestStats
+
+
+class BaseAffinity(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_high_affinity_endpoint(
         self,

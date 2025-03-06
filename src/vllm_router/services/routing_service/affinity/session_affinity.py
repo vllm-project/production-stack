@@ -1,16 +1,20 @@
+from typing import Any, Dict, Set
+
+from fastapi import Request
+from uhashring import HashRing
 
 from vllm_router.services.routing_service.affinity.base import BaseAffinity
-from fastapi import Request
-from typing import Set
+from vllm_router.stats.engine_stats import EngineStats
+from vllm_router.stats.request_stats import RequestStats
+
 
 class SessionAffinity(BaseAffinity):
-    def __init__(
-        self,
-        **kwargs
-    ):
+    def __init__(self, **kwargs):
         if "session_key" not in kwargs:
-            raise ValueError("Using session affinity without specifying "
-            "session_key in affinity config. Please specify a session_key.")
+            raise ValueError(
+                "Using session affinity without specifying "
+                "session_key in affinity config. Please specify a session_key."
+            )
 
         self.session_key = kwargs["session_key"]
         self.hash_ring = HashRing()
@@ -37,7 +41,9 @@ class SessionAffinity(BaseAffinity):
 
         raise ValueError(f"No endpoint found for request: {request}")
 
-    def on_request_routed(self, request: Request, request_json: Dict[str, Any], endpoint: str) -> None:
+    def on_request_routed(
+        self, request: Request, request_json: Dict[str, Any], endpoint: str
+    ) -> None:
         # Simhash affinity's state is irrelevant to which request
         # is routed to which endpoint.
         pass
