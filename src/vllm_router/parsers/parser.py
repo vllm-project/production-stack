@@ -28,6 +28,7 @@ except ImportError:
 # Check if extproc module is available
 try:
     from vllm_router.extproc.service import ExtProcService, serve_extproc
+
     extproc_available = True
 except ImportError:
     extproc_available = False
@@ -58,7 +59,9 @@ def validate_args(args):
         raise ValueError("Request stats window must be greater than 0.")
     # Validate extproc arguments
     if args.extproc and not extproc_available:
-        raise ValueError("Extproc module is not available. Please install the required dependencies.")
+        raise ValueError(
+            "Extproc module is not available. Please install the required dependencies."
+        )
 
 
 def parse_args():
@@ -204,18 +207,18 @@ def parse_args():
         choices=["critical", "error", "warning", "info", "debug", "trace"],
         help="Log level for uvicorn. Default is 'info'.",
     )
-    
+
     # Add extproc arguments
     parser.add_argument(
-        "--extproc", 
-        action="store_true", 
-        help="Run as an Envoy External Processing service"
+        "--extproc",
+        action="store_true",
+        help="Run as an Envoy External Processing service",
     )
     parser.add_argument(
-        "--extproc-port", 
-        type=int, 
-        default=50051, 
-        help="Port to run the extproc service on"
+        "--extproc-port",
+        type=int,
+        default=50051,
+        help="Port to run the extproc service on",
     )
     parser.add_argument(
         "--extproc-grace-period",

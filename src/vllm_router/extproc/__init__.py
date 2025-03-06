@@ -8,4 +8,4 @@ with Envoy proxies.
 
 from vllm_router.extproc.service import ExtProcService, serve_extproc
 
-__all__ = ["ExtProcService", "serve_extproc"] 
+__all__ = ["ExtProcService", "serve_extproc"]
