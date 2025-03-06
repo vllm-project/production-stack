@@ -3,6 +3,8 @@
 # It should be run by config/default
 resources:
 - bases/production-stack.vllm.ai_staticroutes.yaml
+- bases/production-stack.vllm.ai_backends.yaml
+- bases/production-stack.vllm.ai_routes.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
