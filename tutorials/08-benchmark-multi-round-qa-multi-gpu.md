@@ -170,6 +170,7 @@ We followed the installation steps documented in [AIBrix's official repo](https:
 
 To align the configurations used in benchmarking vLLM Production Stack and naive K8s, we changed the configurations documented in [AIBrix's official repo](https://aibrix.readthedocs.io/latest/features/distributed-kv-cache.html) to enable AIBrix's KV Cache CPU offloading.
 Specifically, we changed the model name in their [deployment configuration yaml file](https://aibrix.readthedocs.io/latest/features/distributed-kv-cache.html) at lines #4, #6, #17, #21, #38, #81, #86 and #99 from `deepseek-coder-7b-instruct` to `llama3-1-8b`; and line #36 from `deepseek-ai/deepseek-coder-6.7b-instruct` to `meta-llama/Llama-3.1-8B-Instruct`; and line #57 from and line #73 from `deepseek-coder-7b-kvcache-rpc:9600` to `llama3-1-8b-kvcache-rpc:9600` `/var/run/vineyard-kubernetes/default/deepseek-coder-7b-kvcache` to `/var/run/vineyard-kubernetes/default/llama3-1-8b-kvcache`.
+We changed max model len at line #40 from `8000` to `24000`.
 We also changed the CPU offload memory limit at line #47 from `10` to `120` to match the configuration used in [Step 1](#step-1-running-benchmarks-with-vllm-production-stack).
 Finally, we changed the replica number at line #9 from `1` to `8`.
 
@@ -177,10 +178,10 @@ We also changed the CPU memory limit in AIBrix's KV cache server config: At line
 
 Finally, we follow the steps in [AIBrix's official repo](https://aibrix.readthedocs.io/latest/getting_started/installation/lambda.html) to start AIBrix server and then run the benchmarking code by:
 
-`bash
-bash warmup.sh llama3 http://localhost:8888/v1/
-bash run.sh llama3 http://localhost:8888/v1/ aibrix
-`
+```bash
+bash warmup.sh llama3-1-8b http://localhost:8888/v1/
+bash run.sh llama3-1-8b http://localhost:8888/v1/ aibrix
+```
 
 ## Conclusion
 
