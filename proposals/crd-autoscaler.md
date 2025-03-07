@@ -13,10 +13,6 @@
 * [Alternatives](#alternatives)
 * [Implementation Timeline / Phases](#implementation-timeline--phases)
 * [References](#references)
-<<<<<<< HEAD
-
-=======
->>>>>>> 39130c8 (Add header)
 
 ## Summary
 
