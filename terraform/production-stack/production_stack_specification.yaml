@@ -1,0 +1,61 @@
+servingEngineSpec:
+  strategy:
+    type: Recreate
+  runtimeClassName: ""
+  nodeSelector:
+    app: vllm-inference
+    nvidia.com/gpu: present
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Equal
+    value: present
+    effect: NoSchedule
+  modelSpec:
+  - name: "opt125m"
+    # repository: "eaminchan/opt-125m-cpu"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "facebook/opt-125m"
+    
+    replicaCount: 1
+
+    requestCPU: 1
+    requestMemory: "8Gi"
+    requestGPU: 1
+
+    pvcStorage: "10Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
+
+routerSpec:
+  nodeSelector:
+    app: mgmt-node
+  resources:
+    requests:
+      cpu: 1
+      memory: 4G
+    limits:
+      cpu: 2
+      memory: 8G
+
+
+# gcloud container clusters get-credentials production-stack --region=us-central1-a
+
+# sudo kubectl port-forward svc/vllm-router-service 30080:80
+# curl -o- http://localhost:30080/v1/models
+
+# curl -X POST http://localhost:30080/v1/completions \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "model": "facebook/opt-125m",
+#     "prompt": "Once upon a time,",
+#     "max_tokens": 10
+#   }'
+# helm install vllm vllm/vllm-stack -f production_stack_specification.yaml
+# helm uninstall vllm
+# kubectl get po -A
+# kubectl get no
+# https://ta-starter.tistory.com/49
+# kubectl api-resources
+
+# gpu 할당안되는 문제를 해결하는 방법 -> 그냥 node pool을 2개 만들엇음 ㅋㅋ router node랑 gpu node랑

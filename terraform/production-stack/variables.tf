@@ -17,12 +17,6 @@ variable "zone" {
   # default = "asia-northeast3-b"
 }
 
-variable "cluster_name" {
-  description = "gke cluster name"
-  type = string
-  default = "production-stack"
-}
-
 variable "setup_yaml" {
   description = "default yaml file"
   type = string
