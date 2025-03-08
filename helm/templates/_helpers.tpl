@@ -129,6 +129,15 @@ limits:
 {{- end }}
 
 {{/*
+  Define labels for cache server and its service
+*/}}
+{{- define "chart.cacheserverLabels" -}}
+{{-   with .Values.cacheserverSpec.labels -}}
+{{      toYaml . }}
+{{-   end }}
+{{- end }}
+
+{{/*
   Define helper function to convert labels to a comma separated list
 */}}
 {{- define "labels.toCommaSeparatedList" -}}
@@ -139,4 +148,12 @@ limits:
   {{ $key }}={{ $value }}
   {{- $result = "," -}}
 {{- end -}}
+{{- end -}}
+
+
+{{/*
+  Define helper function to format remote cache url
+*/}}
+{{- define "cacheserver.formatRemoteUrl" -}}
+lm://{{ .service_name }}:{{ .port }}
 {{- end -}}

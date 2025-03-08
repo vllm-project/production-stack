@@ -4,17 +4,16 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
   - name: "opt125m"
-    repository: "eaminchan/opt-125m-cpu"
+    # repository: "eaminchan/opt-125m-cpu"
+    repository: "vllm/vllm-openai"
     tag: "latest"
-    # repository: "vllm/vllm-openai"
     modelURL: "facebook/opt-125m"
     
     replicaCount: 1
-    device: "cpu"
 
-    requestCPU: 1.5
-    requestMemory: "6Gi"
-    requestGPU: 0
+    requestCPU: 1
+    requestMemory: "4Gi"
+    requestGPU: 1
 
     pvcStorage: "10Gi"
     pvcAccessMode:
@@ -24,10 +23,10 @@ routerSpec:
   resources:
     requests:
       cpu: "1"
-      memory: "6Gi"
+      memory: 4G
     limits:
       cpu: "1"
-      memory: "6Gi"
+      memory: 4G
 
 
 # gcloud container clusters get-credentials production-stack --region=us-central1-a

@@ -1,6 +1,6 @@
 #!/bin/bash
 CLUSTER_NAME="production-stack"
-ZONE="us-central1-a"
+ZONE="asia-northeast3-a"
 # Get the current GCP project ID
 GCP_PROJECT=$(gcloud config get-value project)
 
@@ -24,20 +24,21 @@ gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
   --zone "$ZONE" \
   --tier "standard" \
   --no-enable-basic-auth \
-  --cluster-version "1.31.5-gke.1023000" \
+  --cluster-version "1.31.5-gke.1169000" \
   --release-channel "regular" \
-  --machine-type "n2d-standard-8" \
+  # --machine-type "n2d-standard-8" \
+  --machine-type "n2d-standard-2" \
   --image-type "COS_CONTAINERD" \
   --disk-type "pd-balanced" \
   --disk-size "100" \
   --metadata disable-legacy-endpoints=true \
-  --scopes "https://www.googleapis.com/auth/devstorage.read_only",\
-    "https://www.googleapis.com/auth/logging.write",\
-    "https://www.googleapis.com/auth/monitoring",\
-    "https://www.googleapis.com/auth/servicecontrol",\
-    "https://www.googleapis.com/auth/service.management.readonly",\
-    "https://www.googleapis.com/auth/trace.append" \
-  --max-pods-per-node "110" \
+  # --scopes "https://www.googleapis.com/auth/devstorage.read_only",\
+  #   "https://www.googleapis.com/auth/logging.write",\
+  #   "https://www.googleapis.com/auth/monitoring",\
+  #   "https://www.googleapis.com/auth/servicecontrol",\
+  #   "https://www.googleapis.com/auth/service.management.readonly",\
+  #   "https://www.googleapis.com/auth/trace.append" \
+  # --max-pods-per-node "110" \
   --num-nodes "1" \
   --logging=SYSTEM,WORKLOAD \
   --monitoring=SYSTEM,STORAGE,POD,DEPLOYMENT,STATEFULSET,DAEMONSET,HPA,CADVISOR,KUBELET \
