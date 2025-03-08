@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 
 stack_results = []
 qpses = []
-for qps in np.arange(0.1, 1.2, 0.2):
+for qps in np.arange(0.3, 1.2, 0.2):
     # round qps to 1 decimal
     q = round(qps, 1)
     file = f"stack_output_{q}.csv"
@@ -16,7 +16,7 @@ for qps in np.arange(0.1, 1.2, 0.2):
     # Read csv file
     data = pd.read_csv(file)["ttft"].tolist()
     stack_results.append(sum(data) / len(data))
-print("vLLM Production Stack TTFT", stack_results)
+print(stack_results)
 
 plt.plot(
     qpses,
@@ -29,7 +29,7 @@ plt.plot(
 )
 aibrix_results = []
 qpses = []
-for qps in np.arange(0.1, 1.2, 0.2):
+for qps in np.arange(0.3, 1.2, 0.2):
     # round qps to 1 decimal
     q = round(qps, 1)
 
@@ -40,7 +40,7 @@ for qps in np.arange(0.1, 1.2, 0.2):
     # Read csv file
     data = pd.read_csv(file)["ttft"].tolist()
     aibrix_results.append(sum(data) / len(data))
-print("AIBrix TTFT", aibrix_results)
+print(aibrix_results)
 plt.plot(
     qpses,
     aibrix_results,
@@ -52,19 +52,15 @@ plt.plot(
 )
 
 native_results = []
-qpses = []
-for qps in np.arange(0.1, 1.2, 0.2):
+for qps in np.arange(0.3, 1.2, 0.2):
     # round qps to 1 decimal
     q = round(qps, 1)
-    file = f"naive_output_{q}.csv"
-    if not os.path.exists(file):
-        continue
+    file = f"native_output_{q}.csv"
     # Read csv file
     data = pd.read_csv(file)["ttft"].tolist()
     native_results.append(sum(data) / len(data))
-    qpses += [q]
-plt.plot(qpses, native_results, label="Native K8S")
-print("Naive k8s TTFT", native_results)
+plt.plot(np.arange(0.3, 1.2, 0.2), native_results, label="Native K8S")
+
 
 plt.xlim(left=0)
 plt.ylim(top=10)
