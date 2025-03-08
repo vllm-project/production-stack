@@ -9,12 +9,16 @@ if [ -z "$GCP_PROJECT" ]; then
   echo "Error: No GCP project ID found. Please set your project with 'gcloud config set project <PROJECT_ID>'."
   exit 1
 fi
+
 # Ensure a parameter is provided
 if [ "$#" -ne 1 ]; then
   echo "Usage: $0 <SETUP_YAML>"
   exit 1
 fi
+
 SETUP_YAML=$1
+
+
 # Create the GKE cluster
 gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
   --zone "$ZONE" \
@@ -56,6 +60,7 @@ gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
   --enable-managed-prometheus \
   --enable-shielded-nodes \
   --node-locations "$ZONE"
+
 # Deploy the application using Helm
 sudo helm repo add vllm https://vllm-project.github.io/production-stack
 sudo helm install vllm vllm/vllm-stack -f "$SETUP_YAML"
