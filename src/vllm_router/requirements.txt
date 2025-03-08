@@ -1,12 +1,9 @@
 aiofiles==24.1.0
-faiss-cpu>=1.7.4
 fastapi==0.115.8
 httpx==0.28.1
-huggingface-hub==0.25.2
 kubernetes==32.0.0
 numpy==1.26.4
 prometheus_client==0.21.1
 python-multipart==0.0.20
-sentence-transformers>=2.2.2
 uhashring==2.3
 uvicorn==0.34.0
