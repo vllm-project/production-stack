@@ -78,25 +78,26 @@ resource "google_container_node_pool" "primary_nodes" {
   name = "${var.cluster_name}-node-pool"
   location = var.zone # --node-locations "$ZONE"
   cluster = google_container_cluster.primary.name
-  node_count = 2
+  node_count = 1
 
 
   node_config {
-    machine_type = "n2d-standard-4" # --machine-type "n2d-standard-8"
+    # machine_type = "n2d-standard-4" # --machine-type "n2d-standard-8"
     image_type = "COS_CONTAINERD" # --image-type "COS_CONTAINERD"
     disk_type = "pd-balanced" # --disk-type "pd-balanced"
     disk_size_gb = 100 # --disk-size "100"
 
-    # guest_accelerator { # -- gpu nodes
-    #   type  = "nvidia-tesla-t4"
-    #   count = 1
-    #   gpu_driver_installation_config {
-    #     gpu_driver_version = "LATEST"
-    #   }
-    # }
+    guest_accelerator { # -- gpu nodes
+      # type  = "nvidia-tesla-t4"
+      type = "nvidia-l4"
+      count = 1
+      gpu_driver_installation_config {
+        gpu_driver_version = "LATEST"
+      }
+    }
 
-    # # machine_type = "n1-standard-8" # default = "e2-medium"
-    # machine_type = "g2-standard-4" # vs g2-standard-8 (32GB mem)
+    # machine_type = "n1-standard-4" # default = "e2-medium"
+    machine_type = "g2-standard-8" # vs g2-standard-8 (32GB mem)
     
 
     metadata = {
@@ -113,6 +114,14 @@ resource "google_container_node_pool" "primary_nodes" {
 
     labels = {
       env = var.project
+      app = "vllm-inference"
+      "nvidia.com/gpu" = "present"
+    }
+
+    taint {
+      key = "nvidia.com/gpu"
+      value = "present"
+      effect = "NO_SCHEDULE"
     }
 
   }
@@ -129,18 +138,46 @@ resource "google_container_node_pool" "primary_nodes" {
 
 }
 
-# Helm Release 설정
-resource "helm_release" "vllm" {
-  name       = "vllm"
-  repository = "https://vllm-project.github.io/production-stack"
-  chart      = "vllm-stack"
+# 관리용 노드풀 추가 (라우터 및 관리 서비스용)
+resource "google_container_node_pool" "mgmt_nodes" {
+  name = "${var.cluster_name}-mgmt-pool"
+  location = var.zone
+  cluster = google_container_cluster.primary.name
+  node_count = 1
 
-  values = [
-    file(var.setup_yaml)
-  ]
+  node_config {
+    image_type = "COS_CONTAINERD"
+    disk_type = "pd-balanced"
+    disk_size_gb = 50
+    
+    machine_type = "e2-standard-4"  # 관리 작업에 충분한 사양
+    
+    metadata = {
+      disable-legacy-endpoints = "true"
+    }
+    
+    oauth_scopes = [
+      "https://www.googleapis.com/auth/devstorage.read_only",
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/servicecontrol",
+      "https://www.googleapis.com/auth/service.management.readonly",
+      "https://www.googleapis.com/auth/trace.append"
+    ]
 
-  depends_on = [
-    google_container_cluster.primary,
-    google_container_node_pool.primary_nodes
-  ]
+    labels = {
+      env = var.project
+      app = "mgmt-node"
+    }
+  }
+
+  management {
+    auto_repair = true
+    auto_upgrade = true
+  }
+
+  upgrade_settings {
+    max_surge = 1
+    max_unavailable = 0
+  }
 }
