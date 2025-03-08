@@ -98,11 +98,7 @@ helm/examples
 # version files
 src/vllm_router/_version.py
 
-
-
-
-
-
+/tutorials/assets/private.yaml
 
 
 # credentials.json
@@ -112,3 +108,4 @@ credentials.json
 **/*.tfstate
 
 /tutorials/assets/private.yaml
+
