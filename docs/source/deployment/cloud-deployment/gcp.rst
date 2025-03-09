@@ -68,3 +68,5 @@ To remove the deployed vLLM stack and clean up resources, run:
 .. code-block:: bash
 
     bash clean_up.sh production-stack
+
+This command will remove all Kubernetes resources associated with the vLLM deployment.
