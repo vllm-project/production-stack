@@ -153,6 +153,12 @@ spec:
           - name: LMCACHE_REMOTE_SERDE
             value: "{{ .Values.cacheserverSpec.serde }}"
           {{-   end }}
+          {{-   if and .Values.lookupserverSpec $modelSpec.lmcacheConfig.p2pEnabled}}
+          - name: LMCACHE_LOOKUP_URL
+            value: "{{ include "lookupserver.formatLookupUrl" (dict "service_name" (print .Release.Name "-lookup-server-service") "port" .Values.lookupserverSpec.servicePort) }}"
+          - name: LMCACHE_DISTRIBUTED_URL
+            value: "{{ include "distributedserver.formatDistributedUrl" (dict "service_name" (print .Release.Name "-engine-service") "port" $modelSpec.lmcacheConfig.distributedPort) }}"
+          {{-   end }}
           {{- end }}
           {{- if .Values.servingEngineSpec.configs }}
           envFrom:

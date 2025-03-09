@@ -1,0 +1,18 @@
+{{- if .Values.lookupserverSpec -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-lookup-server-service"
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "chart.lookupserverLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: "lookupserver-sport"
+      port: {{ .Values.lookupserverSpec.servicePort }}
+      targetPort: {{ .Values.lookupserverSpec.containerPort }}
+      protocol: TCP
+  selector:
+  {{- include "chart.lookupserverLabels" . | nindent 4 }}
+{{- end -}}
