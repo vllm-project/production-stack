@@ -23,3 +23,26 @@ variable "cluster_name" {
   type = string
   default = "production-stack"
 }
+
+variable "gcp_services" {
+    description = "List of GCP services required for GKE project"
+    type = list(string)
+    default = [
+        # Core GKE-related services
+        "container.googleapis.com",       # Kubernetes Engine API
+        "compute.googleapis.com",         # Compute Engine API
+        "iam.googleapis.com",             # Identity and Access Management API
+        "monitoring.googleapis.com",      # Cloud Monitoring API
+        "logging.googleapis.com",         # Cloud Logging API
+        "cloudtrace.googleapis.com",      # Cloud Trace API
+        "stackdriver.googleapis.com",     # Stackdriver API
+
+        # Networking related services
+        "servicenetworking.googleapis.com",  # Service Networking API
+        "networkmanagement.googleapis.com",  # Network Management API
+
+        # Storage related services
+        "storage-api.googleapis.com",     # Cloud Storage API
+        "artifactregistry.googleapis.com", # Artifact Registry API
+    ]
+}

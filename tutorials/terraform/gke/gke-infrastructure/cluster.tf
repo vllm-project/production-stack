@@ -16,8 +16,8 @@ resource "google_container_cluster" "primary" {
     enable_components = [ "SYSTEM_COMPONENTS", "WORKLOADS" ]
   }
 
-  monitoring_config { # --monitoring=SYSTEM,STORAGE,POD,DEPLOYMENT,STATEFULSET,DAEMONSET,HPA,CADVISOR,KUBELET 
-    enable_components = [ 
+  monitoring_config { # --monitoring=SYSTEM,STORAGE,POD,DEPLOYMENT,STATEFULSET,DAEMONSET,HPA,CADVISOR,KUBELET
+    enable_components = [
       "SYSTEM_COMPONENTS",
       "STORAGE",
       "POD",
@@ -39,7 +39,7 @@ resource "google_container_cluster" "primary" {
   ip_allocation_policy {} # need to vpc-native cluster
   enable_intranode_visibility = false # --no-enable-intra-node-visibility
 
-  
+
   private_cluster_config {
     enable_private_nodes = false # --no-enable-master-authorized-networks
     enable_private_endpoint = false # --no-enable-google-cloud-access
@@ -63,7 +63,7 @@ resource "google_container_cluster" "primary" {
 
   node_config { # --enable-shielded-nodes
     shielded_instance_config {
-      enable_secure_boot = true 
+      enable_secure_boot = true
     }
   }
 
@@ -74,4 +74,8 @@ resource "google_container_cluster" "primary" {
       recurrence = "FREQ=WEEKLY;BYDAY=SA,SU"
     }
   }
+
+  depends_on = [
+    time_sleep.wait_60_seconds
+  ]
 }

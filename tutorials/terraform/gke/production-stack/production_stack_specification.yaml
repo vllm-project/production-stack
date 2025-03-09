@@ -15,7 +15,7 @@ servingEngineSpec:
     repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "facebook/opt-125m"
-    
+
     replicaCount: 1
 
     requestCPU: 1
@@ -36,5 +36,3 @@ routerSpec:
     limits:
       cpu: 2
       memory: 8G
-
-

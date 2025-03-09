@@ -22,7 +22,7 @@ create-helm-chart:
 	gcloud container clusters get-credentials $(CLUSTER_NAME) --region=$(REGION)
 	@cd production-stack && terraform init
 	@cd production-stack && terraform apply -auto-approve
-	
+
 
 destroy-gke-infra:
 	@echo ""

@@ -21,8 +21,6 @@ resource "google_container_node_pool" "primary_nodes" {
     }
 
     machine_type = "g2-standard-8" # (8vpu, 32GB mem)
-    
-
     metadata = {
       disable-legacy-endpoints = "true"  # # --metadata disable-legacy-endpoints=true
     }
@@ -59,6 +57,10 @@ resource "google_container_node_pool" "primary_nodes" {
     max_unavailable = 0 # --max-unavailable-upgrade 0
   }
 
+  depends_on = [
+    google_container_cluster.primary
+  ]
+
 }
 
 resource "google_container_node_pool" "mgmt_nodes" {
@@ -71,13 +73,13 @@ resource "google_container_node_pool" "mgmt_nodes" {
     image_type = "COS_CONTAINERD"
     disk_type = "pd-balanced"
     disk_size_gb = 50
-    
-    machine_type = "e2-standard-4" 
-    
+
+    machine_type = "e2-standard-4"
+
     metadata = {
       disable-legacy-endpoints = "true"
     }
-    
+
     oauth_scopes = [
       "https://www.googleapis.com/auth/devstorage.read_only",
       "https://www.googleapis.com/auth/logging.write",
@@ -102,4 +104,8 @@ resource "google_container_node_pool" "mgmt_nodes" {
     max_surge = 1
     max_unavailable = 0
   }
+
+  depends_on = [
+    google_container_cluster.primary
+  ]
 }
