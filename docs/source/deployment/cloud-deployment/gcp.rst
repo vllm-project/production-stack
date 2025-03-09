@@ -59,3 +59,8 @@ Expected output:
 .. note::
 
     It may take some time for the pods to reach the `Running` state, depending on cluster setup and image download speed.
+
+3. Uninstall
+~~~~~~~~~~~~
+
+To remove the deployed vLLM stack and clean up resources, run:
