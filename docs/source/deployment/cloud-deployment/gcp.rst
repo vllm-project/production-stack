@@ -13,3 +13,6 @@ You must have the following dependencies installed:
 - `helm` (Kubernetes package manager)
 
 Ensure that all the required tools are installed before proceeding.
+
+Steps to Follow
+---------------
