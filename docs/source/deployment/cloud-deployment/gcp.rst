@@ -27,3 +27,7 @@ Modify the fields in the `production_stack_specification.yaml` file as per your 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Run the deployment script by replacing `YAML_FILE_PATH` with the actual configuration file path:
+
+.. code-block:: bash
+
+    sudo bash entry_point.sh YAML_FILE_PATH
