@@ -31,3 +31,6 @@ Run the deployment script by replacing `YAML_FILE_PATH` with the actual configur
 .. code-block:: bash
 
     sudo bash entry_point.sh YAML_FILE_PATH
+
+After executing the script, Kubernetes will start deploying the vLLM inference stack.
+You can monitor the status of the deployment.
