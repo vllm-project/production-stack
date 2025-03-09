@@ -55,3 +55,7 @@ Expected output:
     NAME                                            READY   STATUS    RESTARTS   AGE
     vllm-deployment-router-69b7f9748d-xrkvn         1/1     Running   0          75s
     vllm-opt125m-deployment-vllm-696c998c6f-mvhg4   1/1     Running   0          75s
+
+.. note::
+
+    It may take some time for the pods to reach the `Running` state, depending on cluster setup and image download speed.
