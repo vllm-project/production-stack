@@ -22,3 +22,8 @@ Steps to Follow
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Modify the fields in the `production_stack_specification.yaml` file as per your requirements.
+
+1.2 Execute the Deployment Script
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Run the deployment script by replacing `YAML_FILE_PATH` with the actual configuration file path:
