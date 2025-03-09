@@ -64,3 +64,7 @@ Expected output:
 ~~~~~~~~~~~~
 
 To remove the deployed vLLM stack and clean up resources, run:
+
+.. code-block:: bash
+
+    bash clean_up.sh production-stack
