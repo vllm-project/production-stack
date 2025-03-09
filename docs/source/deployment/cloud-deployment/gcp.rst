@@ -38,3 +38,8 @@ You can monitor the status of the deployment.
 
 2. Validate Installation
 ~~~~~~~~~~~~~~~~~~~~~~~~
+
+2.1 Monitor Deployment Status
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To check whether the pods for vLLM deployment are up and running, use:
