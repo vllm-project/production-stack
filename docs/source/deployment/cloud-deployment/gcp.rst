@@ -47,3 +47,11 @@ To check whether the pods for vLLM deployment are up and running, use:
 .. code-block:: bash
 
     sudo kubectl get pods
+
+Expected output:
+
+.. code-block:: console
+
+    NAME                                            READY   STATUS    RESTARTS   AGE
+    vllm-deployment-router-69b7f9748d-xrkvn         1/1     Running   0          75s
+    vllm-opt125m-deployment-vllm-696c998c6f-mvhg4   1/1     Running   0          75s
