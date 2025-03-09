@@ -18,3 +18,7 @@ Steps to Follow
 ---------------
 1. Deploy GKE vLLM Stack
 ~~~~~~~~~~~~~~~~~~~~~~~~
+1.1 Modify the Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Modify the fields in the `production_stack_specification.yaml` file as per your requirements.
