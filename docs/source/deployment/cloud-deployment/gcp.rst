@@ -16,3 +16,5 @@ Ensure that all the required tools are installed before proceeding.
 
 Steps to Follow
 ---------------
+1. Deploy GKE vLLM Stack
+~~~~~~~~~~~~~~~~~~~~~~~~
