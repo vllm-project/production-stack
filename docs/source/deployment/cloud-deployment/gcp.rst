@@ -43,3 +43,7 @@ You can monitor the status of the deployment.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To check whether the pods for vLLM deployment are up and running, use:
+
+.. code-block:: bash
+
+    sudo kubectl get pods
