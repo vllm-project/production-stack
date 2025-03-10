@@ -4,20 +4,44 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
-  name: staticroutes.production-stack.vllm.ai
+  name: routes.production-stack.vllm.ai
 spec:
   group: production-stack.vllm.ai
   names:
-    kind: StaticRoute
-    listKind: StaticRouteList
-    plural: staticroutes
-    singular: staticroute
+    kind: Route
+    listKind: RouteList
+    plural: routes
+    singular: route
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Backend reference
+      jsonPath: .spec.backendRef.name
+      name: Backend
+      type: string
+    - description: Route path
+      jsonPath: .spec.path
+      name: Path
+      type: string
+    - description: API schema
+      jsonPath: .spec.apiSchema
+      name: API Schema
+      type: string
+    - description: Route weight
+      jsonPath: .spec.weight
+      name: Weight
+      type: integer
+    - description: Route active status
+      jsonPath: .status.isActive
+      name: Active
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: StaticRoute is the Schema for the staticroutes API
+        description: Route is the Schema for the routes API
         properties:
           apiVersion:
             description: |-
@@ -37,8 +61,60 @@ spec:
           metadata:
             type: object
           spec:
-            description: StaticRouteSpec defines the desired state of StaticRoute
+            description: RouteSpec defines the desired state of Route
             properties:
+              apiSchema:
+                default: openai
+                description: APISchema specifies which API schema is supported by
+                  this route
+                enum:
+                - openai
+                - anthropic
+                - vllm
+                type: string
+              backendRef:
+                description: BackendRef is a reference to the Backend resource
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
               configMapRef:
                 description: ConfigMapRef is a reference to the ConfigMap to create
                   with the dynamic config
@@ -83,112 +159,98 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              healthCheck:
-                description: HealthCheck defines the health check configuration for
-                  the router
-                properties:
-                  failureThreshold:
-                    default: 3
-                    description: Minimum consecutive failures for the probe to be
-                      considered failed
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  periodSeconds:
-                    default: 10
-                    description: Number of seconds between probe attempts
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  successThreshold:
-                    default: 1
-                    description: Minimum consecutive successes for the probe to be
-                      considered successful
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  timeoutSeconds:
-                    default: 5
-                    description: Number of seconds after which the probe times out
-                    format: int32
-                    minimum: 1
-                    type: integer
+              headers:
+                additionalProperties:
+                  type: string
+                description: Headers are additional headers to add to the request
                 type: object
-              routerRef:
-                description: RouterRef is a reference to the router service
+              path:
+                description: Path is the URL path to match for this route
+                type: string
+              rateLimitPerMinute:
+                description: RateLimitPerMinute is the maximum number of requests
+                  allowed per minute
+                format: int32
+                minimum: 0
+                type: integer
+              secretRef:
+                description: SecretRef is a reference to a secret containing API keys
+                  for this route
                 properties:
-                  apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  fieldPath:
-                    description: |-
-                      If referring to a piece of an object instead of an entire object, this string
-                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
-                      For example, if the object reference is to a container within a pod, this would take on a value like:
-                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
-                      the event) or if no container name is specified "spec.containers[2]" (container with
-                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
-                      referencing a part of an object.
-                    type: string
-                  kind:
-                    description: |-
-                      Kind of the referent.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                  key:
+                    description: Key is the key in the secret to use
                     type: string
                   name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    description: Name is the name of the secret
                     type: string
                   namespace:
-                    description: |-
-                      Namespace of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    description: Namespace is the namespace of the secret
                     type: string
-                  resourceVersion:
-                    description: |-
-                      Specific resourceVersion to which this reference is made, if any.
-                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-                    type: string
-                  uid:
-                    description: |-
-                      UID of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
-                    type: string
+                required:
+                - key
+                - name
                 type: object
-                x-kubernetes-map-type: atomic
-              routingLogic:
-                default: roundrobin
-                description: RoutingLogic specifies the routing logic to use
-                enum:
-                - roundrobin
-                - least_loaded
-                type: string
-              serviceDiscovery:
-                default: static
-                description: ServiceDiscovery specifies the service discovery method
-                enum:
-                - static
-                type: string
-              staticBackends:
-                description: StaticBackends is a comma-separated list of backend URLs
-                type: string
-              staticModels:
-                description: StaticModels is a comma-separated list of model names
-                type: string
+              semanticCachingConfig:
+                description: SemanticCachingConfig provides configuration for semantic
+                  caching
+                properties:
+                  maxCacheSize:
+                    default: 1000
+                    description: MaxCacheSize is the maximum number of entries in
+                      the cache
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  similarityThreshold:
+                    default: 95
+                    description: SimilarityThreshold is the threshold for semantic
+                      similarity (0-100)
+                    format: int32
+                    maximum: 100
+                    minimum: 0
+                    type: integer
+                  ttl:
+                    default: 3600
+                    description: TTL is the time-to-live for cached entries in seconds
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type: object
+              semanticCachingEnabled:
+                default: false
+                description: SemanticCachingEnabled indicates whether semantic caching
+                  is enabled for this route
+                type: boolean
+              timeout:
+                default: 300
+                description: Timeout is the request timeout in seconds
+                format: int32
+                minimum: 1
+                type: integer
+              weight:
+                default: 100
+                description: Weight is the routing weight for this route (0-100)
+                format: int32
+                maximum: 100
+                minimum: 0
+                type: integer
             required:
+            - apiSchema
+            - backendRef
             - configMapRef
-            - routingLogic
-            - serviceDiscovery
-            - staticBackends
-            - staticModels
+            - path
             type: object
           status:
-            description: StaticRouteStatus defines the observed state of StaticRoute
+            description: RouteStatus defines the observed state of Route
             properties:
+              cacheHitRatePercent:
+                description: CacheHitRate is the cache hit rate for this route (if
+                  semantic caching is enabled)
+                format: int32
+                type: integer
               conditions:
                 description: Conditions represent the latest available observations
-                  of the StaticRoute's state
+                  of the Route's state
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -244,14 +306,18 @@ spec:
                   - type
                   type: object
                 type: array
-              configMapRef:
-                description: ConfigMapRef is a reference to the created ConfigMap
-                type: string
-              lastAppliedTime:
-                description: LastAppliedTime is the last time the configuration was
-                  applied to the router
+              isActive:
+                description: IsActive indicates whether the route is active
+                type: boolean
+              lastConfiguredTime:
+                description: LastConfiguredTime is the last time the route was configured
                 format: date-time
                 type: string
+              requestCount:
+                description: RequestCount is the number of requests processed by this
+                  route
+                format: int64
+                type: integer
             type: object
         type: object
     served: true
