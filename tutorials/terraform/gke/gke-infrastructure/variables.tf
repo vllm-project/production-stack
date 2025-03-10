@@ -46,3 +46,15 @@ variable "gcp_services" {
         "artifactregistry.googleapis.com", # Artifact Registry API
     ]
 }
+
+variable "gpu_machine_type" {
+  description = "gpu node pool machine type"
+  type = string
+  default = "g2-standard-8" # (8vpu, 32GB mem)
+}
+
+variable "gpu_accelerator_type" {
+  description = "gpu node pool gpu type"
+  type = string
+  default = "nvidia-l4"
+}

@@ -12,15 +12,16 @@ resource "google_container_node_pool" "primary_nodes" {
     disk_type = "pd-balanced" # --disk-type "pd-balanced"
     disk_size_gb = 100 # --disk-size "100"
 
+    machine_type = var.gpu_machine_type
+
     guest_accelerator { # -- gpu nodes
-      type = "nvidia-l4"
+      type = var.gpu_accelerator_type
       count = 1
       gpu_driver_installation_config {
         gpu_driver_version = "LATEST"
       }
     }
 
-    machine_type = "g2-standard-8" # (8vpu, 32GB mem)
     metadata = {
       disable-legacy-endpoints = "true"  # # --metadata disable-legacy-endpoints=true
     }
