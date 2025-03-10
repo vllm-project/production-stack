@@ -73,6 +73,75 @@ The deployment includes:
 - vLLM stack with OpenAI-compatible API endpoints (provides a familiar interface for LLM inference)
 - Integrated with GKE ingress for external access
 
+## 🎮 GPU and Model Selection
+
+### Selecting GPU Types
+
+When deploying your vLLM stack, you can customize the GPU types used for inference by modifying the `gke-infrastructure/variables.tf` file
+
+```terraform
+variable "gpu_machine_type" {
+  description = "gpu node pool machine type"
+  type = string
+  default = "g2-standard-8" # (8vpu, 32GB mem)
+}
+
+variable "gpu_accelerator_type" {
+  description = "gpu node pool gpu type"
+  type = string
+  default = "nvidia-l4"
+}
+```
+
+You can adjust both the machine type and accelerator specifications to match your performance and budget requirements.
+
+### 🖥️ Available Machine Types and GPU Combinations in GCP
+
+#### 🚀 N1 Series Machines (Previous Generation)
+
+| Machine Type | vCPUs | Memory (GB) | Compatible GPUs | Max GPUs |
+|-------------|--------|-------------|-----------------|----------|
+| n1-standard-2 | 2 | 7.5 | nvidia-tesla-t4 | 1 |
+| n1-standard-4 | 4 | 15 | nvidia-tesla-t4, nvidia-tesla-p4 | 1 |
+| n1-standard-8 | 8 | 30 | nvidia-tesla-t4, nvidia-tesla-p4, nvidia-tesla-v100 | 1 |
+| n1-standard-16 | 16 | 60 | nvidia-tesla-t4, nvidia-tesla-p4, nvidia-tesla-v100 | 2 |
+| n1-standard-32 | 32 | 120 | nvidia-tesla-t4, nvidia-tesla-p4, nvidia-tesla-v100 | 4 |
+
+#### 🎯 G2 Series Machines (Latest Generation)
+
+| Machine Type | vCPUs | Memory (GB) | Compatible GPUs | Max GPUs |
+|-------------|--------|-------------|-----------------|----------|
+| g2-standard-4 | 4 | 16 | nvidia-l4 | 1 |
+| g2-standard-8 | 8 | 32 | nvidia-l4 | 1 |
+| g2-standard-12 | 12 | 48 | nvidia-l4 | 2 |
+| g2-standard-16 | 16 | 64 | nvidia-l4 | 2 |
+| g2-standard-24 | 24 | 96 | nvidia-l4 | 4 |
+| g2-standard-32 | 32 | 128 | nvidia-l4 | 4 |
+| g2-standard-48 | 48 | 192 | nvidia-l4 | 6 |
+| g2-standard-96 | 96 | 384 | nvidia-l4 | 8 |
+
+### 🎮 GPU Specifications
+
+| GPU Type | Memory | Best For | Relative Cost |
+|----------|---------|----------|---------------|
+| nvidia-tesla-t4 | 16 GB | ML inference, small-scale training | $ |
+| nvidia-tesla-p4 | 8 GB | ML inference | $ |
+| nvidia-tesla-v100 | 32 GB | Large-scale ML training | $$$ |
+| nvidia-l4 | 24 GB | Latest gen for ML/AI workloads | $$ |
+
+#### ⚠️ Note
+
+- GPU availability varies by region and zone
+- G2 machines are optimized for the latest NVIDIA L4 GPUs
+- N1 machines are more flexible with GPU options but are previous generation
+- Pricing varies significantly based on configuration and region
+- More information -> [here](https://cloud.google.com/compute/docs/gpus?hl=en)
+
+### Model Deployment Configuration
+
+To specify which model to deploy, edit the `production_stack_specification.yaml` file
+Please refer to this [production-stack's guide](https://github.com/vllm-project/production-stack/blob/main/tutorials/02-basic-vllm-config.md) for more information
+
 ## 🔧 Deployment Steps
 
 ### Option 1: Using the Makefile (Recommended)
