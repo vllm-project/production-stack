@@ -21,7 +21,7 @@ variable "zone" {
 variable "setup_yaml" {
   description = "default yaml file"
   type = string
-  default = "production_stack_specification.yaml"
+  default = "../production_stack_specification.yaml"
 }
 
 
