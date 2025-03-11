@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# aaa
 # shellcheck disable=SC2034  # result_model appears unused. Verify it or export it.
 result_model=$(curl -s http://"$1":"$2"/v1/models | tee output-02-two-pods/models-02-two-pods.json)
 # shellcheck disable=SC2034  # result_query appears unused. Verify it or export it.
