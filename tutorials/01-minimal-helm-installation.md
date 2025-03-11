@@ -73,8 +73,8 @@ Explanation of the key fields:
 Deploy the Helm chart using the predefined configuration file:
 
 ```bash
-heml repo add vllm https://vllm-project.github.io/production-stack
-heml install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
 ```
 
 Explanation of the command:
@@ -179,5 +179,5 @@ This demonstrates the model generating a continuation for the provided prompt.
 To remove the deployment, run:
 
 ```bash
-heml uninstall vllm
+helm uninstall vllm
 ```

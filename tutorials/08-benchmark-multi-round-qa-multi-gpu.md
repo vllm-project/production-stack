@@ -70,8 +70,8 @@ routerSpec:
 Deploy the vLLM Production Stack server by:
 
 ```bash
-heml repo add vllm https://vllm-project.github.io/production-stack
-heml install vllm vllm/vllm-stack -f stack.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f stack.yaml
 ```
 
 Then you can verify the pod readiness:
@@ -141,8 +141,8 @@ routerSpec:
 Deploy the Naive K8s stack server:
 
 ```bash
-heml repo add vllm https://vllm-project.github.io/production-stack
-heml install vllm vllm/vllm-stack -f naive.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f naive.yaml
 ```
 
 Then you can verify the pod readiness:

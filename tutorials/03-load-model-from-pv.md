@@ -142,7 +142,7 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
 2. Uninstall and reinstall the deployment to observe faster startup:
 
    ```bash
-   heml uninstall vllm
+   helm uninstall vllm
    kubectl delete -f tutorials/assets/pv-03.yaml && kubectl apply -f tutorials/assets/pv-03.yaml
    helm install vllm vllm/vllm-stack -f tutorials/assets/values-03-match-pv.yaml
    ```

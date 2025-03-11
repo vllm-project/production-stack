@@ -54,8 +54,8 @@ Deploy the Helm chart using the predefined configuration file:
 
 .. code-block:: bash
 
-    heml repo add vllm https://vllm-project.github.io/production-stack
-    heml install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
+    helm repo add vllm https://vllm-project.github.io/production-stack
+    helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
 
 
 2. Validate Installation
@@ -167,4 +167,4 @@ To remove the deployment, run:
 
 .. code-block:: bash
 
-    heml uninstall vllm
+    helm uninstall vllm

@@ -80,7 +80,7 @@ The `CacheserverSpec` starts a remote shared KV cache storage.
 Deploy the Helm chart using the customized values file:
 
 ```bash
-heml install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-storage.yaml
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-storage.yaml
 ```
 
 ## Step 3: Verifying the Installation

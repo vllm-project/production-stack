@@ -62,5 +62,5 @@ gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
   --node-locations "$ZONE"
 
 # Deploy the application using Helm
-heml repo add vllm https://vllm-project.github.io/production-stack
-heml install vllm vllm/vllm-stack -f "$SETUP_YAML"
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f "$SETUP_YAML"

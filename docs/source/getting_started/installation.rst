@@ -56,4 +56,4 @@ To uninstall the stack, run:
 
 .. code:: bash
 
-    heml uninstall vllm
+    helm uninstall vllm

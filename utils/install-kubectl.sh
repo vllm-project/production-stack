@@ -25,8 +25,8 @@ mv kubectl "$KUBECTL_PATH"
 
 # Add to PATH if not already included
 if ! echo "$PATH" | grep -q "$KUBECTL_DIR"; then
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+    echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> ~/.bashrc
+    echo "export PATH=\"$HOME/.local/bin:\$PATH\"" >> ~/.profile
     export PATH="$HOME/.local/bin:$PATH"
 fi
 
