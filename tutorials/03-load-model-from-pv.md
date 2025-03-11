@@ -127,7 +127,7 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
    - If using Minikube, access the Minikube VM and check the path:
 
      ```bash
-     sudo minikube ssh
+     minikube ssh
      ls /data/llama3/hub
      ```
 

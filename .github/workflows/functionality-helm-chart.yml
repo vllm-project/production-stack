@@ -35,7 +35,7 @@ jobs:
           sudo docker build --build-arg INSTALL_SENTENCE_TRANSFORMERS=false -t localhost:5000/git-act-router -f docker/Dockerfile .
           sudo docker push localhost:5000/git-act-router
           sudo sysctl fs.protected_regular=0
-          sudo minikube image load localhost:5000/git-act-router
+          minikube image load localhost:5000/git-act-router
           helm install vllm ./helm -f .github/values-01-minimal-example.yaml
       - name: Validate the installation and send query to the stack
         run: |
