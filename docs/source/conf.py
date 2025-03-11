@@ -25,10 +25,10 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    # "myst_parser",
+    "myst_parser",
     "sphinxarg.ext",
-    # "sphinx_design",
-    # "sphinx_togglebutton",
+    "sphinx_design",
+    "sphinx_togglebutton",
     "sphinx_click",
 ]
 
