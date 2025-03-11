@@ -1,5 +1,6 @@
 import abc
 import enum
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -140,7 +141,11 @@ class K8sServiceDiscovery(ServiceDiscovery):
         """
         url = f"http://{pod_ip}:{self.port}/v1/models"
         try:
-            response = requests.get(url)
+            headers = None
+            if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
+                logger.info(f"Using vllm server authentication")
+                headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
+            response = requests.get(url, headers=headers)
             response.raise_for_status()
             model_name = response.json()["data"][0]["id"]
         except Exception as e:
