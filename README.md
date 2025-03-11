@@ -74,7 +74,7 @@ For more information about customizing the helm chart, please refer to [values.y
 ### Uninstall
 
 ```bash
-sudo helm uninstall vllm
+heml uninstall vllm
 ```
 
 ## Grafana Dashboard

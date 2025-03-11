@@ -70,7 +70,7 @@ helm install vllm vllm/vllm-stack -f tutorials/assets/values-04-multiple-models.
 1. Check the running pods to ensure both models are deployed:
 
    ```bash
-   sudo kubectl get pods
+   kubectl get pods
    ```
 
    Expected output:
@@ -87,7 +87,7 @@ helm install vllm vllm/vllm-stack -f tutorials/assets/values-04-multiple-models.
 2. Forward the router service port to access it locally:
 
    ```bash
-   sudo kubectl port-forward svc/vllm-router-service 30080:80
+   kubectl port-forward svc/vllm-router-service 30080:80
    ```
 
    > **Explanation:** We are forwarding the port from the router service, which has a global view of all the vLLM engines running different models.

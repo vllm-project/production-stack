@@ -70,8 +70,8 @@ routerSpec:
 Deploy the vLLM Production Stack server by:
 
 ```bash
-sudo helm repo add vllm https://vllm-project.github.io/production-stack
-sudo helm install vllm vllm/vllm-stack -f stack.yaml
+heml repo add vllm https://vllm-project.github.io/production-stack
+heml install vllm vllm/vllm-stack -f stack.yaml
 ```
 
 Then you can verify the pod readiness:
@@ -83,7 +83,7 @@ kubectl get pods
 Once the pods are ready, run the port forwarding:
 
 ```bash
-sudo kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 Finally, run the benchmarking code by:
@@ -141,8 +141,8 @@ routerSpec:
 Deploy the Naive K8s stack server:
 
 ```bash
-sudo helm repo add vllm https://vllm-project.github.io/production-stack
-sudo helm install vllm vllm/vllm-stack -f naive.yaml
+heml repo add vllm https://vllm-project.github.io/production-stack
+heml install vllm vllm/vllm-stack -f naive.yaml
 ```
 
 Then you can verify the pod readiness:
@@ -154,7 +154,7 @@ kubectl get pods
 Once the pods are ready, run the port forwarding:
 
 ```bash
-sudo kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 Finally, run the benchmarking code by:

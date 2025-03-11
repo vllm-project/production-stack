@@ -66,13 +66,13 @@ helm install vllm vllm/vllm-stack -f tutorials/assets/values-05-cpu-offloading.y
 1. Check the pod logs to verify LMCache is active:
 
    ```bash
-   sudo kubectl get pods
+   kubectl get pods
    ```
 
    Identify the pod name for the vLLM deployment (e.g., `vllm-mistral-deployment-vllm-xxxx-xxxx`). Then run:
 
    ```bash
-   sudo kubectl logs -f <pod-name>
+   kubectl logs -f <pod-name>
    ```
 
    Look for entries in the log indicating LMCache is enabled and operational. An example output is:
@@ -85,7 +85,7 @@ helm install vllm vllm/vllm-stack -f tutorials/assets/values-05-cpu-offloading.y
 2. Forward the router service port to access the stack locally:
 
    ```bash
-   sudo kubectl port-forward svc/vllm-router-service 30080:80
+   kubectl port-forward svc/vllm-router-service 30080:80
    ```
 
 3. Send a request to the stack and observe the logs:

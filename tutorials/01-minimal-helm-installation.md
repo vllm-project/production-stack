@@ -73,8 +73,8 @@ Explanation of the key fields:
 Deploy the Helm chart using the predefined configuration file:
 
 ```bash
-sudo helm repo add vllm https://vllm-project.github.io/production-stack
-sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
+heml repo add vllm https://vllm-project.github.io/production-stack
+heml install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
 ```
 
 Explanation of the command:
@@ -90,7 +90,7 @@ Explanation of the command:
 Monitor the deployment status using:
 
 ```bash
-sudo kubectl get pods
+kubectl get pods
 ```
 
 Expected output:
@@ -112,7 +112,7 @@ _Note_: It may take some time for the containers to download the Docker images a
 Expose the `vllm-router-service` port to the host machine:
 
 ```bash
-sudo kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 #### 3.2: Query the OpenAI-Compatible API to list the available models
@@ -179,5 +179,5 @@ This demonstrates the model generating a continuation for the provided prompt.
 To remove the deployment, run:
 
 ```bash
-sudo helm uninstall vllm
+heml uninstall vllm
 ```
