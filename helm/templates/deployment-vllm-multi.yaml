@@ -125,6 +125,21 @@ spec:
                 key: {{ $modelSpec.hf_token.secretKey }}
             {{- end }}
           {{- end }}
+          {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
+          {{- if $vllmApiKey }}
+          - name: VLLM_API_KEY
+            {{- if kindIs "string" $vllmApiKey }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-secrets
+                key: vllmApiKey
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $vllmApiKey.secretName }}
+                key: {{ $vllmApiKey.secretKey }}
+            {{- end }}
+          {{- end }}
           {{- with $modelSpec.env }}
           {{- toYaml . | nindent 10 }}
           {{- end }}

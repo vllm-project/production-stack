@@ -16,6 +16,28 @@
             }
           }
         },
+        "vllmApiKey": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "secretName": {
+                  "type": "string"
+                },
+                "secretKey": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "secretName",
+                "secretKey"
+              ]
+            }
+          ]
+        },
         "modelSpec": {
           "type": "array",
           "items": {
