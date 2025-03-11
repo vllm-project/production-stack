@@ -12,7 +12,7 @@ from dataclasses import asdict
 
 from sphinx.ext import autodoc
 
-sys.path.insert(0, os.path.abspath("../../src"))
+sys.path.insert(0, os.path.abspath("../../src/vllm_router"))
 
 project = "production-stack"
 copyright = "2025, vLLM Production Stack Team"
