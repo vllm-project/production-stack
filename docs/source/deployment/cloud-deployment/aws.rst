@@ -1,4 +1,4 @@
 .. _aws:
 
-AWS
-===
+Amazon Web Services
+====================
