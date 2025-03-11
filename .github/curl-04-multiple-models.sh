@@ -4,6 +4,7 @@
 result_model=$(curl -s http://"$1":"$2"/v1/models | tee output-04-multiple-models/models-04-multiple-models.json)
 
 # Initialize Conda environment
+# shellcheck disable=SC1091
 source /usr/local/bin/conda-init
 conda activate llmstack
 
