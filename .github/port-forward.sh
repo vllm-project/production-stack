@@ -41,5 +41,6 @@ ip=$(sudo minikube ip)
 port=$(sudo kubectl get svc vllm-router-service -o=jsonpath='{.spec.ports[0].nodePort}')
 
 echo "$port"
+echo "trigger"
 
 bash ".github/$1.sh" "$ip" "$port"
