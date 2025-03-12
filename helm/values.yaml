@@ -26,6 +26,7 @@ servingEngineSpec:
   # - requestCPU: (int) The number of CPUs requested for the model, e.g. 6
   # - requestMemory: (string) The amount of memory requested for the model, e.g., "16Gi"
   # - requestGPU: (int) The number of GPUs requested for the model, e.g., 1
+  # - requestGPUType: (Optional, string) The type of GPU requested, e.g., "nvidia.com/mig-4g.71gb". If not specified, defaults to "nvidia.com/gpu"
   #
   # - pvcStorage: (Optional, string) The amount of storage requested for the model, e.g., "50Gi".
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]

@@ -67,6 +67,9 @@
               "requestGPU": {
                 "type": "integer"
               },
+              "requestGPUType": {
+                "type": "string"
+              },
               "pvcStorage": {
                 "type": "string"
               },
