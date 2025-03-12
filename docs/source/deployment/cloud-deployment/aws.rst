@@ -72,7 +72,7 @@ Expected output:
 .. note::
 
     It may take some time for the pods to reach the ``Running`` state, depending on cluster setup and image download speed.
-    
+
 2.2 Inspect Pod Logs
 ^^^^^^^^^^^^^^^^^^^^
 If a pod is not transitioning to ``Running``, use the following command to inspect logs:
