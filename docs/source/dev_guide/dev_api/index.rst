@@ -9,4 +9,5 @@ Developer API
 
    router-logic.rst
    engine-stats.rst
+   request-stats.rst
    service-discovery.rst

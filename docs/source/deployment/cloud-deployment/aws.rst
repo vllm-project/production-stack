@@ -34,7 +34,7 @@ You need to configure:
 
 - ``servingEngineSpec``: Define the model repository, resource requests, and storage settings.
 - ``routerSpec``: Set up routing resource limits and requests.
-- ``Persistent Storage``: If using AWS EFS, ensure that the persistent volume configuration matches your storage needs.
+- ``Persistent Storage``: If using ``AWS EFS``, ensure that the persistent volume configuration matches your storage needs.
 
 Modify these fields as needed to match your cluster requirements.
 
@@ -61,7 +61,18 @@ To check whether the pods for ``vLLM`` deployment are up and running, use:
 
     kubectl get pods
 
+Expected output:
 
+.. code-block:: bash
+
+    NAME                                            READY   STATUS    RESTARTS   AGE
+    vllm-deployment-router-69b7f9748d-xrkvn         1/1     Running   0          75s
+    vllm-opt125m-deployment-vllm-696c998c6f-mvhg4   1/1     Running   0          75s
+
+.. note::
+
+    It may take some time for the pods to reach the ``Running`` state, depending on cluster setup and image download speed.
+    
 2.2 Inspect Pod Logs
 ^^^^^^^^^^^^^^^^^^^^
 If a pod is not transitioning to ``Running``, use the following command to inspect logs:

@@ -12,7 +12,7 @@ from dataclasses import asdict
 
 from sphinx.ext import autodoc
 
-sys.path.insert(0, os.path.abspath("../../src/vllm_router"))
+sys.path.insert(0, os.path.abspath("../../src/"))
 
 project = "production-stack"
 copyright = "2025, vLLM Production Stack Team"
@@ -21,12 +21,12 @@ author = "vLLM Production Stack Team"
 extensions = [
     "sphinx_copybutton",
     "sphinx.ext.napoleon",
-    "sphinx.ext.linkcode",
+    # "sphinx.ext.linkcode",
     "sphinx.ext.intersphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    "myst_parser",
-    "sphinxarg.ext",
+    # "myst_parser",
+    # "sphinxarg.ext",
     "sphinx_design",
     "sphinx_togglebutton",
     "sphinx_click",
@@ -34,8 +34,6 @@ extensions = [
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
-
-extensions = []
 
 templates_path = ["_templates"]
 exclude_patterns = []
