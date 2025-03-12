@@ -10,7 +10,6 @@ Make sure your ``GCP CLI`` is set up, logged in, and the region is properly conf
 You must have the following dependencies installed:
 
 - ``gcloud`` (Google Cloud CLI)
-- ``eksctl`` (for managing Kubernetes clusters on AWS ``EKS``)
 - ``kubectl`` (Kubernetes command-line tool)
 - ``helm`` (Kubernetes package manager)
 
