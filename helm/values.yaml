@@ -268,3 +268,23 @@ routerSpec:
   #  httpGet:
   #    # -- Path to access on the HTTP server
   #
+
+# -- ServiceMonitor configuration for Prometheus Operator
+serviceMonitor:
+  # -- Enable ServiceMonitor
+  enabled: false
+  # -- Namespace where ServiceMonitor resource should be created
+  namespace: ""
+  # -- Path to scrape metrics from
+  path: "/metrics"
+  # -- Interval at which metrics should be scraped
+  interval: "10s"
+  # -- RelabelConfigs to apply to samples before scraping
+  # -- More info: https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api-reference/api.md#monitoring.coreos.com/v1.RelabelConfig
+  relabelings: []
+  # - sourceLabels: [__meta_kubernetes_pod_node_name]
+  #   separator: ;
+  #   regex: ^(.*)$
+  #   targetLabel: nodename
+  #   replacement: $1
+  #   action: replace

@@ -1,0 +1,25 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ default .Release.Namespace .Values.serviceMonitor.namespace }}
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    {{- include "chart.engineLabels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "chart.engineLabels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: "service-port"
+      path: {{ .Values.serviceMonitor.path }}
+      interval: {{ .Values.serviceMonitor.interval }}
+      {{- if .Values.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml .Values.serviceMonitor.relabelings | nindent 8 }}
+      {{- end }}
+{{- end }}
