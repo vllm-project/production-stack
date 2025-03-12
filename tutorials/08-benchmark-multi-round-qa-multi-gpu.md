@@ -23,14 +23,14 @@ This tutorial provides a step-by-step guide to setting up and running benchmarks
   - [01-minimal-helm-installation.md](01-minimal-helm-installation.md)
 - In `benchmarks/multi-round-qa/`, Install necessary python packages needed to run multi-round QA benchmark script by `pip install -r requirements.txt`.
 - Hardware requirements:
-  - GPU: this tutorial requires **8 GPUs** to run. 
-  - CPU: this tutorial requires **at least 1.2T of CPU memory** for allocating the CPU buffer size. 
+  - GPU: this tutorial requires **8 GPUs** to run.
+  - CPU: this tutorial requires **at least 1.2T of CPU memory** for allocating the CPU buffer size.
 
 ## Step 1: Running Benchmarks with vLLM Production Stack
 
 First, start a vLLM Production Stack server.
 
-To begin with, create a `stack.yaml` configuration file as follows (and please **replace** ``<YOUR_HUGGINGFACE_TOKEN>`` with your own huggingface token): 
+To begin with, create a `stack.yaml` configuration file as follows (and please **replace** ``<YOUR_HUGGINGFACE_TOKEN>`` with your own huggingface token):
 
 ```yaml
 servingEngineSpec:
