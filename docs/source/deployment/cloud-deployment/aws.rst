@@ -29,7 +29,7 @@ Steps to Follow
 
 1.1 Modify the Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Before running the deployment, ensure that the configuration file ``production_stack_specification.yaml`` is properly set up. 
+Before running the deployment, ensure that the configuration file ``production_stack_specification.yaml`` is properly set up.
 You need to configure:
 
 - ``servingEngineSpec``: Define the model repository, resource requests, and storage settings.
@@ -125,4 +125,3 @@ If you encounter issues, refer to the following solutions:
       aws eks update-kubeconfig --name production-stack --region <YOUR_AWSREGION>
 
 Following these steps should help ensure a successful deployment.
-
