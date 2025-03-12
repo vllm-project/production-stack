@@ -5,7 +5,7 @@ Google Cloud Platform
 
 Introduction
 ------------
-This script automatically configures a ``GKE`` ``LLM`` inference cluster.
+This script automatically configures a ``GKE LLM`` inference cluster.
 Make sure your ``GCP CLI`` is set up, logged in, and the region is properly configured.
 You must have the following dependencies installed:
 
@@ -18,7 +18,7 @@ Ensure that all the required tools are installed before proceeding.
 Steps to Follow
 ---------------
 
-1. Deploy ``GKE vLLM`` Stack
+1. Deploy GKE vLLM Stack
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1.1 Modify the Configuration
