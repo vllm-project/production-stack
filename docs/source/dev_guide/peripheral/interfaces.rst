@@ -6,7 +6,7 @@ Interfaces
 Adding a new router using ``RoutingInterface``
 ----------------------------------------------
 
-The following class provides the structure of the RoutingInterface. This strategy cycles through the available endpoints in order.
+The following class provides the structure of the ``RoutingInterface``. This strategy cycles through the available endpoints in order.
 
 .. code-block:: python
 
