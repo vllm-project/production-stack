@@ -93,7 +93,11 @@ Before you begin, ensure the following:
 
 ### Step 3: Installing Minikube with GPU Support
 
-Before proceeding, ensure Docker runs without requiring sudo. To add your user to the docker group, run `sudo usermod -aG docker $USER && newgrp docker`
+Before proceeding, ensure Docker runs without requiring sudo. To add your user to the docker group, run: 
+
+```bash
+sudo usermod -aG docker $USER && newgrp docker`
+```
 
 1. Execute the script `install-minikube-cluster.sh`:
 
