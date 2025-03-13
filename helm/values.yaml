@@ -34,6 +34,18 @@ servingEngineSpec:
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
   # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
+  # - extraVolumes: (Optional, list) Additional volumes to add to the pod, in Kubernetes volume format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volume-v1-core
+  #   Example for an emptyDir volume:
+  #   extraVolumes:
+  #   - name: tmp-volume
+  #     emptyDir:
+  #       medium: ""
+  #       sizeLimit: 5Gi
+  # - extraVolumeMounts: (Optional, list) Additional volume mounts to add to the container, in Kubernetes volumeMount format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volumemount-v1-core
+  #   Example for mounting the tmp-volume to /tmp:
+  #   extraVolumeMounts:
+  #   - name: tmp-volume
+  #     mountPath: /tmp
   # - initContainer: (optional, list of objects) The configuration for the init container to be run before the main container.
   #   - name: (string) The name of the init container, e.g., "init"
   #   - image: (string) The Docker image for the init container, e.g., "busybox:latest"

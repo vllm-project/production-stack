@@ -179,7 +179,7 @@ spec:
               containerPort: {{ include "chart.container-port" . }}
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
-          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
+          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
           volumeMounts:
           {{- end }}
           {{- if hasKey $modelSpec "pvcStorage" }}
@@ -196,11 +196,14 @@ spec:
           - name: {{ .Release.Name }}-chat-templates
             mountPath: /chat_templates
           {{- end}}
+          {{- if hasKey $modelSpec "extraVolumeMounts" }}
+          {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
+          {{- end}}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
-      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
       volumes:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
@@ -220,6 +223,9 @@ spec:
         - name: {{ .Release.Name }}-chat-templates
           configMap:
             name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
+        {{- end}}
+        {{- if hasKey $modelSpec "extraVolumes" }}
+        {{- toYaml $modelSpec.extraVolumes | nindent 8 }}
         {{- end}}
       {{- if .Values.servingEngineSpec.tolerations }}
       {{-   with .Values.servingEngineSpec.tolerations }}
