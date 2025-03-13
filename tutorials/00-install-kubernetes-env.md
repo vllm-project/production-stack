@@ -93,7 +93,7 @@ Before you begin, ensure the following:
 
 ### Step 3: Installing Minikube with GPU Support
 
-Before proceeding, ensure Docker runs without requiring sudo. To add your user to the docker group, run: 
+Before proceeding, ensure Docker runs without requiring sudo. To add your user to the docker group, run:
 
 ```bash
 sudo usermod -aG docker $USER && newgrp docker`
