@@ -36,7 +36,7 @@ run_benchmark() {
 KEY=$3
 
 # Run benchmarks for different QPS values
-for qps in 0.1 0.3 0.5 0.7 0.9 1.1; do
+for qps in 1.5 1.3 1.1 0.9 0.7 0.5 0.3 0.1; do
     output_file="${KEY}_output_${qps}.csv"
     run_benchmark "$qps" "$output_file"
 done
