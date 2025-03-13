@@ -22,12 +22,15 @@ This tutorial provides a step-by-step guide to setting up and running benchmarks
   - [00-install-kubernetes-env.md](00-install-kubernetes-env.md)
   - [01-minimal-helm-installation.md](01-minimal-helm-installation.md)
 - In `benchmarks/multi-round-qa/`, Install necessary python packages needed to run multi-round QA benchmark script by `pip install -r requirements.txt`.
+- Hardware requirements:
+  - GPU: this tutorial requires **8 GPUs** to run.
+  - CPU: this tutorial requires **at least 1.2T of CPU memory** for allocating the CPU buffer size.
 
 ## Step 1: Running Benchmarks with vLLM Production Stack
 
 First, start a vLLM Production Stack server.
 
-To begin with, create a `stack.yaml` configuration file:
+To begin with, create a `stack.yaml` configuration file as follows (and please **replace** ``<YOUR_HUGGINGFACE_TOKEN>`` with your own huggingface token):
 
 ```yaml
 servingEngineSpec:
@@ -97,7 +100,7 @@ bash run.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/ stack
 
 First, start a naive Kubernetes server.
 
-To begin with, create a `naive.yaml` configuration file:
+To begin with, create a `naive.yaml` configuration file (and please **replace** ``<YOUR_HUGGINGFACE_TOKEN>`` with your own huggingface token):
 
 ```yaml
 servingEngineSpec:
@@ -107,7 +110,7 @@ servingEngineSpec:
     repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
-    replicaCount: 1
+    replicaCount: 8
     requestCPU: 10
     requestMemory: "150Gi"
     requestGPU: 1

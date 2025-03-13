@@ -52,6 +52,9 @@ servingEngineSpec:
     requestCPU: 6
     requestMemory: "16Gi"
     requestGPU: 1
+    # Optional resource limits - if not specified, only GPU will have a limit
+    # limitCPU: "8"
+    # limitMemory: "32Gi"
 
 ```
 

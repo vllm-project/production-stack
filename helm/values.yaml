@@ -7,7 +7,12 @@ servingEngineSpec:
   labels:
     environment: "test"
     release: "test"
-
+  # vllmApiKey: (optional) api key for securing the VLMM models. Can be either:
+  #   - A string containing the token directly (will be stored in a generated secret)
+  #   - An object referencing an existing secret:
+  #     secretName: "my-existing-secret"
+  #     secretKey: "vllm-api-key"
+  #
   # modelSpec - configuring multiple serving engines deployments that runs different models
   # Each entry in the modelSpec array should contain the following fields:
   # - name: (string) The name of the model, e.g., "example-model"
@@ -21,7 +26,10 @@ servingEngineSpec:
   # - requestCPU: (int) The number of CPUs requested for the model, e.g. 6
   # - requestMemory: (string) The amount of memory requested for the model, e.g., "16Gi"
   # - requestGPU: (int) The number of GPUs requested for the model, e.g., 1
-  #
+  # - requestGPUType: (Optional, string) The type of GPU requested, e.g., "nvidia.com/mig-4g.71gb". If not specified, defaults to "nvidia.com/gpu"
+  # - limitCPU: (Optional, string) The CPU limit for the model, e.g., "8"
+  # - limitMemory: (Optional, string) The memory limit for the model, e.g., "32Gi"
+  # Note: If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.
   # - pvcStorage: (Optional, string) The amount of storage requested for the model, e.g., "50Gi".
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
@@ -60,6 +68,7 @@ servingEngineSpec:
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   #
   # Example:
+  # vllmApiKey: "vllm_xxxxxxxxxxxxx"
   # modelSpec:
   # - name: "mistral"
   #   repository: "lmcache/vllm-openai"
@@ -97,6 +106,7 @@ servingEngineSpec:
   #     cpuOffloadingBufferSize: "30"
   #
   #   hf_token: "hf_xxxxxxxxxxxxx"
+  #
   #
   #   nodeSelectorTerms:
   #     - matchExpressions:
