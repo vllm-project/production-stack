@@ -172,6 +172,9 @@ servingEngineSpec:
   # -- RuntimeClassName configuration, set to "nvidia" if the model requires GPU
   runtimeClassName: "nvidia"
 
+  # -- SchedulerName configuration
+  schedulerName: ""
+
 routerSpec:
   # -- The docker image of the router. The following values are defaults:
   repository: "lmcache/lmstack-router"

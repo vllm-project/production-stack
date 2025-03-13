@@ -355,6 +355,9 @@
         },
         "runtimeClassName": {
           "type": "string"
+        },
+        "schedulerName": {
+          "type": "string"
         }
       }
     },
