@@ -46,6 +46,10 @@ spec:
           {{- end }}
           {{- end }}
       {{- end }}
+      {{- if .Values.servingEngineSpec.securityContext }}
+      securityContext:
+        {{- toYaml .Values.servingEngineSpec.securityContext | nindent 8 }}
+      {{- end }}
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
@@ -97,8 +101,10 @@ spec:
           - "--chat-template"
           - "/chat_templates/chat-template.jinga"
           {{- end }}
+          {{- if .Values.servingEngineSpec.containerSecurityContext }}
           securityContext:
-            runAsNonRoot: false
+            {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
+          {{- end }}
           imagePullPolicy: IfNotPresent
           env:
           - name: HF_HOME

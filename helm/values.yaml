@@ -187,6 +187,37 @@ servingEngineSpec:
   # -- SchedulerName configuration
   schedulerName: ""
 
+  # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
+  securityContext: {}
+    # -- Run as a non-root user ID
+    # runAsUser: 1000
+    # -- Run with a non-root group ID
+    # runAsGroup: 1000
+    # -- Run as non-root
+    # runAsNonRoot: true
+    # -- Set the seccomp profile
+    # seccompProfile:
+    #   type: RuntimeDefault
+    # -- Drop all capabilities
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # -- Set the file system group ID for all containers
+    # fsGroup: 1000
+
+  # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
+  containerSecurityContext:
+    # -- Run as non-root
+    runAsNonRoot: false
+    # -- Don't allow privilege escalation
+    # allowPrivilegeEscalation: false
+    # -- Drop all capabilities
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # -- Read-only root filesystem
+    # readOnlyRootFilesystem: true
+
 routerSpec:
   # -- The docker image of the router. The following values are defaults:
   repository: "lmcache/lmstack-router"
