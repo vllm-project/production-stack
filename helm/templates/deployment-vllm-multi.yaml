@@ -6,6 +6,7 @@ metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-deployment-vllm"
   namespace: {{ .Release.Namespace }}
   labels:
+    model: {{ $modelSpec.name }}
   {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
   replicas: {{ $modelSpec.replicaCount }}
@@ -17,6 +18,7 @@ spec:
   template:
     metadata:
       labels:
+        model: {{ $modelSpec.name }}
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
       {{- if hasKey $modelSpec "initContainer" }}
