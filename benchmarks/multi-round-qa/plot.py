@@ -4,9 +4,10 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
+QPS_RANGE = [0.1, 0.5, 0.9, 1.3, 1.7, 2.1, 2.7, 3.1, 4.1]
 stack_results = []
 qpses = []
-for qps in np.arange(0.1, 1.2, 0.2):
+for qps in QPS_RANGE:
     # round qps to 1 decimal
     q = round(qps, 1)
     file = f"stack_output_{q}.csv"
@@ -29,7 +30,7 @@ plt.plot(
 )
 aibrix_results = []
 qpses = []
-for qps in np.arange(0.1, 1.2, 0.2):
+for qps in QPS_RANGE:
     # round qps to 1 decimal
     q = round(qps, 1)
 
@@ -53,7 +54,7 @@ plt.plot(
 
 native_results = []
 qpses = []
-for qps in np.arange(0.1, 1.2, 0.2):
+for qps in QPS_RANGE:
     # round qps to 1 decimal
     q = round(qps, 1)
     file = f"naive_output_{q}.csv"
