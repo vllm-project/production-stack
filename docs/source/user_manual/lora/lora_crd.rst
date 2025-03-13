@@ -2,3 +2,5 @@
 
 CRD based configuration (recommended)
 =====================================
+
+Coming soon! Please use manual LoRA configuration for now.

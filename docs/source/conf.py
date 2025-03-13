@@ -12,7 +12,7 @@ from dataclasses import asdict
 
 from sphinx.ext import autodoc
 
-sys.path.insert(0, os.path.abspath("../../src"))
+sys.path.insert(0, os.path.abspath("../../src/"))
 
 project = "production-stack"
 copyright = "2025, vLLM Production Stack Team"
@@ -21,21 +21,19 @@ author = "vLLM Production Stack Team"
 extensions = [
     "sphinx_copybutton",
     "sphinx.ext.napoleon",
-    "sphinx.ext.linkcode",
+    # "sphinx.ext.linkcode",
     "sphinx.ext.intersphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     # "myst_parser",
-    "sphinxarg.ext",
-    # "sphinx_design",
-    # "sphinx_togglebutton",
+    # "sphinxarg.ext",
+    "sphinx_design",
+    "sphinx_togglebutton",
     "sphinx_click",
 ]
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
-
-extensions = []
 
 templates_path = ["_templates"]
 exclude_patterns = []
@@ -69,7 +67,6 @@ autodoc.ClassDocumenter = MockedClassDocumenter
 html_title = project
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
-html_js_files = ["custom.js"]
 html_logo = "./assets/prodstack_icon.png"
 html_favicon = "./assets/output.ico"
 html_permalinks_icon = "<span>#</span>"
@@ -88,7 +85,7 @@ html_theme_options = {
     ],
     "navigation_depth": 3,
     "primary_sidebar_end": [],
-    "pygments_light_style": "tango",
+    "pygments_light_style": "friendly",
     "pygments_dark_style": "monokai",
 }
 
