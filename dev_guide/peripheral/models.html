@@ -1,0 +1,615 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Observability Models &#8212; production-stack</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=a5fa425f"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script src="../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'dev_guide/peripheral/models';</script>
+    <link rel="icon" href="../../_static/output.ico"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Interfaces" href="interfaces.html" />
+    <link rel="prev" title="Peripheral" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../_static/prodstack_icon.png" class="logo__image only-light" alt="production-stack - Home"/>
+    <img src="../../_static/prodstack_icon.png" class="logo__image only-dark pst-js-only" alt="production-stack - Home"/>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/examples.html">Minimal Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Deployment</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../deployment/helm.html">Helm Charts</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../deployment/cloud-deployment/index.html">Cloud Environments</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/cloud-deployment/aws.html">Amazon Web Services</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/cloud-deployment/gcp.html">Google Cloud Platform</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../deployment/ray/ray.html">Ray Deployment</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">User Manual</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../user_manual/router/index.html">Router Configuration</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_manual/router/router_crd.html">CRD based configuration (recommended)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_manual/router/json.html">JSON based configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_manual/router/cmd.html">Command Line based configuration</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../user_manual/lora/index.html">LORA Configuration</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_manual/lora/lora_crd.html">CRD based configuration (recommended)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_manual/lora/manual.html">Manually Load LORA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_manual/kv_cache/index.html">KV Cache Offloading</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Peripheral</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Observability Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="interfaces.html">Interfaces</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../dev_api/index.html">Developer API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../dev_api/router-logic.html">Router Logic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_api/engine-stats.html">Engine Stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_api/request-stats.html">Request Stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_api/service-discovery.html">Service Discovery</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../tutorials/index.html">How to Guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/disagg.html">Disaggregated Prefill</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/kv_cache.html">KV Cache Offloading</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/lora_load.html">LORA Loading</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Benchmarks</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks/multiround-qa.html">Multi-round QA</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/vllm-project/production-stack" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/vllm-project/production-stack/edit/main/docs/source/dev_guide/peripheral/models.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../_sources/dev_guide/peripheral/models.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Observability Models</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#deploy-the-observability-stack">Deploy the observability stack</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#access-the-grafana-prometheus-dashboard">Access the Grafana &amp; Prometheus dashboard</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#use-prometheus-adapter-to-export-vllm-metrics">Use Prometheus Adapter to export vLLM metrics</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#uninstall-the-observability-stack">Uninstall the observability stack</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="observability-models">
+<span id="observability"></span><h1>Observability Models<a class="headerlink" href="#observability-models" title="Link to this heading"><span>#</span></a></h1>
+<p>The current <code class="docutils literal notranslate"><span class="pre">production-stack</span></code> uses a combination of Prometheus and Grafana to provide observability for the stack.</p>
+<figure class="align-center">
+<img alt="grafana" class="no-scaled-link" src="../../_images/graf.png" style="width: 110%; height: 300pt;" />
+</figure>
+<section id="deploy-the-observability-stack">
+<h2>Deploy the observability stack<a class="headerlink" href="#deploy-the-observability-stack" title="Link to this heading"><span>#</span></a></h2>
+<p>The stack is based on <a class="reference external" href="https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/README.md">kube-prom-stack</a>.</p>
+<p>To launch the observability stack you need</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>A running Kubernetes (K8s) environment with GPUs</p></li>
+<li><p>Please follow the steps in the <a class="reference internal" href="../../getting_started/examples.html#examples"><span class="std std-ref">Minimal Example</span></a> section.</p></li>
+</ul>
+</div></blockquote>
+<p>After that you can run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>production-stack/observability
+sudo<span class="w"> </span>bash<span class="w"> </span>install.sh
+</pre></div>
+</div>
+<p>After installing, the dashboard can be accessed through the service <code class="docutils literal notranslate"><span class="pre">service/kube-prom-stack-grafana</span></code> in the <code class="docutils literal notranslate"><span class="pre">monitoring</span></code> namespace.</p>
+</section>
+<section id="access-the-grafana-prometheus-dashboard">
+<h2>Access the Grafana &amp; Prometheus dashboard<a class="headerlink" href="#access-the-grafana-prometheus-dashboard" title="Link to this heading"><span>#</span></a></h2>
+<p>To access the Grafana dashboard, you need to port-forward the Grafana service to your local machine.</p>
+<p>Forward the Grafana dashboard port to the local node-port</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>kubectl<span class="w"> </span>--namespace<span class="w"> </span>monitoring<span class="w"> </span>port-forward<span class="w"> </span>svc/kube-prom-stack-grafana<span class="w"> </span><span class="m">3000</span>:80<span class="w"> </span>--address<span class="w"> </span><span class="m">0</span>.0.0.0
+</pre></div>
+</div>
+<p>Forward the Prometheus dashboard</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>kubectl<span class="w"> </span>--namespace<span class="w"> </span>monitoring<span class="w"> </span>port-forward<span class="w"> </span>prometheus-kube-prom-stack-kube-prome-prometheus-0<span class="w"> </span><span class="m">9090</span>:9090
+</pre></div>
+</div>
+<p>Open the webpage at <code class="docutils literal notranslate"><span class="pre">http://&lt;IP</span> <span class="pre">of</span> <span class="pre">your</span> <span class="pre">node&gt;:3000</span></code> to access the Grafana web page. The default user name is admin and the password can be configured in <code class="docutils literal notranslate"><span class="pre">values.yaml</span></code> (default is <code class="docutils literal notranslate"><span class="pre">prom-operator</span></code>).</p>
+<p>Import the dashboard using the <code class="docutils literal notranslate"><span class="pre">vllm-dashboard.json</span></code> in this folder.</p>
+</section>
+<section id="use-prometheus-adapter-to-export-vllm-metrics">
+<h2>Use Prometheus Adapter to export vLLM metrics<a class="headerlink" href="#use-prometheus-adapter-to-export-vllm-metrics" title="Link to this heading"><span>#</span></a></h2>
+<p>The vLLM router can export metrics to Prometheus using the <a class="reference external" href="https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter">Prometheus Adapter</a>. When running the <code class="docutils literal notranslate"><span class="pre">install.sh</span> <span class="pre">script</span></code>, the Prometheus Adapter will be installed and configured to export the vLLM metrics.</p>
+<p>We provide a minimal example of how to use the Prometheus Adapter to export vLLM metrics. See <a class="reference external" href="https://github.com/vllm-project/production-stack/blob/main/observability/prom-adapter.yaml">prom-adapter.yaml</a> for more details.</p>
+<p>The exported metrics can be used for different purposes, such as horizontal scaling of the vLLM deployments.</p>
+<p>To verify the metrics are being exported, you can use the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl<span class="w"> </span>get<span class="w"> </span>--raw<span class="w"> </span>/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/metrics<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>vllm_num_requests_waiting<span class="w"> </span>-C<span class="w"> </span><span class="m">10</span>
+</pre></div>
+</div>
+<p>You should see the following output:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="o">{</span>
+<span class="w">  </span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;namespaces/vllm_num_requests_waiting&quot;</span>,
+<span class="w">  </span><span class="s2">&quot;singularName&quot;</span>:<span class="w"> </span><span class="s2">&quot;&quot;</span>,
+<span class="w">  </span><span class="s2">&quot;namespaced&quot;</span>:<span class="w"> </span>false,
+<span class="w">  </span><span class="s2">&quot;kind&quot;</span>:<span class="w"> </span><span class="s2">&quot;MetricValueList&quot;</span>,
+<span class="w">  </span><span class="s2">&quot;verbs&quot;</span>:<span class="w"> </span><span class="o">[</span>
+<span class="w">    </span><span class="s2">&quot;get&quot;</span>
+<span class="w">  </span><span class="o">]</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>The following command will show the current value of the metric:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl<span class="w"> </span>get<span class="w"> </span>--raw<span class="w"> </span>/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/metrics/vllm_num_requests_waiting<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+</pre></div>
+</div>
+<p>You should see the following output:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="o">{</span>
+<span class="w">    </span><span class="s2">&quot;kind&quot;</span>:<span class="w"> </span><span class="s2">&quot;MetricValueList&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;apiVersion&quot;</span>:<span class="w"> </span><span class="s2">&quot;custom.metrics.k8s.io/v1beta1&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;metadata&quot;</span>:<span class="w"> </span><span class="o">{}</span>,
+<span class="w">    </span><span class="s2">&quot;items&quot;</span>:<span class="w"> </span><span class="o">[</span>
+<span class="w">        </span><span class="o">{</span>
+<span class="w">        </span><span class="s2">&quot;describedObject&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w">            </span><span class="s2">&quot;kind&quot;</span>:<span class="w"> </span><span class="s2">&quot;Namespace&quot;</span>,
+<span class="w">            </span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;default&quot;</span>,
+<span class="w">            </span><span class="s2">&quot;apiVersion&quot;</span>:<span class="w"> </span><span class="s2">&quot;/v1&quot;</span>
+<span class="w">        </span><span class="o">}</span>,
+<span class="w">        </span><span class="s2">&quot;metricName&quot;</span>:<span class="w"> </span><span class="s2">&quot;vllm_num_requests_waiting&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;timestamp&quot;</span>:<span class="w"> </span><span class="s2">&quot;2025-03-02T01:56:01Z&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;value&quot;</span>:<span class="w"> </span><span class="s2">&quot;0&quot;</span>,
+<span class="w">        </span><span class="s2">&quot;selector&quot;</span>:<span class="w"> </span>null
+<span class="w">        </span><span class="o">}</span>
+<span class="w">    </span><span class="o">]</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</section>
+<section id="uninstall-the-observability-stack">
+<h2>Uninstall the observability stack<a class="headerlink" href="#uninstall-the-observability-stack" title="Link to this heading"><span>#</span></a></h2>
+<p>To uninstall the observability stack, you can run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>production-stack/observability
+sudo<span class="w"> </span>bash<span class="w"> </span>uninstall.sh
+</pre></div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Peripheral</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="interfaces.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Interfaces</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#deploy-the-observability-stack">Deploy the observability stack</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#access-the-grafana-prometheus-dashboard">Access the Grafana &amp; Prometheus dashboard</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#use-prometheus-adapter-to-export-vllm-metrics">Use Prometheus Adapter to export vLLM metrics</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#uninstall-the-observability-stack">Uninstall the observability stack</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By vLLM Production Stack Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025, vLLM Production Stack Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,707 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>CRD based configuration (recommended) &#8212; production-stack</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=a5fa425f"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script src="../../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user_manual/router/router_crd';</script>
+    <link rel="icon" href="../../_static/output.ico"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="JSON based configuration" href="json.html" />
+    <link rel="prev" title="Router Configuration" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../_static/prodstack_icon.png" class="logo__image only-light" alt="production-stack - Home"/>
+    <img src="../../_static/prodstack_icon.png" class="logo__image only-dark pst-js-only" alt="production-stack - Home"/>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/examples.html">Minimal Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Deployment</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../deployment/helm.html">Helm Charts</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../deployment/cloud-deployment/index.html">Cloud Environments</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/cloud-deployment/aws.html">Amazon Web Services</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/cloud-deployment/gcp.html">Google Cloud Platform</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../deployment/ray/ray.html">Ray Deployment</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">User Manual</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Router Configuration</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">CRD based configuration (recommended)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="json.html">JSON based configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cmd.html">Command Line based configuration</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../lora/index.html">LORA Configuration</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../lora/lora_crd.html">CRD based configuration (recommended)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../lora/manual.html">Manually Load LORA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../kv_cache/index.html">KV Cache Offloading</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../dev_guide/peripheral/index.html">Peripheral</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../dev_guide/peripheral/models.html">Observability Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../dev_guide/peripheral/interfaces.html">Interfaces</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../dev_guide/dev_api/index.html">Developer API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../dev_guide/dev_api/router-logic.html">Router Logic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../dev_guide/dev_api/engine-stats.html">Engine Stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../dev_guide/dev_api/request-stats.html">Request Stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../dev_guide/dev_api/service-discovery.html">Service Discovery</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../tutorials/index.html">How to Guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/disagg.html">Disaggregated Prefill</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/kv_cache.html">KV Cache Offloading</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/lora_load.html">LORA Loading</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Benchmarks</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks/multiround-qa.html">Multi-round QA</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/vllm-project/production-stack" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/vllm-project/production-stack/edit/main/docs/source/user_manual/router/router_crd.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../_sources/user_manual/router/router_crd.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>CRD based configuration (recommended)</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#description">Description</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#getting-started">Getting Started</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#to-deploy-on-the-cluster">To Deploy on the cluster</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#to-uninstall">To Uninstall</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#project-distribution">Project Distribution</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#build-the-installer">Build the installer</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#staticroute-crd">StaticRoute CRD</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#how-it-works">How it works</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#check-status">Check Status</a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="crd-based-configuration-recommended">
+<span id="router-crd"></span><h1>CRD based configuration (recommended)<a class="headerlink" href="#crd-based-configuration-recommended" title="Link to this heading"><span>#</span></a></h1>
+<p>This is the controller for the Router CRD. It is responsible for creating and updating the ConfigMap for the vllm_router.</p>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Link to this heading"><span>#</span></a></h2>
+<p>The Router Controller is a Kubernetes controller that manages the Router custom resource. It watches for Router resources and creates a ConfigMap for the <code class="docutils literal notranslate"><span class="pre">vllm_router</span></code>.</p>
+</section>
+<section id="getting-started">
+<h2>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading"><span>#</span></a></h2>
+<section id="prerequisites">
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"><span>#</span></a></h3>
+<ul class="simple">
+<li><p>go version v1.22.0+</p></li>
+<li><p>docker version 17.03+.</p></li>
+<li><p>kubectl version v1.11.3+.</p></li>
+<li><p>Access to a Kubernetes v1.11.3+ cluster.</p></li>
+</ul>
+</section>
+<section id="to-deploy-on-the-cluster">
+<h3>To Deploy on the cluster<a class="headerlink" href="#to-deploy-on-the-cluster" title="Link to this heading"><span>#</span></a></h3>
+<p>Build and push your image to the location specified by <code class="docutils literal notranslate"><span class="pre">IMG</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>docker-build<span class="w"> </span>docker-push<span class="w"> </span><span class="nv">IMG</span><span class="o">=</span>&lt;some-registry&gt;/router-controller:tag
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This image ought to be published in the personal registry you specified. And it is required to have access to pull the image from the working environment. Make sure you have the proper permission to the registry if the above commands don’t work.</p>
+</div>
+<p>Install the CRDs into the cluster:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>install
+</pre></div>
+</div>
+<p>Deploy the Manager to the cluster with the image specified by IMG:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>deploy<span class="w"> </span><span class="nv">IMG</span><span class="o">=</span>&lt;some-registry&gt;/router-controller:tag
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you encounter RBAC errors, you may need to grant yourself cluster-admin privileges or be logged in as admin.</p>
+</div>
+<p>Create instances of your solution You can apply the samples (examples) from the config/sample:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl<span class="w"> </span>apply<span class="w"> </span>-k<span class="w"> </span>config/samples/
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Ensure that the samples has default values to test it out.</p>
+</div>
+</section>
+<section id="to-uninstall">
+<h3>To Uninstall<a class="headerlink" href="#to-uninstall" title="Link to this heading"><span>#</span></a></h3>
+<p>Delete the instances (CRs) from the cluster:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl<span class="w"> </span>delete<span class="w"> </span>-k<span class="w"> </span>config/samples/
+</pre></div>
+</div>
+<p>Delete the APIs(CRDs) from the cluster:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>uninstall
+</pre></div>
+</div>
+<p>Delete the Manager from the cluster:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>undeploy
+</pre></div>
+</div>
+</section>
+</section>
+<section id="project-distribution">
+<h2>Project Distribution<a class="headerlink" href="#project-distribution" title="Link to this heading"><span>#</span></a></h2>
+<section id="build-the-installer">
+<h3>Build the installer<a class="headerlink" href="#build-the-installer" title="Link to this heading"><span>#</span></a></h3>
+<p>Build the installer for the image built and published in the registry:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>build-installer<span class="w"> </span><span class="nv">IMG</span><span class="o">=</span>&lt;some-registry&gt;/router-controller:tag
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The makefile target mentioned above generates an <code class="docutils literal notranslate"><span class="pre">install.yaml</span></code> file in the dist directory. This file contains all the resources built with Kustomize, which are necessary to install this project without its dependencies.</p>
+</div>
+<p>Using the installer</p>
+<p>Users can just run kubectl apply -f to install the project, i.e.:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>https://raw.githubusercontent.com/&lt;org&gt;/router-controller/&lt;tag<span class="w"> </span>or<span class="w"> </span>branch&gt;/dist/install.yaml
+</pre></div>
+</div>
+</section>
+</section>
+<section id="staticroute-crd">
+<h2>StaticRoute CRD<a class="headerlink" href="#staticroute-crd" title="Link to this heading"><span>#</span></a></h2>
+<p>The StaticRoute CRD allows you to configure the vllm_router with static backends and models. The controller reads the CRD and creates a ConfigMap that can be used by the vllm_router with the <code class="docutils literal notranslate"><span class="pre">--dynamic-config-json</span></code> option.</p>
+<p>One example is shown below:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production-stack.vllm.ai/v1alpha1</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">kind</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">StaticRoute</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">metadata</span><span class="p p-Indicator">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">staticroute-sample</span>
+<span class="w">    </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w">    </span><span class="c1"># Service discovery method</span>
+<span class="w">    </span><span class="nt">serviceDiscovery</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static</span>
+
+<span class="w">    </span><span class="c1"># Routing logic</span>
+<span class="w">    </span><span class="nt">routingLogic</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">roundrobin</span>
+
+<span class="w">    </span><span class="c1"># Comma-separated list of backend URLs</span>
+<span class="w">    </span><span class="nt">staticBackends</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://localhost:9001,http://localhost:9002,http://localhost:9003&quot;</span>
+
+<span class="w">    </span><span class="c1"># Comma-separated list of model names</span>
+<span class="w">    </span><span class="nt">staticModels</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m&quot;</span>
+
+<span class="w">    </span><span class="c1"># Name of the vllm_router to configure</span>
+<span class="w">    </span><span class="nt">routerRef</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Service</span>
+<span class="w">        </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vllm-router</span>
+<span class="w">        </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+
+<span class="w">    </span><span class="c1"># Optional: Name of the ConfigMap to create</span>
+<span class="w">    </span><span class="nt">configMapName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vllm-router-config</span>
+</pre></div>
+</div>
+<section id="how-it-works">
+<h3>How it works<a class="headerlink" href="#how-it-works" title="Link to this heading"><span>#</span></a></h3>
+<ul class="simple">
+<li><p>The controller watches for StaticRoute resources.</p></li>
+<li><p>When a StaticRoute is created or updated, the controller creates or updates a ConfigMap with the dynamic configuration.</p></li>
+<li><p>The ConfigMap contains a <code class="docutils literal notranslate"><span class="pre">dynamic_config.json</span></code> file with the following structure:</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">{</span>
+<span class="s">&quot;service_discovery&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;static&quot;</span><span class="p p-Indicator">,</span>
+<span class="s">&quot;routing_logic&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;roundrobin&quot;</span><span class="p p-Indicator">,</span>
+<span class="s">&quot;static_backends&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;http://localhost:9001,http://localhost:9002,http://localhost:9003&quot;</span><span class="p p-Indicator">,</span>
+<span class="s">&quot;static_models&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m&quot;</span>
+<span class="p p-Indicator">}</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>The controller checks the health endpoint of the vllm_router services that match the routerSelector to verify that the configuration is valid.</p></li>
+<li><p>The vllm_router should be configured to use the ConfigMap with the <code class="docutils literal notranslate"><span class="pre">--dynamic-config-json</span></code> option:</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">containers</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vllm-router</span>
+<span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vllm-router:latest</span>
+<span class="nt">args</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;--dynamic-config-json</span><span class="nv"> </span><span class="s">/etc/vllm-router/dynamic_config.json&quot;</span>
+<span class="nt">volumeMounts</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">config-volume</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">mountPath</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/etc/vllm-router</span>
+<span class="nt">volumes</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">config-volume</span>
+<span class="nt">configMap</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vllm-router-config</span>
+</pre></div>
+</div>
+</section>
+<section id="check-status">
+<h3>Check Status<a class="headerlink" href="#check-status" title="Link to this heading"><span>#</span></a></h3>
+<p>The StaticRoute resource has the following status fields:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">configMapRef</span></code>: The name of the ConfigMap that was created.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">lastAppliedTime</span></code>: The time when the configuration was last applied.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">conditions</span></code>: A list of conditions that represent the latest available observations of the StaticRoute’s state.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Router Configuration</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="json.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">JSON based configuration</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#description">Description</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#getting-started">Getting Started</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#to-deploy-on-the-cluster">To Deploy on the cluster</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#to-uninstall">To Uninstall</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#project-distribution">Project Distribution</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#build-the-installer">Build the installer</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#staticroute-crd">StaticRoute CRD</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#how-it-works">How it works</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#check-status">Check Status</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By vLLM Production Stack Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025, vLLM Production Stack Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

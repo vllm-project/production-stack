@@ -1,0 +1,650 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Multi-round QA &#8212; production-stack</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=a3416100" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=13237357" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=a5fa425f"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="../_static/togglebutton.js?v=4a39c7ea"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=887ef09a"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'benchmarks/multiround-qa';</script>
+    <link rel="icon" href="../_static/output.ico"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="LORA Loading" href="../tutorials/lora_load.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/prodstack_icon.png" class="logo__image only-light" alt="production-stack - Home"/>
+    <img src="../_static/prodstack_icon.png" class="logo__image only-dark pst-js-only" alt="production-stack - Home"/>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/examples.html">Minimal Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Deployment</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../deployment/helm.html">Helm Charts</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../deployment/cloud-deployment/index.html">Cloud Environments</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../deployment/cloud-deployment/aws.html">Amazon Web Services</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment/cloud-deployment/gcp.html">Google Cloud Platform</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../deployment/ray/ray.html">Ray Deployment</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">User Manual</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../user_manual/router/index.html">Router Configuration</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_manual/router/router_crd.html">CRD based configuration (recommended)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_manual/router/json.html">JSON based configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_manual/router/cmd.html">Command Line based configuration</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../user_manual/lora/index.html">LORA Configuration</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_manual/lora/lora_crd.html">CRD based configuration (recommended)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_manual/lora/manual.html">Manually Load LORA</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_manual/kv_cache/index.html">KV Cache Offloading</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../dev_guide/peripheral/index.html">Peripheral</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../dev_guide/peripheral/models.html">Observability Models</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_guide/peripheral/interfaces.html">Interfaces</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../dev_guide/dev_api/index.html">Developer API</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../dev_guide/dev_api/router-logic.html">Router Logic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_guide/dev_api/engine-stats.html">Engine Stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_guide/dev_api/request-stats.html">Request Stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_guide/dev_api/service-discovery.html">Service Discovery</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">How to Guides</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/disagg.html">Disaggregated Prefill</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/kv_cache.html">KV Cache Offloading</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/lora_load.html">LORA Loading</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Benchmarks</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Multi-round QA</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/vllm-project/production-stack" target="_blank"
+   class="btn btn-sm btn-source-repository-button dropdown-item"
+   title="Source repository"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="btn__text-container">Repository</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/vllm-project/production-stack/edit/main/docs/source/benchmarks/multiround-qa.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/benchmarks/multiround-qa.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+<button class="sidebar-toggle secondary-toggle btn btn-sm" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Multi-round QA</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#overview">Overview</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setup">Setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-benchmarks">Running benchmarks</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#explanation-of-the-arguments">Explanation of the arguments</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#configuring-the-workload">Configuring the workload</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#configuring-the-serving-engine-connection">Configuring the serving engine connection</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#configuring-the-experiment-optional">Configuring the experiment (Optional)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#processing-previous-outputs-only-optional">Processing previous outputs only (Optional)</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#benchmark-metrics">Benchmark Metrics</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sharegpt-datasets">ShareGPT Datasets</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="multi-round-qa">
+<span id="multiround-qa"></span><h1>Multi-round QA<a class="headerlink" href="#multi-round-qa" title="Link to this heading"><span>#</span></a></h1>
+<p>Benchmarking vLLM Production Stack Performance with multi-round QA</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"><span>#</span></a></h2>
+<p>This repository contains benchmarking tools for evaluating vLLM Production Stack’s performance (e.g., latency, throughput). The initial focus of this benchmark is on the multi-round QA (Question Answering) use case. The script <code class="docutils literal notranslate"><span class="pre">multi-round-qa.py</span></code> simulates multiple users interacting with a language model concurrently for multiple rounds, allowing you to analyze the serving engine’s throughput and latency.</p>
+<p>The overall workflow of this script is shown below:</p>
+<figure class="align-center">
+<img alt="multi-round-qa" class="no-scaled-link" src="../_images/multi-round.png" style="width: 75%;" />
+</figure>
+</section>
+<section id="setup">
+<h2>Setup<a class="headerlink" href="#setup" title="Link to this heading"><span>#</span></a></h2>
+<p>Install the required packages needed to run the benchmark:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</pre></div>
+</div>
+</section>
+<section id="running-benchmarks">
+<h2>Running benchmarks<a class="headerlink" href="#running-benchmarks" title="Link to this heading"><span>#</span></a></h2>
+<p>To run the multi-round QA benchmark, use the following example command:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">python3</span> <span class="n">multi</span><span class="o">-</span><span class="nb">round</span><span class="o">-</span><span class="n">qa</span><span class="o">.</span><span class="n">py</span> \
+    <span class="o">--</span><span class="n">num</span><span class="o">-</span><span class="n">users</span> <span class="mi">10</span> \
+    <span class="o">--</span><span class="n">num</span><span class="o">-</span><span class="n">rounds</span> <span class="mi">5</span> \
+    <span class="o">--</span><span class="n">qps</span> <span class="mf">0.5</span> \
+    <span class="o">--</span><span class="n">shared</span><span class="o">-</span><span class="n">system</span><span class="o">-</span><span class="n">prompt</span> <span class="mi">1000</span> \
+    <span class="o">--</span><span class="n">user</span><span class="o">-</span><span class="n">history</span><span class="o">-</span><span class="n">prompt</span> <span class="mi">2000</span> \
+    <span class="o">--</span><span class="n">answer</span><span class="o">-</span><span class="nb">len</span> <span class="mi">100</span> \
+    <span class="o">--</span><span class="n">model</span> <span class="n">meta</span><span class="o">-</span><span class="n">llama</span><span class="o">/</span><span class="n">Llama</span><span class="o">-</span><span class="mf">3.1</span><span class="o">-</span><span class="mi">8</span><span class="n">B</span><span class="o">-</span><span class="n">Instruct</span> \
+    <span class="o">--</span><span class="n">base</span><span class="o">-</span><span class="n">url</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">localhost</span><span class="p">:</span><span class="mi">30080</span><span class="o">/</span><span class="n">v1</span>
+</pre></div>
+</div>
+<p>Use <code class="docutils literal notranslate"><span class="pre">Ctrl-C</span></code> to terminate the benchmark at any time, and the script will write each request’s detailed stats to <code class="docutils literal notranslate"><span class="pre">summary.csv</span></code>.</p>
+<p>Note: The above command requires a serving engine with the <code class="docutils literal notranslate"><span class="pre">meta-llama/Llama-3.1-8B-Instruct</span></code> model served locally at <code class="docutils literal notranslate"><span class="pre">http://localhost:30080/v1</span></code>. Here’s an example command to launch the serving engine with vLLM Production Stack:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>helm<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>vllm<span class="w"> </span>https://vllm-project.github.io/production-stack
+helm<span class="w"> </span>install<span class="w"> </span>vllm<span class="w"> </span>vllm/vllm-stack<span class="w"> </span>-f<span class="w"> </span>model.yaml
+</pre></div>
+</div>
+<p>Then, perform port-forwarding with the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sudo<span class="w"> </span>kubectl<span class="w"> </span>port-forward<span class="w"> </span>svc/vllm-router-service<span class="w"> </span><span class="m">30080</span>:80
+</pre></div>
+</div>
+</section>
+<section id="explanation-of-the-arguments">
+<h2>Explanation of the arguments<a class="headerlink" href="#explanation-of-the-arguments" title="Link to this heading"><span>#</span></a></h2>
+<section id="configuring-the-workload">
+<h3>Configuring the workload<a class="headerlink" href="#configuring-the-workload" title="Link to this heading"><span>#</span></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--num-users</span> <span class="pre">&lt;int&gt;</span></code>: The maximum number of concurrent users in the system (N in the above figure).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--num-rounds</span> <span class="pre">&lt;int&gt;</span></code>: The number of rounds per user (M in the above figure).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--qps</span> <span class="pre">&lt;float&gt;</span></code>: The overall queries per second (QPS) rate for the system.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--shared-system-prompt</span> <span class="pre">&lt;int&gt;</span></code>: Length of the system prompt shared across all users (in tokens).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--user-history-prompt</span> <span class="pre">&lt;int&gt;</span></code>: Length of the user-specific context (simulating existing chat history) (in tokens).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--answer-len</span> <span class="pre">&lt;int&gt;</span></code>: Length of the answer expected (in tokens).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--init-user-id</span> <span class="pre">&lt;int&gt;</span></code>: The initial user ID to start the benchmark (default = 0). This is useful when you want to resume the benchmark from a specific user ID or avoid serving engine caching the request from previous runs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--request-with-user-id</span></code>: If this option is present, the script will include the user ID in the request header.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--sharegpt</span></code>: If this option is present, the script will use ShareGPT workload instead of dummy context.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use the ShareGPT dataset, the length of the expected answer (in tokens) will be determined by the minimum value between the dataset response and <code class="docutils literal notranslate"><span class="pre">--answer-len</span></code>. You also need to follow the instructions in <strong>ShareGPT Datasets</strong> first.</p>
+</div>
+</section>
+<section id="configuring-the-serving-engine-connection">
+<h3>Configuring the serving engine connection<a class="headerlink" href="#configuring-the-serving-engine-connection" title="Link to this heading"><span>#</span></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--model</span> <span class="pre">&lt;str&gt;</span></code>: The model name (e.g., <code class="docutils literal notranslate"><span class="pre">mistralai/Mistral-7B-Instruct-v0.2</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--base-url</span> <span class="pre">&lt;str&gt;</span></code>: The URL endpoint for the language model server.</p></li>
+</ul>
+</section>
+<section id="configuring-the-experiment-optional">
+<h3>Configuring the experiment (Optional)<a class="headerlink" href="#configuring-the-experiment-optional" title="Link to this heading"><span>#</span></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--output</span> <span class="pre">&lt;str&gt;</span></code>: The CSV file to dump the detailed stats for each query (default = <code class="docutils literal notranslate"><span class="pre">summary.csv</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--log-interval</span> <span class="pre">&lt;float&gt;</span></code>: Time between each performance summary log in seconds (default = 30).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--time</span> <span class="pre">&lt;float&gt;</span></code>: Total time to run the experiment (default = forever).</p></li>
+</ul>
+</section>
+<section id="processing-previous-outputs-only-optional">
+<h3>Processing previous outputs only (Optional)<a class="headerlink" href="#processing-previous-outputs-only-optional" title="Link to this heading"><span>#</span></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--process-summary</span> <span class="pre">&lt;filename&gt;</span></code>: If this option is present, the script will only process the existing output CSV and print out the summary without running any experiment.</p></li>
+</ul>
+</section>
+</section>
+<section id="benchmark-metrics">
+<h2>Benchmark Metrics<a class="headerlink" href="#benchmark-metrics" title="Link to this heading"><span>#</span></a></h2>
+<ul class="simple">
+<li><p><strong>Queries Per Second (QPS)</strong>: The average number of queries processed by the model per second.</p></li>
+<li><p><strong>Average Prompt Throughput</strong>: Tokens generated in the prompt per second.</p></li>
+<li><p><strong>Average Generation Throughput</strong>: Tokens generated as part of the response per second.</p></li>
+<li><p><strong>Average TTFT (Time to First Token)</strong>: Average time taken for the model to generate the first token of a response.</p></li>
+</ul>
+</section>
+<section id="sharegpt-datasets">
+<h2>ShareGPT Datasets<a class="headerlink" href="#sharegpt-datasets" title="Link to this heading"><span>#</span></a></h2>
+<ol class="arabic">
+<li><p>Download and prepare the ShareGPT dataset.
+You can specify the proportion of data to process by providing a number between 0 and 1 as an argument to the script.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bash<span class="w"> </span>prepare_sharegpt_data.sh<span class="w"> </span><span class="m">1</span>
+</pre></div>
+</div>
+<p>In this example, <code class="docutils literal notranslate"><span class="pre">1</span></code> indicates processing 100% of the dataset. You can adjust this value as needed.</p>
+</li>
+<li><p>Run the benchmark.
+Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">python3</span> <span class="n">multi</span><span class="o">-</span><span class="nb">round</span><span class="o">-</span><span class="n">qa</span><span class="o">.</span><span class="n">py</span> \
+    <span class="o">--</span><span class="n">num</span><span class="o">-</span><span class="n">users</span> <span class="mi">10</span> \
+    <span class="o">--</span><span class="n">num</span><span class="o">-</span><span class="n">rounds</span> <span class="mi">5</span> \
+    <span class="o">--</span><span class="n">qps</span> <span class="mf">0.3</span> \
+    <span class="o">--</span><span class="n">shared</span><span class="o">-</span><span class="n">system</span><span class="o">-</span><span class="n">prompt</span> <span class="mi">1000</span> \
+    <span class="o">--</span><span class="n">user</span><span class="o">-</span><span class="n">history</span><span class="o">-</span><span class="n">prompt</span> <span class="mi">2000</span> \
+    <span class="o">--</span><span class="n">answer</span><span class="o">-</span><span class="nb">len</span> <span class="mi">100</span> \
+    <span class="o">--</span><span class="n">model</span> <span class="n">mistralai</span><span class="o">/</span><span class="n">Mistral</span><span class="o">-</span><span class="mi">7</span><span class="n">B</span><span class="o">-</span><span class="n">Instruct</span><span class="o">-</span><span class="n">v0</span><span class="mf">.2</span> \
+    <span class="o">--</span><span class="n">base</span><span class="o">-</span><span class="n">url</span> <span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">localhost</span><span class="p">:</span><span class="mi">8000</span><span class="o">/</span><span class="n">v1</span> \
+    <span class="o">--</span><span class="n">sharegpt</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../tutorials/lora_load.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">LORA Loading</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav class="bd-toc-nav page-toc">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#overview">Overview</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setup">Setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-benchmarks">Running benchmarks</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#explanation-of-the-arguments">Explanation of the arguments</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#configuring-the-workload">Configuring the workload</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#configuring-the-serving-engine-connection">Configuring the serving engine connection</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#configuring-the-experiment-optional">Configuring the experiment (Optional)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#processing-previous-outputs-only-optional">Processing previous outputs only (Optional)</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#benchmark-metrics">Benchmark Metrics</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sharegpt-datasets">ShareGPT Datasets</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By vLLM Production Stack Team
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2025, vLLM Production Stack Team.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
