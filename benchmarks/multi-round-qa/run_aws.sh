@@ -11,7 +11,7 @@ MODEL=$1
 BASE_URL=$2
 # Warmup: precompute KV and store inside CPU mem
 # CONFIGURATION
-NUM_USERS_WARMUP=400
+NUM_USERS_WARMUP=320
 
 SYSTEM_PROMPT=1000 # Shared system prompt length
 CHAT_HISTORY=20000 # User specific chat history length
@@ -40,8 +40,8 @@ MODEL=$1
 BASE_URL=$2
 
 # CONFIGURATION
-NUM_USERS=320
-NUM_ROUNDS=10
+NUM_USERS=260
+NUM_ROUNDS=20
 
 SYSTEM_PROMPT=1000 # Shared system prompt length
 CHAT_HISTORY=20000 # User specific chat history length

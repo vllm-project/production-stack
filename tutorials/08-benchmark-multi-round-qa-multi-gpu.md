@@ -131,12 +131,12 @@ servingEngineSpec:
 
 routerSpec:
   resources:
-  requests:
-    cpu: "2"
-    memory: "8G"
-  limits:
-    cpu: "2"
-    memory: "8G"
+    requests:
+      cpu: "2"
+      memory: "8G"
+    limits:
+      cpu: "2"
+      memory: "8G"
   routingLogic: "session"
   sessionKey: "x-user-id"
 ```
