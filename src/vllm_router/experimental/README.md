@@ -68,12 +68,11 @@ Clients can control caching behavior by adding the following fields to their req
 - `skip_cache`: Set to `true` to bypass the cache for a specific request
 - `cache_similarity_threshold`: Override the default similarity threshold for a specific request
 
-
 ## PII Detection
 
 The PII detection feature is an experimental feature that detects and blocks PII in LLM requests.
 
-### Configuration
+### PII Feature Configuration
 
 To enable the PII detection feature, you need to:
 
@@ -82,6 +81,9 @@ To enable the PII detection feature, you need to:
    ```bash
    --feature-gates=PII=true
    ```
+
+   This will enable the PII detection feature and use the default analyzer.
+
 2. Configure the PII analyzer:
 
    ```bash
@@ -91,5 +93,3 @@ To enable the PII detection feature, you need to:
    Available analyzers:
    - `presidio`: Microsoft Presidio-based analyzer (requires additional dependencies)
    - `regex`: Lightweight regex-based analyzer (no additional dependencies)
-
-

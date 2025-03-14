@@ -11,12 +11,13 @@ logger = logging.getLogger(__name__)
 
 # Regex patterns for different PII types
 PII_PATTERNS = {
-    PIIType.EMAIL: r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',
-    PIIType.PHONE: r'\b(?:\+?1[-.]?)?\s*(?:\([0-9]{3}\)|[0-9]{3})[-.]?[0-9]{3}[-.]?[0-9]{4}\b',
-    PIIType.SSN: r'\b\d{3}[-.]?\d{2}[-.]?\d{4}\b',
-    PIIType.CREDIT_CARD: r'\b(?:\d[ -]*?){13,16}\b',
-    PIIType.IP_ADDRESS: r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
+    PIIType.EMAIL: r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+    PIIType.PHONE: r"\b(?:\+?1[-.]?)?\s*(?:\([0-9]{3}\)|[0-9]{3})[-.]?[0-9]{3}[-.]?[0-9]{4}\b",
+    PIIType.SSN: r"\b\d{3}[-.]?\d{2}[-.]?\d{4}\b",
+    PIIType.CREDIT_CARD: r"\b(?:\d[ -]*?){13,16}\b",
+    PIIType.IP_ADDRESS: r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
 }
+
 
 class RegexAnalyzer(PIIAnalyzer):
     """PII analyzer using regular expressions."""
@@ -88,4 +89,4 @@ class RegexAnalyzer(PIIAnalyzer):
         except Exception as e:
             error_msg = f"Error analyzing text with Regex analyzer: {str(e)}"
             logger.error(error_msg)
-            raise RuntimeError(error_msg) from e 
+            raise RuntimeError(error_msg) from e
