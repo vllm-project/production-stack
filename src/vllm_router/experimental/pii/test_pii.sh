@@ -152,5 +152,5 @@ printf "Failed Tests: %d\n" $failed_tests
 if [[ $total_tests -eq 0 ]]; then
     printf "Overall Success Rate: N/A\n"
 else
-    printf "Overall Success Rate: %.2f%%\n" $(echo "scale=2; $passed_tests * 100 / $total_tests" | bc)
+    printf "Overall Success Rate: %.2f%%\n" "$(echo "scale=2; $passed_tests * 100 / $total_tests" | bc)"
 fi
