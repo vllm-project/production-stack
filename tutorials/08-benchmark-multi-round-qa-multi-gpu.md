@@ -38,7 +38,7 @@ servingEngineSpec:
   modelSpec:
   - name: "llama3"
     repository: "lmcache/vllm-openai"
-    tag: "latest"
+    tag: "2025-03-10"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 8
     requestCPU: 10
@@ -108,7 +108,7 @@ servingEngineSpec:
   modelSpec:
   - name: "llama3"
     repository: "vllm/vllm-openai"
-    tag: "latest"
+    tag: "2025-03-10"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 8
     requestCPU: 10
