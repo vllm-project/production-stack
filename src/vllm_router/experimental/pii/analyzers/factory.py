@@ -5,12 +5,14 @@ from typing import Dict, Optional, Type
 
 from .base import PIIAnalyzer
 from .presidio import PresidioAnalyzer
+from .regex import RegexAnalyzer
 
 logger = logging.getLogger(__name__)
 
 # Registry of available analyzers
 ANALYZERS: Dict[str, Type[PIIAnalyzer]] = {
     "presidio": PresidioAnalyzer,
+    "regex": RegexAnalyzer,
 }
 
 

@@ -1,20 +1,14 @@
 
-# spaCy model - using a compatible version with spacy 3.5+
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.6.0/en_core_web_sm-3.6.0-py3-none-any.whl
+# spaCy models
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 
 # PII detection dependencies
 nltk>=3.8.1,<4.0.0
-numpy>=1.22.4,<1.25.0
 phonenumbers>=8.13.11
+
 # Core dependencies
 presidio-analyzer>=2.2.0
 pydantic>=2.0.0
 
 # Additional dependencies required for PII detection
 regex>=2022.9.13
-
-# Optional dependencies for semantic cache (if needed)
-sentence-transformers>=2.2.0,<3.0.0
-spacy>=3.5.0,<3.7.0
-tldextract>=3.1.0
-torch>=2.0.0,<3.0.0
