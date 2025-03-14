@@ -11,6 +11,7 @@ from vllm_router.dynamic_config import (
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
+from vllm_router.services.callbacks_service.callbacks import initialize_custom_callbacks
 
 try:
     # Semantic cache integration
@@ -205,6 +206,9 @@ def initialize_all(app: FastAPI, args):
         initialize_dynamic_config_watcher(
             args.dynamic_config_json, 10, init_config, app
         )
+
+    if args.callbacks:
+        initialize_custom_callbacks(args.callbacks, app)
 
 
 app = FastAPI(lifespan=lifespan)

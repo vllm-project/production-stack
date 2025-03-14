@@ -44,6 +44,7 @@ Logging Options
 +++++++++++++++
 
 - ``--log-stats``: Log statistics every 30 seconds.
+- ``--callbacks``: The path to the callback instance extending CustomCallbackHandler (e.g. ``my_callbacks.my_callback_handler_instance``).
 
 
 Build docker image
@@ -78,3 +79,46 @@ You can install the router using the following command:
     --engine-stats-interval 10 \
     --log-stats \
     --routing-logic roundrobin
+
+
+Hooking into custom callbacks
+-----------------------------
+
+The router can be extended to add custom callbacks at various points in the request lifecycle.
+
+For this you will need to create a custom callback handler instance, implementing at least one of the available callback methods. You can find all available callbacks along with detailed descriptions in the abstract `CustomCallbackHandler <https://github.com/vllm-project/production-stack/tree/main/src/vllm_router/services/callbacks_service/custom_callbacks.py>`_ class.
+
+.. code-block:: python
+
+    # my_callbacks.py
+
+    from fastapi import Request, Response
+
+    from vllm_router.services.callbacks_service.custom_callbacks import CustomCallbackHandler
+
+
+    class MyCustomCallbackHandler(CustomCallbackHandler):
+        def pre_request(self, request: Request, request_body: bytes, request_json: any) -> Response | None:
+            """
+            Receives the request object before it gets proxied.
+            """
+            if b"coffee" in request_body:
+                return Response("I'm a teapot", 418)
+
+        def post_request(self, request: Request, response_content: bytes) -> None:
+            """
+            Is executed as a background task, receives the request object
+            and the complete response_content.
+            """
+            with open("/tmp/response.txt", "ab") as f:
+                f.write(response_content)
+
+
+    my_callback_handler_instance = MyCustomCallbackHandler()
+
+
+You can pass the instance to the router with the filename first (without the file ending), followed by the instance, separated by a dot like this:
+
+.. code-block:: bash
+
+    vllm-router ... --callbacks my_callbacks.my_callback_handler_instance

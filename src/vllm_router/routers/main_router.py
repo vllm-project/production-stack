@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, Response
 
 from vllm_router.dynamic_config import get_dynamic_config_watcher
@@ -40,7 +40,7 @@ logger = init_logger(__name__)
 
 
 @main_router.post("/v1/chat/completions")
-async def route_chat_completion(request: Request):
+async def route_chat_completion(request: Request, background_tasks: BackgroundTasks):
     if semantic_cache_available:
         # Check if the request can be served from the semantic cache
         logger.debug("Received chat completion request, checking semantic cache")
@@ -51,37 +51,39 @@ async def route_chat_completion(request: Request):
             return cache_response
 
     logger.debug("No cache hit, forwarding request to backend")
-    return await route_general_request(request, "/v1/chat/completions")
+    return await route_general_request(
+        request, "/v1/chat/completions", background_tasks
+    )
 
 
 @main_router.post("/v1/completions")
-async def route_completion(request: Request):
-    return await route_general_request(request, "/v1/completions")
+async def route_completion(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/completions", background_tasks)
 
 
 @main_router.post("/v1/embeddings")
-async def route_embeddings(request: Request):
-    return await route_general_request(request, "/v1/embeddings")
+async def route_embeddings(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/embeddings", background_tasks)
 
 
 @main_router.post("/v1/rerank")
-async def route_v1_rerank(request: Request):
-    return await route_general_request(request, "/v1/rerank")
+async def route_v1_rerank(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/rerank", background_tasks)
 
 
 @main_router.post("/rerank")
-async def route_rerank(request: Request):
-    return await route_general_request(request, "/rerank")
+async def route_rerank(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/rerank", background_tasks)
 
 
 @main_router.post("/v1/score")
-async def route_v1_score(request: Request):
-    return await route_general_request(request, "/v1/score")
+async def route_v1_score(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/score", background_tasks)
 
 
 @main_router.post("/score")
-async def route_score(request: Request):
-    return await route_general_request(request, "/score")
+async def route_score(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/score", background_tasks)
 
 
 @main_router.get("/version")
