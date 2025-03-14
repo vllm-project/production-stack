@@ -18,6 +18,10 @@
 
 ## Step-By-Step Tutorials
 
+### Video
+- Why do we need vllm production-stack? [**EP00 (in Chinese)**](https://www.youtube.com/watch?v=ZOVNAkVbZzc&list=PLJj_urhaf2_qxpg8A5-6xoMvMLBKQMTX1)
+
+### Blog
 0. How To [*Install Kubernetes (kubectl, helm, minikube, etc)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)?
 1. How to [*Deploy Production Stack on Major Cloud Platforms (AWS, GCP, Lambda Labs, Azure)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/cloud_deployments)?
 2. How To [*Setup a Minimal vLLM Production Stack*](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)?
