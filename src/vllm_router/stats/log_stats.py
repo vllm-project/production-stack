@@ -33,7 +33,6 @@ def log_stats(app: FastAPI, interval: int = 10):
         interval (int): The interval in seconds at which statistics are logged.
             Default is 10 seconds.
     """
-
     while True:
         time.sleep(interval)
         logstr = "\n" + "=" * 50 + "\n"

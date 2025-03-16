@@ -14,11 +14,13 @@ from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 _global_service_discovery: "Optional[ServiceDiscovery]" = None
+_global_enable_pd: bool = False
 
 
 class ServiceDiscoveryType(enum.Enum):
     STATIC = "static"
     K8S = "k8s"
+    PD = "static_pd"
 
 
 @dataclass
@@ -81,6 +83,26 @@ class StaticServiceDiscovery(ServiceDiscovery):
             for url, model in zip(self.urls, self.models)
         ]
 
+class StaticServiceDiscoveryPD(StaticServiceDiscovery):
+    def __init__(self, urls: List[str], models: List[str], prefill_urls: List[str], decode_urls: List[str]):
+        super().__init__(urls, models)
+
+        _global_enable_pd = True
+
+        self.prefill_urls = prefill_urls
+        self.decode_urls = decode_urls
+
+    def get_endpoint_info_prefill(self) -> List[EndpointInfo]:
+        return [
+            EndpointInfo(url, model, self.added_timestamp)
+            for url, model in zip(self.prefill_urls, self.models)
+        ]       
+
+    def get_endpoint_info_decode(self) -> List[EndpointInfo]:
+        return [
+            EndpointInfo(url, model, self.added_timestamp)
+            for url, model in zip(self.decode_urls, self.models)
+        ]            
 
 class K8sServiceDiscovery(ServiceDiscovery):
     def __init__(self, namespace: str, port: str, label_selector=None):
@@ -284,6 +306,8 @@ def _create_service_discovery(
 
     if service_discovery_type == ServiceDiscoveryType.STATIC:
         return StaticServiceDiscovery(*args, **kwargs)
+    if service_discovery_type == ServiceDiscoveryType.PD:
+        return StaticServiceDiscoveryPD(*args, **kwargs)    
     elif service_discovery_type == ServiceDiscoveryType.K8S:
         return K8sServiceDiscovery(*args, **kwargs)
     else:
@@ -352,6 +376,9 @@ def get_service_discovery() -> ServiceDiscovery:
         raise ValueError("Service discovery module not initialized")
 
     return _global_service_discovery
+
+def is_pd_enabled() -> bool:
+    return _global_enable_pd
 
 
 if __name__ == "__main__":

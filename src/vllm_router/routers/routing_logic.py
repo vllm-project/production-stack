@@ -13,6 +13,9 @@ from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)
 
+prefill_router = None
+decode_router = None
+
 
 class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
@@ -182,6 +185,19 @@ def initialize_routing_logic(
     elif routing_logic == RoutingLogic.SESSION_BASED:
         logger.info(f"Initializing session-based routing logic with kwargs: {kwargs}")
         return SessionRouter(kwargs.get("session_key"))
+    elif kwargs.get("routing_logic_prefill") is not None and kwargs.get("routing_logic_decode") is not None:
+        prefill_router = None
+        decode_router = None
+        if kwargs.get("routing_logic_prefill") == RoutingLogic.ROUND_ROBIN:
+            prefill_router = RoundRobinRouter()
+        elif kwargs.get("routing_logic_prefill") == RoutingLogic.SESSION_BASED:
+            prefill_router = SessionRouter(kwargs.get("session_key"))
+        if kwargs.get("routing_logic_decode") == RoutingLogic.ROUND_ROBIN:
+            decode_router = RoundRobinRouter()
+        elif kwargs.get("routing_logic_decode") == RoutingLogic.SESSION_BASED:
+            decode_router = SessionRouter(kwargs.get("session_key"))      
+        logger.info("Initialized routing logic for prefill and decode")      
+        return prefill_router, decode_router
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -202,3 +218,9 @@ def get_routing_logic() -> RoutingInterface:
         if cls in SingletonABCMeta._instances:
             return cls()
     raise ValueError("The global router has not been initialized")
+
+def get_routing_logic_prefill() -> RoutingInterface:
+    return prefill_router
+
+def get_routing_logic_decode() -> RoutingInterface:
+    return decode_router    

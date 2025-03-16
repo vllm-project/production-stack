@@ -29,7 +29,7 @@ except ImportError:
 # --- Argument Parsing and Initialization ---
 def validate_args(args):
     if args.service_discovery == "static":
-        if args.static_backends is None:
+        if args.static_backends or (args.static_prefill_backends is None and args.static_decode_backends is None) is None:
             raise ValueError(
                 "Static backends must be provided when using static service discovery."
             )
@@ -98,7 +98,7 @@ def parse_args():
     parser.add_argument(
         "--routing-logic",
         type=str,
-        required=True,
+        # required=True,
         choices=["roundrobin", "session"],
         help="The routing logic to use",
     )
@@ -203,6 +203,39 @@ def parse_args():
         choices=["critical", "error", "warning", "info", "debug", "trace"],
         help="Log level for uvicorn. Default is 'info'.",
     )
+
+    # the following parameters are for PD disaggregation support
+    parser.add_argument(
+        "--enable-pd", 
+        action="store_true", 
+        help="enable PD disaggregation"
+    )
+    parser.add_argument(
+        "--static-prefill-backends",
+        type=str,
+        default=None,
+        help="The URLs of static prefill backends, separated by commas. E.g., http://localhost:8000,http://localhost:8002",
+    )
+    parser.add_argument(
+        "--static-decode-backends",
+        type=str,
+        default=None,
+        help="The URLs of static decode backends, separated by commas. E.g., http://localhost:8001,http://localhost:8003",
+    )    
+    parser.add_argument(
+        "--routing-logic-prefill",
+        type=str,
+        # required=True,
+        choices=["roundrobin", "session"],
+        help="The routing logic for prefill to use",
+    )    
+    parser.add_argument(
+        "--routing-logic-decode",
+        type=str,
+        # required=True,
+        choices=["roundrobin", "session"],
+        help="The routing logic for decode to use",
+    )        
 
     args = parser.parse_args()
     validate_args(args)

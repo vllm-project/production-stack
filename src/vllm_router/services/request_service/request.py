@@ -8,11 +8,11 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from vllm_router.log import init_logger
-from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
     is_request_rewriter_initialized,
 )
+from vllm_router.service_discovery import get_service_discovery, is_pd_enabled
 
 try:
     # Semantic cache integration
@@ -173,24 +173,64 @@ async def route_general_request(request: Request, endpoint: str):
         )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
-    server_url = request.app.state.router.route_request(
-        endpoints, engine_stats, request_stats, request
-    )
-    curr_time = time.time()
-    logger.info(
-        f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
-    )
-    stream_generator = process_request(
-        request,
-        request_body,
-        server_url,
-        request_id,
-        endpoint=endpoint,
-    )
-    headers, status_code = await anext(stream_generator)
-    return StreamingResponse(
-        stream_generator,
-        status_code=status_code,
-        headers={key: value for key, value in headers.items()},
-        media_type="text/event-stream",
-    )
+
+    if not is_pd_enabled():
+        server_url = request.app.state.router.route_request(
+            endpoints, engine_stats, request_stats, request
+        )
+        curr_time = time.time()
+        logger.info(
+            f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+        )
+        stream_generator = process_request(
+            request,
+            request_body,
+            server_url,
+            request_id,
+            endpoint=endpoint,
+        )
+        headers, status_code = await anext(stream_generator)
+        return StreamingResponse(
+            stream_generator,
+            status_code=status_code,
+            headers={key: value for key, value in headers.items()},
+            media_type="text/event-stream",
+        )
+    else:
+        prefill_endpoints = get_service_discovery().get_endpoint_info_prefill()
+        decode_endpoints = get_service_discovery().get_endpoint_info_decode()
+        engine_stats_prefill = {k:v for k,v in engine_stats.items() if k in prefill_endpoints}
+        engine_stats_decode = {k:v for k,v in engine_stats.items() if k in decode_endpoints}
+        request_stats_prefill = {k:v for k,v in request_stats.items() if k in prefill_endpoints}
+        request_stats_decode = {k:v for k,v in request_stats.items() if k in decode_endpoints}        
+        prefill_url = request.app.state.prefill_router.route_request(
+            endpoints, engine_stats_prefill, request_stats_prefill, request
+        )
+        decode_url = request.app.state.decode_router.route_request(
+            endpoints, engine_stats_decode, request_stats_decode, request
+        )
+        prefill_req_data = request_json.copy()
+        prefill_req_data['max_tokens'] = 1
+        prefill_req_data['max_completion_tokens'] = 1
+        response = await request.app.state.httpx_client_wrapper().post(
+            endpoint,
+            base_url=prefill_url,
+            json=prefill_req_data)
+        response.raise_for_status()        
+
+        stream_generator = process_request(
+            request,
+            request_body,
+            decode_url,
+            request_id,
+            endpoint=endpoint,
+        )
+        headers, status_code = await anext(stream_generator)
+        return StreamingResponse(
+            stream_generator,
+            status_code=status_code,
+            headers={key: value for key, value in headers.items()},
+            media_type="text/event-stream",
+        )
+
+

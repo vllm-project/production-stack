@@ -43,6 +43,8 @@ from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
 from vllm_router.routers.routing_logic import (
     get_routing_logic,
+    get_routing_logic_prefill,
+    get_routing_logic_decode,
     initialize_routing_logic,
 )
 from vllm_router.service_discovery import (
@@ -106,11 +108,20 @@ def initialize_all(app: FastAPI, args):
         ValueError: if the service discovery type is invalid
     """
     if args.service_discovery == "static":
-        initialize_service_discovery(
-            ServiceDiscoveryType.STATIC,
-            urls=parse_static_urls(args.static_backends),
-            models=parse_static_model_names(args.static_models),
-        )
+        if args.enable_pd:
+            initialize_service_discovery(
+                ServiceDiscoveryType.PD,
+                urls = parse_static_urls(args.static_prefill_backends) + parse_static_urls(args.static_decode_backends),
+                prefill_urls=parse_static_urls(args.static_prefill_backends),
+                decode_urls=parse_static_urls(args.static_decode_backends),
+                models=parse_static_model_names(args.static_models),
+            )
+        else:
+            initialize_service_discovery(
+                ServiceDiscoveryType.STATIC,
+                urls=parse_static_urls(args.static_backends),
+                models=parse_static_model_names(args.static_models),
+            )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
             ServiceDiscoveryType.K8S,
@@ -134,7 +145,7 @@ def initialize_all(app: FastAPI, args):
             args.batch_processor, args.file_storage_path, app.state.batch_storage
         )
 
-    initialize_routing_logic(args.routing_logic, session_key=args.session_key)
+    initialize_routing_logic(args.routing_logic, session_key=args.session_key, routing_logic_prefill=args.routing_logic_prefill, routing_logic_decode=args.routing_logic_decode)
 
     # Initialize feature gates
     initialize_feature_gates(args.feature_gates)
@@ -198,6 +209,8 @@ def initialize_all(app: FastAPI, args):
     app.state.request_stats_monitor = get_request_stats_monitor()
     app.state.router = get_routing_logic()
     app.state.request_rewriter = get_request_rewriter()
+    app.state.prefill_router = get_routing_logic_prefill()
+    app.state.decode_router = get_routing_logic_decode()
 
     # Initialize dynamic config watcher
     if args.dynamic_config_json:
@@ -221,7 +234,7 @@ def main():
     initialize_all(app, args)
     if args.log_stats:
         threading.Thread(
-            target=log_stats, args=(args.log_stats_interval,), daemon=True
+            target=log_stats, args=(app, args.log_stats_interval,), daemon=True
         ).start()
 
     # Workaround to avoid footguns where uvicorn drops requests with too
