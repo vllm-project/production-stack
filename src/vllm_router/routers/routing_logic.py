@@ -186,8 +186,8 @@ def initialize_routing_logic(
         logger.info(f"Initializing session-based routing logic with kwargs: {kwargs}")
         return SessionRouter(kwargs.get("session_key"))
     elif kwargs.get("routing_logic_prefill") is not None and kwargs.get("routing_logic_decode") is not None:
-        prefill_router = None
-        decode_router = None
+        global prefill_router
+        global decode_router
         if kwargs.get("routing_logic_prefill") == RoutingLogic.ROUND_ROBIN:
             prefill_router = RoundRobinRouter()
         elif kwargs.get("routing_logic_prefill") == RoutingLogic.SESSION_BASED:

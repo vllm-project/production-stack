@@ -87,6 +87,7 @@ class StaticServiceDiscoveryPD(StaticServiceDiscovery):
     def __init__(self, urls: List[str], models: List[str], prefill_urls: List[str], decode_urls: List[str]):
         super().__init__(urls, models)
 
+        global _global_enable_pd
         _global_enable_pd = True
 
         self.prefill_urls = prefill_urls

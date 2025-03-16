@@ -173,7 +173,6 @@ async def route_general_request(request: Request, endpoint: str):
         )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
-
     if not is_pd_enabled():
         server_url = request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request
@@ -211,10 +210,9 @@ async def route_general_request(request: Request, endpoint: str):
         )
         prefill_req_data = request_json.copy()
         prefill_req_data['max_tokens'] = 1
-        prefill_req_data['max_completion_tokens'] = 1
+        prefill_req_data['max_completion_tokens'] = 1      
         response = await request.app.state.httpx_client_wrapper().post(
-            endpoint,
-            base_url=prefill_url,
+            prefill_url + endpoint,
             json=prefill_req_data)
         response.raise_for_status()        
 
