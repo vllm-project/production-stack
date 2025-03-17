@@ -3,7 +3,9 @@ name: Deploy Sphinx Docs
 on:
   push:
     branches:
-      - main  # Adjust branch if needed
+      - main
+    paths:
+      - 'docs/**'
 
 jobs:
   build-and-deploy:
@@ -26,6 +28,7 @@ jobs:
       - name: Build Sphinx Documentation
         run: |
           sphinx-build docs/source vllm-production-stack
+        continue-on-error: false
 
       - name: Add .nojekyll
         run: |
