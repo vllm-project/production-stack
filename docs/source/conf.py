@@ -88,6 +88,11 @@ html_theme_options = {
     "pygments_dark_style": "monokai",
 }
 
+autodoc_mock_imports = [
+    "fastapi",
+    "prometheus_client",
+]
+
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "typing_extensions": ("https://typing-extensions.readthedocs.io/en/latest", None),
