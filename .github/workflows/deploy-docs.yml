@@ -21,7 +21,7 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install -r docs/requirements-docs.txt
-          pip install fastapi aiofiles prometheus_client
+          pip install fastapi aiofiles prometheus_client kubernetes uhashring
 
       - name: Build Sphinx Documentation
         run: |
@@ -47,4 +47,4 @@ jobs:
           git config user.email "siddhant.r98@gmail.com"
           git add .
           git commit -m "Deploy updated Sphinx docs"
-          git push https://${{ github.actor }}:${{ secrets.LM_CACHE_PAT }}@github.com/LM-Cache-Website/lm-cache-website.github.io.git main
+          git push https://${{ secrets.LM_CACHE_PAT }}@github.com/LM-Cache-Website/lm-cache-website.github.io.git main
