@@ -32,7 +32,7 @@ jobs:
 
       - name: Clone Target Repository
         run: |
-          git clone https://github.com/LM-Cache-Website/lm-cache-website.github.io target-repo
+          git clone https://github.com/LM-Cache-Website/lm-cache-website.github.io.git target-repo
 
 
       - name: Copy Files to Target Repository
