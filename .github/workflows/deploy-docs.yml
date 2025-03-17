@@ -46,4 +46,4 @@ jobs:
           git config user.email "github-actions@github.com"
           git add .
           git commit -m "Deploy updated Sphinx docs"
-          git push https://x-access-token:${{ secrets.LM_CACHE_PAT }}@github.com/LM-Cache-Website.git main
+          git push https://x-access-token:${{ secrets.LM_CACHE_PAT }}@github.com/LM-Cache-Website/lm-cache-website.github.io.git main
