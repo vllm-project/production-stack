@@ -21,6 +21,7 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install -r docs/requirements-docs.txt
+          pip install fastapi aiofiles prometheus_client
 
       - name: Build Sphinx Documentation
         run: |
@@ -46,4 +47,4 @@ jobs:
           git config user.email "github-actions@github.com"
           git add .
           git commit -m "Deploy updated Sphinx docs"
-          git push https://x-access-token:${{ secrets.LM_CACHE_PAT }}@github.com/LM-Cache-Website/lm-cache-website.github.io.git main
+          git push https://${{ github.actor }}:${{ secrets.LM_CACHE_PAT }}@github.com/LM-Cache-Website/lm-cache-website.github.io.git main
