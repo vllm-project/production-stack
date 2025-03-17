@@ -66,7 +66,6 @@ autodoc.ClassDocumenter = MockedClassDocumenter
 
 html_title = project
 html_theme = "sphinx_book_theme"
-html_static_path = ["_static"]
 html_logo = "./assets/prodstack_icon.png"
 html_favicon = "./assets/output.ico"
 html_permalinks_icon = "<span>#</span>"
