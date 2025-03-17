@@ -1,0 +1,31 @@
+servingEngineSpec:
+  modelSpec:
+  - name: "llama3"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+    replicaCount: 1
+    requestCPU: 10
+    requestMemory: "16Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      maxModelLen: 4096
+    env:
+      - name: HF_TOKEN
+        value: <YOUR_HF_TOKEN_FOR_LLAMA3.1>
+
+  - name: "mistral"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+    replicaCount: 1
+    requestCPU: 10
+    requestMemory: "16Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      maxModelLen: 4096
+    env:
+      - name: HF_TOKEN
+        value: <YOUR_HF_TOKEN_FOR_MISTRAL>
