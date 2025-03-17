@@ -89,8 +89,11 @@ html_theme_options = {
 }
 
 autodoc_mock_imports = [
+    "aiofiles",
     "fastapi",
+    "kubernetes",
     "prometheus_client",
+    "uhashring",
 ]
 
 intersphinx_mapping = {
