@@ -1,6 +1,6 @@
 # vLLM Production Stack: reference stack for production vLLM deployment
 
-| [**Blog**](https://lmcache.github.io) | [**Docs**](https://docs.lmcache.ai/vllm-production-stack/) | [**Production-Stack Slack Channel**](https://vllm-dev.slack.com/archives/C089SMEAKRA) | [**LMCache Slack**](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ) | [**Interest Form**](https://forms.gle/mQfQDUXbKfp2St1z7) | [**Official Email**](contact@lmcache.ai) |
+| [**Blog**](https://lmcache.github.io) | [**Docs**](https://docs.vllm.ai/projects/production-stack) | [**Production-Stack Slack Channel**](https://vllm-dev.slack.com/archives/C089SMEAKRA) | [**LMCache Slack**](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ) | [**Interest Form**](https://forms.gle/mQfQDUXbKfp2St1z7) | [**Official Email**](contact@lmcache.ai) |
 
 ## Latest News
 
