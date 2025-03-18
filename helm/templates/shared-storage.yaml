@@ -46,4 +46,4 @@ spec:
   resources:
     requests:
       storage: {{ .Values.sharedStorage.size | default "100Gi" }}
-{{- end }} 
+{{- end }}
