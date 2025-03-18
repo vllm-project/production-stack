@@ -319,7 +319,7 @@ loraController:
   enabled: false
   replicaCount: 1
   image:
-    repository: quay.io/chenw615/lora-controller
+    repository: lmcache/lora-controller
     tag: latest
     pullPolicy: Always
   resources:

@@ -54,6 +54,9 @@ cover/
 # Vim temporary files
 .*.sw*
 
+# VS Code
+.vscode/
+
 # misc
 outdated/
 perf-test.py
@@ -92,7 +95,9 @@ perf-test.py
 
 /try
 
+# Values files
 values-*.yaml
+!tutorials/assets/values-*.yaml
 helm/examples
 
 # version files
