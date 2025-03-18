@@ -1,0 +1,20 @@
+{{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
+  namespace: {{ $.Release.Namespace }}
+  labels:
+  {{- include "chart.engineLabels" $ | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: {{ include "chart.service-port-name" $ }}
+      port: {{ include "chart.service-port" $ }}
+      targetPort: {{ include "chart.container-port-name" $ }}
+      protocol: TCP
+  selector:
+    model: {{ $modelSpec.name }}
+  {{- include "chart.engineLabels" $ | nindent 4 }}
+{{- end }}

@@ -1,0 +1,101 @@
+{{- if .Values.routerSpec.enableRouter -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-deployment-router"
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "chart.routerLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.routerSpec.replicaCount }}
+  {{- include "chart.routerStrategy" . | nindent 2 }}
+  selector:
+    matchLabels:
+    {{- include "chart.routerLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+      {{- include "chart.routerLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-router-service-account
+      containers:
+      - name: router-container
+        image: "{{ .Values.routerSpec.repository | default "lmcache/lmstack-router" }}:{{ .Values.routerSpec.tag | default "latest" }}"
+        imagePullPolicy: "{{ .Values.routerSpec.imagePullPolicy | default "Always" }}"
+        env:
+          {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
+          {{- if $vllmApiKey }}
+          - name: VLLM_API_KEY
+            {{- if kindIs "string" $vllmApiKey }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-secrets
+                key: vllmApiKey
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $vllmApiKey.secretName }}
+                key: {{ $vllmApiKey.secretKey }}
+            {{- end }}
+          {{- end }}
+        args:
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "{{ .Values.routerSpec.containerPort }}"
+          - "--service-discovery"
+          - "{{ default "k8s" .Values.routerSpec.serviceDiscovery }}"
+          {{- if eq .Values.routerSpec.serviceDiscovery "k8s" }}
+          - "--k8s-namespace"
+          - "{{ .Release.Namespace }}"
+          - "--k8s-label-selector"
+          - {{ include "labels.toCommaSeparatedList" .Values.servingEngineSpec.labels }}
+          {{- end }}
+          {{- if eq .Values.routerSpec.serviceDiscovery "static" }}
+          - "--static-backends"
+          - "{{ required "When using static service discovery, .Values.routerSpec.staticBackends is a required value" .Values.routerSpec.staticBackends }}"
+          - "--static-models"
+          - "{{ required "When using static service discovery, .Values.routerSpec.staticModels is a required value" .Values.routerSpec.staticModels }}"
+          {{- end }}
+          - "--routing-logic"
+          - "{{ .Values.routerSpec.routingLogic }}"
+          {{- if .Values.routerSpec.sessionKey }}
+          - "--session-key"
+          - "{{ .Values.routerSpec.sessionKey }}"
+          {{- end }}
+          {{- if .Values.routerSpec.engineScrapeInterval }}
+          - "--engine-stats-interval"
+          - "{{ .Values.routerSpec.engineScrapeInterval }}"
+          {{- end }}
+          {{- if .Values.routerSpec.requestStatsWindow }}
+          - "--request-stats-window"
+          - "{{ .Values.routerSpec.requestStatsWindow }}"
+          {{- end }}
+          {{- if .Values.routerSpec.extraArgs }}
+          {{- toYaml .Values.routerSpec.extraArgs | nindent 10 }}
+          {{- end }}
+        {{- if .Values.routerSpec.resources }}
+        resources:
+          {{- if .Values.routerSpec.resources.requests }}
+          requests:
+            cpu: "{{ .Values.routerSpec.resources.requests.cpu }}"
+            memory: "{{ .Values.routerSpec.resources.requests.memory }}"
+          {{- end }}
+          {{- if .Values.routerSpec.resources.limits }}
+          limits:
+            cpu: "{{ .Values.routerSpec.resources.limits.cpu }}"
+            memory: "{{ .Values.routerSpec.resources.limits.memory }}"
+          {{- end }}
+        {{- end }}
+        ports:
+          - name: "router-cport"
+            containerPort: {{ .Values.routerSpec.containerPort }}
+
+        livenessProbe:
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: {{ .Values.routerSpec.containerPort }}
+{{- end }}

@@ -1,0 +1,418 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "servingEngineSpec": {
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "object",
+          "properties": {
+            "environment": {
+              "type": "string"
+            },
+            "release": {
+              "type": "string"
+            }
+          }
+        },
+        "vllmApiKey": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "secretName": {
+                  "type": "string"
+                },
+                "secretKey": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "secretName",
+                "secretKey"
+              ]
+            }
+          ]
+        },
+        "modelSpec": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "repository": {
+                "type": "string"
+              },
+              "tag": {
+                "type": "string"
+              },
+              "modelURL": {
+                "type": "string"
+              },
+              "replicaCount": {
+                "type": "integer"
+              },
+              "requestCPU": {
+                "type": "integer"
+              },
+              "requestMemory": {
+                "type": "string"
+              },
+              "limitCPU": {
+                "type": "integer"
+              },
+              "limitMemory": {
+                "type": "string"
+              },
+              "requestGPU": {
+                "type": "integer"
+              },
+              "requestGPUType": {
+                "type": "string"
+              },
+              "pvcStorage": {
+                "type": "string"
+              },
+              "pvcMatchLabels": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "initContainer": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string"
+                  },
+                  "command": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "requests": {
+                        "type": "object",
+                        "properties": {
+                          "cpu": {
+                            "type": "string"
+                          },
+                          "memory": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "limits": {
+                        "type": "object",
+                        "properties": {
+                          "cpu": {
+                            "type": "string"
+                          },
+                          "memory": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "mountPvcStorage": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "vllmConfig": {
+                "type": "object",
+                "properties": {
+                  "enablePrefixCaching": {
+                    "type": "boolean"
+                  },
+                  "enableChunkedPrefill": {
+                    "type": "boolean"
+                  },
+                  "maxModelLen": {
+                    "type": "integer"
+                  },
+                  "dtype": {
+                    "type": "string"
+                  },
+                  "extraArgs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "lmcacheConfig": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "cpuOffloadingBufferSize": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "cpuOffloadingBufferSize"
+                ]
+              },
+              "hf_token": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "secretName": {
+                        "type": "string"
+                      },
+                      "secretKey": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "secretName",
+                      "secretKey"
+                    ]
+                  }
+                ]
+              },
+              "env": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "value"
+                  ]
+                }
+              },
+              "nodeSelectorTerms": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "matchExpressions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "operator": {
+                            "type": "string"
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "operator",
+                          "values"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "required": [
+              "name",
+              "repository",
+              "tag",
+              "modelURL",
+              "replicaCount",
+              "requestCPU",
+              "requestMemory",
+              "requestGPU",
+              "pvcStorage"
+            ]
+          }
+        },
+        "containerPort": {
+          "type": "integer"
+        },
+        "servicePort": {
+          "type": "integer"
+        },
+        "startupProbe": {
+          "type": "object",
+          "properties": {
+            "initialDelaySeconds": {
+              "type": "integer"
+            },
+            "periodSeconds": {
+              "type": "integer"
+            },
+            "failureThreshold": {
+              "type": "integer"
+            },
+            "httpGet": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path",
+                "port"
+              ]
+            }
+          }
+        },
+        "livenessProbe": {
+          "type": "object",
+          "properties": {
+            "initialDelaySeconds": {
+              "type": "integer"
+            },
+            "periodSeconds": {
+              "type": "integer"
+            },
+            "failureThreshold": {
+              "type": "integer"
+            },
+            "httpGet": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path",
+                "port"
+              ]
+            }
+          }
+        },
+        "maxUnavailablePodDisruptionBudget": {
+          "type": "string"
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "operator": {
+                "type": "string"
+              },
+              "effect": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "runtimeClassName": {
+          "type": "string"
+        },
+        "schedulerName": {
+          "type": "string"
+        },
+        "securityContext": {
+          "type": "object",
+          "description": "Pod-level security context configuration",
+          "additionalProperties": true
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level security context configuration",
+          "additionalProperties": true
+        }
+      }
+    },
+    "routerSpec": {
+      "type": "object",
+      "properties": {
+        "replicaCount": {
+          "type": "integer"
+        },
+        "containerPort": {
+          "type": "integer"
+        },
+        "servicePort": {
+          "type": "integer"
+        },
+        "routingLogic": {
+          "type": "string"
+        },
+        "sessionKey": {
+          "type": "string"
+        },
+        "extraArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "engineScrapeInterval": {
+          "type": "integer"
+        },
+        "requestStatsWindow": {
+          "type": "integer"
+        },
+        "labels": {
+          "type": "object",
+          "properties": {
+            "environment": {
+              "type": "string"
+            },
+            "release": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{{- if .Values.routerSpec.enableRouter -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-router-service"
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "chart.routerLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: "router-sport"
+      port: {{ .Values.routerSpec.servicePort }}
+      targetPort: {{ .Values.routerSpec.containerPort }}
+      protocol: TCP
+  selector:
+  {{- include "chart.routerLabels" . | nindent 4 }}
+{{- end }}

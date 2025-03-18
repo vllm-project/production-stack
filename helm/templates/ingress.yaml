@@ -1,0 +1,42 @@
+{{- if and (.Values.routerSpec.enableRouter) (.Values.routerSpec.ingress.enabled) -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: "{{ .Release.Name }}-ingress-router"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chart.routerLabels" . | nindent 4 }}
+  {{- with .Values.routerSpec.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.routerSpec.ingress.className }}
+  ingressClassName: {{ .Values.routerSpec.ingress.className }}
+  {{- end }}
+  {{- if .Values.routerSpec.ingress.tls }}
+  tls:
+    {{- range .Values.routerSpec.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.routerSpec.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: "{{ $.Release.Name }}-router-service"
+                port:
+                  number: {{ $.Values.routerSpec.servicePort }}
+          {{- end }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,11 @@
+{{- if .Values.servingEngineSpec.configs -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-configs"
+  namespace: {{ .Release.Namespace }}
+data:
+  {{- with .Values.servingEngineSpec.configs }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end -}}

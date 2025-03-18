@@ -1,0 +1,52 @@
+{{- if .Values.cacheserverSpec -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-deployment-cache-server"
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "chart.cacheserverLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+    {{- include "chart.cacheserverLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+      {{- include "chart.cacheserverLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: "lmcache-server"
+          image: "{{ required "Required value 'cacheserverSpec.repository' must be defined !" .Values.cacheserverSpec.repository }}:{{ required "Required value 'cacheserverSpec.tag' must be defined !" .Values.cacheserverSpec.tag }}"
+          command:
+          - "lmcache_experimental_server"
+          - "0.0.0.0"
+          - "{{ .Values.cacheserverSpec.containerPort }}"
+          {{- if .Values.cacheserverSpec.resources }}
+          resources:
+            {{- if .Values.cacheserverSpec.resources.requests }}
+            requests:
+              cpu: "{{ .Values.cacheserverSpec.resources.requests.cpu }}"
+              memory: "{{ .Values.cacheserverSpec.resources.requests.memory }}"
+            {{- end }}
+            {{- if .Values.cacheserverSpec.resources.limits }}
+            limits:
+              cpu: "{{ .Values.cacheserverSpec.resources.limits.cpu }}"
+              memory: "{{ .Values.cacheserverSpec.resources.limits.memory }}"
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: "caserver-cport"
+              containerPort: {{ .Values.cacheserverSpec.containerPort }}
+          imagePullPolicy: IfNotPresent
+
+        # TODO(Jiayi): add health check for lmcache server
+        # livenessProbe:
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 5
+        #   failureThreshold: 3
+        #   httpGet:
+        #     path: /health
+        #     port: {{ .Values.cacheserverSpec.containerPort }}
+{{- end -}}

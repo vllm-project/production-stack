@@ -1,0 +1,18 @@
+{{- if .Values.cacheserverSpec -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-cache-server-service"
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "chart.cacheserverLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: "cacheserver-sport"
+      port: {{ .Values.cacheserverSpec.servicePort }}
+      targetPort: {{ .Values.cacheserverSpec.containerPort }}
+      protocol: TCP
+  selector:
+  {{- include "chart.cacheserverLabels" . | nindent 4 }}
+{{- end -}}
