@@ -91,7 +91,7 @@ helm install vllm vllm/vllm-stack -f tutorials/assets/values-05-cpu-offloading.y
 3. Send a request to the stack and observe the logs:
 
    ```bash
-   curl -X POST http://localhost:30080/completions \
+   curl -X POST http://localhost:30080/v1/completions \
      -H "Content-Type: application/json" \
      -d '{
        "model": "mistralai/Mistral-7B-Instruct-v0.2",

@@ -103,7 +103,7 @@ Test the stack's OpenAI-compatible API by querying the available models:
 
 .. code-block:: bash
 
-    curl -o- http://localhost:30080/models
+    curl -o- http://localhost:30080/v1/models
 
 
 Expected output:
@@ -132,7 +132,7 @@ Send a query to the OpenAI `/completion` endpoint to generate a completion for a
 
 .. code-block:: bash
 
-    curl -X POST http://localhost:30080/completions \
+    curl -X POST http://localhost:30080/v1/completions \
       -H "Content-Type: application/json" \
       -d '{
         "model": "facebook/opt-125m",

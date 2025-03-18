@@ -95,7 +95,7 @@ helm install vllm vllm/vllm-stack -f tutorials/assets/values-04-multiple-models.
 3. Query the `/models` endpoint to verify the models:
 
    ```bash
-   curl http://localhost:30080/models
+   curl http://localhost:30080/v1/models
    ```
 
    For details on the `/models` endpoint, refer to the [README.md](README.md).
