@@ -95,11 +95,6 @@ perf-test.py
 
 /try
 
-# Values files
-values-*.yaml
-!tutorials/assets/values-*.yaml
-helm/examples
-
 # version files
 src/vllm_router/_version.py
 
