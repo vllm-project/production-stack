@@ -29,7 +29,7 @@ except ImportError:
 # --- Argument Parsing and Initialization ---
 def validate_args(args):
     if args.service_discovery == "static":
-        if args.static_backends or (args.static_prefill_backends is None and args.static_decode_backends is None) is None:
+        if args.static_backends is None and (args.static_prefill_backends is None or args.static_decode_backends is None):
             raise ValueError(
                 "Static backends must be provided when using static service discovery."
             )
@@ -37,6 +37,10 @@ def validate_args(args):
             raise ValueError(
                 "Static models must be provided when using static service discovery."
             )
+    if args.routing_logic is None and (args.routing_logic_prefill is None or args.routing_logic_decode is None):
+        raise ValueError(
+            "routing logic must be provided."
+        )        
     if args.service_discovery == "k8s" and args.k8s_port is None:
         raise ValueError("K8s port must be provided when using K8s service discovery.")
     if args.routing_logic == "session" and args.session_key is None:
