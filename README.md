@@ -4,7 +4,7 @@
 
 ## Latest News
 
-- 📄 Official documentation released for production-stack! [Link](https://docs.lmcache.ai/vllm-production-stack/)
+- 📄 Official documentation released for production-stack! [Link](https://docs.vllm.ai/projects/production-stack)
 - ✨ Cloud Deployment Tutorials for Lambda Labs, AWS EKS, Google GCP are out! [Link](https://github.com/vllm-project/production-stack/blob/main/tutorials)
 - 🛤️ 2025 Q1 Road Map Released! Join the discussion [here](https://github.com/vllm-project/production-stack/issues/26)!
 - 🔥 vLLM Production Stack is released! Checkout our [release blogs](https://blog.lmcache.ai/2025-01-21-stack-release) [01-22-2025]
