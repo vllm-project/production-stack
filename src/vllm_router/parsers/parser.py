@@ -102,7 +102,6 @@ def parse_args():
     parser.add_argument(
         "--routing-logic",
         type=str,
-        # required=True,
         choices=["roundrobin", "session"],
         help="The routing logic to use",
     )
@@ -229,14 +228,12 @@ def parse_args():
     parser.add_argument(
         "--routing-logic-prefill",
         type=str,
-        # required=True,
         choices=["roundrobin", "session"],
         help="The routing logic for prefill to use",
     )    
     parser.add_argument(
         "--routing-logic-decode",
         type=str,
-        # required=True,
         choices=["roundrobin", "session"],
         help="The routing logic for decode to use",
     )        
