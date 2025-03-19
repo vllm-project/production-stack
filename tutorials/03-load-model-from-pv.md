@@ -47,13 +47,13 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
 2. Apply the manifest:
 
    ```bash
-   sudo kubectl apply -f tutorials/assets/pv-03.yaml
+   kubectl apply -f tutorials/assets/pv-03.yaml
    ```
 
 3. Verify the PV is created:
 
    ```bash
-   sudo kubectl get pv
+   kubectl get pv
    ```
 
    Expected output:
@@ -103,7 +103,7 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
 3. Verify the deployment:
 
    ```bash
-   sudo kubectl get pods
+   kubectl get pods
    ```
 
    Expected output:
@@ -127,7 +127,7 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
    - If using Minikube, access the Minikube VM and check the path:
 
      ```bash
-     sudo minikube ssh
+     minikube ssh
      ls /data/llama3/hub
      ```
 
@@ -142,8 +142,8 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
 2. Uninstall and reinstall the deployment to observe faster startup:
 
    ```bash
-   sudo helm uninstall vllm
-   sudo kubectl delete -f tutorials/assets/pv-03.yaml && sudo kubectl apply -f tutorials/assets/pv-03.yaml
+   helm uninstall vllm
+   kubectl delete -f tutorials/assets/pv-03.yaml && kubectl apply -f tutorials/assets/pv-03.yaml
    helm install vllm vllm/vllm-stack -f tutorials/assets/values-03-match-pv.yaml
    ```
 

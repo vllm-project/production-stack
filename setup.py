@@ -2,9 +2,12 @@ import os
 
 from setuptools import find_packages, setup
 
-install_sentence_transformers = (
-    os.getenv("INSTALL_SENTENCE_TRANSFORMERS", "true") == "true"
-)
+# Semantic cache dependencies
+semantic_cache_deps = [
+    "sentence-transformers==2.2.2",
+    "faiss-cpu==1.10.0",
+    "huggingface-hub==0.25.2",  # downgrade to 0.25.2 to avoid breaking changes
+]
 
 install_requires = [
     "numpy==1.26.4",
@@ -16,12 +19,16 @@ install_requires = [
     "uhashring==2.3",
     "aiofiles==24.1.0",
     "python-multipart==0.0.20",
-    "faiss-cpu==1.10.0",
-    "huggingface-hub==0.25.2",  # downgrade to 0.25.2 to avoid breaking changes
 ]
 
-if install_sentence_transformers:
-    install_requires.append("sentence-transformers==2.2.2")
+# Add semantic cache deps to install_requires if env var is set
+if os.getenv("INSTALL_SENTENCE_TRANSFORMERS", "true") == "true":
+    install_requires.extend(semantic_cache_deps)
+
+# Optional dependencies
+extras_require = {
+    "semantic_cache": semantic_cache_deps,
+}
 
 setup(
     name="vllm-router",
@@ -29,8 +36,9 @@ setup(
     setup_requires=["setuptools_scm"],
     packages=find_packages(where="src"),
     package_dir={"": "src"},
-    # Should be the same as src/router/requirements.txt
+    # Should be the same as src/vllm_router/requirements.txt
     install_requires=install_requires,
+    extras_require=extras_require,
     entry_points={
         "console_scripts": [
             "vllm-router=vllm_router.app:main",

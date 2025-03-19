@@ -54,8 +54,8 @@ Deploy the Helm chart using the predefined configuration file:
 
 .. code-block:: bash
 
-    sudo helm repo add vllm https://vllm-project.github.io/production-stack
-    sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
+    helm repo add vllm https://vllm-project.github.io/production-stack
+    helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
 
 
 2. Validate Installation
@@ -68,7 +68,7 @@ Monitor the deployment status using:
 
 .. code-block:: bash
 
-    sudo kubectl get pods
+    kubectl get pods
 
 
 Expected output:
@@ -93,7 +93,7 @@ Expose the `vllm-router-service` port to the host machine:
 
 .. code-block:: bash
 
-    sudo kubectl port-forward svc/vllm-router-service 30080:80
+    kubectl port-forward svc/vllm-router-service 30080:80
 
 
 3.2 Query the OpenAI-Compatible API to list the available models
@@ -103,7 +103,7 @@ Test the stack's OpenAI-compatible API by querying the available models:
 
 .. code-block:: bash
 
-    curl -o- http://localhost:30080/models
+    curl -o- http://localhost:30080/v1/models
 
 
 Expected output:
@@ -132,7 +132,7 @@ Send a query to the OpenAI `/completion` endpoint to generate a completion for a
 
 .. code-block:: bash
 
-    curl -X POST http://localhost:30080/completions \
+    curl -X POST http://localhost:30080/v1/completions \
       -H "Content-Type: application/json" \
       -d '{
         "model": "facebook/opt-125m",
@@ -167,4 +167,4 @@ To remove the deployment, run:
 
 .. code-block:: bash
 
-    sudo helm uninstall vllm
+    helm uninstall vllm

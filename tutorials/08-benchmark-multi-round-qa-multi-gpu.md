@@ -38,7 +38,7 @@ servingEngineSpec:
   modelSpec:
   - name: "llama3"
     repository: "lmcache/vllm-openai"
-    tag: "latest"
+    tag: "2025-03-10"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 8
     requestCPU: 10
@@ -59,13 +59,15 @@ servingEngineSpec:
     hf_token: <YOUR_HUGGINGFACE_TOKEN>
 
 routerSpec:
+  repository: "lmcache/lmstack-router"
+  tag: "benchmark"
   resources:
-  requests:
-    cpu: "2"
-    memory: "8G"
-  limits:
-    cpu: "2"
-    memory: "8G"
+    requests:
+      cpu: "2"
+      memory: "8G"
+    limits:
+      cpu: "2"
+      memory: "8G"
   routingLogic: "session"
   sessionKey: "x-user-id"
 ```
@@ -73,8 +75,8 @@ routerSpec:
 Deploy the vLLM Production Stack server by:
 
 ```bash
-sudo helm repo add vllm https://vllm-project.github.io/production-stack
-sudo helm install vllm vllm/vllm-stack -f stack.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f stack.yaml
 ```
 
 Then you can verify the pod readiness:
@@ -86,13 +88,12 @@ kubectl get pods
 Once the pods are ready, run the port forwarding:
 
 ```bash
-sudo kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 Finally, run the benchmarking code by:
 
 ```bash
-bash warmup.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/
 bash run.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/ stack
 ```
 
@@ -132,20 +133,21 @@ servingEngineSpec:
 
 routerSpec:
   resources:
-  requests:
-    cpu: "2"
-    memory: "8G"
-  limits:
-    cpu: "2"
-    memory: "8G"
-  routingLogic: "roundrobin"
+    requests:
+      cpu: "2"
+      memory: "8G"
+    limits:
+      cpu: "2"
+      memory: "8G"
+  routingLogic: "session"
+  sessionKey: "x-user-id"
 ```
 
 Deploy the Naive K8s stack server:
 
 ```bash
-sudo helm repo add vllm https://vllm-project.github.io/production-stack
-sudo helm install vllm vllm/vllm-stack -f naive.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f naive.yaml
 ```
 
 Then you can verify the pod readiness:
@@ -157,13 +159,12 @@ kubectl get pods
 Once the pods are ready, run the port forwarding:
 
 ```bash
-sudo kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 Finally, run the benchmarking code by:
 
 ```bash
-bash warmup.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/
 bash run.sh meta-llama/Llama-3.1-8B-Instruct http://localhost:30080/v1/ native
 ```
 
@@ -182,7 +183,6 @@ We also changed the CPU memory limit in AIBrix's KV cache server config: At line
 Finally, we follow the steps in [AIBrix's official repo](https://aibrix.readthedocs.io/latest/getting_started/installation/lambda.html) to start AIBrix server and then run the benchmarking code by:
 
 ```bash
-bash warmup.sh llama3-1-8b http://localhost:8888/v1/
 bash run.sh llama3-1-8b http://localhost:8888/v1/ aibrix
 ```
 
