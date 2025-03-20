@@ -52,6 +52,10 @@ from vllm_router.service_discovery import (
 )
 from vllm_router.services.batch_service import initialize_batch_processor
 from vllm_router.services.files_service import initialize_storage
+from vllm_router.services.request_service.rewriter import (
+    get_request_rewriter,
+    initialize_request_rewriter,
+)
 from vllm_router.stats.engine_stats import (
     get_engine_stats_scraper,
     initialize_engine_stats_scraper,
@@ -90,7 +94,6 @@ async def lifespan(app: FastAPI):
         dyn_cfg_watcher.close()
 
 
-# TODO: This method needs refactoring, since it has nested if statements and is too long
 def initialize_all(app: FastAPI, args):
     """
     Initialize all the components of the router with the given arguments.
@@ -194,6 +197,7 @@ def initialize_all(app: FastAPI, args):
     app.state.engine_stats_scraper = get_engine_stats_scraper()
     app.state.request_stats_monitor = get_request_stats_monitor()
     app.state.router = get_routing_logic()
+    app.state.request_rewriter = get_request_rewriter()
 
     # Initialize dynamic config watcher
     if args.dynamic_config_json:

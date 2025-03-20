@@ -16,6 +16,28 @@
             }
           }
         },
+        "vllmApiKey": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "secretName": {
+                  "type": "string"
+                },
+                "secretKey": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "secretName",
+                "secretKey"
+              ]
+            }
+          ]
+        },
         "modelSpec": {
           "type": "array",
           "items": {
@@ -42,8 +64,17 @@
               "requestMemory": {
                 "type": "string"
               },
+              "limitCPU": {
+                "type": "integer"
+              },
+              "limitMemory": {
+                "type": "string"
+              },
               "requestGPU": {
                 "type": "integer"
+              },
+              "requestGPUType": {
+                "type": "string"
               },
               "pvcStorage": {
                 "type": "string"
@@ -324,6 +355,19 @@
         },
         "runtimeClassName": {
           "type": "string"
+        },
+        "schedulerName": {
+          "type": "string"
+        },
+        "securityContext": {
+          "type": "object",
+          "description": "Pod-level security context configuration",
+          "additionalProperties": true
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level security context configuration",
+          "additionalProperties": true
         }
       }
     },

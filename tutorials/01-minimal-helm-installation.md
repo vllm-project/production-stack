@@ -6,17 +6,21 @@ This tutorial guides you through a minimal setup of the vLLM Production Stack us
 
 ## Table of Contents
 
-- [Introduction](#introduction)
-- [Table of Contents](#table-of-contents)
-- [Prerequisites](#prerequisites)
-- [Steps](#steps)
-  - [1. Deploy vLLM Instance](#1-deploy-vllm-instance)
-  - [2. Validate Installation](#2-validate-installation)
-  - [3. Send a Query to the Stack](#3-send-a-query-to-the-stack)
-    - [3.1. Forward the Service Port](#31-forward-the-service-port)
-    - [3.2. Query the OpenAI-Compatible API to list the available models](#32-query-the-openai-compatible-api-to-list-the-available-models)
-    - [3.3. Query the OpenAI Completion Endpoint](#33-query-the-openai-completion-endpoint)
-  - [4. Uninstall](#4-uninstall)
+- [Tutorial: Minimal Setup of the vLLM Production Stack](#tutorial-minimal-setup-of-the-vllm-production-stack)
+  - [Introduction](#introduction)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Steps](#steps)
+    - [1. Deploy vLLM Instance](#1-deploy-vllm-instance)
+      - [1.1: Use Predefined Configuration](#11-use-predefined-configuration)
+      - [1.2: Deploy the Helm Chart](#12-deploy-the-helm-chart)
+    - [2. Validate Installation](#2-validate-installation)
+      - [2.1: Monitor Deployment Status](#21-monitor-deployment-status)
+    - [3. Send a Query to the Stack](#3-send-a-query-to-the-stack)
+      - [3.1: Forward the Service Port](#31-forward-the-service-port)
+      - [3.2: Query the OpenAI-Compatible API to list the available models](#32-query-the-openai-compatible-api-to-list-the-available-models)
+      - [3.3: Query the OpenAI Completion Endpoint](#33-query-the-openai-completion-endpoint)
+    - [4. Uninstall](#4-uninstall)
 
 ## Prerequisites
 
@@ -48,6 +52,9 @@ servingEngineSpec:
     requestCPU: 6
     requestMemory: "16Gi"
     requestGPU: 1
+    # Optional resource limits - if not specified, only GPU will have a limit
+    # limitCPU: "8"
+    # limitMemory: "32Gi"
 
 ```
 
@@ -69,8 +76,8 @@ Explanation of the key fields:
 Deploy the Helm chart using the predefined configuration file:
 
 ```bash
-sudo helm repo add vllm https://vllm-project.github.io/production-stack
-sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.yaml
 ```
 
 Explanation of the command:
@@ -86,7 +93,7 @@ Explanation of the command:
 Monitor the deployment status using:
 
 ```bash
-sudo kubectl get pods
+kubectl get pods
 ```
 
 Expected output:
@@ -108,7 +115,7 @@ _Note_: It may take some time for the containers to download the Docker images a
 Expose the `vllm-router-service` port to the host machine:
 
 ```bash
-sudo kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 #### 3.2: Query the OpenAI-Compatible API to list the available models
@@ -116,7 +123,7 @@ sudo kubectl port-forward svc/vllm-router-service 30080:80
 Test the stack's OpenAI-compatible API by querying the available models:
 
 ```bash
-curl -o- http://localhost:30080/models
+curl -o- http://localhost:30080/v1/models
 ```
 
 Expected output:
@@ -141,7 +148,7 @@ Expected output:
 Send a query to the OpenAI `/completion` endpoint to generate a completion for a prompt:
 
 ```bash
-curl -X POST http://localhost:30080/completions \
+curl -X POST http://localhost:30080/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "facebook/opt-125m",
@@ -175,5 +182,5 @@ This demonstrates the model generating a continuation for the provided prompt.
 To remove the deployment, run:
 
 ```bash
-sudo helm uninstall vllm
+helm uninstall vllm
 ```

@@ -1,9 +1,10 @@
 # vLLM Production Stack: reference stack for production vLLM deployment
 
-| [**Blog**](https://lmcache.github.io) | [**Production-Stack Slack Channel**](https://vllm-dev.slack.com/archives/C089SMEAKRA) | [**LMCache Slack**](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ) | [**Interest Form**](https://forms.gle/mQfQDUXbKfp2St1z7) | [**Official Email**](contact@lmcache.ai) |
+| [**Blog**](https://lmcache.github.io) | [**Docs**](https://docs.vllm.ai/projects/production-stack) | [**Production-Stack Slack Channel**](https://vllm-dev.slack.com/archives/C089SMEAKRA) | [**LMCache Slack**](https://join.slack.com/t/lmcacheworkspace/shared_invite/zt-2viziwhue-5Amprc9k5hcIdXT7XevTaQ) | [**Interest Form**](https://forms.gle/mQfQDUXbKfp2St1z7) | [**Official Email**](contact@lmcache.ai) |
 
 ## Latest News
 
+- 📄 Official documentation released for production-stack! [Link](https://docs.lmcache.ai/vllm-production-stack/)
 - ✨ Cloud Deployment Tutorials for Lambda Labs, AWS EKS, Google GCP are out! [Link](https://github.com/vllm-project/production-stack/blob/main/tutorials)
 - 🛤️ 2025 Q1 Road Map Released! Join the discussion [here](https://github.com/vllm-project/production-stack/issues/26)!
 - 🔥 vLLM Production Stack is released! Checkout our [release blogs](https://blog.lmcache.ai/2025-01-21-stack-release) [01-22-2025]
@@ -19,7 +20,7 @@
 ## Step-By-Step Tutorials
 
 0. How To [*Install Kubernetes (kubectl, helm, minikube, etc)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)?
-1. How to [*Deploy Production Stack on Major Cloud Platforms (AWS, GCP, Lambda Labs)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/cloud_deployments)?
+1. How to [*Deploy Production Stack on Major Cloud Platforms (AWS, GCP, Lambda Labs, Azure)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/cloud_deployments)?
 2. How To [*Setup a Minimal vLLM Production Stack*](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)?
 3. How To [*Customize vLLM Configs (optional)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/02-basic-vllm-config.md)?
 4. How to [*Load Your LLM Weights*](https://github.com/vllm-project/production-stack/blob/main/tutorials/03-load-model-from-pv.md)?
@@ -74,7 +75,7 @@ For more information about customizing the helm chart, please refer to [values.y
 ### Uninstall
 
 ```bash
-sudo helm uninstall vllm
+helm uninstall vllm
 ```
 
 ## Grafana Dashboard
