@@ -43,5 +43,9 @@ spec:
     # +optional
     failureThreshold: 3
 
-  # Optional: Name of the ConfigMap to create
-  configMapName: vllm-router-config
+  # Reference to the ConfigMap to create
+  configMapRef:
+    kind: ConfigMap
+    apiVersion: v1
+    name: staticroute-sample-config
+    namespace: default
