@@ -6,6 +6,7 @@ metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-deployment-vllm"
   namespace: {{ .Release.Namespace }}
   labels:
+    model: {{ $modelSpec.name }}
   {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
   replicas: {{ $modelSpec.replicaCount }}
@@ -17,6 +18,7 @@ spec:
   template:
     metadata:
       labels:
+        model: {{ $modelSpec.name }}
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
       {{- if hasKey $modelSpec "initContainer" }}
@@ -43,6 +45,10 @@ spec:
               mountPath: /data
           {{- end }}
           {{- end }}
+      {{- end }}
+      {{- if .Values.servingEngineSpec.securityContext }}
+      securityContext:
+        {{- toYaml .Values.servingEngineSpec.securityContext | nindent 8 }}
       {{- end }}
       containers:
         - name: "vllm"
@@ -95,8 +101,10 @@ spec:
           - "--chat-template"
           - "/chat_templates/chat-template.jinga"
           {{- end }}
+          {{- if .Values.servingEngineSpec.containerSecurityContext }}
           securityContext:
-            runAsNonRoot: false
+            {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
+          {{- end }}
           imagePullPolicy: IfNotPresent
           env:
           - name: HF_HOME
@@ -123,6 +131,21 @@ spec:
               secretKeyRef:
                 name: {{ $modelSpec.hf_token.secretName }}
                 key: {{ $modelSpec.hf_token.secretKey }}
+            {{- end }}
+          {{- end }}
+          {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
+          {{- if $vllmApiKey }}
+          - name: VLLM_API_KEY
+            {{- if kindIs "string" $vllmApiKey }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-secrets
+                key: vllmApiKey
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ $vllmApiKey.secretName }}
+                key: {{ $vllmApiKey.secretKey }}
             {{- end }}
           {{- end }}
           {{- with $modelSpec.env }}
@@ -164,7 +187,7 @@ spec:
               containerPort: {{ include "chart.container-port" . }}
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
-          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
+          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
           volumeMounts:
           {{- end }}
           {{- if hasKey $modelSpec "pvcStorage" }}
@@ -181,11 +204,14 @@ spec:
           - name: {{ .Release.Name }}-chat-templates
             mountPath: /chat_templates
           {{- end}}
+          {{- if hasKey $modelSpec "extraVolumeMounts" }}
+          {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
+          {{- end}}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
-      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
       volumes:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
@@ -206,6 +232,9 @@ spec:
           configMap:
             name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
         {{- end}}
+        {{- if hasKey $modelSpec "extraVolumes" }}
+        {{- toYaml $modelSpec.extraVolumes | nindent 8 }}
+        {{- end}}
       {{- if .Values.servingEngineSpec.tolerations }}
       {{-   with .Values.servingEngineSpec.tolerations }}
       tolerations:
@@ -215,6 +244,9 @@ spec:
 
       {{- if .Values.servingEngineSpec.runtimeClassName }}
       runtimeClassName: {{ .Values.servingEngineSpec.runtimeClassName }}
+      {{- end }}
+      {{- if .Values.servingEngineSpec.schedulerName }}
+      schedulerName: {{ .Values.servingEngineSpec.schedulerName }}
       {{- end }}
       {{- if $modelSpec.nodeSelectorTerms}}
       affinity:

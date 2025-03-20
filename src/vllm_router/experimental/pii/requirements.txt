@@ -1,0 +1,14 @@
+
+# spaCy models
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+
+# PII detection dependencies
+nltk>=3.8.1,<4.0.0
+phonenumbers>=8.13.11
+
+# Core dependencies
+presidio-analyzer>=2.2.0
+pydantic>=2.0.0
+
+# Additional dependencies required for PII detection
+regex>=2022.9.13

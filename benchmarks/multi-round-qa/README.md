@@ -42,7 +42,7 @@ helm install vllm vllm/vllm-stack -f model.yaml
 And then do port-forwarding with the following command:
 
 ```bash
-sudo kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 ### Explanation of the arguments

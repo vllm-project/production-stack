@@ -70,7 +70,7 @@ servingEngineSpec:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm-lora ./helm -f tutorials/assets/values-07-lora-enabled.yaml
+helm install vllm-lora vllm/vllm-stack -f tutorials/assets/values-07-lora-enabled.yaml
 ```
 
 ### 3. Using LoRA Adapters

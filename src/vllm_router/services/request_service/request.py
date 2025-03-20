@@ -9,6 +9,10 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import get_service_discovery
+from vllm_router.services.request_service.rewriter import (
+    get_request_rewriter,
+    is_request_rewriter_initialized,
+)
 
 try:
     # Semantic cache integration
@@ -140,6 +144,20 @@ async def route_general_request(request: Request, endpoint: str):
             status_code=400,
             content={"error": "Invalid request: missing 'model' in request body."},
         )
+
+    # Apply request rewriting if enabled
+    if is_request_rewriter_initialized():
+        rewriter = get_request_rewriter()
+        rewritten_body = rewriter.rewrite_request(
+            request_body, requested_model, endpoint
+        )
+        logger.info(f"Request for model {requested_model} was rewritten")
+        request_body = rewritten_body
+        # Update request_json if the body was rewritten
+        try:
+            request_json = json.loads(request_body)
+        except:
+            logger.warning("Failed to parse rewritten request body as JSON")
 
     # TODO (ApostaC): merge two awaits into one
     endpoints = get_service_discovery().get_endpoint_info()

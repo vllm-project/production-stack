@@ -126,7 +126,7 @@ gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
 After the cluster is created, the next step is to deploy the vLLM application using Helm.
 
 ```bash
-sudo helm repo add vllm https://vllm-project.github.io/production-stack
+helm repo add vllm https://vllm-project.github.io/production-stack
 ```
 
 - **Helm Repository**: This command adds the vLLM Helm repository to your local Helm setup.
@@ -134,7 +134,7 @@ sudo helm repo add vllm https://vllm-project.github.io/production-stack
 #### 2.2 Install the Application
 
 ```bash
-sudo helm install vllm vllm/vllm-stack -f "$SETUP_YAML"
+helm install vllm vllm/vllm-stack -f "$SETUP_YAML"
 ```
 
 - **Deployment**: This command installs the vLLM stack using the specified YAML configuration file, which contains the settings for the deployment.

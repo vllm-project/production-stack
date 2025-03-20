@@ -62,6 +62,12 @@ You can install the router using the following command:
 pip install -e .
 ```
 
+If you want to run the router with the semantic cache, you can install the dependencies using the following command:
+
+```bash
+pip install -e .[semantic_cache]
+```
+
 **Example 1:** running the router locally at port 8000 in front of multiple serving engines:
 
 ```bash

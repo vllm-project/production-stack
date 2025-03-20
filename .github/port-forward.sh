@@ -40,4 +40,6 @@ sudo kubectl patch service vllm-router-service -p '{"spec":{"type":"NodePort"}}'
 ip=$(sudo minikube ip)
 port=$(sudo kubectl get svc vllm-router-service -o=jsonpath='{.spec.ports[0].nodePort}')
 
+sleep 5
+
 bash ".github/$1.sh" "$ip" "$port"
