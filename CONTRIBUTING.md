@@ -39,15 +39,15 @@ Follow the standard GitHub workflow:
 Linter checks are parts of our github workflows. To pass all linter checks, please use <code>pre-commit</code> to format your code. It is installed as follows:
 
 ```bash
-pip install -r requirements-lint.txt
-pre-commit install
+uv sync --all-extras --all-groups
+uv run pre-commit install
 ```
 
 It will run automatically before every commit. You can also run it manually on
 all files with:
 
 ```bash
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 There are a subset of hooks which require additional dependencies that you may
@@ -58,9 +58,9 @@ with:
 
 ```bash
 # Runs all hooks including manual stage hooks
-pre-commit run --all-files --hook-stage manual
+uv run pre-commit run --all-files --hook-stage manual
 # Runs only the manual stage hook shellcheck
-pre-commit run --all-files --hook-stage manual shellcheck
+uv run pre-commit run --all-files --hook-stage manual shellcheck
 ```
 
 If any of these hooks are failing in CI but you cannot run them locally, you
