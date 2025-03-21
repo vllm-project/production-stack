@@ -108,6 +108,12 @@ def parse_args():
         default=None,
         help="The key (in the header) to identify a session.",
     )
+    parser.add_argument(
+        "--callbacks",
+        type=str,
+        default=None,
+        help="Path to the callback instance extending CustomCallbackHandler. Consists of <file path without .py ending>.<instance variable name>.",
+    )
 
     # Request rewriter arguments
     parser.add_argument(
