@@ -302,6 +302,9 @@ routerSpec:
     #    hosts:
     #      - vllm-router.local
 
+  # The node selector terms to match the nodes
+  nodeSelectorTerms: []
+
   # -- TODO: Readiness probe configuration
   #startupProbe:
   #  # -- Number of seconds after the container has started before startup probe is initiated

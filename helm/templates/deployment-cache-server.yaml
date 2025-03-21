@@ -16,6 +16,15 @@ spec:
       labels:
       {{- include "chart.cacheserverLabels" . | nindent 8 }}
     spec:
+      {{- if .Values.cacheserverSpec.nodeSelectorTerms}}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            {{- with .Values.cacheserverSpec.nodeSelectorTerms }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      {{- end }}
       containers:
         - name: "lmcache-server"
           image: "{{ required "Required value 'cacheserverSpec.repository' must be defined !" .Values.cacheserverSpec.repository }}:{{ required "Required value 'cacheserverSpec.tag' must be defined !" .Values.cacheserverSpec.tag }}"
@@ -40,7 +49,6 @@ spec:
             - name: "caserver-cport"
               containerPort: {{ .Values.cacheserverSpec.containerPort }}
           imagePullPolicy: IfNotPresent
-
         # TODO(Jiayi): add health check for lmcache server
         # livenessProbe:
         #   initialDelaySeconds: 30
