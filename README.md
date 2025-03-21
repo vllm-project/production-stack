@@ -13,9 +13,9 @@
 
 We host **weekly** community meetings at **alternating** times to accommodate different time zones. These meetings occur on Tuesdays, starting from February 25th.
 
-Tuesdays at 4:00 PM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1j1gO2PcFQLBi98fq4djEEiqOK_oHgq9j&export=download)
+- Tuesdays at 4:00 PM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1j1gO2PcFQLBi98fq4djEEiqOK_oHgq9j&export=download)
 
-Tuesdays at 8:00 AM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1xdkxpg-OpxkuLqjegHQhihwBM9koFvSh&export=download)
+- Tuesdays at 8:00 AM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1xdkxpg-OpxkuLqjegHQhihwBM9koFvSh&export=download)
 
 Meetings alternate weekly between the two times. All are welcome to join!
 
