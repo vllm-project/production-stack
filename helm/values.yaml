@@ -76,6 +76,7 @@ servingEngineSpec:
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
   # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes
+  # - nodeSelector: (optional, map) The node selector to match the nodes in a simple case
   #
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   #
@@ -126,6 +127,8 @@ servingEngineSpec:
   #         operator: "In"
   #         values:
   #         - "NVIDIA-RTX-A6000"
+  #   nodeSelector:
+  #     nvidia.com/gpu.product: NVIDIA-RTX-A6000
   modelSpec: []
 
   # -- Container port

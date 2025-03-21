@@ -257,6 +257,12 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
+      {{- if $modelSpec.nodeSelector}}
+      nodeSelector:
+        {{- with $modelSpec.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
 {{- if $modelSpec.chatTemplate }}
 ---
 apiVersion: v1
