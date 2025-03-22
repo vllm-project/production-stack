@@ -1,0 +1,27 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "llama3-8b"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+
+    # Tool calling configuration
+    enableTool: true
+    toolCallParser: "llama3_json"  # Parser to use for tool calls (e.g., "llama3_json" for Llama models)
+    chatTemplate: "tool_chat_template_llama3.1_json.jinja"  # Template file name (will be mounted at /vllm/templates)
+
+    # Mount Hugging Face credentials
+    env:
+      - name: HUGGING_FACE_HUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: huggingface-credentials
+            key: HUGGING_FACE_HUB_TOKEN
+
+    replicaCount: 1
+
+    # Resource requirements for Llama-3.1-8B-Instruct
+    requestCPU: 8
+    requestMemory: "32Gi"
+    requestGPU: 1
