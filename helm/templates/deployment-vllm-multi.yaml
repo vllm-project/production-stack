@@ -65,17 +65,6 @@ spec:
           {{- if $modelSpec.enableLoRA }}
           - "--enable-lora"
           {{- end }}
-          {{- if $modelSpec.enableTool }}
-          - "--enable-auto-tool-choice"
-          {{- end }}
-          {{- if $modelSpec.toolCallParser }}
-          - "--tool-call-parser"
-          - {{ $modelSpec.toolCallParser | quote }}
-          {{- end }}
-          {{- if $modelSpec.chatTemplate }}
-          - "--chat-template"
-          - {{ printf "/vllm/templates/%s" $modelSpec.chatTemplate | quote }}
-          {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{-   if hasKey . "enableChunkedPrefill" }}
           - "--enable-chunked-prefill"
@@ -83,7 +72,7 @@ spec:
           {{-   end }}
           {{-   if .enablePrefixCaching }}
           - "--enable-prefix-caching"
-          {{- end }}
+          {{-   end }}
           {{-   if hasKey . "maxModelLen" }}
           - "--max-model-len"
           - {{ .maxModelLen | quote }}
@@ -107,6 +96,17 @@ spec:
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}'
           {{-   end }}
+          {{- end }}
+          {{- if $modelSpec.chatTemplate }}
+          - "--chat-template"
+          {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
+          - name: {{ .Release.Name }}-chat-templates
+            mountPath: /chat_templates
+          {{- else }}
+          - name: vllm-templates
+            mountPath: /vllm/templates
+            readOnly: true
+          {{- end }}
           {{- end }}
           {{- if .Values.servingEngineSpec.containerSecurityContext }}
           securityContext:
@@ -194,7 +194,7 @@ spec:
               containerPort: {{ include "chart.container-port" . }}
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
-          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "extraVolumeMounts") $modelSpec.enableTool }}
+          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
           volumeMounts:
           {{- end }}
           {{- if hasKey $modelSpec "pvcStorage" }}
@@ -208,18 +208,17 @@ spec:
           {{- end}}
           {{- end}}
           {{- if $modelSpec.enableTool }}
-          - name: vllm-templates
-            mountPath: /vllm/templates
-            readOnly: true
-          {{- end}}
-          {{- if hasKey $modelSpec "extraVolumeMounts" }}
-          {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
-          {{- end}}
+          - "--enable-auto-tool-choice"
+          {{- end }}
+          {{- if $modelSpec.toolCallParser }}
+          - "--tool-call-parser"
+          - {{ $modelSpec.toolCallParser | quote }}
+          {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
-      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "extraVolumes") $modelSpec.enableTool }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
       volumes:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
@@ -235,10 +234,16 @@ spec:
             sizeLimit: {{ default "20Gi" $modelSpec.shmSize }}
         {{- end}}
         {{- end}}
-        {{- if $modelSpec.enableTool }}
+        {{- if $modelSpec.chatTemplate}}
+        {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
+        - name: {{ .Release.Name }}-chat-templates
+          configMap:
+            name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
+        {{- else }}
         - name: vllm-templates
           persistentVolumeClaim:
             claimName: vllm-templates-pvc
+        {{- end }}
         {{- end}}
         {{- if hasKey $modelSpec "extraVolumes" }}
         {{- toYaml $modelSpec.extraVolumes | nindent 8 }}
@@ -265,5 +270,17 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
+{{- if and $modelSpec.chatTemplate (hasKey $modelSpec "chatTemplateConfigMap") }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
+  namespace: "{{ .Release.Namespace }}"
+data:
+  {{ $modelSpec.chatTemplate }}: |-
+    {{ $modelSpec.chatTemplateConfigMap }}
 {{- end }}
+{{- end }}
+---
 {{- end }}
