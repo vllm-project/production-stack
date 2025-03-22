@@ -146,6 +146,15 @@ limits:
 {{- end }}
 
 {{/*
+  Define labels for lookup server and its service
+*/}}
+{{- define "chart.lookupserverLabels" -}}
+{{-   with .Values.lookupserverSpec.labels -}}
+{{      toYaml . }}
+{{-   end }}
+{{- end }}
+
+{{/*
   Define helper function to convert labels to a comma separated list
 */}}
 {{- define "labels.toCommaSeparatedList" -}}
@@ -164,4 +173,19 @@ limits:
 */}}
 {{- define "cacheserver.formatRemoteUrl" -}}
 lm://{{ .service_name }}:{{ .port }}
+{{- end -}}
+
+{{/*
+  Define helper function to format lookup server url
+*/}}
+{{- define "lookupserver.formatLookupUrl" -}}
+{{ .service_name }}:{{ .port }}
+{{- end -}}
+
+
+{{/*
+  Define helper function to format distributed server url
+*/}}
+{{- define "distributedserver.formatDistributedUrl" -}}
+{{ .service_name }}:{{ .port }}
 {{- end -}}
