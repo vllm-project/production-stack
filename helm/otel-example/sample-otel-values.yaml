@@ -1,0 +1,22 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "opt125m"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "facebook/opt-125m"
+
+    replicaCount: 1
+
+    requestCPU: 2
+    requestMemory: "8Gi"
+    requestGPU: 1
+
+  # environment variables for OpenTelemetry (using gRPC)
+  env:
+    - name: OTEL_SERVICE_NAME
+      value: "vllm-router"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://otel-collector:4317"
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: "service.name=vllm-router,deployment.environment=test"
