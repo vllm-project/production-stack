@@ -66,7 +66,6 @@ autodoc.ClassDocumenter = MockedClassDocumenter
 
 html_title = project
 html_theme = "sphinx_book_theme"
-html_static_path = ["_static"]
 html_logo = "./assets/prodstack_icon.png"
 html_favicon = "./assets/output.ico"
 html_permalinks_icon = "<span>#</span>"
@@ -88,6 +87,14 @@ html_theme_options = {
     "pygments_light_style": "friendly",
     "pygments_dark_style": "monokai",
 }
+
+autodoc_mock_imports = [
+    "aiofiles",
+    "fastapi",
+    "kubernetes",
+    "prometheus_client",
+    "uhashring",
+]
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),

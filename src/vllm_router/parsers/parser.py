@@ -109,6 +109,15 @@ def parse_args():
         help="The key (in the header) to identify a session.",
     )
 
+    # Request rewriter arguments
+    parser.add_argument(
+        "--request-rewriter",
+        type=str,
+        default="noop",
+        choices=["noop"],
+        help="The request rewriter to use. Default is 'noop' (no rewriting).",
+    )
+
     # Batch API
     # TODO(gaocegege): Make these batch api related arguments to a separate config.
     parser.add_argument(

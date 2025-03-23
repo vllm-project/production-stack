@@ -50,3 +50,4 @@ repos:
   rev: v2.4.1
   hooks:
   - id: codespell
+    args: ["--ignore-words", ".codespell-ignore"]

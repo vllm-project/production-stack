@@ -57,7 +57,7 @@ Then, perform port-forwarding with the following command:
 
 .. code-block:: bash
 
-    sudo kubectl port-forward svc/vllm-router-service 30080:80
+    kubectl port-forward svc/vllm-router-service 30080:80
 
 Explanation of the arguments
 ----------------------------

@@ -98,7 +98,7 @@ REVISION: 1
 1. Check the status of the pods:
 
    ```bash
-   sudo kubectl get pods
+   kubectl get pods
    ```
 
    Expected output:
@@ -117,7 +117,7 @@ REVISION: 1
 2. Verify the service is exposed correctly:
 
    ```bash
-   sudo kubectl get services
+   kubectl get services
    ```
 
    Expected output:

@@ -103,7 +103,7 @@ Look for the following log message to confirm LMCache is active:
 
 .. code-block:: bash
 
-    curl -X POST http://localhost:30080/completions \
+    curl -X POST http://localhost:30080/v1/completions \
         -H "Content-Type: application/json" \
         -d '{
             "model": "mistralai/Mistral-7B-Instruct-v0.2",

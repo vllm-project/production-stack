@@ -34,7 +34,7 @@ servingEngineSpec:
   modelSpec:
   - name: "llama3"
     repository: "lmcache/vllm-openai"
-    tag: "latest"
+    tag: "2025-03-10"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
     requestCPU: 10
@@ -56,12 +56,12 @@ servingEngineSpec:
 
 routerSpec:
   resources:
-  requests:
-    cpu: "2"
-    memory: "8G"
-  limits:
-    cpu: "2"
-    memory: "8G"
+    requests:
+      cpu: "2"
+      memory: "8G"
+    limits:
+      cpu: "2"
+      memory: "8G"
   routingLogic: "session"
   sessionKey: "x-user-id"
 ```
@@ -69,8 +69,8 @@ routerSpec:
 Deploy the vLLM Production Stack server by:
 
 ```bash
-sudo helm repo add vllm https://vllm-project.github.io/production-stack
-sudo helm install vllm vllm/vllm-stack -f stack.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f stack.yaml
 ```
 
 Then you can verify the pod readiness:
@@ -82,7 +82,7 @@ kubectl get pods
 Once the pods are ready, run the port forwarding:
 
 ```bash
-sudo kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 Finally, run the benchmarking code by:
@@ -104,7 +104,7 @@ servingEngineSpec:
   modelSpec:
   - name: "llama3"
     repository: "lmcache/vllm-openai"
-    tag: "latest"
+    tag: "2025-03-10"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
     requestCPU: 10
@@ -129,8 +129,8 @@ servingEngineSpec:
 Deploy the Naive K8s stack server:
 
 ```bash
-sudo helm repo add vllm https://vllm-project.github.io/production-stack
-sudo helm install vllm vllm/vllm-stack -f naive.yaml
+helm repo add vllm https://vllm-project.github.io/production-stack
+helm install vllm vllm/vllm-stack -f naive.yaml
 ```
 
 Then you can verify the pod readiness:
@@ -142,7 +142,7 @@ kubectl get pods
 Once the pods are ready, run the port forwarding:
 
 ```bash
-sudo kubectl port-forward svc/vllm-router-service 30080:80
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
 Finally, run the benchmarking code by:
