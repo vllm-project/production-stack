@@ -6,7 +6,7 @@ on:
     paths:
       - 'src/vllm_router/**'
       - 'docker/**'
-      - 'setup.py'
+      - 'pyproject.toml'
   workflow_dispatch:
 
 jobs:

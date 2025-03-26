@@ -12,13 +12,13 @@ on:
     paths:
       - '.github/**'
       - '**.py'
-      - 'setup.py'
+      - 'pyproject.toml'
       - 'helm/**'
   pull_request:
     paths:
       - '.github/**'
       - '**.py'
-      - 'setup.py'
+      - 'pyproject.toml'
       - 'helm/**'
   merge_group:
 jobs:
@@ -37,7 +37,7 @@ jobs:
           DOCKER_BUILDKIT: 1
         run: |
           cd ${{ github.workspace }}
-          sudo docker build --build-arg INSTALL_SENTENCE_TRANSFORMERS=false -t localhost:5000/git-act-router -f docker/Dockerfile .
+          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
           sudo docker push localhost:5000/git-act-router
           sudo sysctl fs.protected_regular=0
           sudo minikube image load localhost:5000/git-act-router
