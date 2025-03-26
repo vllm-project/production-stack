@@ -48,6 +48,7 @@ jobs:
         timeout-minutes: 2
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: output-05-secure-vllm
           path: |
@@ -73,6 +74,7 @@ jobs:
         timeout-minutes: 2
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: output-02-two-pods
           path: |
@@ -96,6 +98,7 @@ jobs:
         timeout-minutes: 3
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: output-04-multiple-models
           path: |
