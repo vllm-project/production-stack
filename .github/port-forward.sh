@@ -36,3 +36,4 @@ port=$(kubectl get svc vllm-router-service -o=jsonpath='{.spec.ports[0].nodePort
 sleep 5
 
 bash ".github/$1.sh" "$ip" "$port"
+
