@@ -13,10 +13,8 @@ classifiers = [
 # Should be the same as src/router/requirements.txt
 dependencies = [
     "aiofiles==24.1.0",
-    "faiss-cpu==1.10.0",
     "fastapi==0.115.8",
     "httpx==0.28.1",
-    "huggingface-hub==0.25.2",
     "kubernetes==32.0.0",
     "numpy==1.26.4",
     "prometheus-client==0.21.1",

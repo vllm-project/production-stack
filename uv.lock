@@ -633,61 +633,6 @@ wheels = [
 ]
 
 [[package]]
-name = "production-stack"
-source = { editable = "." }
-dependencies = [
-    { name = "aiofiles" },
-    { name = "faiss-cpu" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "huggingface-hub" },
-    { name = "kubernetes" },
-    { name = "numpy" },
-    { name = "prometheus-client" },
-    { name = "python-multipart" },
-    { name = "uhashring" },
-    { name = "uvicorn" },
-]
-
-[package.optional-dependencies]
-transformer = [
-    { name = "sentence-transformers" },
-]
-
-[package.dev-dependencies]
-lint = [
-    { name = "pre-commit" },
-]
-test = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = "==24.1.0" },
-    { name = "faiss-cpu", specifier = "==1.10.0" },
-    { name = "fastapi", specifier = "==0.115.8" },
-    { name = "httpx", specifier = "==0.28.1" },
-    { name = "huggingface-hub", specifier = "==0.25.2" },
-    { name = "kubernetes", specifier = "==32.0.0" },
-    { name = "numpy", specifier = "==1.26.4" },
-    { name = "prometheus-client", specifier = "==0.21.1" },
-    { name = "python-multipart", specifier = "==0.0.20" },
-    { name = "sentence-transformers", marker = "extra == 'transformer'", specifier = "==2.2.2" },
-    { name = "uhashring", specifier = "==2.3" },
-    { name = "uvicorn", specifier = "==0.34.0" },
-]
-provides-extras = ["transformer"]
-
-[package.metadata.requires-dev]
-lint = [{ name = "pre-commit", specifier = ">=4.1.0" }]
-test = [
-    { name = "pytest", specifier = ">=8.3.4" },
-    { name = "pytest-asyncio", specifier = ">=0.25.3" },
-]
-
-[[package]]
 name = "prometheus-client"
 version = "0.21.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1177,6 +1122,8 @@ dependencies = [
     { name = "torch" },
 ]
 wheels = [
+    { url = "https://files.pythonhosted.org/packages/52/5b/76ca113a853b19c7b1da761f8a72cb6429b3bd0bf932537d8df4657f47c3/torchvision-0.21.0-1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:ffa2a16499508fe6798323e455f312c7c55f2a88901c9a7c0fb1efa86cf7e327", size = 2329878 },
+    { url = "https://files.pythonhosted.org/packages/4e/fe/5e193353706dab96fe73ae100d5a633ff635ce310e0d92f3bc2958d075b1/torchvision-0.21.0-1-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:7e9e9afa150e40cd2a8f0701c43cb82a8d724f512896455c0918b987f94b84a4", size = 2280711 },
     { url = "https://files.pythonhosted.org/packages/6e/1b/28f527b22d5e8800184d0bc847f801ae92c7573a8c15979d92b7091c0751/torchvision-0.21.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:97a5814a93c793aaf0179cfc7f916024f4b63218929aee977b645633d074a49f", size = 1784140 },
     { url = "https://files.pythonhosted.org/packages/36/63/0722e153fd27d64d5b0af45b5c8cb0e80b35a68cf0130303bc9a8bb095c7/torchvision-0.21.0-cp312-cp312-manylinux1_x86_64.whl", hash = "sha256:b578bcad8a4083b40d34f689b19ca9f7c63e511758d806510ea03c29ac568f7b", size = 7238673 },
     { url = "https://files.pythonhosted.org/packages/bb/ea/03541ed901cdc30b934f897060d09bbf7a98466a08ad1680320f9ce0cbe0/torchvision-0.21.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:5083a5b1fec2351bf5ea9900a741d54086db75baec4b1d21e39451e00977f1b1", size = 14701186 },
@@ -1281,6 +1228,61 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f1/88/dacc875dd54a8acadb4bcbfd4e3e86df8be75527116c91d8f9784f5e9cab/virtualenv-20.29.2.tar.gz", hash = "sha256:fdaabebf6d03b5ba83ae0a02cfe96f48a716f4fae556461d180825866f75b728", size = 4320272 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/93/fa/849483d56773ae29740ae70043ad88e068f98a6401aa819b5d6bee604683/virtualenv-20.29.2-py3-none-any.whl", hash = "sha256:febddfc3d1ea571bdb1dc0f98d7b45d24def7428214d4fb73cc486c9568cce6a", size = 4301478 },
+]
+
+[[package]]
+name = "vllm-router"
+source = { editable = "." }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "kubernetes" },
+    { name = "numpy" },
+    { name = "prometheus-client" },
+    { name = "python-multipart" },
+    { name = "uhashring" },
+    { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+semantic-cache = [
+    { name = "faiss-cpu" },
+    { name = "huggingface-hub" },
+    { name = "sentence-transformers" },
+]
+
+[package.dev-dependencies]
+lint = [
+    { name = "pre-commit" },
+]
+test = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofiles", specifier = "==24.1.0" },
+    { name = "faiss-cpu", marker = "extra == 'semantic-cache'", specifier = "==1.10.0" },
+    { name = "fastapi", specifier = "==0.115.8" },
+    { name = "httpx", specifier = "==0.28.1" },
+    { name = "huggingface-hub", marker = "extra == 'semantic-cache'", specifier = "==0.25.2" },
+    { name = "kubernetes", specifier = "==32.0.0" },
+    { name = "numpy", specifier = "==1.26.4" },
+    { name = "prometheus-client", specifier = "==0.21.1" },
+    { name = "python-multipart", specifier = "==0.0.20" },
+    { name = "sentence-transformers", marker = "extra == 'semantic-cache'", specifier = "==2.2.2" },
+    { name = "uhashring", specifier = "==2.3" },
+    { name = "uvicorn", specifier = "==0.34.0" },
+]
+provides-extras = ["default", "semantic-cache"]
+
+[package.metadata.requires-dev]
+lint = [{ name = "pre-commit", specifier = ">=4.1.0" }]
+test = [
+    { name = "pytest", specifier = ">=8.3.4" },
+    { name = "pytest-asyncio", specifier = ">=0.25.3" },
 ]
 
 [[package]]
