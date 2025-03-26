@@ -105,4 +105,3 @@ jobs:
             helm uninstall vllm
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
-
