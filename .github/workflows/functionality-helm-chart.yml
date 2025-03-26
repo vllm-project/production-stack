@@ -40,11 +40,11 @@ jobs:
           sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
           sudo docker push localhost:5000/git-act-router
           sudo sysctl fs.protected_regular=0
-          sudo minikube image load localhost:5000/git-act-router
-          sudo helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
+          minikube image load localhost:5000/git-act-router
+          helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          sudo bash .github/port-forward.sh curl-05-secure-vllm
+          bash .github/port-forward.sh curl-05-secure-vllm
         timeout-minutes: 2
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
@@ -54,7 +54,7 @@ jobs:
             output-05-secure-vllm/
       - name: Helm uninstall
         run: |
-            sudo helm uninstall vllm
+            helm uninstall vllm
             sudo docker image prune -f
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
@@ -66,10 +66,10 @@ jobs:
       - name: Deploy via helm charts
         run: |
           cd ${{ github.workspace }}
-          sudo helm install vllm ./helm -f .github/values-01-2pods-minimal-example.yaml
+          helm install vllm ./helm -f .github/values-01-2pods-minimal-example.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          sudo bash .github/port-forward.sh curl-02-two-pods
+          bash .github/port-forward.sh curl-02-two-pods
         timeout-minutes: 2
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
@@ -79,7 +79,7 @@ jobs:
             output-02-two-pods/
       - name: Helm uninstall
         run: |
-          sudo helm uninstall vllm
+          helm uninstall vllm
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
 
@@ -89,11 +89,11 @@ jobs:
     steps:
       - name: Deploy via helm charts
         run: |
-          sudo helm install vllm ./helm -f .github/values-04-multiple-models.yaml
+          helm install vllm ./helm -f .github/values-04-multiple-models.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          sudo bash .github/port-forward.sh curl-04-multiple-models
-        timeout-minutes: 2
+          bash .github/port-forward.sh curl-04-multiple-models
+        timeout-minutes: 3
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         with:
@@ -102,6 +102,6 @@ jobs:
             output-04-multiple-models/
       - name: Helm uninstall
         run: |
-            sudo helm uninstall vllm
+            helm uninstall vllm
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
