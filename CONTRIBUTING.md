@@ -39,7 +39,7 @@ Follow the standard GitHub workflow:
 Linter checks are parts of our github workflows. To pass all linter checks, please use <code>pre-commit</code> to format your code. It is installed as follows:
 
 ```bash
-uv sync uv sync --all-extras --all-groups
+uv sync --all-extras --all-groups
 uv run pre-commit install
 ```
 

@@ -29,7 +29,7 @@ dependencies = [
 vllm-router = "vllm_router.app:main"
 
 [project.urls]
-Repository = "ttps://github.com/vllm-project/production-stack"
+Repository = "https://github.com/vllm-project/production-stack"
 
 [project.optional-dependencies]
 default = []  # leave this empty because pip requires at least one specifier
