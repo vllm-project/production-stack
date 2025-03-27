@@ -1,18 +1,21 @@
 {{- if .Values.servingEngineSpec.enableEngine -}}
+{{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ .Release.Name }}-engine-service"
-  namespace: {{ .Release.Namespace }}
+  name: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
+  namespace: {{ $.Release.Namespace }}
   labels:
-  {{- include "chart.engineLabels" . | nindent 4 }}
+  {{- include "chart.engineLabels" $ | nindent 4 }}
 spec:
   type: ClusterIP
   ports:
-    - name: {{ include "chart.service-port-name" . }}
-      port: {{ include "chart.service-port" . }}
-      targetPort: {{ include "chart.container-port-name" . }}
+    - name: {{ include "chart.service-port-name" $ }}
+      port: {{ include "chart.service-port" $ }}
+      targetPort: {{ include "chart.container-port-name" $ }}
       protocol: TCP
   selector:
-  {{- include "chart.engineLabels" . | nindent 4 }}
+    model: "{{ $modelSpec.name }}"
 {{- end }}
+{{- end}}
