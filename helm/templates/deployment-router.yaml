@@ -23,6 +23,7 @@ spec:
         image: "{{ .Values.routerSpec.repository | default "lmcache/lmstack-router" }}:{{ .Values.routerSpec.tag | default "latest" }}"
         imagePullPolicy: "{{ .Values.routerSpec.imagePullPolicy | default "Always" }}"
         env:
+          {{- if .Values.servingEngineSpec.enableEngine -}}
           {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
           {{- if $vllmApiKey }}
           - name: VLLM_API_KEY
@@ -38,6 +39,16 @@ spec:
                 key: {{ $vllmApiKey.secretKey }}
             {{- end }}
           {{- end }}
+          {{- else }}
+          {{- $vllmApiKey := $.Values.routerSpec.vllmApiKey }}
+          {{- if $vllmApiKey }}
+          - name: VLLM_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ $vllmApiKey.secretName }}
+                key: {{ $vllmApiKey.secretKey }}
+          {{- end }}
+          {{- end }}
         args:
           - "--host"
           - "0.0.0.0"
@@ -48,8 +59,10 @@ spec:
           {{- if eq .Values.routerSpec.serviceDiscovery "k8s" }}
           - "--k8s-namespace"
           - "{{ .Release.Namespace }}"
+          {{- if .Values.servingEngineSpec.enableEngine }}
           - "--k8s-label-selector"
           - {{ include "labels.toCommaSeparatedList" .Values.servingEngineSpec.labels }}
+          {{- end }}
           {{- end }}
           {{- if eq .Values.routerSpec.serviceDiscovery "static" }}
           - "--static-backends"
