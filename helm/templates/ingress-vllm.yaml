@@ -1,0 +1,42 @@
+{{- if and (.Values.servingEngineSpec.enableEngine) (.Values.servingEngineSpec.ingress.enabled) -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: "{{ .Release.Name }}-ingress-engine"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chart.engineLabels" . | nindent 4 }}
+  {{- with .Values.servingEngineSpec.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.servingEngineSpec.ingress.className }}
+  ingressClassName: {{ .Values.servingEngineSpec.ingress.className }}
+  {{- end }}
+  {{- if .Values.servingEngineSpec.ingress.tls }}
+  tls:
+    {{- range .Values.servingEngineSpec.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.servingEngineSpec.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ .backend.service.name }}
+                port:
+                  number: {{ $.Values.servingEngineSpec.servicePort }}
+          {{- end }}
+    {{- end }}
+{{- end }}
