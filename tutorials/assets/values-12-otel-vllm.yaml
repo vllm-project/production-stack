@@ -12,7 +12,6 @@ servingEngineSpec:
     requestMemory: "8Gi"
     requestGPU: 1
 
-  # environment variables for OpenTelemetry (using gRPC)
   env:
     - name: OTEL_SERVICE_NAME
       value: "vllm-router"
