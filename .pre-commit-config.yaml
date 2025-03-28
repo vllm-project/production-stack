@@ -11,6 +11,8 @@ repos:
   - id: check-yaml
     exclude: |
       (?x)(
+          ^tutorials/assets/otel-example/jaeger.yaml
+          ^tutorials/assets/otel-example/otel-collector.yaml
           ^helm/templates/|
           .github/deployment-router.yaml
       )
