@@ -1,12 +1,20 @@
 name: Router E2E tests
 
 on:
-  pull_request:
-    types: [ready_for_review]
+  push:
+    branches:
+      - main
     paths:
       - 'src/vllm_router/**'
       - 'docker/**'
       - 'pyproject.toml'
+      - '.github/**'
+  pull_request:
+    paths:
+      - 'src/vllm_router/**'
+      - 'docker/**'
+      - 'pyproject.toml'
+      - '.github/**'
   workflow_dispatch:
 
 jobs:
@@ -57,7 +65,7 @@ jobs:
       - name: Build and Load test Image
         run: |
           REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          docker build -t "ghcr.io/$REPO/router:test" -f docker/Dockerfile .
+          docker build --build-arg INSTALL_OPTIONAL_DEP=none -t "ghcr.io/$REPO/router:test" -f docker/Dockerfile .
           minikube image load "ghcr.io/$REPO/router:test"
 
       - name: Start Mock OpenAI servers
@@ -85,15 +93,24 @@ jobs:
           # Run with Python debug option
           python3 -v request_generator.py --qps 10 --num-workers 32 --duration 300 2>&1 | tee logs/request_generator.log
 
-      - name: Run E2E Tests
+      - name: Run E2E Tests with Coverage
         run: |
-          pytest src/tests/test_*.py
+          pip install coverage
+          coverage run --source=src/vllm_router -m pytest src/tests/test_*.py
+          coverage report -m > coverage.txt
 
       - name: Cleanup Test Environment
         if: always()
         working-directory: src/tests/perftest
         run: |
           bash clean-up.sh
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.txt
 
       - name: Upload Test logs
         if: always()
