@@ -10,7 +10,6 @@ on:
       - 'pyproject.toml'
       - '.github/**'
   pull_request:
-    types: [ready_for_review]
     paths:
       - 'src/vllm_router/**'
       - 'docker/**'
