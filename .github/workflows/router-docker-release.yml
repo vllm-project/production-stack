@@ -7,7 +7,7 @@ on:
     paths:
       - 'src/vllm_router/**'
       - 'docker/**'
-      - 'setup.py'
+      - 'pyproject.toml'
 
   workflow_dispatch:
 
@@ -45,7 +45,8 @@ jobs:
       - name: Extract and sanitize version
         id: version
         run: |
-          raw_version=$(python setup.py --version)
+          pip install uv
+          raw_version=$(uv run python -c 'from vllm_router.version import __version__; print(__version__)')
           sanitized_version=${raw_version//+/-}
           echo "version=$sanitized_version" >> "$GITHUB_ENV"
           echo "Sanitized version: $sanitized_version"
