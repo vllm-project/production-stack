@@ -1,4 +1,5 @@
 import logging
+import sys
 from logging import Logger
 
 
@@ -31,13 +32,29 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
 
 
+class MaxLevelFilter(logging.Filter):
+    def __init__(self, max_level: int):
+        super().__init__()
+        self.max_level = max_level
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno <= self.max_level
+
+
 def init_logger(name: str, log_level=logging.DEBUG) -> Logger:
     logger = logging.getLogger(name)
+    logger.setLevel(log_level)
 
-    ch = logging.StreamHandler()
-    ch.setLevel(log_level)
-    ch.setFormatter(CustomFormatter())
-    logger.addHandler(ch)
-    logger.setLevel(logging.DEBUG)
+    stdout_stream = logging.StreamHandler(sys.stdout)
+    stdout_stream.setLevel(log_level)
+    stdout_stream.setFormatter(CustomFormatter())
+    stdout_stream.addFilter(MaxLevelFilter(logging.INFO))
+    logger.addHandler(stdout_stream)
+
+    error_stream = logging.StreamHandler()
+    error_stream.setLevel(logging.WARNING)
+    error_stream.setFormatter(CustomFormatter())
+    logger.addHandler(error_stream)
+    logger.propagate = False
 
     return logger
