@@ -18,6 +18,15 @@ spec:
       {{- include "chart.routerLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ .Release.Name }}-router-service-account
+      {{- if .Values.routerSpec.nodeSelectorTerms }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            {{- with .Values.routerSpec.nodeSelectorTerms }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      {{- end }}
       containers:
       - name: router-container
         image: "{{ .Values.routerSpec.repository | default "lmcache/lmstack-router" }}:{{ .Values.routerSpec.tag | default "latest" }}"
@@ -103,7 +112,6 @@ spec:
         ports:
           - name: "router-cport"
             containerPort: {{ .Values.routerSpec.containerPort }}
-
         livenessProbe:
           initialDelaySeconds: 30
           periodSeconds: 5

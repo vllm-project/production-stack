@@ -307,6 +307,16 @@ routerSpec:
     #    hosts:
     #      - vllm-router.local
 
+  # The node selector terms to match the nodes
+  # Example:
+  #   nodeSelectorTerms:
+  #     - matchExpressions:
+  #       - key: nvidia.com/gpu.product
+  #         operator: "In"
+  #         values:
+  #         - "NVIDIA-RTX-A6000"
+  nodeSelectorTerms: []
+
   # -- TODO: Readiness probe configuration
   #startupProbe:
   #  # -- Number of seconds after the container has started before startup probe is initiated
