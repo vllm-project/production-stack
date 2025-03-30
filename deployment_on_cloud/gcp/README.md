@@ -6,7 +6,7 @@ Make sure your GCP cli is set up, logged in, and region set up. You have eksctl,
 Modify fields production_stack_specification.yaml and execute as:
 
 ```bash
-sudo bash entry_point_basic.sh YAML_FILE_PATH
+bash entry_point_basic.sh YAML_FILE_PATH
 ```
 
 Pods for the vllm deployment should transition to Ready and the Running state.
