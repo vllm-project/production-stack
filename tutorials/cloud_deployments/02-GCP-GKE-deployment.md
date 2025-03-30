@@ -9,6 +9,7 @@ Before running this setup, ensure you have:
 1. GCP CLI installed and configured with credential and region set up [[Link]](https://cloud.google.com/sdk/docs/install)
 2. Kubectl
 3. Helm
+4. Quota of GPU
 
 ## TLDR
 
