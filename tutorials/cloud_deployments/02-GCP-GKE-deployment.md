@@ -27,8 +27,8 @@ Expected output:
 
 ```plaintext
 NAME                                            READY   STATUS    RESTARTS   AGE
-vllm-deployment-router-69b7f9748d-xrkvn         1/1     Running   0          75s
-vllm-opt125m-deployment-vllm-696c998c6f-mvhg4   1/1     Running   0          75s
+vllm-deployment-router-6786bdcc5b-flj2x        1/1     Running   0          54s
+vllm-llama3-deployment-vllm-7dd564bc8f-7mf5x   1/1     Running   0          54s
 ```
 
 Clean up the service with:
