@@ -18,7 +18,7 @@ Disclaimer: This script requires cloud resources and will incur costs. Please ma
 To run the service, go to "deployment_on_cloud/gcp" and run:
 
 ```bash
-udo bash entry_point_basic.sh YAML_FILE_PATH
+sudo bash entry_point_basic.sh YAML_FILE_PATH
 ```
 
 Pods for the vllm deployment should transition to Ready and the Running state.
