@@ -34,7 +34,7 @@ vllm-llama3-deployment-vllm-7dd564bc8f-7mf5x   1/1     Running   0          54s
 Clean up the service with:
 
 ```bash
-bash clean_up.sh production-stack
+bash clean_up_basic.sh production-stack
 ```
 
 ## Step by Step Explanation
