@@ -3,7 +3,7 @@ servingEngineSpec:
   vllmApiKey: "abc123XYZ987"
   modelSpec:
   - name: "opt125m"
-    repository: "vllm/vllm-openai"
+    repository: "eaminchan/opt-125m-cpu"
     tag: "latest"
     modelURL: "facebook/opt-125m"
 

@@ -2,7 +2,7 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
   - name: "opt125m"
-    repository: "vllm/vllm-openai"
+    repository: "eaminchan/opt-125m-cpu"
     tag: "latest"
     modelURL: "facebook/opt-125m"
     replicaCount: 1
@@ -14,7 +14,7 @@ servingEngineSpec:
       - ReadWriteOnce
 
   - name: "smol135m"
-    repository: "vllm/vllm-openai"
+    repository: "eaminchan/opt-125m-cpu"
     tag: "latest"
     modelURL: "HuggingFaceTB/SmolLM2-135M-Instruct"
     replicaCount: 1
