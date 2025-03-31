@@ -225,7 +225,12 @@ def main():
     initialize_all(app, args)
     if args.log_stats:
         threading.Thread(
-            target=log_stats, args=(args.log_stats_interval,), daemon=True
+            target=log_stats,
+            args=(
+                app,
+                args.log_stats_interval,
+            ),
+            daemon=True,
         ).start()
 
     # Workaround to avoid footguns where uvicorn drops requests with too
