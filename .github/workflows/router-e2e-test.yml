@@ -65,7 +65,7 @@ jobs:
       - name: Build and Load test Image
         run: |
           REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          docker build --build-arg INSTALL_OPTIONAL_DEP=none -t "ghcr.io/$REPO/router:test" -f docker/Dockerfile .
+          # docker build --build-arg INSTALL_OPTIONAL_DEP=none -t "ghcr.io/$REPO/router:test" -f docker/Dockerfile .
           minikube image load "ghcr.io/$REPO/router:test"
 
       - name: Start Mock OpenAI servers
