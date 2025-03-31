@@ -45,8 +45,6 @@ jobs:
 
       - name: Make scripts executable
         run: |
-          chmod +x ./utils/install-kubectl.sh
-          chmod +x ./utils/install-helm.sh
           chmod +x src/vllm_router/perf-test.sh
           chmod +x src/tests/perftest/*.sh
 
