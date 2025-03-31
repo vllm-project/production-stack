@@ -50,10 +50,6 @@ jobs:
           chmod +x src/vllm_router/perf-test.sh
           chmod +x src/tests/perftest/*.sh
 
-      - name: Build and Load test Image
-        run: |
-          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-
       - name: Start Mock OpenAI servers
         working-directory: src/tests/perftest
         run: |
