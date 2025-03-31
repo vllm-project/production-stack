@@ -36,13 +36,6 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Login to Github Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -52,21 +45,8 @@ jobs:
 
       - name: Make scripts executable
         run: |
-          chmod +x ./utils/install-minikube-cluster.sh
-          chmod +x ./utils/install-kubectl.sh
-          chmod +x ./utils/install-helm.sh
           chmod +x src/vllm_router/perf-test.sh
           chmod +x src/tests/perftest/*.sh
-
-      - name: Setup Test environment
-        run: |
-          ./utils/install-minikube-cluster.sh
-
-      - name: Build and Load test Image
-        run: |
-          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          docker build --build-arg INSTALL_OPTIONAL_DEP=none -t "ghcr.io/$REPO/router:test" -f docker/Dockerfile .
-          minikube image load "ghcr.io/$REPO/router:test"
 
       - name: Start Mock OpenAI servers
         working-directory: src/tests/perftest
@@ -119,5 +99,4 @@ jobs:
           name: test-logs-pr-${{ github.event.pull_request.number || 'manual' }}
           path: |
             ~/.kube/config
-            /tmp/minikube.log
             src/tests/perftest/logs
