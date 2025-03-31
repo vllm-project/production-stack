@@ -45,20 +45,14 @@ jobs:
 
       - name: Make scripts executable
         run: |
-          chmod +x ./utils/install-minikube-cluster.sh
           chmod +x ./utils/install-kubectl.sh
           chmod +x ./utils/install-helm.sh
           chmod +x src/vllm_router/perf-test.sh
           chmod +x src/tests/perftest/*.sh
 
-      - name: Setup Test environment
-        run: |
-          ./utils/install-minikube-cluster.sh
-
       - name: Build and Load test Image
         run: |
           REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          minikube image load "ghcr.io/$REPO/router:test"
 
       - name: Start Mock OpenAI servers
         working-directory: src/tests/perftest
@@ -111,5 +105,4 @@ jobs:
           name: test-logs-pr-${{ github.event.pull_request.number || 'manual' }}
           path: |
             ~/.kube/config
-            /tmp/minikube.log
             src/tests/perftest/logs
