@@ -1,6 +1,7 @@
 import abc
 import enum
-from typing import Dict, List
+import json
+from typing import Any, Dict, List
 
 from fastapi import Request
 from uhashring import HashRing
@@ -17,6 +18,7 @@ logger = init_logger(__name__)
 class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
+    DISAGG_PREFILL = "disagg_prefill"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -27,6 +29,7 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_body: Dict[str, Any],
     ) -> str:
         """
         Route the request to the appropriate engine URL
@@ -57,6 +60,7 @@ class RoundRobinRouter(RoutingInterface):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_body: Dict[str, Any] = None,
     ) -> str:
         """
         Route the request to the appropriate engine URL using a simple
@@ -141,6 +145,7 @@ class SessionRouter(RoutingInterface):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_body: Dict[str, Any] = None,
     ) -> str:
         """
         Route the request to the appropriate engine URL by the 'session id' in
@@ -172,6 +177,59 @@ class SessionRouter(RoutingInterface):
         return url
 
 
+class DisaggregatedPrefillRouter(RoutingInterface):
+    def __init__(self, prefiller_model: str, decoder_model: str):
+        if hasattr(self, "_initialized"):
+            return
+        self.prefiller_model = prefiller_model
+        self.decoder_model = decoder_model
+        self._initialized = True
+
+    def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_body: Dict[str, Any] = None,
+    ) -> str:
+        """
+        Route the request to either the prefiller or decoder endpoint based on the request phase.
+
+        Args:
+            endpoints: List of available endpoints
+            engine_stats: Engine statistics
+            request_stats: Request statistics
+            request: The incoming request
+            request_body: The request body containing the request details
+
+        Returns:
+            The URL of the selected endpoint
+        """
+        request_json = json.loads(request_body)
+        is_prefill = request_json.get("max_tokens", 0) == 1
+        # Find endpoints with matching model labels
+        prefiller_endpoints = [
+            e for e in endpoints if e.model_label == self.prefiller_model
+        ]
+        decoder_endpoints = [
+            e for e in endpoints if e.model_label == self.decoder_model
+        ]
+
+        if not prefiller_endpoints or not decoder_endpoints:
+            logger.error(
+                f"Missing required endpoints. Prefiller: {bool(prefiller_endpoints)}, Decoder: {bool(decoder_endpoints)}"
+            )
+            raise ValueError("Missing required endpoints for routing")
+
+        if is_prefill:
+            logger.debug("Routing to prefill phase")
+            return prefiller_endpoints[0].url
+        else:
+            logger.debug("Routing to decode phase")
+            return decoder_endpoints[0].url
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -182,6 +240,12 @@ def initialize_routing_logic(
     elif routing_logic == RoutingLogic.SESSION_BASED:
         logger.info(f"Initializing session-based routing logic with kwargs: {kwargs}")
         return SessionRouter(kwargs.get("session_key"))
+    elif routing_logic == RoutingLogic.DISAGG_PREFILL:
+        logger.info("Initializing disaggregated prefill routing logic")
+        return DisaggregatedPrefillRouter(
+            prefiller_model=kwargs.get("prefiller_model"),
+            decoder_model=kwargs.get("decoder_model"),
+        )
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -190,7 +254,7 @@ def reconfigure_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
     # Remove the existing routers from the singleton registry
-    for cls in (SessionRouter, RoundRobinRouter):
+    for cls in (SessionRouter, RoundRobinRouter, DisaggregatedPrefillRouter):
         if cls in SingletonABCMeta._instances:
             del SingletonABCMeta._instances[cls]
     return initialize_routing_logic(routing_logic, *args, **kwargs)
@@ -198,7 +262,7 @@ def reconfigure_routing_logic(
 
 def get_routing_logic() -> RoutingInterface:
     # Look up in our singleton registry which router (if any) has been created.
-    for cls in (SessionRouter, RoundRobinRouter):
+    for cls in (SessionRouter, RoundRobinRouter, DisaggregatedPrefillRouter):
         if cls in SingletonABCMeta._instances:
             return cls()
     raise ValueError("The global router has not been initialized")

@@ -93,6 +93,14 @@ spec:
           - "--request-stats-window"
           - "{{ .Values.routerSpec.requestStatsWindow }}"
           {{- end }}
+          {{- if .Values.routerSpec.prefillerModel }}
+          - "--prefiller-model"
+          - "{{ .Values.routerSpec.prefillerModel }}"
+          {{- end }}
+          {{- if .Values.routerSpec.decoderModel }}
+          - "--decoder-model"
+          - "{{ .Values.routerSpec.decoderModel }}"
+          {{- end }}
           {{- if .Values.routerSpec.extraArgs }}
           {{- toYaml .Values.routerSpec.extraArgs | nindent 10 }}
           {{- end }}
