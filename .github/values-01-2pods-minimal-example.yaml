@@ -4,7 +4,7 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
   - name: "opt125m"
-    repository: "eaminchan/opt-125m-cpu"
+    repository: "zhuohangu/vllm-test"
     tag: "latest"
     modelURL: "facebook/opt-125m"
 

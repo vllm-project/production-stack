@@ -71,7 +71,7 @@ jobs:
       - name: Validate the installation and send query to the stack
         run: |
           bash .github/port-forward.sh curl-02-two-pods
-        timeout-minutes: 4
+        timeout-minutes: 2
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         if: always()
