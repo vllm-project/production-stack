@@ -8,7 +8,7 @@ servingEngineSpec:
     replicaCount: 1
     requestCPU: 6
     requestMemory: "16Gi"
-    requestGPU: 1
+    requestGPU: 0
     pvcStorage: "10Gi"
     pvcAccessMode:
       - ReadWriteOnce
@@ -20,7 +20,7 @@ servingEngineSpec:
     replicaCount: 1
     requestCPU: 6
     requestMemory: "16Gi"
-    requestGPU: 1
+    requestGPU: 0
     pvcStorage: "10Gi"
     pvcAccessMode:
       - ReadWriteOnce

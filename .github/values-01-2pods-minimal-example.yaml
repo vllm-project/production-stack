@@ -12,7 +12,7 @@ servingEngineSpec:
 
     requestCPU: 6
     requestMemory: "16Gi"
-    requestGPU: 0.5
+    requestGPU: 0
 
     pvcStorage: "10Gi"
     pvcAccessMode:
