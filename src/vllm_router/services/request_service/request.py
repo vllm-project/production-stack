@@ -1,10 +1,24 @@
+# Copyright 2024-2025 The vLLM Production Stack Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # --- Request Processing & Routing ---
 # TODO: better request id system
 import json
 import time
 import uuid
 
-from fastapi import Request
+from fastapi import BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from vllm_router.log import init_logger
@@ -42,7 +56,13 @@ logger = init_logger(__name__)
 
 
 async def process_request(
-    request: Request, body, backend_url, request_id, endpoint, debug_request=None
+    request: Request,
+    body,
+    backend_url,
+    request_id,
+    endpoint,
+    background_tasks: BackgroundTasks,
+    debug_request=None,
 ):
     """
     Process a request by sending it to the chosen backend.
@@ -78,7 +98,7 @@ async def process_request(
         pass
 
     # For non-streaming requests, collect the full response to cache it properly
-    full_response = bytearray() if not is_streaming else None
+    full_response = bytearray()
 
     async with request.app.state.httpx_client_wrapper().stream(
         method=request.method,
@@ -111,13 +131,19 @@ async def process_request(
     # Store in semantic cache if applicable
     # Use the full response for non-streaming requests, or the last chunk for streaming
     if request.app.state.semantic_cache_available:
-        cache_chunk = bytes(full_response) if full_response is not None else chunk
+        cache_chunk = bytes(full_response) if not is_streaming else chunk
         await store_in_semantic_cache(
             endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
         )
+        if background_tasks and hasattr(request.app.state, "callbacks"):
+            background_tasks.add_task(
+                request.app.state.callbacks.post_request, request, full_response
+            )
 
 
-async def route_general_request(request: Request, endpoint: str):
+async def route_general_request(
+    request: Request, endpoint: str, background_tasks: BackgroundTasks
+):
     """
     Route the incoming request to the backend server and stream the response back to the client.
 
@@ -138,6 +164,14 @@ async def route_general_request(request: Request, endpoint: str):
     request_id = str(uuid.uuid4())
     request_body = await request.body()
     request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+
+    if hasattr(request.app.state, "callbacks") and (
+        response_overwrite := request.app.state.callbacks.pre_request(
+            request, request_body, request_json
+        )
+    ):
+        return response_overwrite
+
     requested_model = request_json.get("model", None)
     if requested_model is None:
         return JSONResponse(
@@ -185,7 +219,8 @@ async def route_general_request(request: Request, endpoint: str):
         request_body,
         server_url,
         request_id,
-        endpoint=endpoint,
+        endpoint,
+        background_tasks,
     )
     headers, status_code = await anext(stream_generator)
     return StreamingResponse(

@@ -11,6 +11,7 @@ from vllm_router.dynamic_config import (
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
+from vllm_router.services.callbacks_service.callbacks import initialize_custom_callbacks
 
 try:
     # Semantic cache integration
@@ -206,6 +207,9 @@ def initialize_all(app: FastAPI, args):
             args.dynamic_config_json, 10, init_config, app
         )
 
+    if args.callbacks:
+        initialize_custom_callbacks(args.callbacks, app)
+
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(main_router)
@@ -221,7 +225,12 @@ def main():
     initialize_all(app, args)
     if args.log_stats:
         threading.Thread(
-            target=log_stats, args=(args.log_stats_interval,), daemon=True
+            target=log_stats,
+            args=(
+                app,
+                args.log_stats_interval,
+            ),
+            daemon=True,
         ).start()
 
     # Workaround to avoid footguns where uvicorn drops requests with too

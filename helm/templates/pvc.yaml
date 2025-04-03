@@ -1,3 +1,5 @@
+
+{{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- with $ -}}
 {{- if and (hasKey $modelSpec "pvcStorage") (not (empty $modelSpec.pvcStorage)) }}
@@ -27,4 +29,5 @@ spec:
 {{- end }}
 {{- end }}
 ---
+{{- end }}
 {{- end }}

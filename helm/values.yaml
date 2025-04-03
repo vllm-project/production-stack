@@ -3,11 +3,12 @@
 
 # -- Serving engine configuratoon
 servingEngineSpec:
+  enableEngine: true
   # -- Customized labels for the serving engine deployment
   labels:
     environment: "test"
     release: "test"
-  # vllmApiKey: (optional) api key for securing the VLMM models. Can be either:
+  # vllmApiKey: (optional) api key for securing the vLLM models. Can be either:
   #   - A string containing the token directly (will be stored in a generated secret)
   #   - An object referencing an existing secret:
   #     secretName: "my-existing-secret"
@@ -261,6 +262,10 @@ routerSpec:
   # -- deployment strategy
   strategy: {}
 
+  # vllmApiKey: (optional) api key for securing the vLLM models. Must be an object referencing an existing secret
+  #   secretName: "my-existing-secret"
+  #   secretKey: "vllm-api-key"
+
   # -- router resource requests and limits
   resources:
     requests:
@@ -301,6 +306,16 @@ routerSpec:
     #  - secretName: vllm-router-tls
     #    hosts:
     #      - vllm-router.local
+
+  # The node selector terms to match the nodes
+  # Example:
+  #   nodeSelectorTerms:
+  #     - matchExpressions:
+  #       - key: nvidia.com/gpu.product
+  #         operator: "In"
+  #         values:
+  #         - "NVIDIA-RTX-A6000"
+  nodeSelectorTerms: []
 
   # -- TODO: Readiness probe configuration
   #startupProbe:
