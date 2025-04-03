@@ -27,15 +27,15 @@ necessary environment variables (like `OTEL_SERVICE_NAME`,
 
 ## Step 1: Preparing the Jaeger Configuration File
 
-1. Locate the example configuration file
-   `tutorials/assets/otel-example/jaeger.yaml`.
-2. Open the file and examine the following fields:
+1. Locate the example configuration files
+   `tutorials/assets/otel-example/{jaeger, jaeger-query, jaeger-collector}.yaml`.
+2. Open the files and examine the following fields:
    - Specify your desired ports for `jaeger-collector` and `jaeger-query`
    services for trace storage and retrieval, respectively.
    - Verify that `COLLECTOR_OTLP_ENABLED` is set to `true`; this enables
    Jaeger's native support for OpenTelemetry
 
-### Explanation of Key Items in `jaeger.yaml`
+### Explanation of Key Items in Jaeger Files
 
 - **`ports`**: The ports through which Jaeger performs its operations
 (collection and querying in this case).
@@ -47,8 +47,8 @@ from within the cluster.
 
 ## Step 2: Preparing the OpenTelemetry Collector File
 
-1. Locate the example collector file
-   `tutorials/assets/otel-example/otel-collector.yaml`.
+1. Locate the example collector files
+   `tutorials/assets/otel-example/{otel-collector, otel-collector-config}.yaml`.
 2. Open the file and examine the following fields:
    - Specify the `receivers`, `processors`, and `exporters` of the collector
    - The OpenTelemetry collection is an intermediary step of collecting traces
@@ -66,8 +66,11 @@ from within the cluster.
    Run the following from the `tutorials/assets` directory:
 
    ```bash
+   sudo kubectl apply -f otel-example/jaeger.yaml
+   sudo kubectl apply -f otel-example/jaeger-collector.yaml
+   sudo kubectl apply -f otel-example/jaeger-query.yaml
+   sudo kubectl apply -f otel-example/otel-collector-config.yaml
    sudo kubectl apply -f otel-example/otel-collector.yaml
-   sudo helm install ../../helm/ -f values-12-otel-vllm.yaml
    sudo helm install vllm ../../helm/ -f values-12-otel-vllm.yaml
    ```
 
