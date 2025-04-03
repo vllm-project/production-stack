@@ -7,7 +7,7 @@ metadata:
   labels:
   {{- include "chart.routerLabels" . | nindent 4 }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.routerSpec.serviceType }}
   ports:
     - name: "router-sport"
       port: {{ .Values.routerSpec.servicePort }}
