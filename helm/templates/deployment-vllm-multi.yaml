@@ -54,7 +54,6 @@ spec:
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
-
           command:
           - "vllm"
           - "serve"
@@ -195,6 +194,10 @@ spec:
           - name: {{ .Release.Name }}-storage
             mountPath: /data
           {{- end }}
+          {{- if .Values.loraController.enabled }}
+          - name: shared-model-storage
+            mountPath: /models
+          {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
           - name: shm
@@ -219,6 +222,11 @@ spec:
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
+        {{- end }}
+        {{- if .Values.loraController.enabled }}
+        - name: shared-model-storage
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-shared-storage-claim
         {{- end }}
         {{- with $modelSpec.vllmConfig }}
         {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}

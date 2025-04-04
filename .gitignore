@@ -54,6 +54,9 @@ cover/
 # Vim temporary files
 .*.sw*
 
+# VS Code
+.vscode/
+
 # misc
 outdated/
 perf-test.py
@@ -91,9 +94,6 @@ perf-test.py
 /docs/output/
 
 /try
-
-values-*.yaml
-helm/examples
 
 # version files
 src/vllm_router/_version.py

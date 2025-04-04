@@ -1,0 +1,49 @@
+{{- if or .Values.sharedStorage.enabled .Values.loraController.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Release.Name }}-shared-storage
+  labels:
+    type: local
+    app: {{ .Release.Name }}
+    component: shared-storage
+spec:
+  storageClassName: {{ .Values.sharedStorage.storageClass | default "standard" }}
+  capacity:
+    storage: {{ .Values.sharedStorage.size | default "100Gi" }}
+  accessModes:
+  {{- if .Values.sharedStorage.accessModes }}
+    {{- toYaml .Values.sharedStorage.accessModes | nindent 4 }}
+  {{- else }}
+    - ReadWriteMany
+  {{- end }}
+  {{- if .Values.sharedStorage.hostPath }}
+  hostPath:
+    path: {{ .Values.sharedStorage.hostPath }}
+  {{- else }}
+  nfs:
+    server: {{ required "A valid .Values.sharedStorage.nfs.server is required" .Values.sharedStorage.nfs.server }}
+    path: {{ required "A valid .Values.sharedStorage.nfs.path is required" .Values.sharedStorage.nfs.path }}
+  {{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-shared-storage-claim
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    component: shared-storage
+spec:
+  storageClassName: {{ .Values.sharedStorage.storageClass | default "standard" }}
+  accessModes:
+  {{- if .Values.sharedStorage.accessModes }}
+    {{- toYaml .Values.sharedStorage.accessModes | nindent 4 }}
+  {{- else }}
+    - ReadWriteMany
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.sharedStorage.size | default "100Gi" }}
+{{- end }}
