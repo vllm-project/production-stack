@@ -50,7 +50,7 @@ Run the deployment script by replacing ``YAML_FILE_PATH`` with the actual config
 
 .. code-block:: bash
 
-    sudo bash entry_point.sh YAML_FILE_PATH
+     bash entry_point_basic.sh YAML_FILE_PATH
 
 After executing the script, ``Kubernetes`` will start deploying the ``vLLM`` inference stack.
 You can monitor the status of the deployment.
@@ -71,9 +71,9 @@ Expected output:
 
 .. code-block:: bash
 
-    NAME                                            READY   STATUS    RESTARTS   AGE
-    vllm-deployment-router-69b7f9748d-xrkvn         1/1     Running   0          75s
-    vllm-opt125m-deployment-vllm-696c998c6f-mvhg4   1/1     Running   0          75s
+    NAME                                           READY   STATUS    RESTARTS   AGE
+    vllm-deployment-router-6786bdcc5b-flj2x        1/1     Running   0          54s
+    vllm-llama3-deployment-vllm-7dd564bc8f-7mf5x   1/1     Running   0          54s
 
 .. note::
 
@@ -101,7 +101,7 @@ To remove the deployed ``vLLM`` stack and clean up resources, run:
 
 .. code-block:: bash
 
-    bash clean_up.sh production-stack
+    bash clean_up_basic.sh production-stack
 
 This command will remove all ``Kubernetes`` resources associated with the ``vLLM`` deployment.
 

@@ -4,7 +4,7 @@
 Cloud Environments
 ==============================================
 
-📈 Easily deploy the stack on AWS, GCP, or any other cloud provider
+📈 Easily deploy the stack on AWS, GCP, Azure or any other cloud provider
 
 .. toctree::
     :maxdepth: 1
@@ -12,3 +12,4 @@ Cloud Environments
 
     aws.rst
     gcp.rst
+    azure.rst
