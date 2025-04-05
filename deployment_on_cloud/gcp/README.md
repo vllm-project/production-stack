@@ -25,4 +25,4 @@ Clean up the service with:
 bash clean_up_basic.sh production-stack
 ```
 
-Note: If you meet up with gpu quota limits, you can try out cpu-version in `gcp/back-up-no-gpu`
+Note: If you meet up with gpu quota limits, you can try out cpu-version in `gcp/OPT125_CPU`
