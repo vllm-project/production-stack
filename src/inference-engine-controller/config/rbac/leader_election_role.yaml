@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/part-of: inference-engine-controller
     app.kubernetes.io/managed-by: kustomize
   name: leader-election-role
+  namespace: vllm-system
 rules:
 - apiGroups:
   - ""
