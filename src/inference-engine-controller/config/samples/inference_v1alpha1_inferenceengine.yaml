@@ -1,0 +1,12 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: InferenceEngine
+metadata:
+  labels:
+    app.kubernetes.io/name: inferenceengine
+    app.kubernetes.io/instance: inferenceengine-sample
+    app.kubernetes.io/part-of: inference-engine-controller
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: inference-engine-controller
+  name: inferenceengine-sample
+spec:
+  # TODO(user): Add fields here

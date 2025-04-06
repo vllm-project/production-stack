@@ -1,0 +1,29 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: InferenceEngine
+metadata:
+  name: vllm-basic-example
+spec:
+  modelConfig:
+    modelName: meta-llama/Llama-2-7b-chat-hf
+    trustRemoteCode: false
+    maxNumBatchedTokens: 4096
+  deploymentMode: basic
+  resources:
+    default:
+      requests:
+        cpu: "2"
+        memory: "8Gi"
+        nvidia.com/gpu: "1"
+      limits:
+        cpu: "2"
+        memory: "8Gi"
+        nvidia.com/gpu: "1"
+  replicas:
+    default: 1
+  storage:
+    size: "10Gi"
+    storageClass: "standard"
+  serviceConfig:
+    default:
+      port: 8000
+      type: ClusterIP

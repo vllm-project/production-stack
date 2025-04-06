@@ -1,0 +1,5 @@
+FROM ubuntu:22.04
+WORKDIR /
+COPY ./manager /manager
+RUN chmod +x /manager
+ENTRYPOINT ["/manager"]

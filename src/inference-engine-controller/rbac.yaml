@@ -1,0 +1,33 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: inference-engine-controller-role
+rules:
+- apiGroups: ["production-stack.vllm.ai"]
+  resources: ["inferenceengines"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["production-stack.vllm.ai"]
+  resources: ["inferenceengines/status"]
+  verbs: ["get", "update", "patch"]
+- apiGroups: [""]
+  resources: ["pods", "services", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: inference-engine-controller-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: controller-manager
+  namespace: vllm-system
+roleRef:
+  kind: ClusterRole
+  name: inference-engine-controller-role
+  apiGroup: rbac.authorization.k8s.io

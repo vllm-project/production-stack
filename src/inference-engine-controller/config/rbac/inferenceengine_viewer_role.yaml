@@ -1,0 +1,27 @@
+# permissions for end users to view inferenceengines.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: inferenceengine-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: inference-engine-controller
+    app.kubernetes.io/part-of: inference-engine-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: inferenceengine-viewer-role
+rules:
+- apiGroups:
+  - production-stack.vllm.ai
+  resources:
+  - inferenceengines
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - production-stack.vllm.ai
+  resources:
+  - inferenceengines/status
+  verbs:
+  - get
