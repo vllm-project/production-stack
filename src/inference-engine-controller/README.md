@@ -38,14 +38,27 @@ go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest
 make install
 ```
 
-## Step 3: Build the Controller
+## Step 3: Deploy RBAC Configuration
+
+```bash
+# Create the vllm-system namespace
+kubectl create namespace vllm-system
+
+# Apply RBAC configurations
+kubectl apply -f rbac.yaml
+
+# Apply additional RBAC configurations from config directory
+kubectl apply -f config/rbac/
+```
+
+## Step 4: Build the Controller
 
 ```bash
 # Build the controller binary
 make
 ```
 
-## Step 4: Build and Push the Container Image
+## Step 5: Build and Push the Container Image
 
 Now build and push the image:
 
@@ -57,7 +70,7 @@ make docker-build IMG=<your-registry>/inference-engine-controller:tag
 make docker-push IMG=<your-registry>/inference-engine-controller:tag
 ```
 
-## Step 5: Deploy the Controller
+## Step 6: Deploy the Controller
 
 ```bash
 # Deploy the controller to your cluster
@@ -65,7 +78,7 @@ make docker-push IMG=<your-registry>/inference-engine-controller:tag
 make deploy IMG=<your-registry>/inference-engine-controller:tag
 ```
 
-## Step 6: Verify the Installation
+## Step 7: Verify the Installation
 
 ```bash
 # Check if the controller is running
@@ -75,7 +88,7 @@ kubectl get pods -n vllm-system
 kubectl get crd | grep inferenceengines
 ```
 
-## Step 7: Create an InferenceEngine Resource
+## Step 8: Create an InferenceEngine Resource
 
 Create a YAML file (e.g., `inference-engine.yaml`) with your desired configuration. Here's a basic example:
 
@@ -138,6 +151,18 @@ If you encounter any issues:
 4. For deployment issues:
    - Check logs: `kubectl logs -n vllm-system -l control-plane=controller-manager`
    - Verify CRD installation: `kubectl get crd inferenceengines.production-stack.vllm.ai`
+
+5. For RBAC issues:
+   - Verify namespace exists: `kubectl get namespace vllm-system`
+   - Check ServiceAccount: `kubectl get serviceaccount -n vllm-system controller-manager`
+   - Verify RoleBindings: `kubectl get rolebindings -n vllm-system`
+   - Check ClusterRoleBindings: `kubectl get clusterrolebindings | grep inference-engine`
+   - If permissions are missing, reapply RBAC configurations:
+
+     ```bash
+     kubectl apply -f rbac.yaml
+     kubectl apply -f config/rbac/
+     ```
 
 ## Cleanup
 
