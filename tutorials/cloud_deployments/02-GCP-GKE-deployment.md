@@ -9,7 +9,6 @@ Before running this setup, ensure you have:
 1. GCP CLI installed and configured with credential and region set up [[Link]](https://cloud.google.com/sdk/docs/install)
 2. Kubectl
 3. Helm
-4. Quota of GPU
 
 ## TLDR
 
@@ -18,7 +17,7 @@ Disclaimer: This script requires cloud resources and will incur costs. Please ma
 To run the service, go to "deployment_on_cloud/gcp" and run:
 
 ```bash
- bash entry_point_basic.sh YAML_FILE_PATH
+sudo bash entry_point.sh YAML_FILE_PATH
 ```
 
 Pods for the vllm deployment should transition to Ready and the Running state.
@@ -27,14 +26,14 @@ Expected output:
 
 ```plaintext
 NAME                                            READY   STATUS    RESTARTS   AGE
-vllm-deployment-router-6786bdcc5b-flj2x        1/1     Running   0          54s
-vllm-llama3-deployment-vllm-7dd564bc8f-7mf5x   1/1     Running   0          54s
+vllm-deployment-router-69b7f9748d-xrkvn         1/1     Running   0          75s
+vllm-opt125m-deployment-vllm-696c998c6f-mvhg4   1/1     Running   0          75s
 ```
 
 Clean up the service with:
 
 ```bash
-bash clean_up_basic.sh production-stack
+bash clean_up.sh production-stack
 ```
 
 ## Step by Step Explanation
@@ -94,12 +93,7 @@ gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
   --disk-type "pd-balanced" \
   --disk-size "100" \
   --metadata disable-legacy-endpoints=true \
-  --scopes "https://www.googleapis.com/auth/devstorage.read_only",\
-    "https://www.googleapis.com/auth/logging.write",\
-    "https://www.googleapis.com/auth/monitoring",\
-    "https://www.googleapis.com/auth/servicecontrol",\
-    "https://www.googleapis.com/auth/service.management.readonly",\
-    "https://www.googleapis.com/auth/trace.append" \
+  --scopes "https://www.googleapis.com/auth/devstorage.read_only","https://www.googleapis.com/auth/logging.write","https://www.googleapis.com/auth/monitoring","https://www.googleapis.com/auth/servicecontrol","https://www.googleapis.com/auth/service.management.readonly","https://www.googleapis.com/auth/trace.append" \
   --max-pods-per-node "110" \
   --num-nodes "1" \
   --logging=SYSTEM,WORKLOAD \
