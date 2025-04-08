@@ -1,4 +1,4 @@
-{{- if or .Values.sharedStorage.enabled .Values.loraController.enabled }}
+{{- if or (and .Values.loraController .Values.loraController.enabled) (and .Values.sharedStorage .Values.sharedStorage.enabled) }}
 ---
 apiVersion: v1
 kind: PersistentVolume
