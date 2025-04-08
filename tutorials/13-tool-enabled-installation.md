@@ -140,7 +140,7 @@ First, we need to set up port forwarding to access the router service:
 kubectl get svc
 
 # Set up port forwarding to the router service
-kubectl port-forward svc/vllm-tool-router 8000:8000
+kubectl port-forward svc/vllm-tool-router-service 8000:80
 ```
 
 #### 4.2: Run the Example Script

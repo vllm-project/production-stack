@@ -66,6 +66,13 @@ spec:
           {{- if $modelSpec.enableLoRA }}
           - "--enable-lora"
           {{- end }}
+          {{- if $modelSpec.enableTool }}
+          - "--enable-auto-tool-choice"
+          {{- end }}
+          {{- if $modelSpec.toolCallParser }}
+          - "--tool-call-parser"
+          - {{ $modelSpec.toolCallParser | quote }}
+          {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{-   if hasKey . "enableChunkedPrefill" }}
           - "--enable-chunked-prefill"
@@ -100,14 +107,7 @@ spec:
           {{- end }}
           {{- if $modelSpec.chatTemplate }}
           - "--chat-template"
-          {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
-          - name: {{ .Release.Name }}-chat-templates
-            mountPath: /chat_templates
-          {{- else }}
-          - name: vllm-templates
-            mountPath: /vllm/templates
-            readOnly: true
-          {{- end }}
+          - {{ $modelSpec.chatTemplate | quote }}
           {{- end }}
           {{- if .Values.servingEngineSpec.containerSecurityContext }}
           securityContext:
@@ -208,12 +208,12 @@ spec:
             mountPath: /dev/shm
           {{- end}}
           {{- end}}
-          {{- if $modelSpec.enableTool }}
-          - "--enable-auto-tool-choice"
+          {{- if $modelSpec.chatTemplate }}
+          - name: vllm-templates
+            mountPath: /templates
           {{- end }}
-          {{- if $modelSpec.toolCallParser }}
-          - "--tool-call-parser"
-          - {{ $modelSpec.toolCallParser | quote }}
+          {{- if hasKey $modelSpec "extraVolumeMounts" }}
+          {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
           {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:

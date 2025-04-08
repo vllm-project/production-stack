@@ -17,6 +17,7 @@ dependencies = [
     "httpx==0.28.1",
     "kubernetes==32.0.0",
     "numpy==1.26.4",
+    "openai==0.28.1",
     "prometheus-client==0.21.1",
     "python-multipart==0.0.20",
     "uhashring==2.3",

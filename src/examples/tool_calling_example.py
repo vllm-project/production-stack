@@ -1,6 +1,6 @@
 import json
 
-from openai import OpenAI
+import openai
 
 
 def get_weather(location: str, unit: str):
@@ -9,14 +9,9 @@ def get_weather(location: str, unit: str):
 
 
 def main():
-    # Initialize the client
-    client = OpenAI(
-        base_url="http://localhost:8000/v1",
-        api_key="dummy",  # Not needed for local vLLM server
-    )
-
-    # Define the tool function
-    tool_functions = {"get_weather": get_weather}
+    # Configure OpenAI
+    openai.api_base = "http://localhost:8000/v1"
+    openai.api_key = "dummy"  # Not needed for local vLLM server
 
     # Define the tools that the model can use
     tools = [
@@ -45,7 +40,7 @@ def main():
     ]
 
     # Make a request to the model
-    response = client.chat.completions.create(
+    response = openai.ChatCompletion.create(
         model="meta-llama/Llama-3.1-8B-Instruct",  # Use the model we deployed
         messages=[
             {"role": "user", "content": "What's the weather like in San Francisco?"}

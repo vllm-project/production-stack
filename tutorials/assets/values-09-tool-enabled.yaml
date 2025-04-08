@@ -22,6 +22,17 @@ servingEngineSpec:
         value: "/templates"
 
     replicaCount: 1
+
+    # Resource requirements for Llama-3.1-8B-Instruct
+    # resources:
+    #   requests:
+    #     cpu: 8
+    #     memory: "32Gi"
+    #     nvidia.com/gpu: 1
+    #   limits:
+    #     cpu: 8
+    #     memory: "32Gi"
+    #     nvidia.com/gpu: 1
     requestCPU: 8
     requestMemory: "32Gi"
     requestGPU: 1
@@ -32,13 +43,6 @@ servingEngineSpec:
       dtype: "bfloat16"
       tensorParallelSize: 1
 
-# Shared storage configuration
-sharedStorage:
-  enabled: true
-  size: "100Gi"
-  storageClass: "standard"
-  accessModes:
-    - ReadWriteMany
-  nfs:
-    server: "your-nfs-server"  # Replace with your NFS server address
-    path: "/path/to/share"     # Replace with your NFS share path
+# Disable shared storage
+# sharedStorage:
+#   enabled: false
