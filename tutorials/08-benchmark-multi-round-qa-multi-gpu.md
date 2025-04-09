@@ -21,7 +21,7 @@ This tutorial provides a step-by-step guide to setting up and running benchmarks
 - Completion of the following tutorials:
   - [00-install-kubernetes-env.md](00-install-kubernetes-env.md)
   - [01-minimal-helm-installation.md](01-minimal-helm-installation.md)
-- In `benchmarks/multi-round-qa/`, Install necessary python packages needed to run multi-round QA benchmark script by `pip install -r requirements.txt`.
+- In [`benchmarks/multi-round-qa/`](../benchmarks/multi-round-qa/), Install necessary python packages needed to run multi-round QA benchmark script by `pip install -r requirements.txt`.
 - Hardware requirements:
   - GPU: this tutorial requires **8 GPUs** to run.
   - CPU: this tutorial requires **at least 1.2T of CPU memory** for allocating the CPU buffer size.

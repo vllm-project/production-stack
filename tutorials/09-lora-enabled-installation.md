@@ -26,7 +26,7 @@ kubectl create secret generic huggingface-credentials \
 
 #### 2.1: Create Configuration File
 
-Locate the file under path tutorial/assets/values-07-lora-enabled.yaml with the following content:
+Locate the file under path [tutorial/assets/values-07-lora-enabled.yaml](assets/values-07-lora-enabled.yaml) with the following content:
 
 ```yaml
 servingEngineSpec:

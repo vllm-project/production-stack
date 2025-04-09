@@ -23,7 +23,7 @@ vLLM Production Stack uses LMCache for remote KV cache sharing. For more details
 
 ## Step 1: Configuring KV Cache Shared Storage
 
-Locate the file `tutorials/assets/values-06-remote-shared-storage.yaml` with the following content:
+Locate the file [`tutorials/assets/values-06-remote-shared-storage.yaml`](assets/values-06-remote-shared-storage.yaml) with the following content:
 
 ```yaml
 servingEngineSpec:

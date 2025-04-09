@@ -23,7 +23,7 @@ vLLM Production Stack uses LMCache for KV cache offloading. For more details, se
 
 ## Step 1: Configuring KV Cache Offloading
 
-Locate the file `tutorials/assets/values-05-cpu-offloading.yaml` with the following content:
+Locate the file [`tutorials/assets/values-05-cpu-offloading.yaml`](assets/values-05-cpu-offloading.yaml) with the following content:
 
 ```yaml
 servingEngineSpec:

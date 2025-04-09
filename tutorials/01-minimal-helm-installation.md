@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This tutorial guides you through a minimal setup of the vLLM Production Stack using one vLLM instance with the `facebook/opt-125m` model. By the end of this tutorial, you will have a working deployment of vLLM on a Kubernetes environment with GPU.
+This tutorial guides you through a minimal setup of the vLLM Production Stack using one vLLM instance with the [`facebook/opt-125m`](https://huggingface.co/facebook/opt-125m) model. By the end of this tutorial, you will have a working deployment of vLLM on a Kubernetes environment with GPU.
 
 ## Table of Contents
 
@@ -25,8 +25,8 @@ This tutorial guides you through a minimal setup of the vLLM Production Stack us
 ## Prerequisites
 
 1. A Kubernetes environment with GPU support. If not set up, follow the [00-install-kubernetes-env](00-install-kubernetes-env.md) guide.
-2. Helm installed. Refer to the [install-helm.sh](install-helm.sh) script for instructions.
-3. kubectl installed. Refer to the [install-kubectl.sh](install-kubectl.sh) script for instructions.
+2. Helm installed. Refer to the [install-helm.sh](../utils/install-helm.sh) script for instructions.
+3. kubectl installed. Refer to the [install-kubectl.sh](../utils/install-kubectl.sh) script for instructions.
 4. the project repository cloned: [vLLM Production Stack repository](https://github.com/vllm-project/production-stack).
 5. Basic familiarity with Kubernetes and Helm.
 
@@ -36,7 +36,7 @@ This tutorial guides you through a minimal setup of the vLLM Production Stack us
 
 #### 1.1: Use Predefined Configuration
 
-The vLLM Production Stack repository provides a predefined configuration file, `values-01-minimal-example.yaml`, located at `tutorials/assets/values-01-minimal-example.yaml`. This file contains the following content:
+The vLLM Production Stack repository provides a predefined configuration file, `values-01-minimal-example.yaml`, located at [`tutorials/assets/values-01-minimal-example.yaml`](assets/values-01-minimal-example.yaml). This file contains the following content:
 
 ```yaml
 servingEngineSpec:
@@ -67,9 +67,10 @@ Explanation of the key fields:
   - `modelURL`: Specifies the LLM model to use.
 - **`replicaCount`**: Sets the number of replicas to deploy.
 - **`requestCPU` and `requestMemory`**: Specifies the CPU and memory resource requests for the pod.
+- **`limitCPU` and `limitMemory`**: Specifies the maximum limit of CPU and memory resource for the pod
 - **`requestGPU`**: Specifies the number of GPUs required.
 
-**Note:** If you intend to set up TWO vllm pods, please refer to `tutorials/assets/values-01-2pods-minimal-example.yaml`.
+**Note:** If you intend to set up TWO vllm pods, please refer to [`tutorials/assets/values-01-2pods-minimal-example.yaml`](assets/values-01-2pods-minimal-example.yaml).
 
 #### 1.2: Deploy the Helm Chart
 
@@ -84,7 +85,7 @@ Explanation of the command:
 
 - `vllm` in the first command: The Helm repository.
 - `vllm` in the second command: The name of the Helm release.
-- `-f tutorials/assets/values-01-minimal-example.yaml`: Specifies the predefined configuration file.
+- `-f tutorials/assets/values-01-minimal-example.yaml`: Specifies the predefined configuration file. You can check out the [default config values](../helm/values.yaml) for the chart [`vllm-stack`](../helm/Chart.yaml).
 
 ### 2. Validate Installation
 
@@ -157,7 +158,7 @@ curl -X POST http://localhost:30080/v1/completions \
   }'
 ```
 
-Expected output:
+Example output of the generated completions:
 
 ```json
 {

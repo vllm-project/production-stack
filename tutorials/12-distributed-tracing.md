@@ -28,7 +28,7 @@ necessary environment variables (like `OTEL_SERVICE_NAME`,
 ## Step 1: Preparing the Jaeger Configuration File
 
 1. Locate the example configuration files
-   `tutorials/assets/otel-example/{jaeger, jaeger-query, jaeger-collector}.yaml`.
+   [`tutorials/assets/otel-example/{jaeger, jaeger-query, jaeger-collector}.yaml`](assets/otel-example/).
 2. Open the files and examine the following fields:
    - Specify your desired ports for `jaeger-collector` and `jaeger-query`
    services for trace storage and retrieval, respectively.
@@ -48,7 +48,7 @@ from within the cluster.
 ## Step 2: Preparing the OpenTelemetry Collector File
 
 1. Locate the example collector files
-   `tutorials/assets/otel-example/{otel-collector, otel-collector-config}.yaml`.
+   [`tutorials/assets/otel-example/{otel-collector, otel-collector-config}.yaml`](assets/otel-example/).
 2. Open the file and examine the following fields:
    - Specify the `receivers`, `processors`, and `exporters` of the collector
    - The OpenTelemetry collection is an intermediary step of collecting traces
