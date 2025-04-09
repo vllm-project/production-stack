@@ -35,21 +35,21 @@ Before you begin, ensure the following:
 
 ### Step 1: Installing kubectl
 
-1. Clone the repository and navigate to the `utils/` folder:
+1. Clone the repository and navigate to the [`utils/`](../utils/) folder:
 
    ```bash
    git clone https://github.com/vllm-project/production-stack.git
    cd production-stack/utils
    ```
 
-2. Execute the script `install-kubectl.sh`:
+2. Execute the script [`install-kubectl.sh`](../utils/install-kubectl.sh):
 
    ```bash
    bash install-kubectl.sh
    ```
 
 3. **Explanation:**
-   This script downloads the latest version of `kubectl`, the Kubernetes command-line tool, and places it in your PATH for easy execution.
+   This script downloads the latest version of [`kubectl`](https://kubernetes.io/docs/reference/kubectl), the Kubernetes command-line tool, and places it in your PATH for easy execution.
 
 4. **Expected Output:**
    - Confirmation that `kubectl` was downloaded and installed.
@@ -67,7 +67,7 @@ Before you begin, ensure the following:
 
 ### Step 2: Installing Helm
 
-1. Execute the script `install-helm.sh`:
+1. Execute the script [`install-helm.sh`](../utils/install-helm.sh):
 
    ```bash
    bash install-helm.sh
