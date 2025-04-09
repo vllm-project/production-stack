@@ -23,7 +23,7 @@ This tutorial demonstrates how to deploy multiple vLLM instances that serve diff
 
 ## Step 1: Configuring Multiple Models
 
-Locate the `tutorials/assets/values-04-multiple-models.yaml` with following contents:
+Locate the [`tutorials/assets/values-04-multiple-models.yaml`](assets/values-04-multiple-models.yaml) with following contents:
 
 ```yaml
 servingEngineSpec:
@@ -126,7 +126,7 @@ helm install vllm vllm/vllm-stack -f tutorials/assets/values-04-multiple-models.
 
 ## Step 4: Querying the Models Using Python
 
-Use the OpenAI Python API to query the deployed models. We provide a python script at `tutorials/assets/example-04-openai.py`
+Use the OpenAI Python API to query the deployed models. We provide a python script at [`tutorials/assets/example-04-openai.py`](assets/example-04-openai.py)
 
 ```python
 from openai import OpenAI

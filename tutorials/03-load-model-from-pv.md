@@ -22,7 +22,7 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
 
 ## Step 1: Creating a Persistent Volume
 
-1. Locate the persistent Volume manifest file at `tutorials/assets/pv-03.yaml`) with the following content:
+1. Locate the persistent Volume manifest file at [`tutorials/assets/pv-03.yaml`](assets/pv-03.yaml) with the following content:
 
    ```yaml
    apiVersion: v1
@@ -65,7 +65,7 @@ In this tutorial, you will learn how to load a model from a Persistent Volume (P
 
 ## Step 2: Deploying with Helm Using the PV
 
-1. Locate the example values file at `tutorials/assets/values-03-match-pv.yaml` with the following content:
+1. Locate the example values file at [`tutorials/assets/values-03-match-pv.yaml`](assets/values-03-match-pv.yaml) with the following content:
 
    ```yaml
    servingEngineSpec:
