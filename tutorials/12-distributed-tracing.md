@@ -48,7 +48,7 @@ from within the cluster.
 ## Step 2: Preparing the OpenTelemetry Collector File
 
 1. Locate the example collector files
-   [`tutorials/assets/otel-example/{otel-collector, otel-collector-config}.yaml`](assets/otel-example/{otel-collector, otel-collector-config}.yaml).
+   [`tutorials/assets/otel-example/{otel-collector, otel-collector-config}.yaml`](assets/otel-example/).
 2. Open the file and examine the following fields:
    - Specify the `receivers`, `processors`, and `exporters` of the collector
    - The OpenTelemetry collection is an intermediary step of collecting traces
