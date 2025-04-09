@@ -8,8 +8,6 @@ servingEngineSpec:
 
     replicaCount: 1
 
-    requestCPU: 2
-    requestMemory: "2Gi"
+    requestCPU: 6
+    requestMemory: "16Gi"
     requestGPU: 1
-    limitCPU: "4"
-    limitMemory: "4Gi"
