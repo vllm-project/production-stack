@@ -204,11 +204,9 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         )
         self.finished_requests[engine_url] += 1
 
-        if finished_request_time := self.request_start_time.get(
-            (engine_url, request_id)
-        ):
+        if request_start_time := self.request_start_time.get((engine_url, request_id)):
             self.latency_monitors[engine_url].update(
-                timestamp, time.time() - finished_request_time
+                timestamp, time.time() - request_start_time
             )
 
     def on_request_swapped(self, engine_url: str, request_id: str, timestamp: float):
