@@ -54,7 +54,7 @@ The exported metrics can be used for different purposes, such as horizontal scal
 To verify the metrics are being exported, you can use the following command:
 
 ```bash
-kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1/namespaces/default/metrics | jq | grep vllm_num_requests_waiting -C 10
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq | grep vllm_num_requests_waiting -C 10
 ```
 
 You should see something like the following:
