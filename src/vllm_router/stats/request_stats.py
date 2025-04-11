@@ -154,7 +154,6 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             self.latency_monitors[engine_url] = MovingAverageMonitor(
                 self.sliding_window_size
             )
-        self.latency_monitors[engine_url].update(timestamp, 0)
 
         if self.first_query_time is None:
             self.first_query_time = timestamp
