@@ -1,0 +1,70 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: InferenceEngine
+metadata:
+  name: vllm-disaggregated-example
+spec:
+  modelConfig:
+    modelName: meta-llama/Llama-2-7b-chat-hf
+    trustRemoteCode: false
+    maxNumBatchedTokens: 4096
+    enableChunkedPrefill: true
+  deploymentMode: disaggregated
+  resources:
+    prefill:
+      requests:
+        cpu: "2"
+        memory: "8Gi"
+        nvidia.com/gpu: "1"
+      limits:
+        cpu: "2"
+        memory: "8Gi"
+        nvidia.com/gpu: "1"
+    decode:
+      requests:
+        cpu: "2"
+        memory: "8Gi"
+        nvidia.com/gpu: "1"
+      limits:
+        cpu: "2"
+        memory: "8Gi"
+        nvidia.com/gpu: "1"
+    proxy:
+      requests:
+        cpu: "0.5"
+        memory: "1Gi"
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+  replicas:
+    prefill: 1
+    decode: 2
+    proxy: 1
+  storage:
+    size: "10Gi"
+    storageClass: "standard"
+  serviceConfig:
+    prefill:
+      port: 8000
+      type: ClusterIP
+    decode:
+      port: 8001
+      type: ClusterIP
+    proxy:
+      port: 8080
+      type: ClusterIP
+  disaggregationConfig:
+    kvTransferConfig:
+      connector: "PyNcclConnector"
+      parallelSize: 3
+      componentConfigs:
+      - role: "kv_producer"
+        rank: 0
+      - role: "kv_consumer"
+        rank: 1
+      - role: "kv_consumer"
+        rank: 2
+    proxyConfig:
+      image: "vllm/vllm-proxy:latest"
+      config:
+        PREFILL_SERVICE: "vllm-disaggregated-example-prefill:8000"
+        DECODE_SERVICE: "vllm-disaggregated-example-decode:8001"
