@@ -57,7 +57,7 @@ def log_stats(app: FastAPI, interval: int = 10):
                 rs = request_stats[url]
                 logstr += (
                     f" Request Stats: QPS: {rs.qps:.2f}, "
-                    f"Avg Latency: {rs.avg_latency}, "
+                    f"Avg Latency: {rs.avg_latency:.2f}, "
                     f"Avg ITL: {rs.avg_itl}, "
                     f"Prefill Requests: {rs.in_prefill_requests}, "
                     f"Decoding Requests: {rs.in_decoding_requests}, "
