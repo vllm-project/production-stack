@@ -1,3 +1,4 @@
+import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Deque, Dict, Tuple
@@ -149,6 +150,11 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             )
         self.qps_monitors[engine_url].update(timestamp, 1)
 
+        if engine_url not in self.latency_monitors:
+            self.latency_monitors[engine_url] = MovingAverageMonitor(
+                self.sliding_window_size
+            )
+
         if self.first_query_time is None:
             self.first_query_time = timestamp
 
@@ -196,6 +202,11 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             0, self.in_decoding_requests.get(engine_url, 1) - 1
         )
         self.finished_requests[engine_url] += 1
+
+        if request_start_time := self.request_start_time.get((engine_url, request_id)):
+            self.latency_monitors[engine_url].update(
+                timestamp, time.time() - request_start_time
+            )
 
     def on_request_swapped(self, engine_url: str, request_id: str, timestamp: float):
         # This function should be called if a request is determined to be swapped from GPU to CPU.
