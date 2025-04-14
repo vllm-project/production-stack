@@ -27,8 +27,9 @@ This tutorial guides you through a minimal setup of the vLLM Production Stack us
 1. A Kubernetes environment with GPU support. If not set up, follow the [00-install-kubernetes-env](00-install-kubernetes-env.md) guide.
 2. Helm installed. Refer to the [install-helm.sh](../utils/install-helm.sh) script for instructions.
 3. kubectl installed. Refer to the [install-kubectl.sh](../utils/install-kubectl.sh) script for instructions.
-4. the project repository cloned: [vLLM Production Stack repository](https://github.com/vllm-project/production-stack).
-5. Basic familiarity with Kubernetes and Helm.
+4. If your cluster includes nodes with AMD GPUs, follow the setup instructions provided in [ROCm's Kubernetes device plugin repository](https://github.com/ROCm/k8s-device-plugin) to prepare them for deployment.
+5. the project repository cloned: [vLLM Production Stack repository](https://github.com/vllm-project/production-stack).
+6. Basic familiarity with Kubernetes and Helm.
 
 ## Steps
 
