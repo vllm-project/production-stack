@@ -82,13 +82,13 @@ Explanation of the key fields:
   - `repository`: Docker repository hosting the model image.
   - `tag`: Docker image tag.
   - `modelURL`: Specifies the LLM model to use.
-- **`replicaCount`**: Sets the number of replicas to deploy.
-- **`requestCPU` and `requestMemory`**: Specifies the CPU and memory resource requests for the pod.
-- **`limitCPU` and `limitMemory`**: Specifies the maximum limit of CPU and memory resource for the pod
-- **`requestGPU`**: Specifies the number of GPUs required.
-- **`requestGPUType`**: Specify "amd.com/gpu" to schedule workloads on nodes with amd gpus.
-- **`nodeSelectorTerms`**: Specifies terms to schecule workloads on desired nodes.
-- **`tolerations`**: Specifies tolerations to schedule workloads on nodes with corresponding taints.
+  - **`replicaCount`**: Sets the number of replicas to deploy.
+  - **`requestCPU` and `requestMemory`**: Specifies the CPU and memory resource requests for the pod.
+  - **`limitCPU` and `limitMemory`**: Specifies the maximum limit of CPU and memory resource for the pod
+  - **`requestGPU`**: Specifies the number of GPUs required.
+  - **`requestGPUType`**: Set to "amd.com/gpu" to schedule workloads on nodes equipped with AMD GPUs.
+  - **`nodeSelectorTerms`**: Defines conditions to match specific nodes for scheduling workloads, based on node labels.
+- **`tolerations`**: Allows pods to be scheduled on nodes with matching taints, enabling workloads to tolerate specific node conditions.
 
 **Note:** If you intend to set up TWO vllm pods, please refer to [`tutorials/assets/values-01-2pods-minimal-example.yaml`](assets/values-01-2pods-minimal-example.yaml).
 
@@ -123,8 +123,8 @@ Expected output:
 
 ```plaintext
 NAME                                               READY   STATUS    RESTARTS   AGE
-vllm-deployment-router-859d8fb668-2x2b7        1/1     Running   0          2m38s
-vllm-opt125m-deployment-vllm-84dfc9bd7-vb9bs   1/1     Running   0          2m38s
+vllm-deployment-router-74dd87b649-gh754        1/1     Running   0          45m
+vllm-opt125m-deployment-vllm-7b5494fb4c-qbsxr  1/1     Running   0          42m
 ```
 
 _Note_: It may take some time for the containers to download the Docker images and LLM weights.
@@ -156,7 +156,7 @@ Expected output:
     {
       "id": "facebook/opt-125m",
       "object": "model",
-      "created": 1737428424,
+      "created": 1744611824,
       "owned_by": "vllm",
       "root": null
     }
@@ -182,17 +182,26 @@ Example output of the generated completions:
 
 ```json
 {
-  "id": "completion-id",
+  "id": "cmpl-4aef720c39a0451e90d71938982e84b7",
   "object": "text_completion",
-  "created": 1737428424,
+  "created": 1744611924,
   "model": "facebook/opt-125m",
   "choices": [
     {
-      "text": " there was a brave knight who...",
       "index": 0,
-      "finish_reason": "length"
+      "text": " my mother and I knew each other and had a",
+      "logprobs": null,
+      "finish_reason": "length",
+      "stop_reason": null,
+      "prompt_logprobs": null
     }
-  ]
+  ],
+  "usage": {
+    "prompt_tokens": 6,
+    "total_tokens": 16,
+    "completion_tokens": 10,
+    "prompt_tokens_details": null
+  }
 }
 ```
 
