@@ -35,7 +35,7 @@ type StaticRouteSpec struct {
 	ServiceDiscovery string `json:"serviceDiscovery"`
 
 	// RoutingLogic specifies the routing logic to use
-	// +kubebuilder:validation:Enum=roundrobin;least_loaded
+	// +kubebuilder:validation:Enum=roundrobin
 	// +kubebuilder:default=roundrobin
 	RoutingLogic string `json:"routingLogic"`
 
