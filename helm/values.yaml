@@ -234,6 +234,9 @@ routerSpec:
   # -- Container port
   containerPort: 8000
 
+  # -- Service type
+  serviceType: ClusterIP
+
   # -- Service port
   servicePort: 80
 
