@@ -14,6 +14,7 @@ spec:
   {{- include "chart.engineStrategy" . | nindent 2 }}
   selector:
     matchLabels:
+      model: {{ $modelSpec.name }}
     {{- include "chart.engineLabels" . | nindent 6 }}
   progressDeadlineSeconds: 1200
   template:
