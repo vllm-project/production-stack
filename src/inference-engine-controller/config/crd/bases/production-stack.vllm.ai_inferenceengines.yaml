@@ -1,0 +1,330 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.kubernetes.io: https://github.com/vllm-project/vllm-pd-disagg-config
+    controller-gen.kubebuilder.io/version: v0.17.3
+  name: inferenceengines.production-stack.vllm.ai
+spec:
+  group: production-stack.vllm.ai
+  names:
+    kind: InferenceEngine
+    listKind: InferenceEngineList
+    plural: inferenceengines
+    shortNames:
+    - ie
+    singular: inferenceengine
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: InferenceEngine is the Schema for the inferenceengines API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: InferenceEngineSpec defines the desired state of InferenceEngine
+            properties:
+              deploymentMode:
+                default: basic
+                description: DeploymentMode specifies how the engine should be deployed
+                  (e.g., basic, disaggregated)
+                enum:
+                - basic
+                - disaggregated
+                type: string
+              disaggregationConfig:
+                description: DisaggregationConfig specifies the configuration for
+                  disaggregated deployment
+                properties:
+                  kvTransferConfig:
+                    description: KVTransferConfig specifies the configuration for
+                      KV cache transfer
+                    properties:
+                      componentConfigs:
+                        description: ComponentConfigs specifies the configuration
+                          for each component
+                        items:
+                          description: KVComponentConfig defines the configuration
+                            for a KV cache component
+                          properties:
+                            additionalConfig:
+                              additionalProperties:
+                                type: string
+                              description: AdditionalConfig specifies additional component-specific
+                                configuration
+                              type: object
+                            rank:
+                              description: Rank specifies the rank of the component
+                              format: int32
+                              minimum: 0
+                              type: integer
+                            role:
+                              description: Role specifies the role of the component
+                                (e.g., "kv_producer", "kv_consumer")
+                              enum:
+                              - kv_producer
+                              - kv_consumer
+                              minLength: 1
+                              type: string
+                          required:
+                          - rank
+                          - role
+                          type: object
+                        minItems: 1
+                        type: array
+                      connector:
+                        description: Connector specifies the type of connector (e.g.,
+                          "PyNcclConnector")
+                        minLength: 1
+                        type: string
+                      parallelSize:
+                        description: ParallelSize specifies the total number of parallel
+                          components
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    required:
+                    - componentConfigs
+                    - connector
+                    - parallelSize
+                    type: object
+                  proxyConfig:
+                    description: ProxyConfig specifies the configuration for the proxy
+                      component
+                    properties:
+                      config:
+                        additionalProperties:
+                          type: string
+                        description: Config specifies proxy-specific configuration
+                        type: object
+                      image:
+                        description: Image specifies the proxy image
+                        type: string
+                    type: object
+                required:
+                - kvTransferConfig
+                type: object
+              modelConfig:
+                description: ModelConfig specifies the model configuration
+                properties:
+                  enableChunkedPrefill:
+                    default: false
+                    description: EnableChunkedPrefill specifies whether to enable
+                      chunked prefill
+                    type: boolean
+                  maxNumBatchedTokens:
+                    default: 2048
+                    description: MaxNumBatchedTokens specifies the maximum number
+                      of batched tokens
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  modelName:
+                    description: ModelName specifies the name of the model
+                    minLength: 1
+                    type: string
+                  trustRemoteCode:
+                    default: false
+                    description: TrustRemoteCode specifies whether to trust remote
+                      code
+                    type: boolean
+                required:
+                - modelName
+                type: object
+              replicas:
+                additionalProperties:
+                  format: int32
+                  type: integer
+                description: |-
+                  Replicas specifies the number of replicas for each component
+                  If DeploymentMode is basic, only the "default" key is used
+                  If DeploymentMode is disaggregated, keys like "prefill", "decode" can be used
+                minProperties: 1
+                type: object
+              resources:
+                additionalProperties:
+                  description: ComponentResources defines the resource requirements
+                    for a component
+                  properties:
+                    limits:
+                      additionalProperties:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      description: |-
+                        Limits describes the maximum amount of compute resources allowed.
+                        More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                      type: object
+                    requests:
+                      additionalProperties:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      description: |-
+                        Requests describes the minimum amount of compute resources required.
+                        More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                      type: object
+                  type: object
+                description: |-
+                  Resources specifies the resource requirements for each component
+                  If DeploymentMode is basic, only the "default" key is used
+                  If DeploymentMode is disaggregated, keys like "prefill", "decode" can be used
+                type: object
+              serviceConfig:
+                additionalProperties:
+                  description: ServiceConfig defines the service configuration
+                  properties:
+                    port:
+                      description: Port specifies the service port
+                      format: int32
+                      maximum: 65535
+                      minimum: 1
+                      type: integer
+                    type:
+                      description: Type specifies the service type
+                      enum:
+                      - ClusterIP
+                      - NodePort
+                      - LoadBalancer
+                      type: string
+                  required:
+                  - port
+                  - type
+                  type: object
+                description: |-
+                  ServiceConfig specifies the service configuration for each component
+                  If DeploymentMode is basic, only the "default" key is used
+                  If DeploymentMode is disaggregated, keys like "prefill", "decode", "proxy" can be used
+                minProperties: 1
+                type: object
+              storage:
+                description: Storage specifies the storage configuration
+                properties:
+                  size:
+                    description: Size specifies the size of the storage
+                    pattern: ^[0-9]+[KMGT]i?$
+                    type: string
+                  storageClass:
+                    description: StorageClass specifies the storage class
+                    minLength: 1
+                    type: string
+                required:
+                - size
+                - storageClass
+                type: object
+            required:
+            - modelConfig
+            - replicas
+            - resources
+            - serviceConfig
+            - storage
+            type: object
+          status:
+            description: InferenceEngineStatus defines the observed state of InferenceEngine
+            properties:
+              conditions:
+                description: Conditions represents the latest available observations
+                  of the inference engine's state
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              message:
+                description: Message provides a human-readable message about the current
+                  state
+                type: string
+              phase:
+                description: Phase represents the current phase of the inference engine
+                enum:
+                - Pending
+                - Running
+                - Failed
+                type: string
+            required:
+            - phase
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

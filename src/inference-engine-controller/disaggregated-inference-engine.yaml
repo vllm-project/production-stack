@@ -1,0 +1,60 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: InferenceEngine
+metadata:
+  name: disagg-engine
+  namespace: vllm-system
+spec:
+  modelConfig:
+    modelName: "meta-llama/Llama-2-7b-chat-hf"
+    trustRemoteCode: false
+    maxNumBatchedTokens: 2048
+    enableChunkedPrefill: false
+  deploymentMode: "disaggregated"
+  resources:
+    prefill:
+      limits:
+        nvidia.com/gpu: "1"
+        cpu: "8"
+        memory: "32Gi"
+      requests:
+        nvidia.com/gpu: "1"
+        cpu: "4"
+        memory: "16Gi"
+    decode:
+      limits:
+        nvidia.com/gpu: "1"
+        cpu: "4"
+        memory: "16Gi"
+      requests:
+        nvidia.com/gpu: "1"
+        cpu: "2"
+        memory: "8Gi"
+  replicas:
+    prefill: 1
+    decode: 1
+  storage:
+    size: "100Gi"
+    storageClass: "standard"
+  serviceConfig:
+    prefill:
+      port: 8000
+      type: ClusterIP
+    decode:
+      port: 8001
+      type: ClusterIP
+    proxy:
+      port: 8002
+      type: LoadBalancer
+  disaggregationConfig:
+    kvTransferConfig:
+      connector: "LMCacheConnector"
+      parallelSize: 3
+      componentConfigs:
+      - role: "kv_producer"
+        rank: 0
+      - role: "kv_consumer"
+        rank: 1
+    proxyConfig:
+      config:
+        prefillTimeout: "30s"
+        decodeTimeout: "5s"
