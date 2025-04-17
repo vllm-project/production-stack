@@ -62,6 +62,9 @@ servingEngineSpec:
   #   - maxModelLen: (optional, int) The maximum model length, e.g., 16384
   #   - dtype: (optional, string) The data type, e.g., "bfloat16"
   #   - tensorParallelSize: (optional, int) The degree of tensor parallelism, e.g., 2
+  #   - maxNumSeqs: (optional, int) Maximum number of sequences to be processed in a single iteration., e.g., 32
+  #   - maxLoras: (optional, int) The maximum number of LoRA models to be loaded in a single batch, e.g., 4
+  #   - gpuMemoryUtilization: (optional, float) The fraction of GPU memory to be used for the model executor, which can range from 0 to 1. e.g., 0.95
   #   - extraArgs: (optional, list) Extra command line arguments to pass to vLLM, e.g., ["--disable-log-requests"]
   #
   # - lmcacheConfig: (optional, map) The configuration of the LMCache for KV offloading, supported options are:
@@ -112,7 +115,10 @@ servingEngineSpec:
   #     enablePrefixCaching: false
   #     maxModelLen: 16384
   #     dtype: "bfloat16"
-  #     extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+  #     maxNumSeqs: 32
+  #     gpuMemoryUtilization: 0.95
+  #     maxLoras: 4
+  #     extraArgs: ["--disable-log-requests", "--trust-remote-code"]
   #
   #   lmcacheConfig:
   #     enabled: true
