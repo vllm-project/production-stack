@@ -24,19 +24,20 @@ gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
   --zone "$ZONE" \
   --tier "standard" \
   --no-enable-basic-auth \
-  --cluster-version "1.31.5-gke.1023000" \
+  --cluster-version "1.32.3-gke.1440000" \
   --release-channel "regular" \
   --machine-type "n2d-standard-8" \
   --image-type "COS_CONTAINERD" \
   --disk-type "pd-balanced" \
   --disk-size "100" \
   --metadata disable-legacy-endpoints=true \
-  --scopes "https://www.googleapis.com/auth/devstorage.read_only",\
-    "https://www.googleapis.com/auth/logging.write",\
-    "https://www.googleapis.com/auth/monitoring",\
-    "https://www.googleapis.com/auth/servicecontrol",\
-    "https://www.googleapis.com/auth/service.management.readonly",\
-    "https://www.googleapis.com/auth/trace.append" \
+  --scopes \
+    "https://www.googleapis.com/auth/devstorage.read_only,\
+https://www.googleapis.com/auth/logging.write,\
+https://www.googleapis.com/auth/monitoring,\
+https://www.googleapis.com/auth/servicecontrol,\
+https://www.googleapis.com/auth/service.management.readonly,\
+https://www.googleapis.com/auth/trace.append" \
   --max-pods-per-node "110" \
   --num-nodes "1" \
   --logging=SYSTEM,WORKLOAD \
