@@ -1,7 +1,7 @@
 # Setting up GKE vLLM stack with one command
 
 This script automatically configures a GKE LLM inference cluster.
-Make sure your GCP cli is set up, logged in, and region set up. You have eksctl, kubectl, helm installed.
+Make sure your GCP cli is set up, logged in, and region set up. You have kubectl and helm installed.
 
 Modify fields production_stack_specification.yaml and execute as:
 
