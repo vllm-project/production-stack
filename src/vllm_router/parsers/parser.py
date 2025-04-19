@@ -99,7 +99,7 @@ def parse_args():
         "--routing-logic",
         type=str,
         required=True,
-        choices=["roundrobin", "session"],
+        choices=["roundrobin", "session", "disagg_prefill"],
         help="The routing logic to use",
     )
     parser.add_argument(
@@ -107,6 +107,18 @@ def parse_args():
         type=str,
         default=None,
         help="The key (in the header) to identify a session.",
+    )
+    parser.add_argument(
+        "--prefiller-model",
+        type=str,
+        default=None,
+        help="The model of the prefiller.",
+    )
+    parser.add_argument(
+        "--decoder-model",
+        type=str,
+        default=None,
+        help="The model of the decoder.",
     )
     parser.add_argument(
         "--callbacks",
