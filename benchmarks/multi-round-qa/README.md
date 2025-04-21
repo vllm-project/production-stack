@@ -65,6 +65,7 @@ _Note:_ If you use ShareGPT dataset, the length of the answer expected (in token
 
 - `--model <str>`: The model name (e.g., `mistralai/Mistral-7B-Instruct-v0.2`).
 - `--base-url <str>`: The URL endpoint for the language model server.
+- `--api-key <str>`: The user side api token for authentication required server (Bearer token).
 
 #### Configuring the experiment (Optional)
 

@@ -14,6 +14,7 @@ spec:
   {{- include "chart.engineStrategy" . | nindent 2 }}
   selector:
     matchLabels:
+      model: {{ $modelSpec.name }}
     {{- include "chart.engineLabels" . | nindent 6 }}
   progressDeadlineSeconds: 1200
   template:
@@ -39,12 +40,10 @@ spec:
           {{- if $container.resources }}
           resources: {{ toYaml $container.resources | nindent 12 }}
           {{- end }}
-          {{- if hasKey $container "mountPvcStorage" }}
+          {{- if and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage") }}
           volumeMounts:
-          {{- if and $container.volumeMounts.pvcStorage (hasKey $modelSpec "pvcStorage") }}
             - name: {{ .Release.Name }}-storage
               mountPath: /data
-          {{- end }}
           {{- end }}
       {{- end }}
       {{- if .Values.servingEngineSpec.securityContext }}
@@ -54,6 +53,7 @@ spec:
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+
           command:
           - "vllm"
           - "serve"
@@ -64,6 +64,13 @@ spec:
           - {{ include "chart.container-port" . | quote }}
           {{- if $modelSpec.enableLoRA }}
           - "--enable-lora"
+          {{- end }}
+          {{- if $modelSpec.enableTool }}
+          - "--enable-auto-tool-choice"
+          {{- end }}
+          {{- if $modelSpec.toolCallParser }}
+          - "--tool-call-parser"
+          - {{ $modelSpec.toolCallParser | quote }}
           {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{-   if hasKey . "enableChunkedPrefill" }}
@@ -99,7 +106,7 @@ spec:
           {{- end }}
           {{- if $modelSpec.chatTemplate }}
           - "--chat-template"
-          - "/chat_templates/chat-template.jinga"
+          - {{ $modelSpec.chatTemplate | quote }}
           {{- end }}
           {{- if .Values.servingEngineSpec.containerSecurityContext }}
           securityContext:
@@ -194,10 +201,6 @@ spec:
           - name: {{ .Release.Name }}-storage
             mountPath: /data
           {{- end }}
-          {{- if .Values.loraController.enabled }}
-          - name: shared-model-storage
-            mountPath: /models
-          {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
           - name: shm
@@ -205,12 +208,12 @@ spec:
           {{- end}}
           {{- end}}
           {{- if $modelSpec.chatTemplate }}
-          - name: {{ .Release.Name }}-chat-templates
-            mountPath: /chat_templates
-          {{- end}}
+          - name: vllm-templates
+            mountPath: /templates
+          {{- end }}
           {{- if hasKey $modelSpec "extraVolumeMounts" }}
           {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
-          {{- end}}
+          {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
@@ -223,11 +226,6 @@ spec:
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
         {{- end }}
-        {{- if .Values.loraController.enabled }}
-        - name: shared-model-storage
-          persistentVolumeClaim:
-            claimName: {{ .Release.Name }}-shared-storage-claim
-        {{- end }}
         {{- with $modelSpec.vllmConfig }}
         {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
         - name: shm
@@ -237,9 +235,15 @@ spec:
         {{- end}}
         {{- end}}
         {{- if $modelSpec.chatTemplate}}
+        {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
         - name: {{ .Release.Name }}-chat-templates
           configMap:
             name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
+        {{- else }}
+        - name: vllm-templates
+          persistentVolumeClaim:
+            claimName: vllm-templates-pvc
+        {{- end }}
         {{- end}}
         {{- if hasKey $modelSpec "extraVolumes" }}
         {{- toYaml $modelSpec.extraVolumes | nindent 8 }}
@@ -266,7 +270,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
-{{- if $modelSpec.chatTemplate }}
+{{- if and $modelSpec.chatTemplate (hasKey $modelSpec "chatTemplateConfigMap") }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -274,8 +278,8 @@ metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
   namespace: "{{ .Release.Namespace }}"
 data:
-  chat-template.jinga: |-
-    {{ $modelSpec.chatTemplate}}
+  {{ $modelSpec.chatTemplate }}: |-
+    {{ $modelSpec.chatTemplateConfigMap }}
 {{- end }}
 {{- end }}
 ---

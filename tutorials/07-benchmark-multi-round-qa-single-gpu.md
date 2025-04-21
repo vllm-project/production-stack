@@ -20,7 +20,7 @@ This tutorial provides a step-by-step guide to setting up and running benchmarks
 - Completion of the following tutorials:
   - [00-install-kubernetes-env.md](00-install-kubernetes-env.md)
   - [01-minimal-helm-installation.md](01-minimal-helm-installation.md)
-- In `benchmarks/multi-round-qa/`, Install necessary python packages needed to run multi-round QA benchmark script by `pip install -r requirements.txt`.
+- In [`benchmarks/multi-round-qa/`](../benchmarks/multi-round-qa/), Install necessary python packages needed to run multi-round QA benchmark script by `pip install -r requirements.txt`.
 
 ## Step 1: Running Benchmarks with vLLM Production Stack
 

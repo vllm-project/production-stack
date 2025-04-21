@@ -579,6 +579,13 @@ def parse_arguments() -> WorkloadConfig:
     parser.add_argument("--qps", type=float, required=True, help="Overall QPS")
     parser.add_argument("--model", type=str, required=True, help="Model name")
     parser.add_argument(
+        "--api-key",
+        type=str,
+        required=False,
+        default="EMPTY",
+        help="Bearer token for authentication",
+    )
+    parser.add_argument(
         "--base-url",
         type=str,
         required=True,
@@ -655,7 +662,7 @@ def main():
     step_interval = 0.1
 
     executor = RequestExecutor(
-        base_url=args.base_url, api_key="EMPTY", model=args.model
+        base_url=args.base_url, api_key=args.api_key, model=args.model
     )
 
     warmup_engine(executor)
