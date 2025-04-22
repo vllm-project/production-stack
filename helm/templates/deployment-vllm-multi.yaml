@@ -8,6 +8,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     model: {{ $modelSpec.name }}
+    helm-release-name: {{ .Release.Name }}
   {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
   replicas: {{ $modelSpec.replicaCount }}
@@ -15,12 +16,14 @@ spec:
   selector:
     matchLabels:
       model: {{ $modelSpec.name }}
+      helm-release-name: {{ .Release.Name }}
     {{- include "chart.engineLabels" . | nindent 6 }}
   progressDeadlineSeconds: 1200
   template:
     metadata:
       labels:
         model: {{ $modelSpec.name }}
+        helm-release-name: {{ .Release.Name }}
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
       {{- if hasKey $modelSpec "initContainer" }}

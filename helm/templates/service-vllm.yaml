@@ -17,5 +17,6 @@ spec:
       protocol: TCP
   selector:
     model: "{{ $modelSpec.name }}"
+    helm-release-name: "{{ $.Release.Name }}"
 {{- end }}
 {{- end}}
