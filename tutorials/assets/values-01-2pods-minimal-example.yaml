@@ -7,13 +7,12 @@ servingEngineSpec:
     repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "facebook/opt-125m"
-
     replicaCount: 2
-
     requestCPU: 6
     requestMemory: "16Gi"
     requestGPU: 0.5
 
     vllmConfig:
       maxModelLen: 1024
-      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.4"]
+      gpuMemoryUtilization: 0.4
+      extraArgs: ["--disable-log-requests"]

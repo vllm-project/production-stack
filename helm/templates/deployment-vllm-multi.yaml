@@ -95,6 +95,18 @@ spec:
           - "--tensor-parallel-size"
           - {{ .tensorParallelSize | quote }}
           {{-   end }}
+          {{-   if hasKey . "maxNumSeqs" }}
+          - "--max-num-seqs"
+          - {{ .maxNumSeqs | quote }}
+          {{-   end }}
+          {{-   if hasKey . "gpuMemoryUtilization" }}
+          - "--gpu_memory_utilization"
+          - {{ .gpuMemoryUtilization | quote }}
+          {{-   end }}
+          {{-   if hasKey . "maxLoras" }}
+          - "--max_loras"
+          - {{ .maxLoras | quote }}
+          {{-   end }}
           {{-   if .extraArgs }}
           {{-     range .extraArgs }}
           - {{ . | quote }}
