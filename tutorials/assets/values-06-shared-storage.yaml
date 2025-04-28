@@ -14,12 +14,14 @@ servingEngineSpec:
       enableChunkedPrefill: false
       enablePrefixCaching: false
       maxModelLen: 16384
-      v0: 0
+      v1: 0
 
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "20"
-
+    env:
+      - name: LMCACHE_LOG_LEVEL
+        value: "DEBUG"
     hf_token: <YOUR HF TOKEN>
 
 cacheserverSpec:
