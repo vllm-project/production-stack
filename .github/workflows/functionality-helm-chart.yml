@@ -20,91 +20,108 @@ on:
       - '**.py'
       - 'pyproject.toml'
       - 'helm/**'
-  merge_group:
+
 jobs:
-  Secure-Minimal-Example:
-    runs-on: self-hosted
+  test-helm-charts:
+    runs-on: ubuntu-latest
     steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
-      - name: Deploy via helm charts
-        env:
-          DOCKER_BUILDKIT: 1
-        run: |
-          cd ${{ github.workspace }}
-          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
-          sudo docker push localhost:5000/git-act-router
-          sudo sysctl fs.protected_regular=0
-          minikube image load localhost:5000/git-act-router
-          helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-05-secure-vllm
-        timeout-minutes: 2
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-05-secure-vllm
-          path: |
-            output-05-secure-vllm/
-      - name: Helm uninstall
-        run: |
-            helm uninstall vllm
-            sudo docker image prune -f
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
 
-  Two-Pods-Minimal-Example:
-    runs-on: self-hosted
-    needs: Secure-Minimal-Example
-    steps:
-      - name: Deploy via helm charts
-        run: |
-          cd ${{ github.workspace }}
-          helm install vllm ./helm -f .github/values-01-2pods-minimal-example.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-02-two-pods
-        timeout-minutes: 2
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-02-two-pods
-          path: |
-            output-02-two-pods/
-      - name: Helm uninstall
-        run: |
-          helm uninstall vllm
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+    # 🔧 Step 0: Setup environment
+    - name: Check out repository code
+      uses: actions/checkout@v4
 
-  Multiple-Models:
-    runs-on: self-hosted
-    needs: Two-Pods-Minimal-Example
-    steps:
-      - name: Deploy via helm charts
-        run: |
-          helm install vllm ./helm -f .github/values-04-multiple-models.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-04-multiple-models
-        timeout-minutes: 3
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-04-multiple-models
-          path: |
-            output-04-multiple-models/
-      - name: Helm uninstall
-        run: |
-            helm uninstall vllm
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+    # 🐳 Step 1: Build and tag Docker image
+    - name: Build Docker image
+      run: |
+        docker build --build-arg INSTALL_OPTIONAL_DEP=default \
+          -t localhost:5000/git-act-router \
+          -f docker/Dockerfile .
+
+    # 🌀 Step 2: Create Kind cluster
+    - name: Set up Kind (Kubernetes in Docker)
+      uses: helm/kind-action@v1.12.0
+      timeout-minutes: 5
+
+    # 🔄 Step 3: Load Docker image into Kind
+    - name: Load Docker image into Kind
+      run: |
+        kind load docker-image localhost:5000/git-act-router
+
+    # ⛵ Step 4: Test multiple Helm configurations
+    - name: Run Helm tests with matrix strategy
+      env:
+        DOCKER_BUILDKIT: 1
+      run: |
+        set -e
+        export KUBECONFIG=/kind/.kube/config
+
+        # Wait for Kind cluster to be ready
+        until kubectl get nodes &> /dev/null; do
+          echo "Waiting for Kubernetes nodes..."
+          sleep 5
+        done
+
+        # Define test scenarios
+        TEST_SCENARIOS=(
+          ".github/values-05-secure-vllm.yaml curl-05-secure-vllm"
+          ".github/values-01-2pods-minimal-example.yaml curl-02-two-pods"
+          ".github/values-04-multiple-models.yaml curl-04-multiple-models"
+        )
+
+        for SCENARIO in "${TEST_SCENARIOS[@]}"; do
+          VALUES_FILE=$(echo $SCENARIO | cut -d' ' -f1)
+          VALIDATION_SCRIPT=$(echo $SCENARIO | cut -d' ' -f2)
+
+          echo "🚀 Deploying scenario with values file: $VALUES_FILE"
+
+          # Uninstall previous release if exists
+          helm uninstall vllm || true
+
+          # Install Helm chart
+          helm install vllm ./helm -f "$VALUES_FILE" || {
+            echo "❌ Helm install failed"
+            kubectl get pods -A
+            kubectl describe pod -l app.kubernetes.io/instance=vllm
+            kubectl get events --sort-by='.lastTimestamp'
+            exit 1
+          }
+
+          # Wait for pods to become ready
+          echo "⏳ Waiting for pods to be ready..."
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=vllm --timeout=120s || {
+            echo "🚨 Pods failed to become ready"
+            kubectl get pods -A
+            kubectl describe pod -l app.kubernetes.io/instance=vllm
+            kubectl get events --sort-by='.lastTimestamp'
+            exit 1
+          }
+
+          # Validate installation
+          echo "🧪 Validating deployment with script: $VALIDATION_SCRIPT"
+          bash .github/port-forward.sh "$VALIDATION_SCRIPT" || {
+            echo "❌ Validation failed"
+            kubectl logs -l app.kubernetes.io/instance=vllm --tail=100
+            exit 1
+          }
+
+          # Archive results
+          mkdir -p output-"${VALIDATION_SCRIPT}"
+          kubectl get all -o yaml > output-"${VALIDATION_SCRIPT}"/k8s-resources.yaml
+          helm status vllm > output-"${VALIDATION_SCRIPT}"/helm-status.txt
+        done
+
+    # 📦 Step 5: Archive test results
+    - name: Archive test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: helm-test-results
+        path: |
+          output-*
+
+    # 🧹 Step 6: Clean up resources
+    - name: Cleanup Kind cluster
+      run: |
+        helm uninstall vllm || true
+        kind delete clusters kind
+      if: always()
