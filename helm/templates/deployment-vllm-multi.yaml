@@ -118,8 +118,18 @@ spec:
           {{- end }}
           {{- if $modelSpec.lmcacheConfig }}
           {{-   if $modelSpec.lmcacheConfig.enabled }}
+          {{-     if hasKey $modelSpec.vllmConfig "v1" }}
+          {{-       if eq (toString $modelSpec.vllmConfig.v1) "1" }}
+          - "--kv-transfer-config"
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'
+          {{-       else }}
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}'
+          {{-       end }}
+          {{-     else }}
+          - "--kv-transfer-config"
+          - '{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}'
+          {{-     end }}
           {{-   end }}
           {{- end }}
           {{- if $modelSpec.chatTemplate }}
@@ -139,6 +149,8 @@ spec:
             value: /tmp
             {{- end }}
           {{- with $modelSpec.vllmConfig}}
+          - name: LMCACHE_LOG_LEVEL
+            value: "DEBUG"
           {{- if hasKey . "v1" }}
           - name: VLLM_USE_V1
             value: {{ default 0 $modelSpec.vllmConfig.v1 | quote }}
