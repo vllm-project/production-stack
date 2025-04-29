@@ -56,8 +56,6 @@ cacheserverSpec:
     environment: "cacheserver"
     release: "cacheserver"
 
-
-
 routerSpec:
   resources:
     requests:
