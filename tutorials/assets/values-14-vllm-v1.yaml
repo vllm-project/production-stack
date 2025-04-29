@@ -22,11 +22,11 @@ servingEngineSpec:
       dtype: "bfloat16"
       v1: 1
       extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "20"
     hf_token: <your-hf-token>
-
 
 cacheserverSpec:
   # -- Number of replicas
