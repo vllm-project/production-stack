@@ -1,0 +1,100 @@
+# Unified configuration for disaggregated prefill setup
+servingEngineSpec:
+  enableEngine: true
+  runtimeClassName: ""
+  modelSpec:
+    # Prefill node configuration
+    - name: "mistral-prefill"
+      repository: "lmcache/vllm-openai"
+      tag: "2025-03-28"
+      modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+      replicaCount: 1
+      requestCPU: 8
+      requestMemory: "30Gi"
+      requestGPU: 1
+      pvcStorage: "50Gi"
+      vllmConfig:
+        enableChunkedPrefill: false
+        enablePrefixCaching: false
+        maxModelLen: 16384
+      lmcacheConfig:
+        enabled: true
+        cpuOffloadingBufferSize: "20"
+        kvRole: "kv_producer"
+        kvRank: 0
+        kvParallelSize: 2  # Set prefill node as producer
+      hf_token: <YOUR_HF_TOKEN>
+      labels:
+        role: "prefill"
+        model: "mistral-prefill"
+
+    # Decode node configuration
+    - name: "mistral-decode"
+      repository: "lmcache/vllm-openai"
+      tag: "2025-03-28"
+      modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+      replicaCount: 1
+      requestCPU: 8
+      requestMemory: "30Gi"
+      requestGPU: 1
+      pvcStorage: "50Gi"
+      vllmConfig:
+        enableChunkedPrefill: false
+        enablePrefixCaching: false
+        maxModelLen: 16384
+      lmcacheConfig:
+        enabled: true
+        cpuOffloadingBufferSize: "20"
+        kvRole: "kv_consumer"  # Set decode node as consumer
+        kvRank: 1
+        kvParallelSize: 2  # Set decode node as consumer
+      hf_token: <YOUR_HF_TOKEN>
+      labels:
+        role: "decode"
+        model: "mistral-decode"
+
+routerSpec:
+  enableRouter: true
+  repository: "1nfinity/vllm_router"
+  tag: "latest"
+  replicaCount: 1
+  containerPort: 8000
+  servicePort: 80
+  routingLogic: "disagg_prefill"
+  engineScrapeInterval: 15
+  requestStatsWindow: 60
+  resources:
+    requests:
+      cpu: "4"
+      memory: "16G"
+    limits:
+      cpu: "4"
+      memory: "32G"
+  labels:
+    environment: "router"
+    release: "router"
+  extraArgs:
+    - "--prefiller-model"
+    - "mistral-prefill"
+    - "--decoder-model"
+    - "mistral-decode"
+
+cacheserverSpec:
+  replicaCount: 1
+  containerPort: 8080
+  servicePort: 81
+  serde: "naive"
+
+  repository: "lmcache/vllm-openai"
+  tag: "2025-03-28"
+  resources:
+    requests:
+      cpu: "2"
+      memory: "8G"
+    limits:
+      cpu: "2"
+      memory: "10G"
+
+  labels:
+    environment: "cacheserver"
+    release: "cacheserver"

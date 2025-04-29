@@ -1,5 +1,19 @@
 {{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+{{- $kv_role := "kv_both" }}
+{{- $kv_rank := 0 }}
+{{- $kv_parallel_size := 1 }}
+{{- if $modelSpec.lmcacheConfig }}
+{{- if $modelSpec.lmcacheConfig.kvRole }}
+{{- $kv_role = $modelSpec.lmcacheConfig.kvRole }}
+{{- end }}
+{{- if $modelSpec.lmcacheConfig.kvRank }}
+{{- $kv_rank = $modelSpec.lmcacheConfig.kvRank }}
+{{- end }}
+{{- if $modelSpec.lmcacheConfig.kvParallelSize }}
+{{- $kv_parallel_size = $modelSpec.lmcacheConfig.kvParallelSize }}
+{{- end }}
+{{- end }}
 {{- with $ -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -119,7 +133,7 @@ spec:
           {{- if $modelSpec.lmcacheConfig }}
           {{-   if $modelSpec.lmcacheConfig.enabled }}
           - "--kv-transfer-config"
-          - '{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}'
+          - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}","kv_rank":{{ $kv_rank }},"kv_parallel_size":{{ $kv_parallel_size }}}'
           {{-   end }}
           {{- end }}
           {{- if $modelSpec.chatTemplate }}
