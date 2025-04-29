@@ -1,28 +1,32 @@
 servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
-  - name: "mistral"
+  - name: "llama3"
     repository: "lmcache/vllm-openai"
     tag: "2025-04-18"
-    modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
-    replicaCount: 2
-    requestCPU: 10
-    requestMemory: "40Gi"
+    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+    replicaCount: 1
+
+    requestCPU: 6
+    requestMemory: "16Gi"
     requestGPU: 1
+
     pvcStorage: "50Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
+
     vllmConfig:
       enableChunkedPrefill: false
       enablePrefixCaching: false
-      maxModelLen: 16384
-      v1: 0
+      maxModelLen: 4096
+      dtype: "bfloat16"
+      v1: 1
+      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
 
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "20"
-    env:
-      - name: LMCACHE_LOG_LEVEL
-        value: "DEBUG"
-    hf_token: <YOUR HF TOKEN>
+    hf_token: <your-hf-token>
 
 cacheserverSpec:
   # -- Number of replicas
@@ -45,24 +49,13 @@ cacheserverSpec:
   # -- router resource requests and limits
   resources:
     requests:
-      cpu: "4"
+      cpu: "2"
       memory: "8G"
     limits:
-      cpu: "4"
+      cpu: "2"
       memory: "10G"
 
   # -- Customized labels for the cache server deployment
   labels:
     environment: "cacheserver"
     release: "cacheserver"
-
-routerSpec:
-  resources:
-    requests:
-      cpu: "1"
-      memory: "2G"
-    limits:
-      cpu: "1"
-      memory: "2G"
-  routingLogic: "session"
-  sessionKey: "x-user-id"
