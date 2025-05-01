@@ -13,10 +13,15 @@
 # limitations under the License.
 
 import abc
+import asyncio
 import enum
+import threading
 from typing import Dict, List
 
+import requests
 from fastapi import Request
+from lmcache.experimental.cache_controller import controller_manager
+from lmcache.experimental.cache_controller.message import LookupMsg
 from uhashring import HashRing
 
 from vllm_router.log import init_logger
@@ -31,6 +36,7 @@ logger = init_logger(__name__)
 class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
+    KVAWARE = "kvaware"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -65,7 +71,7 @@ class RoundRobinRouter(RoutingInterface):
         self.req_id = 0
         self._initialized = True
 
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
@@ -149,7 +155,7 @@ class SessionRouter(RoutingInterface):
         for node in new_nodes - current_nodes:
             self.hash_ring.add_node(node)
 
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
@@ -186,6 +192,48 @@ class SessionRouter(RoutingInterface):
         return url
 
 
+class KvawareRouter(RoutingInterface):
+    def __init__(self, lmcache_controller_port: int):
+        self.lmcache_controller_port = lmcache_controller_port
+        self.kv_manager = controller_manager.LMCacheControllerManager(
+            f"0.0.0.0:{self.lmcache_controller_port}"
+        )
+        self.req_id = 0
+
+    def start_kv_manager(self):
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+        self.thread.start()
+        asyncio.run_coroutine_threadsafe(self.kv_manager.start_all(), self.loop)
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        url = endpoints[0].url + "/tokenize"
+        headers = {"Content-Type": "application/json"}
+        data = {"model": endpoints[0].model_name, "prompt": request_json["prompt"]}
+        response = requests.post(url, headers=headers, json=data).json()
+        token_ids = response["tokens"]
+        msg = LookupMsg(tokens=token_ids)
+        instance_id = await self.kv_manager.handle_orchestration_message(msg)
+        if instance_id.best_instance_id is None:
+            len_engines = len(endpoints)
+            chosen = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
+            self.req_id += 1
+            return chosen.url
+        else:
+            self.req_id += 1
+            logger.info(
+                f"Routing request to {instance_id.best_instance_id} found by kvaware router"
+            )
+            return instance_id.best_instance_id
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -196,6 +244,11 @@ def initialize_routing_logic(
     elif routing_logic == RoutingLogic.SESSION_BASED:
         logger.info(f"Initializing session-based routing logic with kwargs: {kwargs}")
         return SessionRouter(kwargs.get("session_key"))
+    elif routing_logic == RoutingLogic.KVAWARE:
+        logger.info("Initializing kvaware routing logic")
+        router = KvawareRouter(kwargs.get("lmcache_controller_port"))
+        router.start_kv_manager()
+        return router
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -204,7 +257,7 @@ def reconfigure_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
     # Remove the existing routers from the singleton registry
-    for cls in (SessionRouter, RoundRobinRouter):
+    for cls in (SessionRouter, RoundRobinRouter, KvawareRouter):
         if cls in SingletonABCMeta._instances:
             del SingletonABCMeta._instances[cls]
     return initialize_routing_logic(routing_logic, *args, **kwargs)
@@ -212,7 +265,7 @@ def reconfigure_routing_logic(
 
 def get_routing_logic() -> RoutingInterface:
     # Look up in our singleton registry which router (if any) has been created.
-    for cls in (SessionRouter, RoundRobinRouter):
+    for cls in (SessionRouter, RoundRobinRouter, KvawareRouter):
         if cls in SingletonABCMeta._instances:
             return cls()
     raise ValueError("The global router has not been initialized")
