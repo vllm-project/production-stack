@@ -133,6 +133,24 @@ servingEngineSpec:
   #         operator: "In"
   #         values:
   #         - "NVIDIA-RTX-A6000"
+
+  #  extraVolumes:
+  #    - name: dev-fuse
+  #      hostPath:
+  #        path: /dev/fuse
+  #        type: CharDevice
+  #    - name: cache-dir
+  #      hostPath:
+  #        path: /var/cache/vllm
+
+  #    extraVolumeMounts:
+  #    - name: dev-fuse
+  #      mountPath: /dev/fuse
+  #      readOnly: true
+  #    - name: cache-dir
+  #      mountPath: /cache
+  #      readOnly: false
+
   modelSpec: []
 
   # -- Container port
@@ -224,6 +242,8 @@ servingEngineSpec:
     #   - ALL
     # -- Read-only root filesystem
     # readOnlyRootFilesystem: true
+
+
 
 routerSpec:
   # -- The docker image of the router. The following values are defaults:
