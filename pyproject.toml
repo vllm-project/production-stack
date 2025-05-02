@@ -21,7 +21,7 @@ dependencies = [
     "python-multipart==0.0.20",
     "uhashring==2.3",
     "uvicorn==0.34.0",
-    "lmcache @ git+https://github.com/LMCache/LMCache.git",
+    "lmcache==0.2.11",
 ]
 
 [project.scripts]
