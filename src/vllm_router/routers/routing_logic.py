@@ -71,7 +71,7 @@ class RoundRobinRouter(RoutingInterface):
         self.req_id = 0
         self._initialized = True
 
-    async def route_request(
+    def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
@@ -155,7 +155,7 @@ class SessionRouter(RoutingInterface):
         for node in new_nodes - current_nodes:
             self.hash_ring.add_node(node)
 
-    async def route_request(
+    def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
@@ -206,6 +206,16 @@ class KvawareRouter(RoutingInterface):
         self.thread.start()
         asyncio.run_coroutine_threadsafe(self.kv_manager.start_all(), self.loop)
 
+    def kv_aware_routing(self, msg: LookupMsg) -> str:
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+        self.thread.start()
+        instance_id = asyncio.run_coroutine_threadsafe(
+            self.kv_manager.handle_orchestration_message(msg), self.loop
+        )
+        self.loop.close()
+        return instance_id
+
     async def route_request(
         self,
         endpoints: List[EndpointInfo],
@@ -220,8 +230,8 @@ class KvawareRouter(RoutingInterface):
         response = requests.post(url, headers=headers, json=data).json()
         token_ids = response["tokens"]
         msg = LookupMsg(tokens=token_ids)
-        instance_id = await self.kv_manager.handle_orchestration_message(msg)
-        if instance_id.best_instance_id is None:
+        instance_id = self.kv_aware_routing(msg)
+        if instance_id is None:
             len_engines = len(endpoints)
             chosen = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
             self.req_id += 1
