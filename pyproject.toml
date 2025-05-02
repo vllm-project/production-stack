@@ -21,7 +21,6 @@ dependencies = [
     "python-multipart==0.0.20",
     "uhashring==2.3",
     "uvicorn==0.34.0",
-    "lmcache==0.2.11",
 ]
 
 [project.scripts]
@@ -36,6 +35,9 @@ semantic_cache = [
     "sentence-transformers==2.2.2",
     "faiss-cpu==1.10.0",
     "huggingface-hub==0.25.2",  # downgrade to 0.25.2 to avoid breaking changes
+]
+lmcache_cache = [
+    "lmcache==0.2.11",
 ]
 
 [build-system]
