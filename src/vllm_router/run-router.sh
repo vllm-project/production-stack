@@ -14,7 +14,7 @@ fi
 #     --engine-stats-interval 10 \
 #     --log-stats
 
-# Use this command when testing with static service discovery
+# Use this command when testing with static service discovery for KV cache aware routing
 python3 -m vllm_router.app --port "$1" \
     --service-discovery static \
     --static-backends "http://localhost:8000,http://localhost:8001" \
