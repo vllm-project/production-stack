@@ -80,7 +80,7 @@ servingEngineSpec:
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
   # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes
-  #
+  # - nodeName: (optional) Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   #
   # Example:
