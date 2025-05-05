@@ -21,12 +21,16 @@ from typing import Dict, List
 
 import requests
 from fastapi import Request
-from lmcache.experimental.cache_controller import controller_manager
-from lmcache.experimental.cache_controller.message import (
-    LookupMsg,
-    QueryInstMsg,
-    QueryInstRetMsg,
-)
+
+try:
+    from lmcache.experimental.cache_controller import controller_manager
+    from lmcache.experimental.cache_controller.message import (
+        LookupMsg,
+        QueryInstMsg,
+        QueryInstRetMsg,
+    )
+except ImportError:
+    pass
 from uhashring import HashRing
 
 from vllm_router.log import init_logger
