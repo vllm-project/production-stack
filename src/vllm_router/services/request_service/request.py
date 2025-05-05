@@ -22,6 +22,7 @@ from fastapi import BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from vllm_router.log import init_logger
+from vllm_router.routers.routing_logic import KvawareRouter
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
@@ -135,11 +136,10 @@ async def process_request(
         await store_in_semantic_cache(
             endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
         )
-
-    if hasattr(request.app.state, "callbacks"):
-        background_tasks.add_task(
-            request.app.state.callbacks.post_request, request, full_response
-        )
+        if background_tasks and hasattr(request.app.state, "callbacks"):
+            background_tasks.add_task(
+                request.app.state.callbacks.post_request, request, full_response
+            )
 
 
 async def route_general_request(
@@ -208,9 +208,14 @@ async def route_general_request(
         )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
-    server_url = request.app.state.router.route_request(
-        endpoints, engine_stats, request_stats, request
-    )
+    if isinstance(request.app.state.router, KvawareRouter):
+        server_url = await request.app.state.router.route_request(
+            endpoints, engine_stats, request_stats, request, request_json
+        )
+    else:
+        server_url = request.app.state.router.route_request(
+            endpoints, engine_stats, request_stats, request
+        )
     curr_time = time.time()
     logger.info(
         f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
