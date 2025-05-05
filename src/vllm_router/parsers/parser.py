@@ -41,7 +41,7 @@ def validate_args(args):
         raise ValueError("K8s port must be provided when using K8s service discovery.")
     if args.routing_logic == "session" and args.session_key is None:
         raise ValueError(
-            "Session key must be provided when using session routing logic."
+            "Session key must be provided when using session routing affinity."
         )
     if args.log_stats and args.log_stats_interval <= 0:
         raise ValueError("Log stats interval must be greater than 0.")
@@ -100,14 +100,41 @@ def parse_args():
         "--routing-logic",
         type=str,
         required=True,
-        choices=["roundrobin", "session"],
-        help="The routing logic to use",
+        choices=["roundrobin", "session", "longest_prefix", "simhash"],
+        help="The routing affinity to use.",
     )
     parser.add_argument(
         "--session-key",
         type=str,
         default=None,
-        help="The key (in the header) to identify a session.",
+        help="The key (in the header) to identify a session. This is a shortcut"
+        " for --routing-logic-config "
+        '\'{"session_key": "<session_key>"}\'.',
+    )
+    parser.add_argument(
+        "--routing-logic-config",
+        type=str,
+        default="{}",
+        help="The routing configuration in JSON format.",
+    )
+    parser.add_argument(
+        "--endpoint-filters",
+        nargs="+",
+        default=[],
+        choices=["num_queueing_request"],
+        help="Tndpoint filters to use. Example usage: "
+        "--endpoint-filters num_queueing_request other_filter_A "
+        "other_filter_B ...",
+    )
+    parser.add_argument(
+        "--endpoint-filters-configs",
+        nargs="+",
+        default=[],
+        help="The configurations for endpoint filters, in JSON format. "
+        "Example usage: "
+        "--endpoint-filters-configs "
+        "'{\"percentile\": 0.9}' "
+        "other_filter_config_A other_filter_config_B ...",
     )
     parser.add_argument(
         "--callbacks",

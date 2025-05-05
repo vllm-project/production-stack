@@ -209,7 +209,7 @@ async def route_general_request(
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
     server_url = request.app.state.router.route_request(
-        endpoints, engine_stats, request_stats, request
+        endpoints, engine_stats, request_stats, request, request_json
     )
     curr_time = time.time()
     logger.info(

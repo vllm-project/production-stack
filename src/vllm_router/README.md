@@ -81,7 +81,7 @@ vllm-router --port 8000 \
     --static-models "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m" \
     --engine-stats-interval 10 \
     --log-stats \
-    --routing-logic roundrobin
+    --routing-logic longest_prefix
 ```
 
 ## Dynamic Router Config
