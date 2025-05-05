@@ -2,6 +2,7 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
 
@@ -55,7 +56,6 @@ from vllm_router.services.batch_service import initialize_batch_processor
 from vllm_router.services.files_service import initialize_storage
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
-    initialize_request_rewriter,
 )
 from vllm_router.stats.engine_stats import (
     get_engine_stats_scraper,
@@ -106,6 +106,9 @@ def initialize_all(app: FastAPI, args):
     Raises:
         ValueError: if the service discovery type is invalid
     """
+    if sentry_dsn := args.sentry_dsn:
+        sentry_sdk.init(dsn=sentry_dsn, send_default_pii=True)
+
     if args.service_discovery == "static":
         initialize_service_discovery(
             ServiceDiscoveryType.STATIC,

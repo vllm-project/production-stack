@@ -211,6 +211,12 @@ def parse_args():
         help="Log level for uvicorn. Default is 'info'.",
     )
 
+    parser.add_argument(
+        "--sentry-dsn",
+        type=str,
+        help="Enables Sentry Error Reporting to the specified Data Source Name",
+    )
+
     args = parser.parse_args()
     validate_args(args)
     return args
