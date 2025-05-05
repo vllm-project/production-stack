@@ -221,16 +221,10 @@ class KvawareRouter(RoutingInterface):
 
     def query_manager(self, msg) -> str:
         """
-        Get the instance id for the given IP address
+        Get the instance id for the given message
         """
-
         instance_id = self.kv_manager.handle_orchestration_message(msg)
         return instance_id
-
-    def get_ip(self) -> str:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
 
     async def route_request(
         self,
@@ -240,6 +234,21 @@ class KvawareRouter(RoutingInterface):
         request: Request,
         request_json: Dict,
     ) -> str:
+        """
+        Route the request to the appropriate engine URL by where the KV cache
+        of the longest prefix match is found.
+        If there is no session id in the request header, it will pick a server
+        with round robin.
+        Args:
+            endpoints (List[EndpointInfo]): The list of engine URLs
+            engine_stats (Dict[str, EngineStats]): The engine stats indicating
+                the 'physical' load of each engine
+            request_stats (Dict[str, RequestStats]): The request stats
+                indicating the request-level performance of each engine
+            request (Request): The incoming request
+            request_json (Dict): The request body (needed for finding the
+            longest prefix match)
+        """
         if self.instance_id_to_ip is None:
             self.instance_id_to_ip = {}
             for endpoint in endpoints:
