@@ -100,8 +100,14 @@ def parse_args():
         "--routing-logic",
         type=str,
         required=True,
-        choices=["roundrobin", "session"],
+        choices=["roundrobin", "session", "kvaware"],
         help="The routing logic to use",
+    )
+    parser.add_argument(
+        "--lmcache-controller-port",
+        type=int,
+        default=9000,
+        help="The port of the LMCache controller.",
     )
     parser.add_argument(
         "--session-key",

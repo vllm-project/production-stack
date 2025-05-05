@@ -37,6 +37,9 @@ semantic_cache = [
     "faiss-cpu==1.10.0",
     "huggingface-hub==0.25.2",  # downgrade to 0.25.2 to avoid breaking changes
 ]
+lmcache = [
+    "lmcache==0.2.11",
+]
 
 [build-system]
 requires = ["setuptools>=68", "setuptools_scm[toml]>=8.0"]
@@ -53,5 +56,5 @@ lint = [
 ]
 test = [
     "pytest>=8.3.4",
-    "pytest-asyncio>=0.25.3",
+    "pytest-asyncio>=0.25.3"
 ]
