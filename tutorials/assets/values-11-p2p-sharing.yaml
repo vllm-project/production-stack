@@ -1,0 +1,66 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "mistral-1"
+    repository: "lmcache/vllm-openai"
+    tag: "latest"
+    modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+    replicaCount: 2
+    requestCPU: 10
+    requestMemory: "40Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      maxModelLen: 16384
+
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "20"
+      p2pEnabled: true
+      distributedPort: "8200"
+
+    hf_token: <YOUR HF TOKEN>
+
+  - name: "mistral-2"
+    repository: "lmcache/vllm-openai"
+    tag: "latest"
+    modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+    replicaCount: 2
+    requestCPU: 10
+    requestMemory: "40Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      maxModelLen: 16384
+
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "20"
+      p2pEnabled: true
+      distributedPort: "8201"
+
+    hf_token: <YOUR HF TOKEN>
+
+lookupserverSpec:
+  replicaCount: 1
+  containerPort: 8080
+  servicePort: 8100
+  serde: "naive"
+
+  repository: "redis"
+  tag: "latest"
+  resources:
+    requests:
+      cpu: "4"
+      memory: "8G"
+    limits:
+      cpu: "4"
+      memory: "10G"
+
+  labels:
+    environment: "lookupserver"
+    release: "lookupserver"

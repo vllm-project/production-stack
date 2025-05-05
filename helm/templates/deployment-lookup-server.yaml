@@ -1,0 +1,49 @@
+{{- if .Values.lookupserverSpec -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-deployment-lookup-server"
+  namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "chart.lookupserverLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+    {{- include "chart.lookupserverLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+      {{- include "chart.lookupserverLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: "lookup-server"
+          image: "{{ required "Required value 'lookupserverSpec.repository' must be defined !" .Values.lookupserverSpec.repository }}:{{ required "Required value 'lookupserverSpec.tag' must be defined !" .Values.lookupserverSpec.tag }}"
+          command: ["redis-server"]
+          {{- if .Values.lookupserverSpec.resources }}
+          resources:
+            {{- if .Values.lookupserverSpec.resources.requests }}
+            requests:
+              cpu: "{{ .Values.lookupserverSpec.resources.requests.cpu }}"
+              memory: "{{ .Values.lookupserverSpec.resources.requests.memory }}"
+            {{- end }}
+            {{- if .Values.lookupserverSpec.resources.limits }}
+            limits:
+              cpu: "{{ .Values.lookupserverSpec.resources.limits.cpu }}"
+              memory: "{{ .Values.lookupserverSpec.resources.limits.memory }}"
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: "caserver-cport"
+              containerPort: {{ .Values.lookupserverSpec.containerPort }}
+          imagePullPolicy: IfNotPresent
+
+        # TODO(Jiayi): add health check for redis lookup server
+        # livenessProbe:
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 5
+        #   failureThreshold: 3
+        #   httpGet:
+        #     path: /health
+        #     port: {{ .Values.lookupserverSpec.containerPort }}
+{{- end -}}
