@@ -291,7 +291,9 @@ spec:
       {{- if .Values.servingEngineSpec.schedulerName }}
       schedulerName: {{ .Values.servingEngineSpec.schedulerName }}
       {{- end }}
-      {{- if $modelSpec.nodeSelectorTerms}}
+      {{- if $modelSpec.nodeName }}
+      nodeName: {{ $modelSpec.nodeName }}
+      {{- else if $modelSpec.nodeSelectorTerms}}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
