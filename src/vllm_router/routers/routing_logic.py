@@ -208,7 +208,7 @@ class KvawareRouter(RoutingInterface):
             f"0.0.0.0:{self.lmcache_controller_port}"
         )
         self.req_id = 0
-        self.instance_id_to_ip = None
+        self.instance_id_to_ip = {}
 
     def start_kv_manager(self):
         """
@@ -249,16 +249,6 @@ class KvawareRouter(RoutingInterface):
             request_json (Dict): The request body (needed for finding the
             longest prefix match)
         """
-        if self.instance_id_to_ip is None:
-            self.instance_id_to_ip = {}
-            for endpoint in endpoints:
-                query_message = QueryInstMsg(
-                    ip=endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[0].split(
-                        "//"
-                    )[1]
-                )
-                instance_id = await self.query_manager(query_message)
-                self.instance_id_to_ip[instance_id.instance_id] = endpoint.url
         url = endpoints[0].url + "/tokenize"
         headers = {"Content-Type": "application/json"}
         data = {"model": endpoints[0].model_name, "prompt": request_json["prompt"]}
@@ -274,6 +264,15 @@ class KvawareRouter(RoutingInterface):
             return chosen.url
         else:
             self.req_id += 1
+            if instance_id.best_instance_id not in self.instance_id_to_ip:
+                for endpoint in endpoints:
+                    query_message = QueryInstMsg(
+                        ip=endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
+                            0
+                        ].split("//")[1]
+                    )
+                    instance_id = await self.query_manager(query_message)
+                    self.instance_id_to_ip[instance_id.instance_id] = endpoint.url
             logger.info(
                 f"Routing request to {instance_id.best_instance_id} found by kvaware router"
             )
