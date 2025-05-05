@@ -54,7 +54,7 @@ def validate_args(args):
 def parse_args():
     parser = argparse.ArgumentParser(description="Run the FastAPI app.")
     parser.add_argument(
-        "--host", default="0.0.0.0", help="The host to run the server on."
+        "--host", type=str, default="0.0.0.0", help="The host to run the server on."
     )
     parser.add_argument(
         "--port", type=int, default=8001, help="The port to run the server on."
@@ -62,6 +62,7 @@ def parse_args():
     parser.add_argument(
         "--service-discovery",
         required=True,
+        type=str,
         choices=["static", "k8s"],
         help="The service discovery type.",
     )
