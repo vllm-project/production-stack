@@ -14,7 +14,6 @@ servingEngineSpec:
       enableChunkedPrefill: false
       enablePrefixCaching: false
       maxModelLen: 16384
-      v1: 0
 
     lmcacheConfig:
       enabled: true
@@ -31,8 +30,8 @@ servingEngineSpec:
 
 
 routerSpec:
-  repository: "lmcache/test"
-  tag: "router-2025-05-04"
+  repository: "lmcache/lmstack-router"
+  tag: "v0.1.2"
   resources:
     requests:
       cpu: "1"
