@@ -15,7 +15,7 @@ COPY .git/ .git/
 # Copy the rest of the application code
 COPY src/ src/
 
-ARG INSTALL_OPTIONAL_DEP=semantic_cache
+ARG INSTALL_OPTIONAL_DEP=semantic_cache,lmcache
 ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
 
 # Install dependencies (use cache, and delete after install, to speed up the build)
