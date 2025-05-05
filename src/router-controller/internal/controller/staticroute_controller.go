@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -57,6 +58,7 @@ type HealthCheckConfig struct {
 type StaticRouteReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Record record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=staticroutes,verbs=get;list;watch;create;update;patch;delete
@@ -176,6 +178,7 @@ func (r *StaticRouteReconciler) reconcileConfigMap(ctx context.Context, staticRo
 		return nil
 	})
 	if err != nil {
+		r.Record.Eventf(staticRoute, corev1.EventTypeWarning, "FailedReconcileConfigMap", "Failed to create or update ConfigMap %s/%s : %v", configMap.Namespace, configMap.Name, err)
 		return nil, fmt.Errorf("failed to create or update ConfigMap: %w", err)
 	}
 
