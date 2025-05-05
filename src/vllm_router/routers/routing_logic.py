@@ -219,7 +219,7 @@ class KvawareRouter(RoutingInterface):
         self.thread.start()
         asyncio.run_coroutine_threadsafe(self.kv_manager.start_all(), self.loop)
 
-    def query_manager(self, msg: QueryInstMsg) -> str:
+    def query_manager(self, msg) -> str:
         """
         Get the instance id for the given IP address
         """
