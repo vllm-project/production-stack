@@ -153,7 +153,10 @@ spec:
             value: "DEBUG"
           {{- if hasKey . "v1" }}
           - name: VLLM_USE_V1
-            value: {{ default 0 $modelSpec.vllmConfig.v1 | quote }}
+            value: {{ $modelSpec.vllmConfig.v1 | quote }}
+          {{- else }}
+          - name: VLLM_USE_V1
+            value: "0"
           {{- end}}
           {{- end}}
           {{- if $modelSpec.hf_token }}
