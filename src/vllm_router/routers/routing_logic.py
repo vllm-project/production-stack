@@ -202,6 +202,11 @@ class SessionRouter(RoutingInterface):
 
 
 class KvawareRouter(RoutingInterface):
+    """
+    Route the request to the appropriate engine URL by where the KV cache
+    of the longest prefix match is found.
+    """
+
     def __init__(self, lmcache_controller_port: int):
         self.lmcache_controller_port = lmcache_controller_port
         self.kv_manager = controller_manager.LMCacheControllerManager(
@@ -239,12 +244,13 @@ class KvawareRouter(RoutingInterface):
         of the longest prefix match is found.
         If there is no session id in the request header, it will pick a server
         with round robin.
+
         Args:
             endpoints (List[EndpointInfo]): The list of engine URLs
             engine_stats (Dict[str, EngineStats]): The engine stats indicating
-                the 'physical' load of each engine
+               the 'physical' load of each engine
             request_stats (Dict[str, RequestStats]): The request stats
-                indicating the request-level performance of each engine
+               indicating the request-level performance of each engine
             request (Request): The incoming request
             request_json (Dict): The request body (needed for finding the
             longest prefix match)
