@@ -99,6 +99,32 @@ Before proceeding, ensure Docker runs without requiring sudo. To add your user t
 sudo usermod -aG docker $USER && newgrp docker
 ```
 
+If Minikube is already installed on your system, we recommend uninstalling the existing version before proceeding. You may use one of the following commands based on your operating system and package manager:
+
+```bash
+# Ubuntu / Debian
+sudo apt remove minikube
+
+# RHEL / CentOS / Fedora
+sudo yum remove minikube
+# or
+sudo dnf remove minikube
+
+# macOS (installed via Homebrew)
+brew uninstall minikube
+
+# Arch Linux
+sudo pacman -Rs minikube
+
+# Windows (via Chocolatey)
+choco uninstall minikube
+
+# Windows (via Scoop)
+scoop uninstall minikube
+```
+
+After removing the previous installation, please execute the script provided below to install the latest version.
+
 1. Execute the script `install-minikube-cluster.sh`:
 
    ```bash

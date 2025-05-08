@@ -96,6 +96,10 @@ spec:
           {{- if .Values.routerSpec.extraArgs }}
           {{- toYaml .Values.routerSpec.extraArgs | nindent 10 }}
           {{- end }}
+          {{- if .Values.routerSpec.lmcacheControllerPort }}
+          - "--lmcache-controller-port"
+          - "{{ .Values.routerSpec.lmcacheControllerPort }}"
+          {{- end }}
         {{- if .Values.routerSpec.resources }}
         resources:
           {{- if .Values.routerSpec.resources.requests }}

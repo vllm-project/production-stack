@@ -222,6 +222,9 @@
                   ]
                 }
               },
+              "nodeName": {
+                "type": "string"
+              },
               "nodeSelectorTerms": {
                 "type": "array",
                 "items": {

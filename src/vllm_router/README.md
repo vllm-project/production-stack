@@ -48,6 +48,10 @@ The router can be configured using command-line arguments. Below are the availab
 
 - `--dynamic-config-json`: The path to the json file containing the dynamic configuration.
 
+### Sentry Options
+
+- `--sentry-dsn`: The Sentry Data Source Name to use for error reporting.
+
 ## Build docker image
 
 ```bash
