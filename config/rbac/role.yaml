@@ -1,0 +1,95 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - production-stack.vllm.ai
+  resources:
+  - staticroutes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - production-stack.vllm.ai
+  resources:
+  - staticroutes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - production-stack.vllm.ai
+  resources:
+  - staticroutes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - serving.vllm.ai
+  resources:
+  - vllmrouters
+  - vllmruntimes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - serving.vllm.ai
+  resources:
+  - vllmrouters/finalizers
+  - vllmruntimes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - serving.vllm.ai
+  resources:
+  - vllmrouters/status
+  - vllmruntimes/status
+  verbs:
+  - get
+  - patch
+  - update

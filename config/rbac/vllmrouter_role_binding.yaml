@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-viewer-binding
+  namespace: default
+  labels:
+    app.kubernetes.io/name: production-stack
+    app.kubernetes.io/managed-by: kustomize
+subjects:
+- kind: ServiceAccount
+  name: vllmrouter-sa
+  namespace: default
+roleRef:
+  kind: Role
+  name: pod-viewer-role
+  apiGroup: rbac.authorization.k8s.io
