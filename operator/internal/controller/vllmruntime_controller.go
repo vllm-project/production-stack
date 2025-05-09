@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -246,6 +247,15 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 			},
 		)
 
+		// Add KV transfer config based on V1 flag
+		var lmcache_config string
+		if vllmRuntime.Spec.V1 {
+			lmcache_config = `{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}`
+		} else {
+			lmcache_config = `{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}`
+		}
+		args = append(args, "--kv-transfer-config", lmcache_config)
+
 		if vllmRuntime.Spec.LMCacheConfig.CPUOffloadingBufferSize != "" {
 			env = append(env,
 				corev1.EnvVar{
@@ -437,6 +447,8 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr
 	actualEnabled := false
 	actualCPUOffloadingBufferSize := ""
 	actualDiskOffloadingBufferSize := ""
+	actualRemoteURL := ""
+	actualRemoteSerde := ""
 
 	for _, env := range actualLMCacheConfig {
 		switch env.Name {
@@ -446,13 +458,19 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr
 			actualCPUOffloadingBufferSize = env.Value
 		case "LMCACHE_MAX_LOCAL_DISK_SIZE":
 			actualDiskOffloadingBufferSize = env.Value
+		case "LMCACHE_REMOTE_URL":
+			actualRemoteURL = env.Value
+		case "LMCACHE_REMOTE_SERDE":
+			actualRemoteSerde = env.Value
 		}
 	}
 
 	// Compare specific fields
 	if expectedLMCacheConfig.Enabled != actualEnabled ||
 		expectedLMCacheConfig.CPUOffloadingBufferSize != actualCPUOffloadingBufferSize ||
-		expectedLMCacheConfig.DiskOffloadingBufferSize != actualDiskOffloadingBufferSize {
+		expectedLMCacheConfig.DiskOffloadingBufferSize != actualDiskOffloadingBufferSize ||
+		expectedLMCacheConfig.RemoteURL != actualRemoteURL ||
+		expectedLMCacheConfig.RemoteSerde != actualRemoteSerde {
 		return true
 	}
 
@@ -461,25 +479,30 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr
 
 // updateStatus updates the status of the VLLMRuntime
 func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *productionstackv1alpha1.VLLMRuntime, dep *appsv1.Deployment) error {
-	// Re-read the VLLMRuntime to get the latest version
-	latestVR := &productionstackv1alpha1.VLLMRuntime{}
-	if err := r.Get(ctx, types.NamespacedName{Name: vr.Name, Namespace: vr.Namespace}, latestVR); err != nil {
-		return err
-	}
+	return retry.OnError(retry.DefaultRetry, func(err error) bool {
+		return errors.IsConflict(err)
+	}, func() error {
+		// Get the latest version of the VLLMRuntime
+		latestVR := &productionstackv1alpha1.VLLMRuntime{}
+		if err := r.Get(ctx, types.NamespacedName{Name: vr.Name, Namespace: vr.Namespace}, latestVR); err != nil {
+			return err
+		}
 
-	latestVR.Status.LastUpdated = metav1.Now()
+		// Update the status fields
+		latestVR.Status.LastUpdated = metav1.Now()
 
-	// Update model status based on deployment status
-	if dep.Status.AvailableReplicas > 0 {
-		latestVR.Status.ModelStatus = "Ready"
-	} else if dep.Status.UpdatedReplicas > 0 {
-		// If we have updated replicas but they're not yet available, mark as updating
-		latestVR.Status.ModelStatus = "Updating"
-	} else {
-		latestVR.Status.ModelStatus = "NotReady"
-	}
+		// Update model status based on deployment status
+		if dep.Status.AvailableReplicas > 0 {
+			latestVR.Status.ModelStatus = "Ready"
+		} else if dep.Status.UpdatedReplicas > 0 {
+			// If we have updated replicas but they're not yet available, mark as updating
+			latestVR.Status.ModelStatus = "Updating"
+		} else {
+			latestVR.Status.ModelStatus = "NotReady"
+		}
 
-	return r.Status().Update(ctx, latestVR)
+		return r.Status().Update(ctx, latestVR)
+	})
 }
 
 // serviceForVLLMRuntime returns a VLLMRuntime Service object

@@ -178,6 +178,3 @@ docs/book/src/docs
 /testdata/**/go.sum
 /docs/book/src/simple-external-plugin-tutorial/testdata/sampleexternalplugin/v1/bin
 /testdata/**legacy**
-
-# skip operator's test for now
-operator/test

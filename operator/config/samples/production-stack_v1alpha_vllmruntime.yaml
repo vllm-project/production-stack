@@ -14,13 +14,13 @@ spec:
   gpuMemoryUtilization: "0.8"
   maxLoras: 4
   extraArgs: ["--disable-log-requests"]
-  v1: false
+  v1: true
 
   # LM Cache configuration
   lmCacheConfig:
     enabled: true
-    cpuOffloadingBufferSize: "4Gi"
-    diskOffloadingBufferSize: "8Gi"
+    cpuOffloadingBufferSize: "15"
+    diskOffloadingBufferSize: "8"
     remoteUrl: ""
     remoteSerde: ""
 

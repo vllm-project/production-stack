@@ -19,10 +19,10 @@ spec:
   routingLogic: roundrobin
 
   # Engine statistics collection interval
-  engineScrapeInterval: "30"
+  engineScrapeInterval: 30
 
   # Request statistics window
-  requestStatsWindow: "60"
+  requestStatsWindow: 60
 
   # Container port for the router service
   port: 80

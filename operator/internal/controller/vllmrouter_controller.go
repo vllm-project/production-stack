@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -226,11 +227,11 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 	if router.Spec.SessionKey != "" {
 		args = append(args, "--session-key", router.Spec.SessionKey)
 	}
-	if router.Spec.EngineScrapeInterval != "" {
-		args = append(args, "--engine-stats-interval", router.Spec.EngineScrapeInterval)
+	if router.Spec.EngineScrapeInterval != 0 {
+		args = append(args, "--engine-stats-interval", fmt.Sprintf("%d", router.Spec.EngineScrapeInterval))
 	}
-	if router.Spec.RequestStatsWindow != "" {
-		args = append(args, "--request-stats-window", router.Spec.RequestStatsWindow)
+	if router.Spec.RequestStatsWindow != 0 {
+		args = append(args, "--request-stats-window", fmt.Sprintf("%d", router.Spec.RequestStatsWindow))
 	}
 	if router.Spec.ExtraArgs != nil {
 		args = append(args, router.Spec.ExtraArgs...)
@@ -323,24 +324,29 @@ func (r *VLLMRouterReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, rou
 
 // updateStatus updates the status of the VLLMRouter
 func (r *VLLMRouterReconciler) updateStatus(ctx context.Context, router *servingv1alpha1.VLLMRouter, dep *appsv1.Deployment) error {
-	// Re-read the VLLMRouter to get the latest version
-	latestRouter := &servingv1alpha1.VLLMRouter{}
-	if err := r.Get(ctx, types.NamespacedName{Name: router.Name, Namespace: router.Namespace}, latestRouter); err != nil {
-		return err
-	}
+	return retry.OnError(retry.DefaultRetry, func(err error) bool {
+		return errors.IsConflict(err)
+	}, func() error {
+		// Get the latest version of the VLLMRouter
+		latestRouter := &servingv1alpha1.VLLMRouter{}
+		if err := r.Get(ctx, types.NamespacedName{Name: router.Name, Namespace: router.Namespace}, latestRouter); err != nil {
+			return err
+		}
 
-	latestRouter.Status.LastUpdated = metav1.Now()
+		// Update the status fields
+		latestRouter.Status.LastUpdated = metav1.Now()
 
-	// Update VLLMRouter status based on deployment status
-	if dep.Status.AvailableReplicas > 0 {
-		latestRouter.Status.Status = "Ready"
-	} else if dep.Status.UpdatedReplicas > 0 {
-		latestRouter.Status.Status = "Updating"
-	} else {
-		latestRouter.Status.Status = "NotReady"
-	}
+		// Update VLLMRouter status based on deployment status
+		if dep.Status.AvailableReplicas > 0 {
+			latestRouter.Status.Status = "Ready"
+		} else if dep.Status.UpdatedReplicas > 0 {
+			latestRouter.Status.Status = "Updating"
+		} else {
+			latestRouter.Status.Status = "NotReady"
+		}
 
-	return r.Status().Update(ctx, latestRouter)
+		return r.Status().Update(ctx, latestRouter)
+	})
 }
 
 // serviceForVLLMRouter returns a VLLMRouter Service object

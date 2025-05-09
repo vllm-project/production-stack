@@ -45,7 +45,8 @@ spec:
                 type: boolean
               engineScrapeInterval:
                 description: EngineScrapeInterval for collecting engine statistics
-                type: string
+                format: int32
+                type: integer
               env:
                 description: Environment variables
                 items:
@@ -102,11 +103,11 @@ spec:
                           operator:
                             description: |-
                               Represents a key's relationship to a set of values.
-                              Valid operators are In, Not In, Exists, DoesNotExist. Gt, and Lt.
+                              Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                             type: string
                           values:
                             description: |-
-                              An array of string values. If the operator is In or Not In,
+                              An array of string values. If the operator is In or NotIn,
                               the values array must be non-empty. If the operator is Exists or DoesNotExist,
                               the values array must be empty. If the operator is Gt or Lt, the values
                               array must have a single element, which will be interpreted as an integer.
@@ -135,11 +136,11 @@ spec:
                           operator:
                             description: |-
                               Represents a key's relationship to a set of values.
-                              Valid operators are In, Not In, Exists, DoesNotExist. Gt, and Lt.
+                              Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
                             type: string
                           values:
                             description: |-
-                              An array of string values. If the operator is In or Not In,
+                              An array of string values. If the operator is In or NotIn,
                               the values array must be non-empty. If the operator is Exists or DoesNotExist,
                               the values array must be empty. If the operator is Gt or Lt, the values
                               array must have a single element, which will be interpreted as an integer.
@@ -169,7 +170,8 @@ spec:
                 type: integer
               requestStatsWindow:
                 description: RequestStatsWindow for request statistics
-                type: string
+                format: int32
+                type: integer
               resources:
                 description: Resource requirements
                 properties:

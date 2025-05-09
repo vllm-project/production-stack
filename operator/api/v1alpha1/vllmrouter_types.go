@@ -58,10 +58,10 @@ type VLLMRouterSpec struct {
 	SessionKey string `json:"sessionKey,omitempty"`
 
 	// EngineScrapeInterval for collecting engine statistics
-	EngineScrapeInterval string `json:"engineScrapeInterval,omitempty"`
+	EngineScrapeInterval int32 `json:"engineScrapeInterval,omitempty"`
 
 	// RequestStatsWindow for request statistics
-	RequestStatsWindow string `json:"requestStatsWindow,omitempty"`
+	RequestStatsWindow int32 `json:"requestStatsWindow,omitempty"`
 
 	// ExtraArgs for additional router arguments
 	ExtraArgs []string `json:"extraArgs,omitempty"`
