@@ -151,6 +151,16 @@ def initialize_all(app: FastAPI, args):
             args.batch_processor, args.file_storage_path, app.state.batch_storage
         )
 
+    # Initialize dynamic config watcher
+    if args.dynamic_config_json:
+        init_config = DynamicRouterConfig.from_args(args)
+        initialize_dynamic_config_watcher(
+            args.dynamic_config_json, 10, init_config, app
+        )
+
+    if args.callbacks:
+        initialize_custom_callbacks(args.callbacks, app)
+
     initialize_routing_logic(
         args.routing_logic,
         session_key=args.session_key,
@@ -219,16 +229,6 @@ def initialize_all(app: FastAPI, args):
     app.state.request_stats_monitor = get_request_stats_monitor()
     app.state.router = get_routing_logic()
     app.state.request_rewriter = get_request_rewriter()
-
-    # Initialize dynamic config watcher
-    if args.dynamic_config_json:
-        init_config = DynamicRouterConfig.from_args(args)
-        initialize_dynamic_config_watcher(
-            args.dynamic_config_json, 10, init_config, app
-        )
-
-    if args.callbacks:
-        initialize_custom_callbacks(args.callbacks, app)
 
 
 app = FastAPI(lifespan=lifespan)
