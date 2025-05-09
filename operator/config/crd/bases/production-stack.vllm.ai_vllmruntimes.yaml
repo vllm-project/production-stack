@@ -1,0 +1,216 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: vllmruntimes.production-stack.vllm.ai
+spec:
+  group: production-stack.vllm.ai
+  names:
+    kind: VLLMRuntime
+    listKind: VLLMRuntimeList
+    plural: vllmruntimes
+    shortNames:
+    - vr
+    singular: vllmruntime
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: VLLMRuntime is the Schema for the vllmruntimes API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: VLLMRuntimeSpec defines the desired state of VLLMRuntime
+            properties:
+              deploymentStrategy:
+                default: RollingUpdate
+                description: Deploy strategy
+                enum:
+                - RollingUpdate
+                - Recreate
+                type: string
+              enableChunkedPrefill:
+                description: Enable chunked prefill
+                type: boolean
+              enablePrefixCaching:
+                description: Enable prefix caching
+                type: boolean
+              env:
+                description: Environment variables
+                items:
+                  description: EnvVar represents an environment variable
+                  properties:
+                    name:
+                      type: string
+                    value:
+                      type: string
+                  required:
+                  - name
+                  - value
+                  type: object
+                type: array
+              extraArgs:
+                description: Extra arguments for vllm serve
+                items:
+                  type: string
+                type: array
+              gpuMemoryUtilization:
+                description: GPU memory utilization
+                type: string
+              hfTokenName:
+                default: token
+                type: string
+              hfTokenSecret:
+                description: HuggingFace token secret
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              image:
+                description: Image configuration
+                properties:
+                  name:
+                    type: string
+                  pullPolicy:
+                    type: string
+                  pullSecretName:
+                    type: string
+                  registry:
+                    type: string
+                required:
+                - name
+                - registry
+                type: object
+              lmCacheConfig:
+                description: LM Cache configuration
+                properties:
+                  cpuOffloadingBufferSize:
+                    default: 4Gi
+                    description: CPUOffloadingBufferSize is the size of the CPU offloading
+                      buffer
+                    type: string
+                  diskOffloadingBufferSize:
+                    default: 8Gi
+                    description: DiskOffloadingBufferSize is the size of the disk
+                      offloading buffer
+                    type: string
+                  enabled:
+                    default: false
+                    description: Enabled enables LM Cache
+                    type: boolean
+                  remoteSerde:
+                    description: RemoteSerde is the serialization format for the remote
+                      cache
+                    type: string
+                  remoteUrl:
+                    description: RemoteURL is the URL of the remote cache server
+                    type: string
+                type: object
+              maxLoras:
+                description: Maximum number of LoRAs
+                format: int32
+                type: integer
+              model:
+                description: Model configuration
+                properties:
+                  dtype:
+                    description: Data type
+                    type: string
+                  enableLoRA:
+                    description: Enable LoRA
+                    type: boolean
+                  enableTool:
+                    description: Enable tool
+                    type: boolean
+                  maxModelLen:
+                    description: Maximum model length
+                    format: int32
+                    type: integer
+                  maxNumSeqs:
+                    description: Maximum number of sequences
+                    format: int32
+                    type: integer
+                  modelURL:
+                    description: Model URL
+                    type: string
+                  toolCallParser:
+                    description: Tool call parser
+                    type: string
+                required:
+                - modelURL
+                type: object
+              port:
+                default: 8000
+                description: Port for vLLM server
+                format: int32
+                type: integer
+              replicas:
+                default: 1
+                description: Replicas
+                format: int32
+                type: integer
+              resources:
+                description: Resource requirements
+                properties:
+                  cpu:
+                    type: string
+                  gpu:
+                    type: string
+                  memory:
+                    type: string
+                type: object
+              tensorParallelSize:
+                description: Tensor parallel size
+                format: int32
+                type: integer
+              v1:
+                description: Use V1 API
+                type: boolean
+            required:
+            - image
+            - model
+            - resources
+            type: object
+          status:
+            description: VLLMRuntimeStatus defines the observed state of VLLMRuntime
+            properties:
+              lastUpdated:
+                description: Last updated timestamp
+                format: date-time
+                type: string
+              modelStatus:
+                description: Model status
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

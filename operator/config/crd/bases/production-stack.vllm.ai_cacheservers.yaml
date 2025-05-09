@@ -1,0 +1,113 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: cacheservers.production-stack.vllm.ai
+spec:
+  group: production-stack.vllm.ai
+  names:
+    kind: CacheServer
+    listKind: CacheServerList
+    plural: cacheservers
+    singular: cacheserver
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.status
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CacheServer is the Schema for the cacheservers API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CacheServerSpec defines the desired state of CacheServer
+            properties:
+              deploymentStrategy:
+                default: RollingUpdate
+                description: Deployment strategy
+                enum:
+                - RollingUpdate
+                - Recreate
+                type: string
+              image:
+                description: Image configuration for the cache server
+                properties:
+                  name:
+                    type: string
+                  pullPolicy:
+                    type: string
+                  pullSecretName:
+                    type: string
+                  registry:
+                    type: string
+                required:
+                - name
+                - registry
+                type: object
+              port:
+                default: 8000
+                description: Container port for the cache server
+                format: int32
+                type: integer
+              replicas:
+                default: 1
+                description: Number of replicas
+                format: int32
+                type: integer
+              resources:
+                description: Resource requirements
+                properties:
+                  cpu:
+                    type: string
+                  gpu:
+                    type: string
+                  memory:
+                    type: string
+                type: object
+            required:
+            - deploymentStrategy
+            - image
+            - port
+            - replicas
+            - resources
+            type: object
+          status:
+            description: CacheServerStatus defines the observed state of CacheServer
+            properties:
+              lastUpdated:
+                description: Last time the status was updated
+                format: date-time
+                type: string
+              status:
+                description: Current status of the cache server
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

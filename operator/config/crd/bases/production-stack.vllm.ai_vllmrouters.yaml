@@ -1,0 +1,257 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: vllmrouters.production-stack.vllm.ai
+spec:
+  group: production-stack.vllm.ai
+  names:
+    kind: VLLMRouter
+    listKind: VLLMRouterList
+    plural: vllmrouters
+    singular: vllmrouter
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: VLLMRouter is the Schema for the vllmrouters API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: VLLMRouterSpec defines the desired state of VLLMRouter
+            properties:
+              enableRouter:
+                default: true
+                description: EnableRouter determines if the router should be deployed
+                type: boolean
+              engineScrapeInterval:
+                description: EngineScrapeInterval for collecting engine statistics
+                format: int32
+                type: integer
+              env:
+                description: Environment variables
+                items:
+                  description: EnvVar represents an environment variable
+                  properties:
+                    name:
+                      type: string
+                    value:
+                      type: string
+                  required:
+                  - name
+                  - value
+                  type: object
+                type: array
+              extraArgs:
+                description: ExtraArgs for additional router arguments
+                items:
+                  type: string
+                type: array
+              image:
+                description: Image configuration
+                properties:
+                  name:
+                    type: string
+                  pullPolicy:
+                    type: string
+                  pullSecretName:
+                    type: string
+                  registry:
+                    type: string
+                required:
+                - name
+                - registry
+                type: object
+              k8sLabelSelector:
+                description: K8sLabelSelector specifies the label selector for vLLM
+                  runtime pods when using k8s service discovery
+                type: string
+              nodeSelectorTerms:
+                description: NodeSelectorTerms for pod scheduling
+                items:
+                  description: |-
+                    A null or empty node selector term matches no objects. The requirements of
+                    them are ANDed.
+                    The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
+                  properties:
+                    matchExpressions:
+                      description: A list of node selector requirements by node's
+                        labels.
+                      items:
+                        description: |-
+                          A node selector requirement is a selector that contains values, a key, and an operator
+                          that relates the key and values.
+                        properties:
+                          key:
+                            description: The label key that the selector applies to.
+                            type: string
+                          operator:
+                            description: |-
+                              Represents a key's relationship to a set of values.
+                              Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                            type: string
+                          values:
+                            description: |-
+                              An array of string values. If the operator is In or NotIn,
+                              the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                              the values array must be empty. If the operator is Gt or Lt, the values
+                              array must have a single element, which will be interpreted as an integer.
+                              This array is replaced during a strategic merge patch.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                        required:
+                        - key
+                        - operator
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    matchFields:
+                      description: A list of node selector requirements by node's
+                        fields.
+                      items:
+                        description: |-
+                          A node selector requirement is a selector that contains values, a key, and an operator
+                          that relates the key and values.
+                        properties:
+                          key:
+                            description: The label key that the selector applies to.
+                            type: string
+                          operator:
+                            description: |-
+                              Represents a key's relationship to a set of values.
+                              Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                            type: string
+                          values:
+                            description: |-
+                              An array of string values. If the operator is In or NotIn,
+                              the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                              the values array must be empty. If the operator is Gt or Lt, the values
+                              array must have a single element, which will be interpreted as an integer.
+                              This array is replaced during a strategic merge patch.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                        required:
+                        - key
+                        - operator
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: atomic
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
+              port:
+                default: 80
+                description: ContainerPort for the router service
+                format: int32
+                type: integer
+              replicas:
+                default: 1
+                description: Replicas specifies the number of router replicas
+                format: int32
+                type: integer
+              requestStatsWindow:
+                description: RequestStatsWindow for request statistics
+                format: int32
+                type: integer
+              resources:
+                description: Resource requirements
+                properties:
+                  cpu:
+                    type: string
+                  gpu:
+                    type: string
+                  memory:
+                    type: string
+                type: object
+              routingLogic:
+                default: roundrobin
+                description: RoutingLogic specifies the routing strategy
+                enum:
+                - roundrobin
+                - session
+                type: string
+              serviceAccountName:
+                description: ServiceAccountName for the router pod
+                type: string
+              serviceDiscovery:
+                default: k8s
+                description: ServiceDiscovery specifies the service discovery method
+                  (k8s or static)
+                enum:
+                - k8s
+                - static
+                type: string
+              sessionKey:
+                default: ""
+                description: SessionKey for session-based routing
+                type: string
+              staticBackends:
+                description: StaticBackends is required when using static service
+                  discovery
+                type: string
+              staticModels:
+                description: StaticModels is required when using static service discovery
+                type: string
+              vllmApiKeyName:
+                type: string
+              vllmApiKeySecret:
+                description: VLLM API Key configuration
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+            required:
+            - image
+            - resources
+            type: object
+          status:
+            description: VLLMRouterStatus defines the observed state of VLLMRouter
+            properties:
+              activeRuntimes:
+                description: Number of active runtimes
+                format: int32
+                type: integer
+              lastUpdated:
+                description: Last updated timestamp
+                format: date-time
+                type: string
+              status:
+                description: Router status
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

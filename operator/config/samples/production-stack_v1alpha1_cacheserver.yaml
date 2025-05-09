@@ -1,0 +1,28 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: CacheServer
+metadata:
+  labels:
+    app.kubernetes.io/name: production-stack
+    app.kubernetes.io/managed-by: kustomize
+  name: cacheserver-sample
+spec:
+  # Image configuration
+  image:
+    registry: "docker.io"
+    name: "lmcache/vllm-openai:2025-04-18"
+    pullPolicy: "IfNotPresent"
+    pullSecretName: ""
+
+  # Container port
+  port: 8000
+
+  # Resource requirements
+  resources:
+    cpu: "2"
+    memory: "16Gi"
+
+  # Number of replicas
+  replicas: 1
+
+  # Deployment strategy
+  deploymentStrategy: "Recreate"
