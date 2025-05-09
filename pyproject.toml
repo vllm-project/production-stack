@@ -13,6 +13,7 @@ classifiers = [
 # Should be the same as src/router/requirements.txt
 dependencies = [
     "aiofiles==24.1.0",
+    "aiohttp>=3.11.18",
     "fastapi==0.115.8",
     "httpx==0.28.1",
     "kubernetes==32.0.0",
@@ -36,9 +37,6 @@ semantic_cache = [
     "sentence-transformers==2.2.2",
     "faiss-cpu==1.10.0",
     "huggingface-hub==0.25.2",  # downgrade to 0.25.2 to avoid breaking changes
-]
-lmcache = [
-    "lmcache==0.2.11",
 ]
 
 [build-system]

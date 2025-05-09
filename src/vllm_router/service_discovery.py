@@ -17,10 +17,11 @@ import enum
 import os
 import threading
 import time
+import asyncio
+from asyncio import Task
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
-
-import requests
+import aiohttp
 from kubernetes import client, config, watch
 
 from vllm_router.log import init_logger
@@ -116,6 +117,16 @@ class K8sServiceDiscovery(ServiceDiscovery):
         self.available_engines: Dict[Tuple[str, str], EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
         self.label_selector = label_selector
+        # Create an event loop for async operations
+        self.loop = asyncio.new_event_loop()
+        # Dictionary to track pending async tasks for model discovery
+        self.pending_discoveries: Dict[str, Task] = {}
+        self.pending_discoveries_lock = threading.Lock()
+        # Start a daemon thread to run the event loop
+        self.event_loop_thread = threading.Thread(target=self._run_event_loop, daemon=True)
+        self.event_loop_thread.start()
+        # Create a shared aiohttp session
+        self._init_aiohttp_session()
 
         # Init kubernetes watcher
         try:
@@ -131,6 +142,32 @@ class K8sServiceDiscovery(ServiceDiscovery):
         self.watcher_thread = threading.Thread(target=self._watch_engines, daemon=True)
         self.watcher_thread.start()
 
+    def _init_aiohttp_session(self):
+        """Initialize the aiohttp session in the event loop thread"""
+        future = asyncio.run_coroutine_threadsafe(self._create_aiohttp_session(), self.loop)
+        future.result(timeout=10)  # Wait for session creation with timeout
+
+    async def _create_aiohttp_session(self):
+        """Create an aiohttp ClientSession for reuse"""
+        self.session = aiohttp.ClientSession()
+        
+    def _run_event_loop(self):
+        """Run the asyncio event loop in a separate thread"""
+        asyncio.set_event_loop(self.loop)
+        try:
+            self.loop.run_forever()
+        finally:
+            # Clean up any remaining tasks
+            pending = asyncio.all_tasks(self.loop)
+            for task in pending:
+                task.cancel()
+            # Wait for tasks to cancel
+            if pending:
+                self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            # Close the loop
+            self.loop.close()
+            logger.info("Async event loop closed")
+
     @staticmethod
     def _check_pod_ready(container_statuses):
         """
@@ -142,10 +179,12 @@ class K8sServiceDiscovery(ServiceDiscovery):
         ready_count = sum(1 for status in container_statuses if status.ready)
         return ready_count == len(container_statuses)
 
-    def _get_model_names(self, pod_ip) -> Optional[List[str]]:
+    async def _get_model_names_async(self, pod_ip) -> Optional[List[str]]:
         """
         Get the model names of the serving engine pod by querying the pod's
         '/v1/models' endpoint. A pod can serve multiple models (e.g., base + LoRAs).
+        
+        This method uses async HTTP requests.
 
         Args:
             pod_ip: the IP address of the pod
@@ -160,32 +199,30 @@ class K8sServiceDiscovery(ServiceDiscovery):
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
                 logger.info(f"Using vllm server authentication for {url}")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            # Consider making timeout configurable if necessary
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            data = response.json().get("data")
+            # Use aiohttp for async HTTP requests with timeout
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with self.session.get(url, headers=headers, timeout=timeout) as response:
+                response.raise_for_status()
+                data = (await response.json()).get("data")
 
-            if isinstance(data, list):
-                for model_entry in data:
-                    if isinstance(model_entry, dict) and "id" in model_entry and model_entry["id"]:
-                        model_names_list.append(model_entry["id"])
-            
-            if not model_names_list: # This means data was not a list, was empty, or contained no valid model_entries
-                logger.warning(f"No model IDs found or 'data' was not a list/empty in response from {url}. Response status: {response.status_code}")
-                # If the API successfully returns an empty list of models, we should return an empty list.
-                # If there was an issue with the 'data' field itself not being a list, or structure is wrong, then None is more appropriate.
-                # For now, if data is a list but empty, it results in an empty model_names_list, which is fine.
-                # If 'data' is not a list, model_names_list remains empty, leading to this warning and returning None.
-                # Let's refine this: if data is a list (even empty), return model_names_list. If data is None or not a list, then it's an issue.
-                if data is None or not isinstance(data, list):
-                     logger.error(f"Field 'data' missing or not a list in response from {url}")
-                     return None # Indicates an issue with the response structure beyond just an empty list of models
-                # If data is an empty list, model_names_list will be empty, and that's what will be returned.
+                if isinstance(data, list):
+                    for model_entry in data:
+                        if isinstance(model_entry, dict) and "id" in model_entry and model_entry["id"]:
+                            model_names_list.append(model_entry["id"])
+                
+                if not model_names_list: # This means data was not a list, was empty, or contained no valid model_entries
+                    logger.warning(f"No model IDs found or 'data' was not a list/empty in response from {url}. Response status: {response.status}")
+                    # If the API successfully returns an empty list of models, we should return an empty list.
+                    # If there was an issue with the 'data' field itself not being a list, or structure is wrong, then None is more appropriate.
+                    if data is None or not isinstance(data, list):
+                        logger.error(f"Field 'data' missing or not a list in response from {url}")
+                        return None # Indicates an issue with the response structure beyond just an empty list of models
+                    # If data is an empty list, model_names_list will be empty, and that's what will be returned.
 
-        except requests.exceptions.Timeout:
+        except asyncio.TimeoutError:
             logger.error(f"Timeout when getting model names from {url}")
             return None
-        except requests.exceptions.RequestException as e: # Covers ConnectionError, HTTPError, etc.
+        except aiohttp.ClientError as e: # Covers ConnectionError, HTTPError, etc.
             logger.error(f"Request failed to get model names from {url}: {e}")
             return None
         except (ValueError, KeyError) as e: # Handles JSON parsing errors or missing keys like "data" or "id"
@@ -196,6 +233,47 @@ class K8sServiceDiscovery(ServiceDiscovery):
             return None
         
         return model_names_list
+
+    async def _async_discover_models(self, pod_name: str, pod_ip: str, event_type: str, is_pod_ready: bool):
+        """
+        Asynchronously discover models for a pod and update the available engines using
+        async/await for HTTP requests.
+        
+        Args:
+            pod_name: Name of the pod
+            pod_ip: IP address of the pod
+            event_type: Kubernetes event type ("ADDED", "MODIFIED", "DELETED")
+            is_pod_ready: Whether the pod is marked as ready
+        """
+        try:
+            # Get model names from the pod
+            model_names_reported = await self._get_model_names_async(pod_ip)
+            
+            # Process the results with the main event handling logic
+            self._on_engine_update(pod_name, pod_ip, event_type, is_pod_ready, model_names_reported)
+            
+        except Exception as e:
+            logger.error(f"Error in async model discovery for pod {pod_name}: {str(e)}")
+            # Still call _on_engine_update with model_names_reported=None to handle the error case
+            self._on_engine_update(pod_name, pod_ip, event_type, is_pod_ready, None)
+        finally:
+            # Remove this future from the pending discoveries
+            with self.pending_discoveries_lock:
+                if pod_name in self.pending_discoveries:
+                    del self.pending_discoveries[pod_name]
+
+    def _submit_async_task(self, coro, *args, **kwargs):
+        """
+        Submit an async coroutine to the event loop and return a Task object.
+        
+        Args:
+            coro: The coroutine function to run
+            *args, **kwargs: Arguments to pass to the coroutine
+            
+        Returns:
+            An asyncio.Task object
+        """
+        return asyncio.run_coroutine_threadsafe(coro(*args, **kwargs), self.loop)
 
     def _watch_engines(self):
         # TODO (ApostaC): remove the hard-coded timeouts
@@ -215,15 +293,35 @@ class K8sServiceDiscovery(ServiceDiscovery):
                     
                     is_pod_ready = self._check_pod_ready(pod.status.container_statuses)
                     
-                    model_names_reported: Optional[List[str]] = None
-                    if is_pod_ready and pod_ip: # Only try to get models if pod is ready and has an IP
-                        model_names_reported = self._get_model_names(pod_ip)
-                    # If model_names_reported is None here, it means _get_model_names failed.
-                    # If it's an empty list, it means the endpoint returned no models.
+                    # For DELETE events, handle immediately without async discovery
+                    if event_type == "DELETED":
+                        # Cancel any pending discovery for this pod
+                        with self.pending_discoveries_lock:
+                            if pod_name in self.pending_discoveries:
+                                task = self.pending_discoveries.pop(pod_name)
+                                task.cancel()
+                        
+                        # Handle the deletion
+                        self._on_engine_update(pod_name, pod_ip, event_type, is_pod_ready, None)
+                        continue
                     
-                    self._on_engine_update(
-                        pod_name, pod_ip, event_type, is_pod_ready, model_names_reported
-                    )
+                    # For ADDED or MODIFIED events, only discover models if pod is ready and has an IP
+                    if is_pod_ready and pod_ip:
+                        # Cancel any existing pending discovery for this pod
+                        with self.pending_discoveries_lock:
+                            if pod_name in self.pending_discoveries:
+                                old_task = self.pending_discoveries.pop(pod_name)
+                                old_task.cancel()
+                            
+                            # Submit a new asynchronous discovery task to the event loop
+                            task = self._submit_async_task(
+                                self._async_discover_models, pod_name, pod_ip, event_type, is_pod_ready
+                            )
+                            self.pending_discoveries[pod_name] = task
+                    else:
+                        # Pod is not ready or has no IP, handle directly with no model names
+                        self._on_engine_update(pod_name, pod_ip, event_type, is_pod_ready, None)
+
             except client.exceptions.ApiException as e:
                 if e.status == 410: # Resource version too old (Gone)
                     logger.warning(f"K8s watcher stream returned HTTP 410 (Gone): {e}. Restarting watch.")
@@ -368,7 +466,30 @@ class K8sServiceDiscovery(ServiceDiscovery):
         """
         self.running = False
         self.k8s_watcher.stop()
-        self.watcher_thread.join()
+        # Cancel all pending async tasks
+        logger.info("Cancelling pending async discovery tasks...")
+        with self.pending_discoveries_lock:
+            for task in self.pending_discoveries.values():
+                task.cancel()
+            self.pending_discoveries.clear()
+        
+        # Close the aiohttp session
+        if hasattr(self, 'session'):
+            close_session_future = asyncio.run_coroutine_threadsafe(self.session.close(), self.loop)
+            try:
+                close_session_future.result(timeout=5)
+                logger.info("aiohttp session closed")
+            except Exception as e:
+                logger.warning(f"Error closing aiohttp session: {e}")
+        
+        # Stop the event loop
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        logger.info("Stopped async event loop")
+        
+        # Wait for threads to finish
+        self.watcher_thread.join(timeout=5)
+        self.event_loop_thread.join(timeout=5)
+        logger.info("All threads terminated")
 
 
 def _create_service_discovery(
