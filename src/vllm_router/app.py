@@ -79,7 +79,12 @@ from vllm_router.stats.request_stats import (
     get_request_stats_monitor,
     initialize_request_stats_monitor,
 )
-from vllm_router.utils import parse_static_model_names, parse_static_urls, set_ulimit
+from vllm_router.utils import (
+    parse_static_aliases,
+    parse_static_model_names,
+    parse_static_urls,
+    set_ulimit,
+)
 
 logger = logging.getLogger("uvicorn")
 
@@ -127,6 +132,7 @@ def initialize_all(app: FastAPI, args):
             ServiceDiscoveryType.STATIC,
             urls=parse_static_urls(args.static_backends),
             models=parse_static_model_names(args.static_models),
+            aliases=parse_static_aliases(args.static_aliases),
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(

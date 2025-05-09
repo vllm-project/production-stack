@@ -6,3 +6,4 @@ sphinx-copybutton==0.5.2
 sphinx-togglebutton==0.3.2
 sphinx_design==0.6.1
 sphinxemoji==0.3.1
+starlette==0.45.3

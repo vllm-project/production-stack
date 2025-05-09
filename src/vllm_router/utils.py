@@ -1,6 +1,10 @@
 import abc
+import json
 import re
 import resource
+
+from fastapi.requests import Request
+from starlette.datastructures import MutableHeaders
 
 from vllm_router.log import init_logger
 
@@ -93,3 +97,24 @@ def parse_static_urls(static_backends: str):
 def parse_static_model_names(static_models: str):
     models = static_models.split(",")
     return models
+
+
+def parse_static_aliases(static_aliases: str):
+    aliases = {}
+    for alias_and_model in static_aliases.split(","):
+        alias, model = alias_and_model.split(":")
+        aliases[alias] = model
+    logger.info(f"Loaded aliases {aliases}")
+    return aliases
+
+
+def replace_model_in_request_body(request_json: dict, model: str):
+    request_json["model"] = model
+    request_body = json.dumps(request_json)
+    return request_body
+
+
+def update_content_length(request: Request, request_body: str):
+    headers = MutableHeaders(request.headers)
+    headers["Content-Length"] = str(len(request_body))
+    request._headers = headers

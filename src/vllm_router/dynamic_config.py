@@ -45,6 +45,7 @@ class DynamicRouterConfig:
     # Service discovery configurations
     static_backends: Optional[str] = None
     static_models: Optional[str] = None
+    static_aliases: Optional[str] = None
     k8s_port: Optional[int] = None
     k8s_namespace: Optional[str] = None
     k8s_label_selector: Optional[str] = None
@@ -72,6 +73,7 @@ class DynamicRouterConfig:
             service_discovery=args.service_discovery,
             static_backends=args.static_backends,
             static_models=args.static_models,
+            static_aliases=args.static_aliases,
             k8s_port=args.k8s_port,
             k8s_namespace=args.k8s_namespace,
             k8s_label_selector=args.k8s_label_selector,

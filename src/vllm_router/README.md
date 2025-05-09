@@ -7,6 +7,7 @@ The source code for the request router.
 - Support routing to endpoints that run different models
 - Exporting observability metrics for each serving engine instance, including QPS, time-to-first-token (TTFT), number of pending/running/finished requests, and uptime
 - Support automatic service discovery and fault tolerance by Kubernetes API
+- Model aliases
 - Multiple different routing algorithms
   - Round-robin routing
   - Session-ID based routing
@@ -26,6 +27,7 @@ The router can be configured using command-line arguments. Below are the availab
 - `--service-discovery`: The service discovery type. Options are `static` or `k8s`. This option is required.
 - `--static-backends`: The URLs of static serving engines, separated by commas (e.g., `http://localhost:8000,http://localhost:8001`).
 - `--static-models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
+- `--static-aliases`: The aliases of the models running in the static serving engines, separated by commas and associated using colons (e.g., `model_alias1:model,mode_alias2:model`).
 - `--k8s-port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
 - `--k8s-namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
 - `--k8s-label-selector`: The label selector to filter vLLM pods when using K8s service discovery.
@@ -79,6 +81,7 @@ vllm-router --port 8000 \
     --service-discovery static \
     --static-backends "http://localhost:9001,http://localhost:9002,http://localhost:9003" \
     --static-models "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m" \
+    --static-aliases "gpt4:meta-llama/Llama-3.1-8B-Instruct" \
     --engine-stats-interval 10 \
     --log-stats \
     --routing-logic roundrobin
