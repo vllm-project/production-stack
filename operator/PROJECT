@@ -26,4 +26,13 @@ resources:
   kind: VLLMRouter
   path: production-stack/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: vllm.ai
+  group: production-stack
+  kind: CacheServer
+  path: production-stack/api/v1alpha1
+  version: v1alpha1
 version: "3"

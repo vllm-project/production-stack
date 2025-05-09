@@ -33,6 +33,7 @@ rules:
 - apiGroups:
   - production-stack.vllm.ai
   resources:
+  - cacheservers
   - vllmrouters
   - vllmruntimes
   verbs:
@@ -46,6 +47,7 @@ rules:
 - apiGroups:
   - production-stack.vllm.ai
   resources:
+  - cacheservers/finalizers
   - vllmrouters/finalizers
   - vllmruntimes/finalizers
   verbs:
@@ -53,6 +55,7 @@ rules:
 - apiGroups:
   - production-stack.vllm.ai
   resources:
+  - cacheservers/status
   - vllmrouters/status
   - vllmruntimes/status
   verbs:

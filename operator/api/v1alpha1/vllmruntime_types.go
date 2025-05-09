@@ -133,21 +133,6 @@ type EnvVar struct {
 	Value string `json:"value"`
 }
 
-// ResourceRequirements defines the resource requirements
-type ResourceRequirements struct {
-	CPU    string `json:"cpu,omitempty"`
-	Memory string `json:"memory,omitempty"`
-	GPU    string `json:"gpu,omitempty"`
-}
-
-// ImageSpec defines the container image configuration
-type ImageSpec struct {
-	Registry       string `json:"registry"`
-	Name           string `json:"name"`
-	PullPolicy     string `json:"pullPolicy,omitempty"`
-	PullSecretName string `json:"pullSecretName,omitempty"`
-}
-
 // VLLMRuntimeStatus defines the observed state of VLLMRuntime
 type VLLMRuntimeStatus struct {
 	// Model status
