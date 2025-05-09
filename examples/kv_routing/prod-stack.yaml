@@ -1,0 +1,43 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "mistral"
+    repository: "lmcache/test"
+    tag: "2025-05-04"
+    modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+    replicaCount: 1
+    requestCPU: 6
+    requestMemory: "30Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      maxModelLen: 16384
+
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "20"
+      enableController: true
+      instanceId: "default1"
+      controllerPort: "9001"
+      workerPort: 8002
+
+    env:
+      - name: LMCACHE_LOG_LEVEL
+        value: "DEBUG"
+    hf_token: <YOUR_HF_TOKEN>
+
+
+routerSpec:
+  repository: "lmcache/lmstack-router"
+  tag: "v0.1.2"
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2G"
+    limits:
+      cpu: "1"
+      memory: "2G"
+  routingLogic: "kvaware"
+  lmcacheControllerPort: 9001

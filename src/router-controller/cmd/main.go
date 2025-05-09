@@ -147,6 +147,7 @@ func main() {
 	if err = (&controller.StaticRouteReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Record: mgr.GetEventRecorderFor("staticroute"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StaticRoute")
 		os.Exit(1)

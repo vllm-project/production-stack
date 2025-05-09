@@ -54,7 +54,7 @@ def validate_args(args):
 def parse_args():
     parser = argparse.ArgumentParser(description="Run the FastAPI app.")
     parser.add_argument(
-        "--host", default="0.0.0.0", help="The host to run the server on."
+        "--host", type=str, default="0.0.0.0", help="The host to run the server on."
     )
     parser.add_argument(
         "--port", type=int, default=8001, help="The port to run the server on."
@@ -62,6 +62,7 @@ def parse_args():
     parser.add_argument(
         "--service-discovery",
         required=True,
+        type=str,
         choices=["static", "k8s"],
         help="The service discovery type.",
     )
@@ -99,8 +100,14 @@ def parse_args():
         "--routing-logic",
         type=str,
         required=True,
-        choices=["roundrobin", "session"],
+        choices=["roundrobin", "session", "kvaware"],
         help="The routing logic to use",
+    )
+    parser.add_argument(
+        "--lmcache-controller-port",
+        type=int,
+        default=9000,
+        help="The port of the LMCache controller.",
     )
     parser.add_argument(
         "--session-key",
@@ -208,6 +215,12 @@ def parse_args():
         default="info",
         choices=["critical", "error", "warning", "info", "debug", "trace"],
         help="Log level for uvicorn. Default is 'info'.",
+    )
+
+    parser.add_argument(
+        "--sentry-dsn",
+        type=str,
+        help="Enables Sentry Error Reporting to the specified Data Source Name",
     )
 
     args = parser.parse_args()
