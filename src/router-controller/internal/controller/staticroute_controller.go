@@ -189,12 +189,11 @@ func (r *StaticRouteReconciler) reconcileConfigMap(ctx context.Context, staticRo
 func (r *StaticRouteReconciler) checkRouterHealth(ctx context.Context, staticRoute *productionstackv1alpha1.StaticRoute) error {
 	logger := log.FromContext(ctx)
 
-	// List services that match the router selector or use the router reference
-	services := &corev1.ServiceList{}
+	// Get service that match the router selector or use the router reference
+	service := &corev1.Service{}
 
 	if staticRoute.Spec.RouterRef != nil {
 		// Use the RouterRef to directly access the service
-		service := &corev1.Service{}
 		serviceKey := client.ObjectKey{
 			Name:      staticRoute.Spec.RouterRef.Name,
 			Namespace: staticRoute.Spec.RouterRef.Namespace,
@@ -213,13 +212,8 @@ func (r *StaticRouteReconciler) checkRouterHealth(ctx context.Context, staticRou
 			}
 			return fmt.Errorf("failed to get router service: %w", err)
 		}
-
-		// Add the service to the list
-		services.Items = append(services.Items, *service)
-	}
-
-	if len(services.Items) == 0 {
-		logger.Info("No router services found")
+	} else {
+		logger.Info("No router reference provided")
 		return nil
 	}
 
@@ -244,124 +238,88 @@ func (r *StaticRouteReconciler) checkRouterHealth(ctx context.Context, staticRou
 		}
 	}
 
-	logger.Info("Using health check configuration",
+	logger.Info("Using health check configuration for router service",
+		"namespace", service.Namespace,
+		"name", service.Name,
 		"timeoutSeconds", timeoutSeconds,
 		"periodSeconds", periodSeconds,
 		"successThreshold", successThreshold,
 		"failureThreshold", failureThreshold)
 
-	// Check the health endpoint of each router service
-	for _, service := range services.Items {
-		logger.Info("Checking health of router service", "namespace", service.Namespace, "name", service.Name)
-
-		// Get the service port
-		var port int32
-		for _, p := range service.Spec.Ports {
-			if p.Name == "http" || p.Name == "https" || p.Port == 8000 {
-				port = p.Port
-				break
-			}
+	// Get the service port
+	var port int32
+	for _, p := range service.Spec.Ports {
+		if p.Name == "http" || p.Name == "https" || p.Port == 8000 {
+			port = p.Port
+			break
 		}
+	}
 
-		if port == 0 {
-			logger.Info("No suitable port found for service", "namespace", service.Namespace, "name", service.Name)
-			continue
-		}
+	if port == 0 {
+		logger.Info("No suitable port found for service", "namespace", service.Namespace, "name", service.Name)
+		return nil
+	}
 
-		// Check the health endpoint
-		// Try to use the service's cluster IP directly instead of DNS name if CoreDNS is not working
-		healthURL := ""
-		if service.Spec.ClusterIP != "" && service.Spec.ClusterIP != "None" {
-			healthURL = fmt.Sprintf("http://%s:%d/health", service.Spec.ClusterIP, port)
-		} else {
-			healthURL = fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/health", service.Name, service.Namespace, port)
-		}
+	// Check the health endpoint
+	// Try to use the service's cluster IP directly instead of DNS name if CoreDNS is not working
+	healthURL := ""
+	if service.Spec.ClusterIP != "" && service.Spec.ClusterIP != "None" {
+		healthURL = fmt.Sprintf("http://%s:%d/health", service.Spec.ClusterIP, port)
+	} else {
+		healthURL = fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/health", service.Name, service.Namespace, port)
+	}
 
-		logger.Info("Checking health endpoint", "url", healthURL)
+	logger.Info("Checking health endpoint", "url", healthURL)
 
-		// Create a client with a timeout
-		client := &http.Client{
-			Timeout: time.Duration(timeoutSeconds) * time.Second,
-		}
+	// Create a client with a timeout
+	client := &http.Client{
+		Timeout: time.Duration(timeoutSeconds) * time.Second,
+	}
 
-		// Track consecutive successes and failures
-		consecutiveSuccesses := int32(0)
-		consecutiveFailures := int32(0)
-		maxRetries := failureThreshold
+	// Track consecutive successes and failures
+	consecutiveSuccesses := int32(0)
+	consecutiveFailures := int32(0)
+	maxRetries := failureThreshold
 
-		// Retry the health check based on configuration
-		err := wait.PollUntilContextTimeout(ctx, time.Duration(periodSeconds)*time.Second, time.Duration(periodSeconds*maxRetries)*time.Second, false, func(ctx context.Context) (bool, error) {
-			resp, err := client.Get(healthURL)
-			if err != nil {
-				logger.Error(err, "Failed to connect to health endpoint", "url", healthURL)
-				consecutiveSuccesses = 0
-				consecutiveFailures++
-				if consecutiveFailures >= failureThreshold {
-					return false, fmt.Errorf("health check failed after %d consecutive failures: %w", consecutiveFailures, err)
-				}
-				return false, nil
-			}
-			defer resp.Body.Close()
-			logger.Info("Health endpoint returned status", "url", healthURL, "status", resp.StatusCode)
-			if resp.StatusCode != http.StatusOK {
-				logger.Info("Health endpoint returned non-OK status", "url", healthURL, "status", resp.StatusCode)
-				consecutiveSuccesses = 0
-				consecutiveFailures++
-				if consecutiveFailures >= failureThreshold {
-					return false, fmt.Errorf("health check failed after %d consecutive failures: status code %d", consecutiveFailures, resp.StatusCode)
-				}
-				return false, nil
-			}
-
-			logger.Info("Health endpoint check successful", "url", healthURL)
-			consecutiveFailures = 0
-			consecutiveSuccesses++
-			return consecutiveSuccesses >= successThreshold, nil
-		})
-
+	// Retry the health check based on configuration
+	err := wait.PollUntilContextTimeout(ctx, time.Duration(periodSeconds)*time.Second, time.Duration(periodSeconds*maxRetries)*time.Second, false, func(ctx context.Context) (bool, error) {
+		resp, err := client.Get(healthURL)
 		if err != nil {
-			logger.Error(err, "Health check failed after retries", "url", healthURL)
-			// Update the status condition
-			condition := metav1.Condition{
-				Type:               "HealthCheckFailed",
-				Status:             metav1.ConditionTrue,
-				LastTransitionTime: metav1.Now(),
-				Reason:             "HealthCheckFailed",
-				Message:            fmt.Sprintf("Health check failed for service %s: %v", service.Name, err),
+			logger.Error(err, "Failed to connect to health endpoint", "url", healthURL)
+			consecutiveSuccesses = 0
+			consecutiveFailures++
+			if consecutiveFailures >= failureThreshold {
+				return false, fmt.Errorf("health check failed after %d consecutive failures: %w", consecutiveFailures, err)
 			}
-
-			// Initialize conditions if nil
-			if staticRoute.Status.Conditions == nil {
-				staticRoute.Status.Conditions = []metav1.Condition{}
+			return false, nil
+		}
+		defer resp.Body.Close()
+		logger.Info("Health endpoint returned status", "url", healthURL, "status", resp.StatusCode)
+		if resp.StatusCode != http.StatusOK {
+			logger.Info("Health endpoint returned non-OK status", "url", healthURL, "status", resp.StatusCode)
+			consecutiveSuccesses = 0
+			consecutiveFailures++
+			if consecutiveFailures >= failureThreshold {
+				return false, fmt.Errorf("health check failed after %d consecutive failures: status code %d", consecutiveFailures, resp.StatusCode)
 			}
-
-			// Find and update or append the condition
-			found := false
-			for i, c := range staticRoute.Status.Conditions {
-				if c.Type == condition.Type {
-					staticRoute.Status.Conditions[i] = condition
-					found = true
-					break
-				}
-			}
-			if !found {
-				staticRoute.Status.Conditions = append(staticRoute.Status.Conditions, condition)
-			}
-
-			if err := r.Status().Update(ctx, staticRoute); err != nil {
-				logger.Error(err, "Failed to update StaticRoute status")
-				return err
-			}
-			return fmt.Errorf("health check failed for service %s: %w", service.Name, err)
+			return false, nil
 		}
 
+		logger.Info("Health endpoint check successful", "url", healthURL)
+		consecutiveFailures = 0
+		consecutiveSuccesses++
+		return consecutiveSuccesses >= successThreshold, nil
+	})
+
+	if err != nil {
+		logger.Error(err, "Health check failed after retries", "url", healthURL)
 		// Update the status condition
 		condition := metav1.Condition{
-			Type:               "HealthCheckSucceeded",
+			Type:               "HealthCheckFailed",
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
-			Reason:             "HealthCheckSucceeded",
-			Message:            fmt.Sprintf("Health check succeeded for service %s", service.Name),
+			Reason:             "HealthCheckFailed",
+			Message:            fmt.Sprintf("Health check failed for service %s: %v", service.Name, err),
 		}
 
 		// Initialize conditions if nil
@@ -386,6 +344,39 @@ func (r *StaticRouteReconciler) checkRouterHealth(ctx context.Context, staticRou
 			logger.Error(err, "Failed to update StaticRoute status")
 			return err
 		}
+		return fmt.Errorf("health check failed for service %s: %w", service.Name, err)
+	}
+
+	// Update the status condition
+	condition := metav1.Condition{
+		Type:               "HealthCheckSucceeded",
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "HealthCheckSucceeded",
+		Message:            fmt.Sprintf("Health check succeeded for service %s", service.Name),
+	}
+
+	// Initialize conditions if nil
+	if staticRoute.Status.Conditions == nil {
+		staticRoute.Status.Conditions = []metav1.Condition{}
+	}
+
+	// Find and update or append the condition
+	found := false
+	for i, c := range staticRoute.Status.Conditions {
+		if c.Type == condition.Type {
+			staticRoute.Status.Conditions[i] = condition
+			found = true
+			break
+		}
+	}
+	if !found {
+		staticRoute.Status.Conditions = append(staticRoute.Status.Conditions, condition)
+	}
+
+	if err = r.Status().Update(ctx, staticRoute); err != nil {
+		logger.Error(err, "Failed to update StaticRoute status")
+		return err
 	}
 
 	return nil
