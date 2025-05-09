@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	servingv1alpha1 "production-stack/api/v1alpha1"
+	productionstackv1alpha1 "production-stack/api/v1alpha1"
 )
 
 var _ = Describe("VLLMRuntime Controller", func() {
@@ -40,13 +40,13 @@ var _ = Describe("VLLMRuntime Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		vllmruntime := &servingv1alpha1.VLLMRuntime{}
+		vllmruntime := &productionstackv1alpha1.VLLMRuntime{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind VLLMRuntime")
 			err := k8sClient.Get(ctx, typeNamespacedName, vllmruntime)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &servingv1alpha1.VLLMRuntime{
+				resource := &productionstackv1alpha1.VLLMRuntime{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,7 +59,7 @@ var _ = Describe("VLLMRuntime Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &servingv1alpha1.VLLMRuntime{}
+			resource := &productionstackv1alpha1.VLLMRuntime{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 

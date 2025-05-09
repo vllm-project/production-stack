@@ -42,10 +42,10 @@ type VLLMRouterReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=serving.vllm.ai,resources=vllmrouters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=serving.vllm.ai,resources=vllmrouters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=serving.vllm.ai,resources=vllmrouters/finalizers,verbs=update
-// +kubebuilder:rbac:groups=serving.vllm.ai,resources=vllmruntimes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=vllmrouters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=vllmrouters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=vllmrouters/finalizers,verbs=update
+// +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=vllmruntimes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete

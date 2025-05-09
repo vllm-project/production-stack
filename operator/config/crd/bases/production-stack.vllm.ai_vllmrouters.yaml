@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: vllmrouters.serving.vllm.ai
+  name: vllmrouters.production-stack.vllm.ai
 spec:
-  group: serving.vllm.ai
+  group: production-stack.vllm.ai
   names:
     kind: VLLMRouter
     listKind: VLLMRouterList

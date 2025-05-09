@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	servingv1alpha1 "production-stack/api/v1alpha1"
+	productionstackv1alpha1 "production-stack/api/v1alpha1"
 )
 
 // VLLMRuntimeReconciler reconciles a VLLMRuntime object
@@ -42,9 +42,9 @@ type VLLMRuntimeReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=serving.vllm.ai,resources=vllmruntimes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=serving.vllm.ai,resources=vllmruntimes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=serving.vllm.ai,resources=vllmruntimes/finalizers,verbs=update
+// +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=vllmruntimes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=vllmruntimes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=vllmruntimes/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -56,7 +56,7 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	log := log.FromContext(ctx)
 
 	// Fetch the VLLMRuntime instance
-	vllmRuntime := &servingv1alpha1.VLLMRuntime{}
+	vllmRuntime := &productionstackv1alpha1.VLLMRuntime{}
 	err := r.Get(ctx, req.NamespacedName, vllmRuntime)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -148,7 +148,7 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // deploymentForVLLMRuntime returns a VLLMRuntime Deployment object
-func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *servingv1alpha1.VLLMRuntime) *appsv1.Deployment {
+func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *productionstackv1alpha1.VLLMRuntime) *appsv1.Deployment {
 	labels := map[string]string{
 		"app": vllmRuntime.Name,
 	}
@@ -395,7 +395,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *servingv1a
 }
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
-func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr *servingv1alpha1.VLLMRuntime) bool {
+func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr *productionstackv1alpha1.VLLMRuntime) bool {
 	// Generate the expected deployment
 	expectedDep := r.deploymentForVLLMRuntime(vr)
 
@@ -460,9 +460,9 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr
 }
 
 // updateStatus updates the status of the VLLMRuntime
-func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *servingv1alpha1.VLLMRuntime, dep *appsv1.Deployment) error {
+func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *productionstackv1alpha1.VLLMRuntime, dep *appsv1.Deployment) error {
 	// Re-read the VLLMRuntime to get the latest version
-	latestVR := &servingv1alpha1.VLLMRuntime{}
+	latestVR := &productionstackv1alpha1.VLLMRuntime{}
 	if err := r.Get(ctx, types.NamespacedName{Name: vr.Name, Namespace: vr.Namespace}, latestVR); err != nil {
 		return err
 	}
@@ -483,7 +483,7 @@ func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *servingv1a
 }
 
 // serviceForVLLMRuntime returns a VLLMRuntime Service object
-func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *servingv1alpha1.VLLMRuntime) *corev1.Service {
+func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *productionstackv1alpha1.VLLMRuntime) *corev1.Service {
 	labels := map[string]string{
 		"app": vllmRuntime.Name,
 	}
@@ -513,7 +513,7 @@ func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *servingv1alph
 }
 
 // serviceNeedsUpdate checks if the service needs to be updated
-func (r *VLLMRuntimeReconciler) serviceNeedsUpdate(svc *corev1.Service, vr *servingv1alpha1.VLLMRuntime) bool {
+func (r *VLLMRuntimeReconciler) serviceNeedsUpdate(svc *corev1.Service, vr *productionstackv1alpha1.VLLMRuntime) bool {
 	// Compare target port
 	expectedTargetPort := int(vr.Spec.Port)
 	actualTargetPort := svc.Spec.Ports[0].TargetPort.IntValue()
@@ -527,7 +527,7 @@ func (r *VLLMRuntimeReconciler) serviceNeedsUpdate(svc *corev1.Service, vr *serv
 // SetupWithManager sets up the controller with the Manager.
 func (r *VLLMRuntimeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&servingv1alpha1.VLLMRuntime{}).
+		For(&productionstackv1alpha1.VLLMRuntime{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Complete(r)

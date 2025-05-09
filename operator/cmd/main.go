@@ -37,7 +37,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	servingv1alpha1 "production-stack/api/v1alpha1"
+	productionstackv1alpha1 "production-stack/api/v1alpha1"
 	"production-stack/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -50,7 +50,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(servingv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(productionstackv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

@@ -31,7 +31,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - serving.vllm.ai
+  - production-stack.vllm.ai
   resources:
   - vllmrouters
   - vllmruntimes
@@ -44,14 +44,14 @@ rules:
   - update
   - watch
 - apiGroups:
-  - serving.vllm.ai
+  - production-stack.vllm.ai
   resources:
   - vllmrouters/finalizers
   - vllmruntimes/finalizers
   verbs:
   - update
 - apiGroups:
-  - serving.vllm.ai
+  - production-stack.vllm.ai
   resources:
   - vllmrouters/status
   - vllmruntimes/status

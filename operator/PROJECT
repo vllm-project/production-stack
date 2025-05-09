@@ -13,7 +13,7 @@ resources:
     namespaced: true
   controller: true
   domain: vllm.ai
-  group: serving
+  group: production stack
   kind: VLLMRuntime
   path: production-stack/api/v1alpha1
   version: v1alpha1
@@ -22,8 +22,8 @@ resources:
     namespaced: true
   controller: true
   domain: vllm.ai
-  group: serving
-  kind: Router
+  group: production-stack
+  kind: VLLMRouter
   path: production-stack/api/v1alpha1
   version: v1alpha1
 version: "3"

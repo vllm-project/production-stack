@@ -1,7 +1,7 @@
 # This rule is not used by the project production-stack itself.
 # It is provided to allow the cluster admin to help manage permissions for users.
 #
-# Grants full permissions ('*') over serving.vllm.ai.
+# Grants full permissions ('*') over production-stack.vllm.ai.
 # This role is intended for users authorized to modify roles and bindings within the cluster,
 # enabling them to delegate specific permissions to other users or groups as needed.
 
@@ -14,14 +14,14 @@ metadata:
   name: vllmrouter-admin-role
 rules:
 - apiGroups:
-  - serving.vllm.ai
+  - production-stack.vllm.ai
   resources:
-  - routers
+  - vllmrouters
   verbs:
   - '*'
 - apiGroups:
-  - serving.vllm.ai
+  - production-stack.vllm.ai
   resources:
-  - routers/status
+  - vllmrouters/status
   verbs:
   - get

@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: vllmruntimes.serving.vllm.ai
+  name: vllmruntimes.production-stack.vllm.ai
 spec:
-  group: serving.vllm.ai
+  group: production-stack.vllm.ai
   names:
     kind: VLLMRuntime
     listKind: VLLMRuntimeList

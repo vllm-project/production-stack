@@ -1,4 +1,4 @@
-apiVersion: serving.vllm.ai/v1alpha1
+apiVersion: production-stack.vllm.ai/v1alpha1
 kind: VLLMRouter
 metadata:
   labels:

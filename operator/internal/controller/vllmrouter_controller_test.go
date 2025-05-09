@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	servingv1alpha1 "production-stack/api/v1alpha1"
+	productionstackv1alpha1 "production-stack/api/v1alpha1"
 )
 
 var _ = Describe("VLLMRouter Controller", func() {
@@ -40,13 +40,13 @@ var _ = Describe("VLLMRouter Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		router := &servingv1alpha1.VLLMRouter{}
+		router := &productionstackv1alpha1.VLLMRouter{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind VLLMRouter")
 			err := k8sClient.Get(ctx, typeNamespacedName, router)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &servingv1alpha1.VLLMRouter{
+				resource := &productionstackv1alpha1.VLLMRouter{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,7 +59,7 @@ var _ = Describe("VLLMRouter Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &servingv1alpha1.VLLMRouter{}
+			resource := &productionstackv1alpha1.VLLMRouter{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
