@@ -126,6 +126,9 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         Args:
             url: The URL of the serving engine
             scraped_urls: Set of already scraped URLs
+
+        Returns:
+            A tuple of (stats, url) where stats is an EngineStats object or None if scraping failed
         """
         if url in scraped_urls:
             return None, url
@@ -134,13 +137,34 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             # Wait for session to be initialized
             await self.session_initialized.wait()
 
-            timeout = aiohttp.ClientTimeout(total=self.scrape_interval / 2)
-            async with self.aiohttp_session.get(f"{url}/metrics", timeout=timeout) as response:
+            # Use a shorter timeout to avoid blocking health checks
+            timeout = aiohttp.ClientTimeout(total=self.scrape_interval / 2, connect=1, sock_read=2)
+            metrics_url = f"{url}/metrics"
+
+            async with self.aiohttp_session.get(metrics_url, timeout=timeout) as response:
                 response.raise_for_status()
                 text = await response.text()
                 stats = EngineStats.from_vllm_scrape(text)
                 scraped_urls.add(url)
                 return stats, url
+
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout when scraping metrics from {url}")
+            return None, url
+        except aiohttp.ClientConnectorError as e:
+            logger.warning(f"Connection error when scraping metrics from {url}: {e}")
+            # Report to service discovery that this endpoint might be unhealthy
+            try:
+                service_discovery = get_service_discovery()
+                if hasattr(service_discovery, "remove_endpoint_by_url"):
+                    service_discovery.remove_endpoint_by_url(url)
+                    logger.info(f"Removed unhealthy endpoint {url} from service discovery")
+            except Exception as e:
+                logger.error(f"Error removing unhealthy endpoint {url}: {e}")
+            return None, url
+        except aiohttp.ClientResponseError as e:
+            logger.warning(f"HTTP error {e.status} when scraping metrics from {url}: {e}")
+            return None, url
         except Exception as e:
             logger.error(f"Failed to scrape metrics from {url}: {e}")
             return None, url
@@ -157,14 +181,24 @@ class EngineStatsScraper(metaclass=SingletonMeta):
 
         # Create tasks for all unique endpoints
         unique_urls = {info.url for info in endpoints}
-        tasks = [self._scrape_one_endpoint(url, scraped_urls) for url in unique_urls]
 
-        results = await asyncio.gather(*tasks)
+        # Use a task group to ensure all tasks complete or timeout together
+        tasks = []
+        for url in unique_urls:
+            if url not in scraped_urls:
+                tasks.append(self._scrape_one_endpoint(url, scraped_urls))
 
-        # Process results
-        for stats, url in results:
-            if stats:
-                collected_engine_stats[url] = stats
+        # Use gather with return_exceptions=True to prevent one failure from cancelling all tasks
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process successful results
+        for result in results:
+            if isinstance(result, tuple) and len(result) == 2:
+                stats, url = result
+                if stats:
+                    collected_engine_stats[url] = stats
+            elif isinstance(result, Exception):
+                logger.warning(f"Exception during metrics scraping: {result}")
 
         # Update engine_stats dictionary with the collected stats
         with self.engine_stats_lock:
@@ -206,7 +240,18 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         Returns:
             bool: True if the EngineStatsScraper is healthy
         """
-        return self.event_loop_thread.is_alive()
+        # Check 1: Is the event loop thread alive?
+        if not self.event_loop_thread.is_alive():
+            logger.error("EngineStatsScraper unhealthy: Event loop thread is not alive")
+            return False
+
+        # Check 2: Was the session initialized successfully?
+        if not hasattr(self, "aiohttp_session") or self.aiohttp_session is None:
+            logger.error("EngineStatsScraper unhealthy: aiohttp session not initialized")
+            return False
+
+        # Everything looks good
+        return True
 
     async def _close_session(self):
         """Close the aiohttp session."""

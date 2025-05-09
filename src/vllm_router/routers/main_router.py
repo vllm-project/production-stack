@@ -51,9 +51,7 @@ async def route_chat_completion(request: Request, background_tasks: BackgroundTa
             return cache_response
 
     logger.debug("No cache hit, forwarding request to backend")
-    return await route_general_request(
-        request, "/v1/chat/completions", background_tasks
-    )
+    return await route_general_request(request, "/v1/chat/completions", background_tasks)
 
 
 @main_router.post("/v1/completions")
@@ -139,24 +137,38 @@ async def health() -> Response:
         down, or a plain Response with status code 200 if all components
         are healthy.
     """
+    health_issues = []
 
-    if not get_service_discovery().get_health():
-        return JSONResponse(
-            content={"status": "Service discovery module is down."}, status_code=503
-        )
-    if not get_engine_stats_scraper().get_health():
-        return JSONResponse(
-            content={"status": "Engine stats scraper is down."}, status_code=503
-        )
+    # Check service discovery
+    service_discovery = get_service_discovery()
+    if not service_discovery.get_health():
+        health_issues.append("Service discovery module is down")
 
+    # Check engine stats scraper
+    engine_stats_scraper = get_engine_stats_scraper()
+    if not engine_stats_scraper.get_health():
+        health_issues.append("Engine stats scraper is down")
+
+    # Check that we have registered endpoints
+    endpoints = service_discovery.get_endpoint_info()
+    if not endpoints:
+        # This is just a warning, not a failure - useful for debugging
+        logger.warning("Health check: No endpoints registered")
+
+    # Return unhealthy status if we have issues
+    if health_issues:
+        return JSONResponse(content={"status": "unhealthy", "issues": health_issues}, status_code=503)
+
+    # Return healthy status with diagnostic info
+    response_content = {
+        "status": "healthy",
+        "endpoints_count": len(endpoints),
+        "models": list(set(ep.model_name for ep in endpoints)),
+    }
+
+    # Add dynamic config if available
     if get_dynamic_config_watcher() is not None:
         dynamic_config = get_dynamic_config_watcher().get_current_config()
-        return JSONResponse(
-            content={
-                "status": "healthy",
-                "dynamic_config": json.loads(dynamic_config.to_json_str()),
-            },
-            status_code=200,
-        )
-    else:
-        return JSONResponse(content={"status": "healthy"}, status_code=200)
+        response_content["dynamic_config"] = json.loads(dynamic_config.to_json_str())
+
+    return JSONResponse(content=response_content, status_code=200)
