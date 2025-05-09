@@ -39,6 +39,10 @@ type VLLMRouterSpec struct {
 	// +kubebuilder:default=k8s
 	ServiceDiscovery string `json:"serviceDiscovery,omitempty"`
 
+	// K8sLabelSelector specifies the label selector for vLLM runtime pods when using k8s service discovery
+	// +kubebuilder:validation:RequiredWhen=ServiceDiscovery=k8s
+	K8sLabelSelector string `json:"k8sLabelSelector,omitempty"`
+
 	// StaticBackends is required when using static service discovery
 	// +kubebuilder:validation:RequiredWhen=ServiceDiscovery=static
 	StaticBackends string `json:"staticBackends,omitempty"`

@@ -208,6 +208,7 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 	if router.Spec.ServiceDiscovery == "k8s" {
 		args = append(args,
 			"--k8s-namespace", router.Namespace,
+			"--k8s-label-selector", router.Spec.K8sLabelSelector,
 		)
 	} else if router.Spec.ServiceDiscovery == "static" {
 		if router.Spec.StaticBackends == "" || router.Spec.StaticModels == "" {
@@ -324,9 +325,7 @@ func (r *VLLMRouterReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, rou
 
 // updateStatus updates the status of the VLLMRouter
 func (r *VLLMRouterReconciler) updateStatus(ctx context.Context, router *servingv1alpha1.VLLMRouter, dep *appsv1.Deployment) error {
-	return retry.OnError(retry.DefaultRetry, func(err error) bool {
-		return errors.IsConflict(err)
-	}, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Get the latest version of the VLLMRouter
 		latestRouter := &servingv1alpha1.VLLMRouter{}
 		if err := r.Get(ctx, types.NamespacedName{Name: router.Name, Namespace: router.Namespace}, latestRouter); err != nil {

@@ -392,6 +392,34 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 								},
 							},
 							Resources: resources,
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path:   "/health",
+										Port:   intstr.FromInt(int(vllmRuntime.Spec.Port)),
+										Scheme: corev1.URISchemeHTTP,
+									},
+								},
+								InitialDelaySeconds: 10,
+								PeriodSeconds:       5,
+								TimeoutSeconds:      3,
+								SuccessThreshold:    1,
+								FailureThreshold:    3,
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path:   "/health",
+										Port:   intstr.FromInt(int(vllmRuntime.Spec.Port)),
+										Scheme: corev1.URISchemeHTTP,
+									},
+								},
+								InitialDelaySeconds: 30,
+								PeriodSeconds:       10,
+								TimeoutSeconds:      3,
+								SuccessThreshold:    1,
+								FailureThreshold:    3,
+							},
 						},
 					},
 				},
@@ -479,9 +507,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr
 
 // updateStatus updates the status of the VLLMRuntime
 func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *productionstackv1alpha1.VLLMRuntime, dep *appsv1.Deployment) error {
-	return retry.OnError(retry.DefaultRetry, func(err error) bool {
-		return errors.IsConflict(err)
-	}, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Get the latest version of the VLLMRuntime
 		latestVR := &productionstackv1alpha1.VLLMRuntime{}
 		if err := r.Get(ctx, types.NamespacedName{Name: vr.Name, Namespace: vr.Namespace}, latestVR); err != nil {

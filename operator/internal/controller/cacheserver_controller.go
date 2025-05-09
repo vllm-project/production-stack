@@ -224,9 +224,7 @@ func (r *CacheServerReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, cs
 
 // updateStatus updates the status of the CacheServer
 func (r *CacheServerReconciler) updateStatus(ctx context.Context, cs *productionstackv1alpha1.CacheServer, dep *appsv1.Deployment) error {
-	return retry.OnError(retry.DefaultRetry, func(err error) bool {
-		return errors.IsConflict(err)
-	}, func() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Get the latest version of the CacheServer
 		latestCS := &productionstackv1alpha1.CacheServer{}
 		if err := r.Get(ctx, types.NamespacedName{Name: cs.Name, Namespace: cs.Namespace}, latestCS); err != nil {

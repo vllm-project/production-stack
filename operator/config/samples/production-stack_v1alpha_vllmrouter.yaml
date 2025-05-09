@@ -15,6 +15,9 @@ spec:
   # Service discovery method (k8s or static)
   serviceDiscovery: k8s
 
+  # Label selector for vLLM runtime pods
+  k8sLabelSelector: "app=vllmruntime-sample"
+
   # Routing strategy (roundrobin or session)
   routingLogic: roundrobin
 

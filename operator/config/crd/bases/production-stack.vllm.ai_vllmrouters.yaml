@@ -81,6 +81,10 @@ spec:
                 - name
                 - registry
                 type: object
+              k8sLabelSelector:
+                description: K8sLabelSelector specifies the label selector for vLLM
+                  runtime pods when using k8s service discovery
+                type: string
               nodeSelectorTerms:
                 description: NodeSelectorTerms for pod scheduling
                 items:
