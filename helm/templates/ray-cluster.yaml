@@ -25,16 +25,16 @@ spec:
         {{- end }}
         containers:
           - name: vllm-ray-head
-            env:
-              - name: HF_HOME
-                value: "{{ .Values.servingEngineSpec.modelMountPath }}"
+	    envFrom:
+	      - configMapRef:
+  		  name: "{{ .Release.Name }}-{{$modelSpec.name}}-envs"
             image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
             livenessProbe:
               exec:
-                command: ["bash", "-c", "true"]
+                command: ["/bin/bash", "-c", "echo TBD"]
             readinessProbe:
               exec:
-                command: ["bash", "-c", "true"]
+                command: ["/bin/bash", "-c", "echo TBD"]
             volumeMounts:
               - mountPath: {{ .Values.servingEngineSpec.modelMountPath | quote }}
                 name: models
@@ -58,20 +58,6 @@ spec:
                 - mountPath: {{ .Values.servingEngineSpec.modelMountPath | quote }}
                   name: models
               env:
-                - name: HF_HOME
-                  {{- if hasKey $modelSpec "pvcStorage" }}
-                  value: /data
-                  {{- else }}
-                  value: /tmp
-                  {{- end }}
-                {{- with $modelSpec.vllmConfig}}
-                - name: LMCACHE_LOG_LEVEL
-                  value: "DEBUG"
-                {{- if hasKey . "v1" }}
-                - name: VLLM_USE_V1
-                  value: {{ default 0 $modelSpec.vllmConfig.v1 | quote }}
-                {{- end}}
-                {{- end}}
                 {{- if $modelSpec.hf_token }}
                 - name: HF_TOKEN
                   {{- if kindIs "string" $modelSpec.hf_token }}
@@ -104,37 +90,14 @@ spec:
                 {{- with $modelSpec.env }}
                 {{- toYaml . | nindent 10 }}
                 {{- end }}
-                {{- if $modelSpec.lmcacheConfig }}
-                {{-   if $modelSpec.lmcacheConfig.enabled }}
-                - name: LMCACHE_USE_EXPERIMENTAL
-                  value: "True"
-                - name: VLLM_RPC_TIMEOUT
-                  value: "1000000"
-                {{-   end }}
-                {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
-                - name: LMCACHE_LOCAL_CPU
-                  value: "True"
-                - name: LMCACHE_MAX_LOCAL_CPU_SIZE
-                  value: "{{ $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}"
-                {{-   end }}
-                {{-   if $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}
-                - name: LMCACHE_LOCAL_DISK
-                  value: "True"
-                - name: LMCACHE_MAX_LOCAL_DISK_SIZE
-                  value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
-                {{-   end }}
-                {{-   if .Values.cacheserverSpec }}
-                - name: LMCACHE_REMOTE_URL
-                  value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
-                - name: LMCACHE_REMOTE_SERDE
-                  value: "{{ .Values.cacheserverSpec.serde }}"
-                {{-   end }}
-                {{- end }}
                 {{- if .Values.servingEngineSpec.configs }}
                 envFrom:
                   - configMapRef:
                       name: "{{ .Release.Name }}-configs"
                 {{- end }}
+		envFrom:
+		  - configMapRef:
+  		      name: "{{ .Release.Name }}-{{$modelSpec.name}}-envs"
               ports:
                 - name: {{ include "chart.container-port-name" . }}
                   containerPort: {{ include "chart.container-port" . }}
@@ -217,7 +180,7 @@ spec:
                     {{- end }}
               {{- end }}
 
-              image: {{ .Values.servingEngineSpec.image | quote }}
+              image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
               resources:
                 limits:
                   nvidia.com/gpu: "{{ .Values.servingEngineSpec.gpuLimit }}"
@@ -226,11 +189,50 @@ spec:
                   command: ["/bin/bash", "-c", "echo TBD"]
               readinessProbe:
                 exec:
-                  command: ["bash", "-c", "true"]
+                  command: ["/bin/bash", "-c", "echo TBD"]
           volumes:
             - name: models
               persistentVolumeClaim:
                 claimName: {{ .Values.servingEngineSpec.pvcName | quote }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-{{$modelSpec.name}}-envs"
+  namespace: "{{ .Release.Namespace }}"
+data:
+  HF_HOME: {{- if hasKey $modelSpec "pvcStorage" }}"\/data"{{ else }}"/tmp"{{ end }}
+  LMCACHE_LOG_LEVEL: "DEBUG"
+  {{- if hasKey $modelSpec.vllmConfig "v1" }}
+  VLLM_USE_V1: {{ default 0 $modelSpec.vllmConfig.v1 | quote }}
+  {{- end }}
+  {{- if $modelSpec.lmcacheConfig }}
+    {{- if $modelSpec.lmcacheConfig.enabled }}
+  LMCACHE_USE_EXPERIMENTAL: "True"
+  VLLM_RPC_TIMEOUT: "1000000"
+    {{- end }}
+    {{- if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
+  LMCACHE_LOCAL_CPU: "True"
+  LMCACHE_MAX_LOCAL_CPU_SIZE: "{{ $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}"
+    {{- end }}
+    {{- if $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}
+  LMCACHE_LOCAL_DISK: "True"
+  LMCACHE_MAX_LOCAL_DISK_SIZE: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
+    {{- end }}
+    {{- if .Values.cacheserverSpec }}
+  LMCACHE_REMOTE_URL: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
+  LMCACHE_REMOTE_SERDE: "{{ .Values.cacheserverSpec.serde }}"
+    {{- end }}
+  {{- end }}
+  {{- with $modelSpec.env }}
+    {{- range $k, $v := . }}
+  {{ $k }}: "{{ $v }}"
+    {{- end }}
+  {{- end }}
+---
+
+
 {{- if and $modelSpec.chatTemplate (hasKey $modelSpec "chatTemplateConfigMap") }}
 ---
 apiVersion: v1
@@ -244,5 +246,6 @@ data:
 {{- end }}
 {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}
