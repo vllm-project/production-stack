@@ -1,22 +1,23 @@
-{{- if .Values.servingEngineSpec.enableEngine -}}
+{{- if and .Values.servingEngineSpec.enableEngine .Values.servingEngineSpec.enableKubeRay }}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- with $ -}}
-{{- if .Values.servingEngineSpec.enableKubeRay }}
 apiVersion: ray.io/v1
 kind: RayCluster
 metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-raycluster-vllm"
   namespace: {{ .Release.Namespace }}
   labels:
-    model: {{ $modelSpec.name }}
     helm-release-name: {{ .Release.Name }}
-  {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
   headGroupSpec:
     serviceType: ClusterIP
     rayStartParams:
       dashboard-host: "0.0.0.0"
     template:
+      metadata:
+        labels:
+          model: {{ $modelSpec.name }}
+          {{- include "chart.engineLabels" . | nindent 10 }}
       spec:
         terminationGracePeriodSeconds: 0
         {{- if .Values.servingEngineSpec.securityContext }}
@@ -25,9 +26,6 @@ spec:
         {{- end }}
         containers:
           - name: vllm-ray-head
-	    envFrom:
-	      - configMapRef:
-  		  name: "{{ .Release.Name }}-{{$modelSpec.name}}-envs"
             image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
             livenessProbe:
               exec:
@@ -35,13 +33,6 @@ spec:
             readinessProbe:
               exec:
                 command: ["/bin/bash", "-c", "echo TBD"]
-            volumeMounts:
-              - mountPath: {{ .Values.servingEngineSpec.modelMountPath | quote }}
-                name: models
-        volumes:
-          - name: models
-            persistentVolumeClaim:
-              claimName: {{ .Values.servingEngineSpec.pvcName | quote }}
   workerGroupSpecs:
     - rayStartParams: {}
       replicas: {{ $modelSpec.replicaCount }}
@@ -54,183 +45,16 @@ spec:
         spec:
           containers:
             - name: vllm-ray-worker
-              volumeMounts:
-                - mountPath: {{ .Values.servingEngineSpec.modelMountPath | quote }}
-                  name: models
-              env:
-                {{- if $modelSpec.hf_token }}
-                - name: HF_TOKEN
-                  {{- if kindIs "string" $modelSpec.hf_token }}
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ .Release.Name }}-secrets
-                      key: hf_token_{{ $modelSpec.name }}
-                  {{- else }}
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $modelSpec.hf_token.secretName }}
-                      key: {{ $modelSpec.hf_token.secretKey }}
-                  {{- end }}
-                {{- end }}
-                {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
-                {{- if $vllmApiKey }}
-                - name: VLLM_API_KEY
-                  {{- if kindIs "string" $vllmApiKey }}
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ .Release.Name }}-secrets
-                      key: vllmApiKey
-                  {{- else }}
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $vllmApiKey.secretName }}
-                      key: {{ $vllmApiKey.secretKey }}
-                  {{- end }}
-                {{- end }}
-                {{- with $modelSpec.env }}
-                {{- toYaml . | nindent 10 }}
-                {{- end }}
-                {{- if .Values.servingEngineSpec.configs }}
-                envFrom:
-                  - configMapRef:
-                      name: "{{ .Release.Name }}-configs"
-                {{- end }}
-		envFrom:
-		  - configMapRef:
-  		      name: "{{ .Release.Name }}-{{$modelSpec.name}}-envs"
-              ports:
-                - name: {{ include "chart.container-port-name" . }}
-                  containerPort: {{ include "chart.container-port" . }}
-              {{- include "chart.probes" . | indent 10 }}
-              resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
-              {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
-              volumeMounts:
-              {{- end }}
-              {{- if hasKey $modelSpec "pvcStorage" }}
-              - name: {{ .Release.Name }}-storage
-                mountPath: /data
-              {{- end }}
-              {{- with $modelSpec.vllmConfig }}
-              {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
-              - name: shm
-                mountPath: /dev/shm
-              {{- end}}
-              {{- end}}
-              {{- if $modelSpec.chatTemplate }}
-              - name: vllm-templates
-                mountPath: /templates
-              {{- end }}
-              {{- if hasKey $modelSpec "extraVolumeMounts" }}
-              {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
-              {{- end }}
-              {{- if $modelSpec.imagePullSecret }}
-              imagePullSecrets:
-                - name: {{ $modelSpec.imagePullSecret }}
-              {{- end }}
-              {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
-              volumes:
-              {{- end}}
-                {{- if hasKey $modelSpec "pvcStorage" }}
-                - name: {{ .Release.Name }}-storage
-                  persistentVolumeClaim:
-                    claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
-                {{- end }}
-                {{- with $modelSpec.vllmConfig }}
-                {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
-                - name: shm
-                  emptyDir:
-                    medium: Memory
-                    sizeLimit: {{ default "20Gi" $modelSpec.shmSize }}
-                {{- end}}
-                {{- end}}
-                {{- if $modelSpec.chatTemplate}}
-                {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
-                - name: {{ .Release.Name }}-chat-templates
-                  configMap:
-                    name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
-                {{- else }}
-                - name: vllm-templates
-                  persistentVolumeClaim:
-                    claimName: vllm-templates-pvc
-                {{- end }}
-                {{- end}}
-                {{- if hasKey $modelSpec "extraVolumes" }}
-                {{- toYaml $modelSpec.extraVolumes | nindent 8 }}
-                {{- end}}
-              {{- if .Values.servingEngineSpec.tolerations }}
-              {{-   with .Values.servingEngineSpec.tolerations }}
-              tolerations:
-                {{-   toYaml . | nindent 8 }}
-              {{-   end }}
-              {{- end }}
-
-              {{- if .Values.servingEngineSpec.runtimeClassName }}
-              runtimeClassName: {{ .Values.servingEngineSpec.runtimeClassName }}
-              {{- end }}
-              {{- if .Values.servingEngineSpec.schedulerName }}
-              schedulerName: {{ .Values.servingEngineSpec.schedulerName }}
-              {{- end }}
-              {{- if $modelSpec.nodeSelectorTerms}}
-              affinity:
-                nodeAffinity:
-                  requiredDuringSchedulingIgnoredDuringExecution:
-                    nodeSelectorTerms:
-                    {{- with $modelSpec.nodeSelectorTerms }}
-                    {{- toYaml . | nindent 12 }}
-                    {{- end }}
-              {{- end }}
-
               image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
               resources:
                 limits:
-                  nvidia.com/gpu: "{{ .Values.servingEngineSpec.gpuLimit }}"
+                  nvidia.com/gpu: {{ .Values.servingEngineSpec.gpuLimit }}
               livenessProbe:
                 exec:
                   command: ["/bin/bash", "-c", "echo TBD"]
               readinessProbe:
                 exec:
                   command: ["/bin/bash", "-c", "echo TBD"]
-          volumes:
-            - name: models
-              persistentVolumeClaim:
-                claimName: {{ .Values.servingEngineSpec.pvcName | quote }}
-
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: "{{ .Release.Name }}-{{$modelSpec.name}}-envs"
-  namespace: "{{ .Release.Namespace }}"
-data:
-  HF_HOME: {{- if hasKey $modelSpec "pvcStorage" }}"\/data"{{ else }}"/tmp"{{ end }}
-  LMCACHE_LOG_LEVEL: "DEBUG"
-  {{- if hasKey $modelSpec.vllmConfig "v1" }}
-  VLLM_USE_V1: {{ default 0 $modelSpec.vllmConfig.v1 | quote }}
-  {{- end }}
-  {{- if $modelSpec.lmcacheConfig }}
-    {{- if $modelSpec.lmcacheConfig.enabled }}
-  LMCACHE_USE_EXPERIMENTAL: "True"
-  VLLM_RPC_TIMEOUT: "1000000"
-    {{- end }}
-    {{- if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
-  LMCACHE_LOCAL_CPU: "True"
-  LMCACHE_MAX_LOCAL_CPU_SIZE: "{{ $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}"
-    {{- end }}
-    {{- if $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}
-  LMCACHE_LOCAL_DISK: "True"
-  LMCACHE_MAX_LOCAL_DISK_SIZE: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
-    {{- end }}
-    {{- if .Values.cacheserverSpec }}
-  LMCACHE_REMOTE_URL: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
-  LMCACHE_REMOTE_SERDE: "{{ .Values.cacheserverSpec.serde }}"
-    {{- end }}
-  {{- end }}
-  {{- with $modelSpec.env }}
-    {{- range $k, $v := . }}
-  {{ $k }}: "{{ $v }}"
-    {{- end }}
-  {{- end }}
----
 
 
 {{- if and $modelSpec.chatTemplate (hasKey $modelSpec "chatTemplateConfigMap") }}
@@ -246,6 +70,5 @@ data:
 {{- end }}
 {{- end }}
 ---
-{{- end }}
 {{- end }}
 {{- end }}

@@ -1,4 +1,4 @@
-{{- if .Values.servingEngineSpec.enableEngine -}}
+{{- if and .Values.servingEngineSpec.enableEngine (not .Values.servingEngineSpec.enableKubeRay) -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- $kv_role := "kv_both" }}
 {{- $kv_rank := 0 }}

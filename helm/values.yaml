@@ -4,6 +4,7 @@
 # -- Serving engine configuratoon
 servingEngineSpec:
   enableEngine: true
+  enableKubeRay: false
   # -- Customized labels for the serving engine deployment
   labels:
     environment: "test"
