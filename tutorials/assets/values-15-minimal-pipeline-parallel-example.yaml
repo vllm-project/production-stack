@@ -1,5 +1,6 @@
 servingEngineSpec:
   runtimeClassName: ""
+  enableKubeRay: true
   modelSpec:
   - name: "gpt2"
     repository: "vllm/vllm-openai"
@@ -11,4 +12,3 @@ servingEngineSpec:
     requestCPU: 6
     requestMemory: "16Gi"
     requestGPU: 1
-    enableKubeRay: "true"
