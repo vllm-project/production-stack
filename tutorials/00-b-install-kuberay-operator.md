@@ -32,7 +32,7 @@ Before you begin, ensure the following:
 4. **Kubernetes Installation:**
    - Follow the instructions in [`00-install-kubernetes-env.md`](00-install-kubernetes-env.md) to set up your Kubernetes environment.
 
-5. **Kubereay Operator Installation:**
+5. **Kubereay Concept Review:**
    - Review the [`official KubeRay documentation`](https://docs.ray.io/en/latest/cluster/kubernetes/index.html) for additional context and best practices.
 
 ## Steps
