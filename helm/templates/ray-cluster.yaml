@@ -69,6 +69,97 @@ spec:
             env:
               - name: EXPECTED_NODES
                 value: "{{ add $modelSpec.replicaCount 1}}"
+              - name: HF_HOME
+                {{- if hasKey $modelSpec "pvcStorage" }}
+                value: /data
+                {{- else }}
+                value: /tmp
+                {{- end }}
+              {{- with $modelSpec.vllmConfig}}
+              - name: LMCACHE_LOG_LEVEL
+                value: "DEBUG"
+              {{- if hasKey . "v1" }}
+              - name: VLLM_USE_V1
+                value: {{ $modelSpec.vllmConfig.v1 | quote }}
+              {{- else }}
+              - name: VLLM_USE_V1
+                value: "0"
+              {{- end}}
+              {{- end}}
+              {{- if $modelSpec.hf_token }}
+              - name: HF_TOKEN
+                {{- if kindIs "string" $modelSpec.hf_token }}
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .Release.Name }}-secrets
+                    key: hf_token_{{ $modelSpec.name }}
+                {{- else }}
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $modelSpec.hf_token.secretName }}
+                    key: {{ $modelSpec.hf_token.secretKey }}
+                {{- end }}
+              {{- end }}
+              {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
+              {{- if $vllmApiKey }}
+              - name: VLLM_API_KEY
+                {{- if kindIs "string" $vllmApiKey }}
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ .Release.Name }}-secrets
+                    key: vllmApiKey
+                {{- else }}
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $vllmApiKey.secretName }}
+                    key: {{ $vllmApiKey.secretKey }}
+                {{- end }}
+              {{- end }}
+              {{- with $modelSpec.env }}
+              {{- toYaml . | nindent 10 }}
+              {{- end }}
+              {{- if $modelSpec.lmcacheConfig }}
+              {{-   if $modelSpec.lmcacheConfig.enabled }}
+              - name: LMCACHE_USE_EXPERIMENTAL
+                value: "True"
+              - name: VLLM_RPC_TIMEOUT
+                value: "1000000"
+              {{-   end }}
+              {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
+              - name: LMCACHE_LOCAL_CPU
+                value: "True"
+              - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+                value: "{{ $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}"
+              {{-   end }}
+              {{-   if $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}
+              - name: LMCACHE_LOCAL_DISK
+                value: "True"
+              - name: LMCACHE_MAX_LOCAL_DISK_SIZE
+                value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
+              {{-   end }}
+              {{-   if .Values.cacheserverSpec }}
+              - name: LMCACHE_REMOTE_URL
+                value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
+              - name: LMCACHE_REMOTE_SERDE
+                value: "{{ .Values.cacheserverSpec.serde }}"
+              {{-   end }}
+              {{-   if hasKey $modelSpec.lmcacheConfig "enableController" }}
+              - name: LMCACHE_ENABLE_CONTROLLER
+                value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.enableController | quote }}
+              {{-   end }}
+              {{-   if hasKey $modelSpec.lmcacheConfig "instanceId" }}
+              - name: LMCACHE_INSTANCE_ID
+                value: {{ $modelSpec.lmcacheConfig.instanceId | quote }}
+              {{-   end }}
+              {{-   if hasKey $modelSpec.lmcacheConfig "controllerPort" }}
+              - name: LMCACHE_CONTROLLER_URL
+                value: "{{ .Release.Name }}-{{$modelSpec.name}}-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
+              {{-   end }}
+              {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
+              - name: LMCACHE_WORKER_PORT
+                value: "{{ .Release.Name }}-service:{{ $modelSpec.lmcacheConfig.workerPort }}"
+              {{-   end }}
+              {{- end }}
             startupProbe:
               exec:
                 command: ["/bin/bash", "-c", "python3 /scripts/wait_for_ray.py"]
@@ -161,6 +252,98 @@ spec:
           containers:
             - name: vllm-ray-worker
               image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+              env:
+                - name: HF_HOME
+                  {{- if hasKey $modelSpec "pvcStorage" }}
+                  value: /data
+                  {{- else }}
+                  value: /tmp
+                  {{- end }}
+                {{- with $modelSpec.vllmConfig}}
+                - name: LMCACHE_LOG_LEVEL
+                  value: "DEBUG"
+                {{- if hasKey . "v1" }}
+                - name: VLLM_USE_V1
+                  value: {{ $modelSpec.vllmConfig.v1 | quote }}
+                {{- else }}
+                - name: VLLM_USE_V1
+                  value: "0"
+                {{- end}}
+                {{- end}}
+                {{- if $modelSpec.hf_token }}
+                - name: HF_TOKEN
+                  {{- if kindIs "string" $modelSpec.hf_token }}
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-secrets
+                      key: hf_token_{{ $modelSpec.name }}
+                  {{- else }}
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $modelSpec.hf_token.secretName }}
+                      key: {{ $modelSpec.hf_token.secretKey }}
+                  {{- end }}
+                {{- end }}
+                {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
+                {{- if $vllmApiKey }}
+                - name: VLLM_API_KEY
+                  {{- if kindIs "string" $vllmApiKey }}
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-secrets
+                      key: vllmApiKey
+                  {{- else }}
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $vllmApiKey.secretName }}
+                      key: {{ $vllmApiKey.secretKey }}
+                  {{- end }}
+                {{- end }}
+                {{- with $modelSpec.env }}
+                {{- toYaml . | nindent 10 }}
+                {{- end }}
+                {{- if $modelSpec.lmcacheConfig }}
+                {{-   if $modelSpec.lmcacheConfig.enabled }}
+                - name: LMCACHE_USE_EXPERIMENTAL
+                  value: "True"
+                - name: VLLM_RPC_TIMEOUT
+                  value: "1000000"
+                {{-   end }}
+                {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
+                - name: LMCACHE_LOCAL_CPU
+                  value: "True"
+                - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+                  value: "{{ $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}"
+                {{-   end }}
+                {{-   if $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}
+                - name: LMCACHE_LOCAL_DISK
+                  value: "True"
+                - name: LMCACHE_MAX_LOCAL_DISK_SIZE
+                  value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
+                {{-   end }}
+                {{-   if .Values.cacheserverSpec }}
+                - name: LMCACHE_REMOTE_URL
+                  value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
+                - name: LMCACHE_REMOTE_SERDE
+                  value: "{{ .Values.cacheserverSpec.serde }}"
+                {{-   end }}
+                {{-   if hasKey $modelSpec.lmcacheConfig "enableController" }}
+                - name: LMCACHE_ENABLE_CONTROLLER
+                  value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.enableController | quote }}
+                {{-   end }}
+                {{-   if hasKey $modelSpec.lmcacheConfig "instanceId" }}
+                - name: LMCACHE_INSTANCE_ID
+                  value: {{ $modelSpec.lmcacheConfig.instanceId | quote }}
+                {{-   end }}
+                {{-   if hasKey $modelSpec.lmcacheConfig "controllerPort" }}
+                - name: LMCACHE_CONTROLLER_URL
+                  value: "{{ .Release.Name }}-{{$modelSpec.name}}-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
+                {{-   end }}
+                {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
+                - name: LMCACHE_WORKER_PORT
+                  value: "{{ .Release.Name }}-service:{{ $modelSpec.lmcacheConfig.workerPort }}"
+                {{-   end }}
+                {{- end }}
               resources:
                 limits:
                   nvidia.com/gpu: {{ .Values.servingEngineSpec.gpuLimit }}
