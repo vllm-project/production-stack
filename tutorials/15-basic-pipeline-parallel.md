@@ -27,7 +27,7 @@ This tutorial guides you through the basic configurations required to deploy a v
 ### Explanation of Key Items in `values-15-minimal-pipeline-parallel-example.yaml`
 
 - **`raySpec`**: Required when using KubeRay to enable pipeline parallelism.
-- **`headNode`**: Specifies the resource requirements for the Ray head node and must be defined accordingly.
+- **`headNode`**: Specifies the resource requirements for the Kuberay head node and must be defined accordingly.
 - **`name`**: The unique identifier for your model deployment.
 - **`repository`**: The Docker repository containing the model's serving engine image.
 - **`tag`**: Specifies the version of the model image to use.
