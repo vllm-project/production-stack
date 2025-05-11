@@ -32,7 +32,7 @@ This tutorial guides you through the basic configurations required to deploy a v
 - **`repository`**: The Docker repository containing the model's serving engine image.
 - **`tag`**: Specifies the version of the model image to use.
 - **`modelURL`**: The URL pointing to the model on Hugging Face or another hosting service.
-- **`replicaCount`**: The number of replicas for each Kuberay worker pod.
+- **`replicaCount`**: The number of total Kuberay worker pods.
 - **`requestCPU`**: The amount of CPU resources requested per Kuberay worker pod.
 - **`requestMemory`**: Memory allocation for each Kuberay worker pod; sufficient memory is required to load the model.
 - **`requestGPU`**: Specifies the number of GPUs to allocate for each Kuberay worker pod.
