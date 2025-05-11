@@ -22,7 +22,7 @@ spec:
         terminationGracePeriodSeconds: 0
         {{- if .Values.servingEngineSpec.securityContext }}
         securityContext:
-          {{- toYaml .Values.servingEngineSpec.securityContext | nindent 8 }}
+          {{- toYaml .Values.servingEngineSpec.securityContext | nindent 10 }}
         {{- end }}
         containers:
           - name: vllm-ray-head
@@ -33,6 +33,23 @@ spec:
             readinessProbe:
               exec:
                 command: ["/bin/bash", "-c", "echo TBD"]
+            env:
+              - name: EXPECTED_NODES
+                value: "{{ add $modelSpec.replicaCount 1}}"
+            startupProbe:
+              exec:
+                command: ["/bin/bash", "-c", "python3 /scripts/wait_for_ray.py"]
+              failureThreshold: 30
+              periodSeconds: 15
+              timeoutSeconds: 10
+            volumeMounts:
+              - name: wait-script
+                mountPath: /scripts
+                readOnly: true
+        volumes:
+          - name: wait-script
+            configMap:
+              name: wait-for-ray-script
   workerGroupSpecs:
     - rayStartParams: {}
       replicas: {{ $modelSpec.replicaCount }}
@@ -56,6 +73,40 @@ spec:
                 exec:
                   command: ["/bin/bash", "-c", "echo TBD"]
 
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wait-for-ray-script
+data:
+  wait_for_ray.py: |
+    import ray
+    import logging
+    import os
+    import sys
+
+    logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
+
+    try:
+        ray.init(address="auto")
+    except Exception as e:
+        logging.error(f"Failed to initialize Ray: {e}")
+        sys.exit(1)
+
+    expected_nodes = int(os.environ.get("EXPECTED_NODES", "1"))
+
+    alive_nodes = [n for n in ray.nodes() if n["Alive"]]
+    alive_count = len(alive_nodes)
+
+    logging.info(f"Ray cluster status: {alive_count}/{expected_nodes} nodes alive.")
+
+    if alive_count >= expected_nodes:
+        logging.info("Cluster is ready.")
+        sys.exit(0)
+    else:
+        logging.info("Cluster is NOT ready.")
+        sys.exit(1)
+---
 
 {{- if and $modelSpec.chatTemplate (hasKey $modelSpec "chatTemplateConfigMap") }}
 ---
