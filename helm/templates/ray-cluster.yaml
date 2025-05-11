@@ -60,12 +60,6 @@ spec:
                 chmod +x \$HOME/vllm-entrypoint.sh &&
                 \$HOME/vllm-entrypoint.sh &
                 echo \"Running vllm command in the background.\""
-            livenessProbe:
-              exec:
-                command: ["/bin/bash", "-c", "echo TBD"]
-            readinessProbe:
-              exec:
-                command: ["/bin/bash", "-c", "echo TBD"]
             env:
               - name: EXPECTED_NODES
                 value: "{{ add $modelSpec.replicaCount 1}}"
@@ -160,6 +154,16 @@ spec:
                 value: "{{ .Release.Name }}-service:{{ $modelSpec.lmcacheConfig.workerPort }}"
               {{-   end }}
               {{- end }}
+            {{- if .Values.servingEngineSpec.configs }}
+            envFrom:
+              - configMapRef:
+                  name: "{{ .Release.Name }}-configs"
+            {{- end }}
+            ports:
+              - name: {{ include "chart.container-port-name" . }}
+                containerPort: {{ include "chart.container-port" . }}
+            {{- include "chart.probes" . | indent 12 }}
+            resources: {{- include "chart.resources" $modelSpec | nindent 14 }}
             startupProbe:
               exec:
                 command: ["/bin/bash", "-c", "python3 /scripts/wait_for_ray.py"]
@@ -363,15 +367,16 @@ spec:
                   value: "{{ .Release.Name }}-service:{{ $modelSpec.lmcacheConfig.workerPort }}"
                 {{-   end }}
                 {{- end }}
-              resources:
-                limits:
-                  nvidia.com/gpu: {{ .Values.servingEngineSpec.gpuLimit }}
-              livenessProbe:
-                exec:
-                  command: ["/bin/bash", "-c", "echo TBD"]
-              readinessProbe:
-                exec:
-                  command: ["/bin/bash", "-c", "echo TBD"]
+              {{- if .Values.servingEngineSpec.configs }}
+              envFrom:
+                - configMapRef:
+                    name: "{{ .Release.Name }}-configs"
+              {{- end }}
+              ports:
+                - name: {{ include "chart.container-port-name" . }}
+                  containerPort: {{ include "chart.container-port" . }}
+              {{- include "chart.probes" . | indent 14 }}
+              resources: {{- include "chart.resources" $modelSpec | nindent 16 }}
               {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
               volumeMounts:
               {{- end }}
