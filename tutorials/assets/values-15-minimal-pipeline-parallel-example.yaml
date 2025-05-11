@@ -1,6 +1,9 @@
 servingEngineSpec:
   runtimeClassName: ""
-  enableKubeRay: true
+  raySpec:
+    headNode:
+      requestCPU: 2
+      requestMemory: "20Gi"
   modelSpec:
   - name: "distilgpt2"
     repository: "vllm/vllm-openai"
@@ -9,10 +12,12 @@ servingEngineSpec:
 
     replicaCount: 2
 
-    requestCPU: 6
-    requestMemory: "16Gi"
+    requestCPU: 2
+    requestMemory: "20Gi"
     requestGPU: 1
 
     vllmConfig:
       tensorParallelSize: 1
       pipelineParallelSize: 2
+
+    shmSize: "20Gi"
