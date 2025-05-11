@@ -68,8 +68,8 @@ Before you begin, ensure the following:
    Example output:
 
    ```plaintext
-   NAME                                READY   STATUS    RESTARTS   AGE
-   kuberay-operator-78cb88fb88-gbw7w   0/1     Running   0          5s
+   NAME                                          READY   STATUS    RESTARTS   AGE
+   kuberay-operator-975995b7d-75jqd              1/1     Running   0          25h
    ```
 
 ## Conclusion
