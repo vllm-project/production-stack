@@ -27,6 +27,13 @@ spec:
         containers:
           - name: vllm-ray-head
             image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+            command:
+              - >-
+                /bin/bash -c "
+                cp /entrypoint/vllm-entrypoint.sh \$HOME/vllm-entrypoint.sh &&
+                chmod +x \$HOME/vllm-entrypoint.sh &&
+                \$HOME/vllm-entrypoint.sh &
+                echo \"Running vllm command in the background.\""
             livenessProbe:
               exec:
                 command: ["/bin/bash", "-c", "echo TBD"]
@@ -45,11 +52,15 @@ spec:
             volumeMounts:
               - name: wait-script
                 mountPath: /scripts
-                readOnly: true
+              - name: vllm-script
+                mountPath: /entrypoint
         volumes:
           - name: wait-script
             configMap:
               name: wait-for-ray-script
+          - name: vllm-script
+            configMap:
+              name: vllm-start-script
   workerGroupSpecs:
     - rayStartParams: {}
       replicas: {{ $modelSpec.replicaCount }}
@@ -107,6 +118,112 @@ data:
         logging.info("Cluster is NOT ready.")
         sys.exit(1)
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vllm-start-script
+data:
+  vllm-entrypoint.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "Waiting for Ray to become available..."
+    until python3 /scripts/wait_for_ray.py; do
+      echo "Ray not ready yet. Retrying in 2 seconds..."
+      sleep 2
+    done
+
+    echo "Ray is ready. Starting vLLM..."
+
+    # Start constructing command
+    ARGS=(
+      "vllm"
+      "serve"
+      "{{ $modelSpec.modelURL | quote }}"
+      "--host" "0.0.0.0"
+      "--port" "{{ include "chart.container-port" . }}"
+      "--distributed-executor-backend" "ray"
+    )
+
+    {{- if $modelSpec.enableLoRA }}
+    ARGS+=("--enable-lora")
+    {{- end }}
+
+    {{- if $modelSpec.enableTool }}
+    ARGS+=("--enable-auto-tool-choice")
+    {{- end }}
+
+    {{- if $modelSpec.toolCallParser }}
+    ARGS+=("--tool-call-parser" {{ $modelSpec.toolCallParser | quote }})
+    {{- end }}
+
+    {{- with $modelSpec.vllmConfig }}
+      {{- if hasKey . "enableChunkedPrefill" }}
+        {{- if .enableChunkedPrefill }}
+    ARGS+=("--enable-chunked-prefill")
+        {{- else }}
+    ARGS+=("--no-enable-chunked-prefill")
+        {{- end }}
+      {{- end }}
+
+      {{- if .enablePrefixCaching }}
+    ARGS+=("--enable-prefix-caching")
+      {{- end }}
+
+      {{- if hasKey . "maxModelLen" }}
+    ARGS+=("--max-model-len" {{ .maxModelLen | quote }})
+      {{- end }}
+
+      {{- if hasKey . "dtype" }}
+    ARGS+=("--dtype" {{ .dtype | quote }})
+      {{- end }}
+
+      {{- if hasKey . "tensorParallelSize" }}
+    ARGS+=("--tensor-parallel-size" {{ .tensorParallelSize | quote }})
+      {{- end }}
+
+      {{- if hasKey . "pipelineParallelSize" }}
+    ARGS+=("--pipeline-parallel-size" {{ .pipelineParallelSize | quote }})
+      {{- end }}
+
+      {{- if hasKey . "maxNumSeqs" }}
+    ARGS+=("--max-num-seqs" {{ .maxNumSeqs | quote }})
+      {{- end }}
+
+      {{- if hasKey . "gpuMemoryUtilization" }}
+    ARGS+=("--gpu-memory-utilization" {{ .gpuMemoryUtilization | quote }})
+      {{- end }}
+
+      {{- if hasKey . "maxLoras" }}
+    ARGS+=("--max-loras" {{ .maxLoras | quote }})
+      {{- end }}
+
+      {{- range .extraArgs }}
+    ARGS+=({{ . | quote }})
+      {{- end }}
+    {{- end }}
+
+    {{- if $modelSpec.lmcacheConfig }}
+      {{- if $modelSpec.lmcacheConfig.enabled }}
+        {{- if hasKey $modelSpec.vllmConfig "v1" }}
+          {{- if eq (toString $modelSpec.vllmConfig.v1) "1" }}
+    ARGS+=("--kv-transfer-config" "{\"kv_connector\":\"LMCacheConnectorV1\",\"kv_role\":\"kv_both\"}")
+          {{- else }}
+    ARGS+=("--kv-transfer-config" "{\"kv_connector\":\"LMCacheConnector\",\"kv_role\":\"kv_both\"}")
+          {{- end }}
+        {{- else }}
+    ARGS+=("--kv-transfer-config" "{\"kv_connector\":\"LMCacheConnector\",\"kv_role\":\"kv_both\"}")
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+    {{- if $modelSpec.chatTemplate }}
+    ARGS+=("--chat-template" {{ $modelSpec.chatTemplate | quote }})
+    {{- end }}
+
+    echo "Executing: ${ARGS[@]}"
+    exec "${ARGS[@]}"
+
 
 {{- if and $modelSpec.chatTemplate (hasKey $modelSpec "chatTemplateConfigMap") }}
 ---
