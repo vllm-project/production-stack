@@ -26,6 +26,8 @@ This tutorial guides you through the basic configurations required to deploy a v
 
 ### Explanation of Key Items in `values-15-minimal-pipeline-parallel-example.yaml`
 
+- **`raySpec`**: Required when using KubeRay to enable pipeline parallelism.
+- **`headNode`**: Specifies the resource requirements for the Ray head node and must be defined accordingly.
 - **`name`**: The unique identifier for your model deployment.
 - **`repository`**: The Docker repository containing the model's serving engine image.
 - **`tag`**: Specifies the version of the model image to use.
@@ -35,9 +37,9 @@ This tutorial guides you through the basic configurations required to deploy a v
 - **`requestMemory`**: Memory allocation for each Kuberay worker pod; sufficient memory is required to load the model.
 - **`requestGPU`**: Specifies the number of GPUs to allocate for each Kuberay worker pod.
 - **`vllmConfig`**: Contains model-specific configurations:
-  - `tensorParallelSize`: Number of GPUs to assign for each worker pod.
-  - `pipelineParallelSize`: Pipeline parallel factor. `Total GPUs` = `pipelineParallelSize` x `tensorParallelSize`
-- **`shmSize`**: Shared memory size to enable appropriate shared memory across multiple processes used to run tensor and pipeline parallelism.
+  - `tensorParallelSize`: Defines the number of GPUs allocated to each worker pod.
+  - `pipelineParallelSize`: Specifies the degree of pipeline parallelism. `The total number of GPUs` used is calculated as `pipelineParallelSize × tensorParallelSize`.
+- **`shmSize`**: Configures the shared memory size to ensure adequate memory is available for inter-process communication during tensor and pipeline parallelism execution.
 - **`hf_token`**: The Hugging Face token for authenticating with the Hugging Face model hub.
 
 ### Example Snippet
@@ -113,9 +115,11 @@ TEST SUITE: None
    vllm-distilgpt2-raycluster-ray-worker-jrcrl   1/1     Running   0          40s
    ```
 
-   - The `vllm-deployment-router` pod acts as the router, managing requests and routing them to the appropriate model-serving pod.
-   - The `vllm-distilgpt2-raycluster-head` pod runs actual vllm command.
-   - `vllm-distilgpt2-raycluster-ray-worker-*` pods serves the actual model for inference.
+   - The vllm-deployment-router pod functions as the request router, directing incoming traffic to the appropriate model-serving pod.
+
+   - The vllm-distilgpt2-raycluster-head pod is responsible for running the primary vLLM command.
+
+   - The vllm-distilgpt2-raycluster-ray-worker-* pods serve the model and handle inference requests.
 
 2. Verify the service is exposed correctly:
 
@@ -141,50 +145,39 @@ TEST SUITE: None
 
 3. Test the health endpoint:
 
+   To verify that the service is operational, execute the following commands:
+
    ```bash
-   curl http://<SERVICE_IP>/health
+   kubectl port-forward svc/vllm-router-service 30080:80
+   curl http://localhost:30080/v1/models
    ```
 
-   Replace `<SERVICE_IP>` with the external IP of the service. If everything is configured correctly, you will get:
+   **Note:** Port forwarding must be performed from a separate shell session. If the deployment is configured correctly, you should receive a response similar to the following:
 
    ```plaintext
-   {"status":"healthy"}
+   {"object":"list","data":[{"id":"distilbert/distilgpt2","object":"model","created":1746978162,"owned_by":"vllm","root":null}]}
+   ```
+
+   You may also perform a basic inference test to validate that pipeline parallelism is functioning as expected. Use the following curl command:
+
+   ```bash
+   curl -X POST http://localhost:30080/v1/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "distilbert/distilgpt2",
+      "prompt": "Once upon a time,",
+      "max_tokens": 10
+    }'
+   ```
+
+   A successful response should resemble the following output:
+
+   ```plaintext
+   {"id":"cmpl-27e058ce9f0443dd96b76aced16f8b90","object":"text_completion","created":1746978495,"model":"distilbert/distilgpt2","choices":[{"index":0,"text":" the dim of light lingered as it projected enough","logprobs":null,"finish_reason":"length","stop_reason":null,"prompt_logprobs":null}],"usage":{"prompt_tokens":5,"total_tokens":15,"completion_tokens":10,"prompt_tokens_details":null}}
    ```
 
 Please refer to Step 3 in the [01-minimal-helm-installation](01-minimal-helm-installation.md) tutorial for querying the deployed vLLM service.
 
-## Step 4 (Optional): Multi-GPU Deployment
-
-So far, you have configured and deployment vLLM serving engine with a single GPU. You may also deploy a serving engine on multiple GPUs with the following example configuration snippet:
-
-```yaml
-servingEngineSpec:
-  runtimeClassName: ""
-  modelSpec:
-  - name: "llama3"
-    repository: "vllm/vllm-openai"
-    tag: "latest"
-    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
-    replicaCount: 1
-    requestCPU: 10
-    requestMemory: "16Gi"
-    requestGPU: 2
-    pvcStorage: "50Gi"
-    pvcAccessMode:
-      - ReadWriteOnce
-    vllmConfig:
-      enableChunkedPrefill: false
-      enablePrefixCaching: false
-      maxModelLen: 4096
-      tensorParallelSize: 2
-      dtype: "bfloat16"
-      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
-    hf_token: <YOUR HF TOKEN>
-    shmSize: "20Gi"
-```
-
-Note that only tensor parallelism is supported for now. The field ``shmSize`` has to be configured if you are requesting ``requestGPU`` to be more than one, to enable appropriate shared memory across multiple processes used to run tensor parallelism.
-
 ## Conclusion
 
-In this tutorial, you configured and deployed a vLLM serving engine with pipeline parallelism support (on multiple GPUs) in a Kubernetes environment with Kuberay. You also learned how to verify its deployment and pods and ensure it is running as expected. For further customization, refer to the `values.yaml` file and Helm chart documentation.
+In this tutorial, you configured and deployed the vLLM serving engine with support for pipeline parallelism across multiple GPUs within a Kubernetes environment using KubeRay. Additionally, you learned how to verify the deployment and monitor the associated pods to ensure proper operation. For further customization and configuration options, please consult the `values.yaml` file and the Helm chart documentation.
