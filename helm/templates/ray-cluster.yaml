@@ -1,10 +1,10 @@
-{{- if and .Values.servingEngineSpec.enableEngine .Values.servingEngineSpec.enableKubeRay }}
+{{- if and .Values.servingEngineSpec.enableEngine (hasKey .Values.servingEngineSpec "raySpec")}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- with $ -}}
 apiVersion: ray.io/v1
 kind: RayCluster
 metadata:
-  name: "{{ .Release.Name }}-{{$modelSpec.name}}-raycluster-vllm"
+  name: "{{ .Release.Name }}-{{$modelSpec.name}}-raycluster"
   namespace: {{ .Release.Namespace }}
   labels:
     model: {{ $modelSpec.name }}
@@ -162,8 +162,19 @@ spec:
             ports:
               - name: {{ include "chart.container-port-name" . }}
                 containerPort: {{ include "chart.container-port" . }}
-            {{- include "chart.probes" . | indent 12 }}
-            resources: {{- include "chart.resources" $modelSpec | nindent 14 }}
+            readinessProbe:
+              exec:
+                command: ["/bin/bash", "-c", "echo TBD"]
+            livenessProbe:
+              exec:
+                command: ["/bin/bash", "-c", "echo TBD"]
+            resources:
+              limits:
+                cpu: {{ default "2" .Values.servingEngineSpec.raySpec.headNode.requestCPU }}
+                memory: {{ default "8Gi" .Values.servingEngineSpec.raySpec.headNode.requestMemory }}
+                {{- if hasKey .Values.servingEngineSpec.raySpec.headNode "requestGPU" }}
+                nvidia.com/gpu: {{ .Values.servingEngineSpec.raySpec.headNode.requestGPU }}
+                {{- end }}
             startupProbe:
               exec:
                 command: ["/bin/bash", "-c", "python3 /scripts/wait_for_ray.py"]
@@ -261,7 +272,7 @@ spec:
   workerGroupSpecs:
     - rayStartParams: {}
       replicas: {{ $modelSpec.replicaCount }}
-      groupName: vllm-ray-worker
+      groupName: ray
       template:
         metadata:
           labels:
@@ -375,7 +386,12 @@ spec:
               ports:
                 - name: {{ include "chart.container-port-name" . }}
                   containerPort: {{ include "chart.container-port" . }}
-              {{- include "chart.probes" . | indent 14 }}
+              readinessProbe:
+                exec:
+                  command: ["/bin/bash", "-c", "echo TBD"]
+              livenessProbe:
+                exec:
+                  command: ["/bin/bash", "-c", "echo TBD"]
               resources: {{- include "chart.resources" $modelSpec | nindent 16 }}
               {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
               volumeMounts:
