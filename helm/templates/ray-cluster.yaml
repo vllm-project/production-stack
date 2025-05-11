@@ -171,6 +171,25 @@ spec:
                 mountPath: /scripts
               - name: vllm-script
                 mountPath: /entrypoint
+              {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
+              {{- if hasKey $modelSpec "pvcStorage" }}
+              - name: {{ .Release.Name }}-storage
+                mountPath: /data
+              {{- end }}
+              {{- with $modelSpec.vllmConfig }}
+              {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
+              - name: shm
+                mountPath: /dev/shm
+              {{- end}}
+              {{- end}}
+              {{- if $modelSpec.chatTemplate }}
+              - name: vllm-templates
+                mountPath: /templates
+              {{- end }}
+              {{- if hasKey $modelSpec "extraVolumeMounts" }}
+              {{- toYaml $modelSpec.extraVolumeMounts | nindent 14 }}
+              {{- end }}
+              {{- end }}
         volumes:
           - name: wait-script
             configMap:
@@ -178,7 +197,7 @@ spec:
           - name: vllm-script
             configMap:
               name: vllm-start-script
-        {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
+          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
           {{- if hasKey $modelSpec "pvcStorage" }}
           - name: {{ .Release.Name }}-storage
             persistentVolumeClaim:
@@ -353,6 +372,26 @@ spec:
               readinessProbe:
                 exec:
                   command: ["/bin/bash", "-c", "echo TBD"]
+              {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
+              volumeMounts:
+              {{- end }}
+              {{- if hasKey $modelSpec "pvcStorage" }}
+              - name: {{ .Release.Name }}-storage
+                mountPath: /data
+              {{- end }}
+              {{- with $modelSpec.vllmConfig }}
+              {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
+              - name: shm
+                mountPath: /dev/shm
+              {{- end}}
+              {{- end}}
+              {{- if $modelSpec.chatTemplate }}
+              - name: vllm-templates
+                mountPath: /templates
+              {{- end }}
+              {{- if hasKey $modelSpec "extraVolumeMounts" }}
+              {{- toYaml $modelSpec.extraVolumeMounts | nindent 14 }}
+              {{- end }}
           volumes:
             - name: wait-script
               configMap:
@@ -360,7 +399,7 @@ spec:
             - name: vllm-script
               configMap:
                 name: vllm-start-script
-          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
+            {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
             {{- if hasKey $modelSpec "pvcStorage" }}
             - name: {{ .Release.Name }}-storage
               persistentVolumeClaim:
