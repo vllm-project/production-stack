@@ -4,13 +4,14 @@ servingEngineSpec:
     headNode:
       requestCPU: 2
       requestMemory: "20Gi"
+      requestGPU: 1
   modelSpec:
   - name: "distilgpt2"
     repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "distilbert/distilgpt2"
 
-    replicaCount: 2
+    replicaCount: 1
 
     requestCPU: 2
     requestMemory: "20Gi"
