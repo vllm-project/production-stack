@@ -56,11 +56,16 @@ spec:
             command:
               - >-
                 /bin/bash -c "
+                pip install ray[default] &&
                 cp /entrypoint/vllm-entrypoint.sh \$HOME/vllm-entrypoint.sh &&
                 chmod +x \$HOME/vllm-entrypoint.sh &&
                 \$HOME/vllm-entrypoint.sh &
                 echo \"Running vllm command in the background.\""
             env:
+              - name: VLLM_HOST_IP
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
               - name: EXPECTED_NODES
                 value: "{{ add $modelSpec.replicaCount 1}}"
               - name: HF_HOME
@@ -289,6 +294,10 @@ spec:
             - name: vllm-ray-worker
               image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
               env:
+                - name: VLLM_HOST_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.podIP
                 - name: HF_HOME
                   {{- if hasKey $modelSpec "pvcStorage" }}
                   value: /data
