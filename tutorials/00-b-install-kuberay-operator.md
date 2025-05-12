@@ -46,10 +46,10 @@ Before you begin, ensure the following:
    helm repo update
    ```
 
-2. Install the Custom Resource Definitions (CRDs) and the KubeRay operator (version 1.1.0) in the default namespace:
+2. Install the Custom Resource Definitions (CRDs) and the KubeRay operator (version 1.2.0) in the default namespace:
 
    ```bash
-   helm install kuberay-operator kuberay/kuberay-operator --version 1.1.0
+   helm install kuberay-operator kuberay/kuberay-operator --version 1.2.0
    ```
 
 3. **Explanation:**
