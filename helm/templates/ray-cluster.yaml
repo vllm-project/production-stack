@@ -14,7 +14,6 @@ spec:
   headGroupSpec:
     serviceType: ClusterIP
     rayStartParams:
-      include-dashboard: "true"
       dashboard-host: "0.0.0.0"
     template:
       metadata:
@@ -28,29 +27,6 @@ spec:
         securityContext:
           {{- toYaml .Values.servingEngineSpec.securityContext | nindent 10 }}
         {{- end }}
-        {{- if hasKey $modelSpec "initContainer" }}
-        {{- $container := $modelSpec.initContainer }}
-        initContainers:
-          - name: {{ $container.name }}
-            image: {{ $container.image }}
-            {{- if $container.command }}
-            command: {{ toYaml $container.command | nindent 12 }}
-            {{- end }}
-            {{- if $container.args }}
-            args: {{ toYaml $container.args | nindent 12 }}
-            {{- end }}
-            {{- if $container.env }}
-            env: {{ toYaml $container.env | nindent 12 }}
-            {{- end }}
-            {{- if $container.resources }}
-            resources: {{ toYaml $container.resources | nindent 12 }}
-            {{- end }}
-            {{- if and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage") }}
-            volumeMounts:
-              - name: {{ .Release.Name }}-storage
-                mountPath: /data
-            {{- end }}
-        {{- end }}
         containers:
           - name: vllm-ray-head
             image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
@@ -60,7 +36,6 @@ spec:
                 cp /entrypoint/vllm-entrypoint.sh \$HOME/vllm-entrypoint.sh &&
                 chmod +x \$HOME/vllm-entrypoint.sh &&
                 \$HOME/vllm-entrypoint.sh &
-                pip install -U "ray[default]" &&
                 echo \"Running vllm command in the background.\""
             env:
               - name: VLLM_HOST_IP
