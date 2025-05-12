@@ -14,6 +14,7 @@ spec:
   headGroupSpec:
     serviceType: ClusterIP
     rayStartParams:
+      include-dashboard: "true"
       dashboard-host: "0.0.0.0"
     template:
       metadata:
@@ -56,10 +57,10 @@ spec:
             command:
               - >-
                 /bin/bash -c "
-                pip install ray[default] &&
                 cp /entrypoint/vllm-entrypoint.sh \$HOME/vllm-entrypoint.sh &&
                 chmod +x \$HOME/vllm-entrypoint.sh &&
                 \$HOME/vllm-entrypoint.sh &
+                pip install -U "ray[default]" &&
                 echo \"Running vllm command in the background.\""
             env:
               - name: VLLM_HOST_IP
