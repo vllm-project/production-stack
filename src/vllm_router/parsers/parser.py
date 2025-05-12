@@ -118,6 +118,12 @@ def parse_args():
         help="The models of static backends, separated by commas. E.g., model1,model2",
     )
     parser.add_argument(
+        "--static-aliases",
+        type=str,
+        default=None,
+        help="The aliases of static backends, separated by commas. E.g., your-custom-model:llama3",
+    )
+    parser.add_argument(
         "--k8s-port",
         type=int,
         default=8000,

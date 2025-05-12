@@ -115,6 +115,7 @@ The router ensures efficient request distribution among backends. It supports:
 - Routing to endpoints that run different models
 - Exporting observability metrics for each serving engine instance, including QPS, time-to-first-token (TTFT), number of pending/running/finished requests, and uptime
 - Automatic service discovery and fault tolerance by Kubernetes API
+- Model aliases
 - Multiple different routing algorithms
   - Round-robin routing
   - Session-ID based routing
