@@ -176,6 +176,58 @@ TEST SUITE: None
    {"id":"cmpl-27e058ce9f0443dd96b76aced16f8b90","object":"text_completion","created":1746978495,"model":"distilbert/distilgpt2","choices":[{"index":0,"text":" the dim of light lingered as it projected enough","logprobs":null,"finish_reason":"length","stop_reason":null,"prompt_logprobs":null}],"usage":{"prompt_tokens":5,"total_tokens":15,"completion_tokens":10,"prompt_tokens_details":null}}
    ```
 
+   You can also monitor GPU usage for each Ray head and worker pod:
+
+   ```plaintext
+   kubectl exec -it vllm-distilgpt2-raycluster-head-xrcgw -- /bin/bash
+   root@vllm-distilgpt2-raycluster-head-xrcgw:/vllm-workspace# nvidia-smi
+   Mon May 12 14:51:41 2025
+   +-----------------------------------------------------------------------------------------+
+   | NVIDIA-SMI 550.90.07              Driver Version: 550.90.07      CUDA Version: 12.4     |
+   |-----------------------------------------+------------------------+----------------------+
+   | GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+   | Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+   |                                         |                        |               MIG M. |
+   |=========================================+========================+======================|
+   |   0  NVIDIA L4                      Off |   00000000:00:03.0 Off |                    0 |
+   | N/A   76C    P0             40W /   72W |   20129MiB /  23034MiB |      0%      Default |
+   |                                         |                        |                  N/A |
+   +-----------------------------------------+------------------------+----------------------+
+
+   +-----------------------------------------------------------------------------------------+
+   | Processes:                                                                              |
+   |  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+   |        ID   ID                                                               Usage      |
+   |=========================================================================================|
+   |    0   N/A  N/A        13      C   /usr/bin/python3                                0MiB |
+   +-----------------------------------------------------------------------------------------+
+
+   ###########################################################################################
+
+   kubectl exec -it vllm-distilgpt2-raycluster-head-xrcgw -- /bin/bash
+   root@vllm-distilgpt2-raycluster-ray-worker-92zrr:/vllm-workspace# nvidia-smi
+   Mon May 12 14:51:44 2025
+   +-----------------------------------------------------------------------------------------+
+   | NVIDIA-SMI 550.90.07              Driver Version: 550.90.07      CUDA Version: 12.4     |
+   |-----------------------------------------+------------------------+----------------------+
+   | GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+   | Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+   |                                         |                        |               MIG M. |
+   |=========================================+========================+======================|
+   |   0  NVIDIA L4                      Off |   00000000:00:04.0 Off |                    0 |
+   | N/A   71C    P0             39W /   72W |   20119MiB /  23034MiB |      0%      Default |
+   |                                         |                        |                  N/A |
+   +-----------------------------------------+------------------------+----------------------+
+
+   +-----------------------------------------------------------------------------------------+
+   | Processes:                                                                              |
+   |  GPU   GI   CI        PID   Type   Process name                              GPU Memory |
+   |        ID   ID                                                               Usage      |
+   |=========================================================================================|
+   |    0   N/A  N/A       273      C   ray::RayWorkerWrapper                           0MiB |
+   +-----------------------------------------------------------------------------------------+
+   ```
+
 Please refer to Step 3 in the [01-minimal-helm-installation](01-minimal-helm-installation.md) tutorial for querying the deployed vLLM service.
 
 ## Conclusion
