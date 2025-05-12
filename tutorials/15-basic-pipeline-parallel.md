@@ -204,7 +204,7 @@ TEST SUITE: None
 
    ###########################################################################################
 
-   kubectl exec -it vllm-distilgpt2-raycluster-head-xrcgw -- /bin/bash
+   kubectl exec -it vllm-distilgpt2-raycluster-ray-worker-92zrr -- /bin/bash
    root@vllm-distilgpt2-raycluster-ray-worker-92zrr:/vllm-workspace# nvidia-smi
    Mon May 12 14:51:44 2025
    +-----------------------------------------------------------------------------------------+
