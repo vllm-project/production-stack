@@ -51,13 +51,14 @@ servingEngineSpec:
     headNode:
       requestCPU: 2
       requestMemory: "20Gi"
+      requestGPU: 1
   modelSpec:
   - name: "distilgpt2"
     repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "distilbert/distilgpt2"
 
-    replicaCount: 2
+    replicaCount: 1
 
     requestCPU: 2
     requestMemory: "20Gi"
@@ -108,11 +109,10 @@ TEST SUITE: None
 
    ```plaintext
    NAME                                          READY   STATUS    RESTARTS   AGE
-   kuberay-operator-975995b7d-75jqd              1/1     Running   0          24h
-   vllm-deployment-router-8666bf6464-ds8pm       1/1     Running   0          40s
-   vllm-distilgpt2-raycluster-head-74qvn         1/1     Running   0          40s
-   vllm-distilgpt2-raycluster-ray-worker-jlgj8   1/1     Running   0          40s
-   vllm-distilgpt2-raycluster-ray-worker-jrcrl   1/1     Running   0          40s
+   kuberay-operator-f89ddb644-psts7              1/1     Running   0          11m
+   vllm-deployment-router-8666bf6464-7nz5f       1/1     Running   0          2m34s
+   vllm-distilgpt2-raycluster-head-xrcgw         1/1     Running   0          2m34s
+   vllm-distilgpt2-raycluster-ray-worker-92zrr   1/1     Running   0          2m34s
    ```
 
    - The vllm-deployment-router pod functions as the request router, directing incoming traffic to the appropriate model-serving pod.
@@ -132,12 +132,12 @@ TEST SUITE: None
    Ensure there are services for both the serving engine and the router:
 
    ```plaintext
-   NAME                                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE
-   kuberay-operator                      ClusterIP   10.99.122.176   <none>        8080/TCP            24h
-   kubernetes                            ClusterIP   10.96.0.1       <none>        443/TCP             5d1h
-   vllm-distilgpt2-engine-service        ClusterIP   10.105.193.58   <none>        80/TCP              2m42s
-   vllm-distilgpt2-raycluster-head-svc   ClusterIP   None            <none>        8000/TCP,8080/TCP   2m42s
-   vllm-router-service                   ClusterIP   10.108.70.18    <none>        80/TCP              2m42s
+   NAME                                  TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE
+   kuberay-operator                      ClusterIP   10.99.21.240   <none>        8080/TCP            11m
+   kubernetes                            ClusterIP   10.96.0.1      <none>        443/TCP             6d8h
+   vllm-distilgpt2-engine-service        ClusterIP   10.96.242.69   <none>        80/TCP              2m57s
+   vllm-distilgpt2-raycluster-head-svc   ClusterIP   None           <none>        8000/TCP,8080/TCP   2m56s
+   vllm-router-service                   ClusterIP   10.99.111.73   <none>        80/TCP              2m57s
    ```
 
    - The `vllm-engine-service` exposes the serving engine.
