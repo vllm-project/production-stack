@@ -1,4 +1,20 @@
+# Copyright 2024-2025 The vLLM Production Stack Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import argparse
+import json
+import logging
+import sys
 
 from vllm_router.version import __version__
 
@@ -26,8 +42,32 @@ except ImportError:
     semantic_cache_available = False
 
 
+logger = logging.getLogger(__name__)
+
+
+def verify_required_args_provided(args: argparse.Namespace) -> None:
+    if not args.routing_logic:
+        logger.error("--routing-logic must be provided.")
+        sys.exit(1)
+    if not args.service_discovery:
+        logger.error("--service-discovery must be provided.")
+        sys.exit(1)
+
+
+def load_initial_config_from_config_json_if_required(
+    parser: argparse.ArgumentParser, args: argparse.Namespace
+) -> argparse.Namespace:
+    if dynamic_config := args.dynamic_config_json:
+        logger.info(f"Initial loading of dynamic config file at {dynamic_config}")
+        with open(dynamic_config, encoding="utf-8") as f:
+            parser.set_defaults(**json.load(f))
+            args = parser.parse_args()
+    return args
+
+
 # --- Argument Parsing and Initialization ---
 def validate_args(args):
+    verify_required_args_provided(args)
     if args.service_discovery == "static":
         if args.static_backends is None:
             raise ValueError(
@@ -61,7 +101,6 @@ def parse_args():
     )
     parser.add_argument(
         "--service-discovery",
-        required=True,
         type=str,
         choices=["static", "k8s"],
         help="The service discovery type.",
@@ -77,6 +116,12 @@ def parse_args():
         type=str,
         default=None,
         help="The models of static backends, separated by commas. E.g., model1,model2",
+    )
+    parser.add_argument(
+        "--static-aliases",
+        type=str,
+        default=None,
+        help="The aliases of static backends, separated by commas. E.g., your-custom-model:llama3",
     )
     parser.add_argument(
         "--k8s-port",
@@ -99,7 +144,6 @@ def parse_args():
     parser.add_argument(
         "--routing-logic",
         type=str,
-        required=True,
         choices=["roundrobin", "session", "kvaware"],
         help="The routing logic to use",
     )
@@ -224,5 +268,7 @@ def parse_args():
     )
 
     args = parser.parse_args()
+    args = load_initial_config_from_config_json_if_required(parser, args)
+
     validate_args(args)
     return args

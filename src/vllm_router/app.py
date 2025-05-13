@@ -1,3 +1,16 @@
+# Copyright 2024-2025 The vLLM Production Stack Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -66,7 +79,12 @@ from vllm_router.stats.request_stats import (
     get_request_stats_monitor,
     initialize_request_stats_monitor,
 )
-from vllm_router.utils import parse_static_model_names, parse_static_urls, set_ulimit
+from vllm_router.utils import (
+    parse_static_aliases,
+    parse_static_model_names,
+    parse_static_urls,
+    set_ulimit,
+)
 
 logger = logging.getLogger("uvicorn")
 
@@ -114,6 +132,7 @@ def initialize_all(app: FastAPI, args):
             ServiceDiscoveryType.STATIC,
             urls=parse_static_urls(args.static_backends),
             models=parse_static_model_names(args.static_models),
+            aliases=parse_static_aliases(args.static_aliases),
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
@@ -137,6 +156,16 @@ def initialize_all(app: FastAPI, args):
         app.state.batch_processor = initialize_batch_processor(
             args.batch_processor, args.file_storage_path, app.state.batch_storage
         )
+
+    # Initialize dynamic config watcher
+    if args.dynamic_config_json:
+        init_config = DynamicRouterConfig.from_args(args)
+        initialize_dynamic_config_watcher(
+            args.dynamic_config_json, 10, init_config, app
+        )
+
+    if args.callbacks:
+        initialize_custom_callbacks(args.callbacks, app)
 
     initialize_routing_logic(
         args.routing_logic,
@@ -206,16 +235,6 @@ def initialize_all(app: FastAPI, args):
     app.state.request_stats_monitor = get_request_stats_monitor()
     app.state.router = get_routing_logic()
     app.state.request_rewriter = get_request_rewriter()
-
-    # Initialize dynamic config watcher
-    if args.dynamic_config_json:
-        init_config = DynamicRouterConfig.from_args(args)
-        initialize_dynamic_config_watcher(
-            args.dynamic_config_json, 10, init_config, app
-        )
-
-    if args.callbacks:
-        initialize_custom_callbacks(args.callbacks, app)
 
 
 app = FastAPI(lifespan=lifespan)

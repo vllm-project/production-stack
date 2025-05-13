@@ -24,8 +24,7 @@ python3 -m vllm_router.app --port "$1" \
     --engine-stats-interval 10 \
     --request-stats-window 10 \
     --request-stats-window 10 \
-    --routing-logic kvaware \
-    --lmcache-controller-port 9001
+    --routing-logic roundrobin
 
 # Use this command when testing with roundrobin routing logic
 #python3 router.py --port "$1" \

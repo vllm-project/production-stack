@@ -28,6 +28,7 @@ from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
     is_request_rewriter_initialized,
 )
+from vllm_router.utils import replace_model_in_request_body, update_content_length
 
 try:
     # Semantic cache integration
@@ -195,11 +196,18 @@ async def route_general_request(
             logger.warning("Failed to parse rewritten request body as JSON")
 
     # TODO (ApostaC): merge two awaits into one
-    endpoints = get_service_discovery().get_endpoint_info()
+    service_discovery = get_service_discovery()
+    endpoints = service_discovery.get_endpoint_info()
     engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
     request_stats = request.app.state.request_stats_monitor.get_request_stats(
         time.time()
     )
+
+    aliases = getattr(service_discovery, "aliases", None)
+    if aliases and requested_model in aliases.keys():
+        requested_model = aliases[requested_model]
+        request_body = replace_model_in_request_body(request_json, requested_model)
+        update_content_length(request, request_body)
 
     endpoints = list(filter(lambda x: x.model_name == requested_model, endpoints))
     if not endpoints:
