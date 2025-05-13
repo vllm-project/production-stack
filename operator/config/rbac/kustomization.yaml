@@ -25,9 +25,13 @@ resources:
 - cacheserver_admin_role.yaml
 - cacheserver_editor_role.yaml
 - cacheserver_viewer_role.yaml
-- router_admin_role.yaml
-- router_editor_role.yaml
-- router_viewer_role.yaml
+- vllmrouter_admin_role.yaml
+- vllmrouter_editor_role.yaml
+- vllmrouter_viewer_role.yaml
 - vllmruntime_admin_role.yaml
 - vllmruntime_editor_role.yaml
 - vllmruntime_viewer_role.yaml
+# Pod viewer role is used to view pods for vllmrouter's service discovery
+- pod_viewer_role.yaml
+- vllmrouter_service_account.yaml
+- vllmrouter_role_binding.yaml

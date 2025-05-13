@@ -20,7 +20,7 @@ spec:
   lmCacheConfig:
     enabled: true
     cpuOffloadingBufferSize: "15"
-    diskOffloadingBufferSize: "8"
+    diskOffloadingBufferSize: "0"
     remoteUrl: "lm://cacheserver-sample.default.svc.cluster.local:80"
     remoteSerde: "naive"
 
