@@ -132,7 +132,11 @@ def initialize_all(app: FastAPI, args):
             ServiceDiscoveryType.STATIC,
             urls=parse_static_urls(args.static_backends),
             models=parse_static_model_names(args.static_models),
-            aliases=parse_static_aliases(args.static_aliases),
+            aliases=(
+                parse_static_aliases(args.static_aliases)
+                if args.static_aliases
+                else None
+            ),
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
