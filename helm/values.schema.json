@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
     "servingEngineSpec": {
@@ -71,7 +71,7 @@
                 "type": "string"
               },
               "requestGPU": {
-                "type": "integer"
+                "type": "number"
               },
               "requestGPUType": {
                 "type": "string"
@@ -214,11 +214,24 @@
                     },
                     "value": {
                       "type": "string"
+                    },
+                    "valueFrom": {
+                      "type": "object"
                     }
                   },
-                  "required": [
-                    "name",
-                    "value"
+                  "anyOf": [
+                    {
+                      "required": [
+                        "name",
+                        "value"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "name",
+                        "valueFrom"
+                      ]
+                    }
                   ]
                 }
               },
@@ -267,8 +280,7 @@
               "replicaCount",
               "requestCPU",
               "requestMemory",
-              "requestGPU",
-              "pvcStorage"
+              "requestGPU"
             ]
           }
         },
@@ -405,19 +417,19 @@
           "type": "integer"
         },
         "vllmApiKey": {
-           "type": "object",
-            "properties": {
-              "secretName": {
-                "type": "string"
-              },
-              "secretKey": {
-                "type": "string"
-              }
+          "type": "object",
+          "properties": {
+            "secretName": {
+              "type": "string"
             },
-            "required": [
-              "secretName",
-              "secretKey"
-            ]
+            "secretKey": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "secretName",
+            "secretKey"
+          ]
         },
         "labels": {
           "type": "object",
