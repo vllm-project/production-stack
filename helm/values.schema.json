@@ -43,6 +43,18 @@
           "items": {
             "type": "object",
             "properties": {
+              "annotations": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "podAnnotations": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
               "name": {
                 "type": "string"
               },
@@ -84,6 +96,9 @@
                 "additionalProperties": {
                   "type": "string"
                 }
+              },
+              "serviceAccountName": {
+                "type": "string"
               },
               "initContainer": {
                 "type": "object",
