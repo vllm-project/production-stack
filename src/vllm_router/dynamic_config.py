@@ -26,7 +26,11 @@ from vllm_router.service_discovery import (
     ServiceDiscoveryType,
     reconfigure_service_discovery,
 )
-from vllm_router.utils import SingletonMeta, parse_static_model_names, parse_static_urls
+from vllm_router.utils import (
+    SingletonMeta,
+    parse_comma_separated_args,
+    parse_static_urls,
+)
 
 logger = init_logger(__name__)
 
@@ -134,7 +138,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
             reconfigure_service_discovery(
                 ServiceDiscoveryType.STATIC,
                 urls=parse_static_urls(config.static_backends),
-                models=parse_static_model_names(config.static_models),
+                models=parse_comma_separated_args(config.static_models),
             )
         elif config.service_discovery == "k8s":
             reconfigure_service_discovery(
