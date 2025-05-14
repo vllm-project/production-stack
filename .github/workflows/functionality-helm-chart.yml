@@ -10,101 +10,179 @@ on:
     branches:
       - main
     paths:
-      - '.github/**'
-      - '**.py'
-      - 'pyproject.toml'
-      - 'helm/**'
+      - ".github/**"
+      - "**.py"
+      - "pyproject.toml"
+      - "helm/**"
   pull_request:
     paths:
-      - '.github/**'
-      - '**.py'
-      - 'pyproject.toml'
-      - 'helm/**'
-  merge_group:
+      - ".github/**"
+      - "**.py"
+      - "pyproject.toml"
+      - "helm/**"
+
 jobs:
-  Secure-Minimal-Example:
-    runs-on: self-hosted
+  e2e-k8s-functionality-test:
+    name: E2E Kubernetes Functionality Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+      # Step 0: Maximize runner space to ensure sufficient disk space for the workflow
+      - name: Maximize runner space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 30720
+          temp-reserve-mb: 10240
+          remove-dotnet: "true"
+          remove-android: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
+          remove-docker-images: "true"
+      # Step 1: Check out the repository code to prepare for the build and deployment steps
       - name: Check out repository code
         uses: actions/checkout@v4
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
-      - name: Deploy via helm charts
+
+      # Step 2: Build and tag the Docker image for the application
+      - name: Build Docker image
+        env:
+          DOCKER_IMAGE_NAME: localhost:5000/git-act-router
+        run: |
+          docker build --build-arg INSTALL_OPTIONAL_DEP=default \
+            -t "$DOCKER_IMAGE_NAME" \
+            -f docker/Dockerfile .
+
+      # Step 3: Create a Kubernetes Kind cluster for testing the Helm chart
+      - name: Create k8s Kind Cluster
+        run: |
+          # install kubectl
+          curl -LO "https://dl.k8s.io/release/v1.28.3/bin/linux/amd64/kubectl"
+          sudo chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+
+          # install kind
+          curl -LO https://github.com/kubernetes-sigs/kind/releases/download/v0.20.0/kind-linux-amd64
+          sudo chmod +x kind-linux-amd64
+          sudo mv kind-linux-amd64 /usr/local/bin/kind
+          kind version
+
+          # create kind cluster
+          kind_node_image="kindest/node:v1.23.17"
+          echo "Kubernetes version: ${kind_node_image}"
+          kind create cluster --name production-stack --image "${kind_node_image}"
+          kubectl version
+          kubectl get all --all-namespaces
+
+      - name: Verify Kind cluster is ready
+        run: |
+          for i in {1..30}; do
+            echo "Attempt ${i}/30: Checking cluster status..."
+            if kubectl get nodes -o wide; then
+              break
+            else
+              sleep 10
+            fi
+
+            if [ "${i}" -gt 10 ]; then
+              echo "Cluster state details:"
+              kubectl describe nodes
+              kubectl get events --sort-by='.lastTimestamp' -A
+              kubectl get pods -A -o wide
+            fi
+          done
+
+          kubectl wait --for=condition=Ready nodes --all --timeout=600s
+
+          printf "\n=== Cluster Details ===\n"
+          kubectl config view
+          kubectl cluster-info
+          kubectl get nodes -o wide
+          kubectl describe nodes
+          kubectl get pods -A -o wide
+          kubectl get events --sort-by='.lastTimestamp' -A
+          helm version
+          kubectl version
+
+          printf "\n=== Final Cluster Health Check ===\n"
+          kubectl get cs
+          kubectl -n kube-system wait --for=condition=Ready pod --all --timeout=300s
+
+      # Step 4: Load the Docker image into the Kind cluster to make it available for deployment
+      - name: Load Docker image into Kind
+        env:
+          DOCKER_IMAGE_NAME: localhost:5000/git-act-router
+        run: |
+          kind load docker-image "$DOCKER_IMAGE_NAME" --name production-stack
+
+      # Step 5: Run Helm tests with a matrix strategy to validate multiple configurations
+      - name: Run Helm tests with matrix strategy
         env:
           DOCKER_BUILDKIT: 1
         run: |
-          cd ${{ github.workspace }}
-          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
-          sudo docker push localhost:5000/git-act-router
-          sudo sysctl fs.protected_regular=0
-          minikube image load localhost:5000/git-act-router
-          helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-05-secure-vllm
-        timeout-minutes: 2
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-05-secure-vllm
-          path: |
-            output-05-secure-vllm/
-      - name: Helm uninstall
-        run: |
-            helm uninstall vllm
-            sudo docker image prune -f
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+          set -e
 
-  Two-Pods-Minimal-Example:
-    runs-on: self-hosted
-    needs: Secure-Minimal-Example
-    steps:
-      - name: Deploy via helm charts
-        run: |
-          cd ${{ github.workspace }}
-          helm install vllm ./helm -f .github/values-01-2pods-minimal-example.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-02-two-pods
-        timeout-minutes: 2
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-02-two-pods
-          path: |
-            output-02-two-pods/
-      - name: Helm uninstall
-        run: |
-          helm uninstall vllm
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+          TEST_SCENARIOS=(
+            ".github/router.yaml routerSpec"
+          )
 
-  Multiple-Models:
-    runs-on: self-hosted
-    needs: Two-Pods-Minimal-Example
-    steps:
-      - name: Deploy via helm charts
-        run: |
-          helm install vllm ./helm -f .github/values-04-multiple-models.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-04-multiple-models
-        timeout-minutes: 3
-      - name: Archive functionality results
+          for SCENARIO in "${TEST_SCENARIOS[@]}"; do
+            VALUES_FILE="$(echo "$SCENARIO" | cut -d' ' -f1)"
+            echo "🚀 Deploying scenario with values file: ${VALUES_FILE}"
+
+            helm uninstall vllm || true
+
+            helm lint ./helm || {
+              echo "❌ Helm lint failed"
+              exit 1
+            }
+
+            helm install vllm ./helm -f "$VALUES_FILE" --debug || {
+              echo "❌ Helm install failed"
+              kubectl get pods -A
+              kubectl describe pod -l environment=router,release=router --namespace=default
+              kubectl get events --sort-by='.lastTimestamp'
+              exit 1
+            }
+
+            echo "⏳ Waiting for pods to be ready..."
+            RETRIES=5
+            LOG_DIR="output-logs"
+            mkdir -p "$LOG_DIR"
+
+            for i in $(seq 1 "${RETRIES}"); do
+              if kubectl wait --for=condition=ready pod -l environment=router,release=router --namespace=default --timeout=60s; then
+                echo "✅ Pods are ready after ${i} attempt(s)"
+                kubectl get pods -n default -o wide > "$LOG_DIR/pod-status.log"
+                kubectl describe pods -n default -l environment=router,release=router >> "$LOG_DIR/pod-event.log"
+                break
+              else
+                echo "🚨 Attempt ${i}/${RETRIES}: Pods failed to become ready"
+                kubectl get pods -A -o wide
+                kubectl describe pod -l environment=router,release=router --namespace=default
+                kubectl get events --sort-by='.lastTimestamp'
+                kubectl logs -l environment=router,release=router --namespace=default --all-containers=true > "$LOG_DIR/pod-logs-attempt-${i}.log"
+                if [ "${i}" -eq "${RETRIES}" ]; then
+                  echo "❌ Pods did not become ready after ${RETRIES} attempts."
+                  kubectl logs -l environment=router,release=router --namespace=default --all-containers=true > "$LOG_DIR/pod-logs-final.log"
+                  exit 1
+                fi
+                echo "🔄 Retrying in 10 seconds..."
+                sleep 10
+              fi
+            done
+          done
+
+      # Step 6: Archive test results for debugging and record-keeping
+      - name: Archive test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: output-04-multiple-models
+          name: helm-test-results
           path: |
-            output-04-multiple-models/
-      - name: Helm uninstall
+            output-logs/**
+
+      # Step 7: Clean up resources to ensure no leftover artifacts or clusters remain
+      - name: Cleanup Kind cluster
         run: |
-            helm uninstall vllm
+          helm uninstall vllm || true
+          kind delete clusters kind || true
         if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."

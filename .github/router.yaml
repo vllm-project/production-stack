@@ -1,0 +1,11 @@
+routerSpec:
+  repository: "localhost:5000/git-act-router"
+  imagePullPolicy: "IfNotPresent"
+  enableRouter: true
+  resources:
+    requests:
+      cpu: "1"
+      memory: "6G"
+    limits:
+      cpu: "1"
+      memory: "6G"
