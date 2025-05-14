@@ -19,6 +19,7 @@ python3 -m vllm_router.app --port "$1" \
     --service-discovery static \
     --static-backends "http://10.19.20.28:8000" \
     --static-models "facebook/opt-125m" \
+    --static-model-types "chat" \
     --log-stats \
     --log-stats-interval 10 \
     --engine-stats-interval 10 \
