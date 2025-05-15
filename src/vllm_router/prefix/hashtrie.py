@@ -74,7 +74,7 @@ class HashTrie:
         Find the longest matching prefix using hashed chunks.
         Args:
             request (str): The request to find the longest matching prefix.
-            unavailable_endpoints (Set[str]): The endpoints that are unavailable.
+            available_endpoints (Set[str]): The endpoints that are available.
         """
         node = self.root
         match_length = 0
