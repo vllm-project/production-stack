@@ -19,6 +19,7 @@ import hashlib
 import os
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -45,6 +46,9 @@ class EndpointInfo:
 
     # Model names
     model_names: List[str]
+
+    # Endpoint Id
+    Id: str
 
     # Added timestamp
     added_timestamp: float
@@ -175,6 +179,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.aliases = aliases
         self.model_labels = model_labels
         self.model_types = model_types
+        self.engines_id = [str(uuid.uuid4()) for i in range(0, len(urls))]
         self.added_timestamp = int(time.time())
         self.unhealthy_endpoint_hashes = []
         if static_backend_health_checks:
@@ -248,6 +253,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
             endpoint_info = EndpointInfo(
                 url=url,
                 model_names=[model],  # Convert single model to list
+                Id=self.engines_id[i],
                 added_timestamp=self.added_timestamp,
                 model_label=model_label,
                 model_info=self._get_model_info(model),
@@ -439,6 +445,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
                 url=f"http://{engine_ip}:{self.port}",
                 model_names=model_names,
                 added_timestamp=int(time.time()),
+                Id=str(uuid.uuid5(uuid.NAMESPACE_DNS, engine_name)),
                 model_label=model_label,
                 pod_name=engine_name,
                 namespace=self.namespace,

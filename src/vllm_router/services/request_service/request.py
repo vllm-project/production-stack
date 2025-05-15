@@ -175,6 +175,11 @@ async def route_general_request(
     request_body = await request.body()
     request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
 
+    if request.query_params:
+        request_endpoint = request.query_params.get("id")
+    else:
+        request_endpoint = None
+
     if hasattr(request.app.state, "callbacks") and (
         response_overwrite := request.app.state.callbacks.pre_request(
             request, request_body, request_json
@@ -206,10 +211,6 @@ async def route_general_request(
     # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
-    engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
-    request_stats = request.app.state.request_stats_monitor.get_request_stats(
-        time.time()
-    )
 
     aliases = getattr(service_discovery, "aliases", None)
     if aliases and requested_model in aliases.keys():
@@ -217,15 +218,33 @@ async def route_general_request(
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
 
-    # Filter endpoints that have the requested model
-    endpoints = list(filter(lambda x: requested_model in x.model_names, endpoints))
+    if not request_endpoint:
+        endpoints = list(filter(lambda x: requested_model in x.model_names, endpoints))
+        engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
+        request_stats = request.app.state.request_stats_monitor.get_request_stats(
+            time.time()
+        )
+    else:
+        endpoints = list(
+            filter(
+                lambda x: requested_model in x.model_names and x.Id == request_endpoint,
+                endpoints,
+            )
+        )
+
     if not endpoints:
         return JSONResponse(
             status_code=400, content={"error": f"Model {requested_model} not found."}
         )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
-    if isinstance(request.app.state.router, KvawareRouter) or isinstance(
+    if request_endpoint:
+        server_url = endpoints[0].url
+        logger.debug(
+            f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
+        )
+
+    elif isinstance(request.app.state.router, KvawareRouter) or isinstance(
         request.app.state.router, PrefixAwareRouter
     ):
         server_url = await request.app.state.router.route_request(
@@ -235,6 +254,7 @@ async def route_general_request(
         server_url = request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request
         )
+
     curr_time = time.time()
     logger.info(
         f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
