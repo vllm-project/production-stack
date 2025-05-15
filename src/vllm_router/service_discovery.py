@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import abc
+import asyncio
 import enum
+import hashlib
 import os
 import threading
 import time
@@ -23,6 +25,7 @@ from typing import Dict, List, Optional
 import requests
 from kubernetes import client, config, watch
 
+from vllm_router import utils
 from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
@@ -86,6 +89,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         aliases: List[str] | None,
         model_labels: List[str] | None,
         model_types: List[str] | None,
+        static_backend_health_checks: bool,
     ):
         assert len(urls) == len(models), "URLs and models should have the same length"
         self.urls = urls
@@ -94,6 +98,37 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.model_labels = model_labels
         self.model_types = model_types
         self.added_timestamp = int(time.time())
+        self.unhealthy_endpoint_hashes = []
+        if static_backend_health_checks:
+            self.start_health_check_task()
+
+    def get_unhealthy_endpoint_hashes(self) -> list[str]:
+        unhealthy_endpoints = []
+        for url, model, model_type in zip(self.urls, self.models, self.model_types):
+            if utils.is_model_healthy(url, model, model_type):
+                logger.debug(f"{model} at {url} is healthy")
+            else:
+                logger.warning(f"{model} at {url} not healthy!")
+                unhealthy_endpoints.append(self.get_model_endpoint_hash(url, model))
+        return unhealthy_endpoints
+
+    async def check_model_health(self):
+        while True:
+            try:
+                self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
+                time.sleep(60)
+            except Exception as e:
+                logger.error(e)
+
+    def start_health_check_task(self) -> None:
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+        self.thread.start()
+        asyncio.run_coroutine_threadsafe(self.check_model_health(), self.loop)
+        logger.info("Health check thread started")
+
+    def get_model_endpoint_hash(self, url: str, model: str) -> str:
+        return hashlib.md5(f"{url}{model}".encode()).hexdigest()
 
     def get_endpoint_info(self) -> List[EndpointInfo]:
         """
@@ -103,18 +138,16 @@ class StaticServiceDiscovery(ServiceDiscovery):
         Returns:
             a list of engine URLs
         """
-        if self.model_labels is None:
-            endpoint_infos = [
-                EndpointInfo(url, model, self.added_timestamp, "default")
-                for url, model in zip(self.urls, self.models)
-            ]
-        else:
-            endpoint_infos = [
-                EndpointInfo(url, model, self.added_timestamp, model_label)
-                for url, model, model_label in zip(
-                    self.urls, self.models, self.model_labels
-                )
-            ]
+        if not self.model_labels:
+            self.model_labels = ["default"] * len(self.models)
+        endpoint_infos = [
+            EndpointInfo(url, model, self.added_timestamp, model_label)
+            for url, model, model_label in zip(
+                self.urls, self.models, self.model_labels
+            )
+            if self.get_model_endpoint_hash(url, model)
+            not in self.unhealthy_endpoint_hashes
+        ]
         return endpoint_infos
 
 
