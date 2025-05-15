@@ -26,5 +26,5 @@ sudo apt-get install -y cri-o
 sudo systemctl start crio.service
 
 # Install CNI (container network interface) plugins
-wget https://raw.githubusercontent.com/cri-o/cri-o/refs/heads/main/contrib/cni/10-crio-bridge.conflist
-sudo cp 10-crio-bridge.conflist /etc/cni/net.d
+wget https://raw.githubusercontent.com/cri-o/cri-o/refs/heads/main/contrib/cni/11-crio-ipv4-bridge.conflist
+sudo cp 11-crio-ipv4-bridge.conflist /etc/cni/net.d
