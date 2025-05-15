@@ -142,6 +142,7 @@ def initialize_all(app: FastAPI, args):
                 if args.static_model_types
                 else None
             ),
+            endpoint_health_check_enabled=args.static_backend_health_checks,
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(

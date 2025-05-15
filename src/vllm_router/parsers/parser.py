@@ -77,6 +77,10 @@ def validate_args(args):
             raise ValueError(
                 "Static models must be provided when using static service discovery."
             )
+        if args.static_backend_health_checks and args.static_model_types is None:
+            raise ValueError(
+                "Static model types must be provided when using the backend healthcheck."
+            )
     if args.service_discovery == "k8s" and args.k8s_port is None:
         raise ValueError("K8s port must be provided when using K8s service discovery.")
     if args.routing_logic == "session" and args.session_key is None:

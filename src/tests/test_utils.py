@@ -2,6 +2,7 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 from starlette.datastructures import MutableHeaders
 
 from vllm_router import utils
@@ -76,3 +77,27 @@ def test_parse_comma_separated_args_when_comma_separated_list_supplied_returns_l
 def test_get_test_payload_returns_values_for_known_types() -> None:
     for model_type in utils.ModelType:
         assert isinstance(utils.ModelType.get_test_payload(model_type.name), dict)
+
+
+def test_is_model_healthy_when_requests_responds_with_status_code_200_returns_true(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request_mock = MagicMock(return_value=MagicMock(status_code=200))
+    monkeypatch.setattr("requests.post", request_mock)
+    assert utils.is_model_healthy("http://localhost", "test", "chat") is True
+
+
+def test_is_model_healthy_when_requests_raises_exception_returns_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request_mock = MagicMock(side_effect=requests.exceptions.ReadTimeout)
+    monkeypatch.setattr("requests.post", request_mock)
+    assert utils.is_model_healthy("http://localhost", "test", "chat") is False
+
+
+def test_is_model_healthy_when_requests_status_with_status_code_not_200_returns_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request_mock = MagicMock(return_value=MagicMock(status_code=500))
+    monkeypatch.setattr("requests.post", request_mock)
+    assert utils.is_model_healthy("http://localhost", "test", "chat") is False

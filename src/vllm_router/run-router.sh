@@ -17,13 +17,10 @@ fi
 # Use this command when testing with static service discovery
 python3 -m vllm_router.app --port "$1" \
     --service-discovery static \
-    --static-backends "http://10.19.20.28:8000" \
-    --static-models "facebook/opt-125m" \
-    --log-stats \
-    --log-stats-interval 10 \
-    --engine-stats-interval 10 \
-    --request-stats-window 10 \
-    --request-stats-window 10 \
+    --static-backends "http://127.0.0.1:11434,http://127.0.0.1:11434,http://127.0.0.1:11434,http://127.0.0.1:11434" \
+    --static-models "qwen3,tinyllama,starcoder2,bge-m3" \
+    --static-model-types "chat,chat,completion,embeddings" \
+    --static-endpoint-healthcheck-enabled \
     --routing-logic roundrobin
 
 # Use this command when testing with roundrobin routing logic

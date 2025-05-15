@@ -4,6 +4,7 @@ import json
 import re
 import resource
 
+import requests
 from fastapi.requests import Request
 from starlette.datastructures import MutableHeaders
 
@@ -59,11 +60,11 @@ class ModelType(enum.Enum):
                         {
                             "role": "user",
                             "content": "Hello",
-                            "temperature": 0.0,
-                            "max_tokens": 3,
-                            "max_completion_tokens": 3,
                         }
                     ],
+                    "temperature": 0.0,
+                    "max_tokens": 3,
+                    "max_completion_tokens": 3,
                 }
             case ModelType.completion:
                 return {"prompt": "Hello"}
@@ -147,3 +148,18 @@ def update_content_length(request: Request, request_body: str):
     headers = MutableHeaders(request.headers)
     headers["Content-Length"] = str(len(request_body))
     request._headers = headers
+
+
+def is_model_healthy(url: str, model: str, model_type: str) -> bool:
+    model_details = ModelType[model_type]
+    try:
+        response = requests.post(
+            f"{url}{model_details.value}",
+            headers={"Content-Type": "application/json"},
+            json={"model": model} | model_details.get_test_payload(model_type),
+            timeout=30,
+        )
+    except Exception as e:
+        logger.error(e)
+        return False
+    return response.status_code == 200
