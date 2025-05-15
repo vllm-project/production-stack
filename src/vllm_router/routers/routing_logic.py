@@ -356,12 +356,8 @@ def initialize_routing_logic(
         router.start_kv_manager()
         return router
     elif routing_logic == RoutingLogic.PREFIXAWARE:
-        try:
-            logger.info("Initializing prefix-aware routing logic")
-            return PrefixAwareRouter()
-        except Exception as e:
-            logger.error(f"Error initializing prefix-aware routing logic: {e}")
-            raise e
+        logger.info("Initializing prefix-aware routing logic")
+        return PrefixAwareRouter()
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
