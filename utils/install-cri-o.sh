@@ -1,6 +1,8 @@
 #!/bin/bash
 
 # Refer to https://github.com/cri-o/packaging/blob/main/README.md#distributions-using-deb-packages
+# and
+# https://github.com/cri-o/cri-o/blob/main/contrib/cni/README.md#configuration-directory
 # for more information.
 
 # Install the dependencies for adding repositories
@@ -22,3 +24,7 @@ sudo apt-get install -y cri-o
 
 # Start CRI-O
 sudo systemctl start crio.service
+
+# Install CNI (container network interface) plugins
+wget https://raw.githubusercontent.com/cri-o/cri-o/refs/heads/main/contrib/cni/10-crio-bridge.conflist
+sudo cp 10-crio-bridge.conflist /etc/cni/net.d

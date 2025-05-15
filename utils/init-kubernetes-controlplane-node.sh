@@ -34,3 +34,7 @@ sudo kubeadm init --cri-socket=unix:///var/run/crio/crio.sock
 # kubeadm join <YOUR_CONTROL_PLANE_NODE_IP> --token <YOUR_GENERATED_TOKEN> \
 #         --discovery-token-ca-cert-hash <YOUR_GENERATED_CA_CERT_HASH>
 # --------------------------------------------------------------------------------
+
+# Make sure to save the following command from your output:
+# sudo kubeadm join <YOUR_CONTROL_PLANE_NODE_IP> --token <YOUR_GENERATED_TOKEN> \
+#         --discovery-token-ca-cert-hash <YOUR_GENERATED_CA_CERT_HASH> --cri-socket=unix:///var/run/crio/crio.sock
