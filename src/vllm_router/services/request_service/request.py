@@ -216,8 +216,9 @@ async def route_general_request(
         )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
-    if isinstance(request.app.state.router, KvawareRouter) \
-        or isinstance(request.app.state.router, PrefixAwareRouter):
+    if isinstance(request.app.state.router, KvawareRouter) or isinstance(
+        request.app.state.router, PrefixAwareRouter
+    ):
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
         )

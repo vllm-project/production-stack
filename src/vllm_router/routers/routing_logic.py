@@ -15,11 +15,10 @@
 import abc
 import asyncio
 import enum
+import random
 import socket
 import threading
 from typing import Dict, List
-
-import random
 
 import requests
 from fastapi import Request
@@ -300,6 +299,7 @@ class PrefixAwareRouter(RoutingInterface):
         if hasattr(self, "_initialized"):
             return
         from vllm_router.prefix.hashtrie import HashTrie
+
         self.hashtrie = HashTrie()
         self._initialized = True
 
@@ -312,7 +312,7 @@ class PrefixAwareRouter(RoutingInterface):
         request_json: Dict,
     ) -> str:
         """
-        Route the request to the appropriate engine URL by where the longest 
+        Route the request to the appropriate engine URL by where the longest
         prefix match is found.
 
         In this routing logic, we do not consider the eviction of prefix cache.
@@ -330,7 +330,8 @@ class PrefixAwareRouter(RoutingInterface):
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
         matched_length, matched_endpoint = self.hashtrie.longest_prefix_match(
-            request_json["prompt"], available_endpoints)
+            request_json["prompt"], available_endpoints
+        )
 
         selected_endpoint = random.choice(list(matched_endpoint))
 

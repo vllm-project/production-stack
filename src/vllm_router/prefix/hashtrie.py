@@ -91,8 +91,7 @@ class HashTrie:
                     break
 
                 match_length += self.chunk_size
-                selected_endpoints = node.endpoints.intersection(
-                    selected_endpoints)
+                selected_endpoints = node.endpoints.intersection(selected_endpoints)
             else:
                 break
 
