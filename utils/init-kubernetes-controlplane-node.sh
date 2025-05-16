@@ -4,11 +4,21 @@
 # for more information.
 # This script will create a Kubernetes cluster using kubeadm.
 
+# IMPORTANT: THIS STEP IS REQUIRED FOR CNI SETUP VIA CALICO
+
 # Look for a line starting with "default via"
+# For example: default via 10.128.0.1 dev ens5
 ip route show
 
+# Or get your network interface's ip address using the following command:
+export K8S_NET_IP=$(ip addr show dev $(ip route show | awk '/^default/ {print $5}') | awk '/inet / {print $2}' | cut -d/ -f1)
+echo "K8S_NET_IP=${K8S_NET_IP}"
+
 # On one of your nodes which to become a control node, execute following command:
-sudo kubeadm init --cri-socket=unix:///var/run/crio/crio.sock
+sudo kubeadm init \
+    --cri-socket=unix:///var/run/crio/crio.sock \
+    --apiserver-advertise-address=${K8S_NET_IP} \
+    --pod-network-cidr=192.168.0.0/16
 
 # The output will look like this:
 # --------------------------------------------------------------------------------
