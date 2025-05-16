@@ -124,6 +124,12 @@ def parse_args():
         help="The aliases of static backends, separated by commas. E.g., your-custom-model:llama3",
     )
     parser.add_argument(
+        "--static-model-types",
+        type=str,
+        default=None,
+        help="Specify the static model types of each model. This is used for the backend health check, separated by commas. E.g. chat,embeddings,rerank",
+    )
+    parser.add_argument(
         "--k8s-port",
         type=int,
         default=8000,
