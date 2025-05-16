@@ -36,10 +36,10 @@ def test_route_request_with_session_id():
     request = Request(headers={"session_id": "abc123"})
 
     router = SessionRouter(session_key="session_id")
-    url = router.route_request(endpoints, None, request_stats, request)
+    url = router.route_request(endpoints, None, request_stats, request)[0]
 
     # Ensure the same session ID always maps to the same endpoint
-    assert url == router.route_request(endpoints, None, request_stats, request)
+    assert url == router.route_request(endpoints, None, request_stats, request)[0]
 
 
 def test_route_request_without_session_id():
@@ -57,7 +57,7 @@ def test_route_request_without_session_id():
     request = Request(headers={})  # No session ID
 
     router = SessionRouter(session_key="session_id")
-    url = router.route_request(endpoints, None, request_stats, request)
+    url = router.route_request(endpoints, None, request_stats, request)[0]
 
     # Ensure the endpoint with the lowest QPS is selected
     assert url == "http://engine2.com"
@@ -78,12 +78,12 @@ def test_route_request_with_dynamic_endpoints():
     request = Request(headers={"session_id": "abc123"})
 
     router = SessionRouter(session_key="session_id")
-    url1 = router.route_request(endpoints, None, request_stats, request)
+    url1 = router.route_request(endpoints, None, request_stats, request)[0]
 
     # Add a new endpoint
     endpoints.append(EndpointInfo(url="http://engine3.com"))
     request_stats["http://engine3.com"] = RequestStats(qps=2)
-    url2 = router.route_request(endpoints, None, request_stats, request)
+    url2 = router.route_request(endpoints, None, request_stats, request)[0]
 
     # Ensure the session ID is still mapped to a valid endpoint
     assert url2 in [endpoint.url for endpoint in endpoints]
@@ -110,7 +110,7 @@ def test_consistent_hashing_remove_node_multiple_sessions():
 
     # Route with initial endpoints
     urls_before = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        router.route_request(endpoints, None, request_stats, req)[0] for req in requests
     ]
 
     # Remove an endpoint
@@ -119,9 +119,8 @@ def test_consistent_hashing_remove_node_multiple_sessions():
 
     # Route with the updated endpoints
     urls_after = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        router.route_request(endpoints, None, request_stats, req)[0] for req in requests
     ]
-
     # Ensure all session IDs are still mapped to valid endpoints
     assert all(url in [endpoint.url for endpoint in endpoints] for url in urls_after)
 
@@ -155,7 +154,7 @@ def test_consistent_hashing_add_node_multiple_sessions():
 
     # Route with initial endpoints
     urls_before = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        router.route_request(endpoints, None, request_stats, req)[0] for req in requests
     ]
 
     # Add a new endpoint
@@ -165,7 +164,7 @@ def test_consistent_hashing_add_node_multiple_sessions():
 
     # Route with the updated endpoints
     urls_after = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        router.route_request(endpoints, None, request_stats, req)[0] for req in requests
     ]
 
     # Ensure all session IDs are still mapped to valid endpoints
@@ -201,7 +200,7 @@ def test_consistent_hashing_add_then_remove_node():
 
     # Route with initial endpoints
     urls_before_add = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        router.route_request(endpoints, None, request_stats, req)[0] for req in requests
     ]
 
     # Add a new endpoint
@@ -211,7 +210,7 @@ def test_consistent_hashing_add_then_remove_node():
 
     # Route with the updated endpoints (after adding)
     urls_after_add = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        router.route_request(endpoints, None, request_stats, req)[0] for req in requests
     ]
 
     # Ensure all session IDs are still mapped to valid endpoints
@@ -233,7 +232,7 @@ def test_consistent_hashing_add_then_remove_node():
 
     # Route with the updated endpoints (after removing)
     urls_after_remove = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        router.route_request(endpoints, None, request_stats, req)[0] for req in requests
     ]
 
     # Ensure all session IDs are still mapped to valid endpoints
@@ -258,3 +257,27 @@ def test_consistent_hashing_add_then_remove_node():
     print(
         f"{unaffected_count} out of {len(session_ids)} session IDs were unaffected by adding and removing a node."
     )
+
+
+def test_n_candidates():
+    """
+    Test the candidates returned by the router without session id should be sorted.
+    """
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+        EndpointInfo(url="http://engine3.com"),
+    ]
+    request_stats = {
+        "http://engine1.com": RequestStats(qps=10),
+        "http://engine2.com": RequestStats(qps=5),
+        "http://engine3.com": RequestStats(qps=2),
+    }
+    request = Request(headers={})  # No session ID
+
+    router = SessionRouter(session_key="session_id")
+    # Route with 2 candidates.
+    candidates = router.route_request(endpoints, None, request_stats, request, 2)
+
+    # Ensure the candidates are sorted by QPS
+    assert candidates == ["http://engine3.com", "http://engine2.com"]

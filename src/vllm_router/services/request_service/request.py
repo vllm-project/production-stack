@@ -55,6 +55,7 @@ except ImportError:
 
 
 logger = init_logger(__name__)
+CONST_DEFAULT_RETRY_TIMES = 3
 
 
 async def process_request(
@@ -214,7 +215,7 @@ async def route_general_request(
         return JSONResponse(
             status_code=400, content={"error": f"Model {requested_model} not found."}
         )
-
+    n_candidates = CONST_DEFAULT_RETRY_TIMES
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
     if isinstance(request.app.state.router, KvawareRouter) or isinstance(
         request.app.state.router, PrefixAwareRouter
@@ -222,26 +223,43 @@ async def route_general_request(
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
         )
+        server_urls = [server_url]
     else:
-        server_url = request.app.state.router.route_request(
-            endpoints, engine_stats, request_stats, request
+        server_urls = request.app.state.router.route_request(
+            endpoints, engine_stats, request_stats, request, n_candidates
         )
     curr_time = time.time()
     logger.info(
-        f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+        f"Routing request {request_id} to {server_urls} at {curr_time} with retry times {CONST_DEFAULT_RETRY_TIMES}, process time = {curr_time - in_router_time:.4f}"
     )
-    stream_generator = process_request(
-        request,
-        request_body,
-        server_url,
-        request_id,
-        endpoint,
-        background_tasks,
-    )
-    headers, status_code = await anext(stream_generator)
-    return StreamingResponse(
-        stream_generator,
-        status_code=status_code,
-        headers={key: value for key, value in headers.items()},
-        media_type="text/event-stream",
-    )
+    # Retry over the server_urls, the server_urls can be overlapped.
+    for attempt in range(CONST_DEFAULT_RETRY_TIMES):
+        try:
+            server_url = server_urls[attempt % len(server_urls)]
+            logger.info(
+                f"Attempt {attempt + 1} to route request {request_id} to {server_url}"
+            )
+            stream_generator = process_request(
+                request,
+                request_body,
+                server_url,
+                request_id,
+                endpoint,
+                background_tasks,
+            )
+            headers, status_code = await anext(stream_generator)
+            # If the status_code is 5xx, retry the request.
+            if status_code >= 500:
+                logger.warning(
+                    f"Request {request_id} failed with status code {status_code}, retrying..."
+                )
+                continue
+            return StreamingResponse(
+                stream_generator,
+                status_code=status_code,
+                headers={key: value for key, value in headers.items()},
+                media_type="text/event-stream",
+            )
+        # TODO: Handle the timeout. Currently there is no timeout for the connection.
+        except Exception as e:
+            logger.error(f"Error routing request {request_id} to {server_url}: {e}")
