@@ -1,12 +1,11 @@
 #!/bin/bash
 
-sudo swapoff -a
-sudo modprobe br_netfilter
-sudo sysctl -w net.ipv4.ip_forward=1
-
 # Refer to https://v1-32.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
 # for more information.
 # This script will create a Kubernetes cluster using kubeadm.
+
+# Look for a line starting with "default via"
+ip route show
 
 # On one of your nodes which to become a control node, execute following command:
 sudo kubeadm init --cri-socket=unix:///var/run/crio/crio.sock
