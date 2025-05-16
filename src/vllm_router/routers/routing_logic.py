@@ -329,13 +329,13 @@ class PrefixAwareRouter(RoutingInterface):
         """
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
-        matched_length, matched_endpoint = self.hashtrie.longest_prefix_match(
+        _, matched_endpoint = await self.hashtrie.longest_prefix_match(
             request_json["prompt"], available_endpoints
         )
 
         selected_endpoint = random.choice(list(matched_endpoint))
 
-        self.hashtrie.insert(request_json["prompt"], selected_endpoint)
+        await self.hashtrie.insert(request_json["prompt"], selected_endpoint)
 
         return selected_endpoint
 

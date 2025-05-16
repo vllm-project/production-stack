@@ -14,8 +14,8 @@
 
 import logging
 import random
-from collections import defaultdict
 from typing import Any, Dict, Generator, Set, Tuple
+import asyncio
 
 import xxhash
 
@@ -25,8 +25,12 @@ logger = logging.getLogger(__name__)
 class TrieNode:
     def __init__(self):
         self.children = {}
-        self.is_end = False
         self.endpoints = set()
+
+        # assign a lock for each trie node.
+        # this assures that each node will only be accessed by one co-routine
+        # at a time.
+        self.lock = asyncio.Lock()
 
 
 class HashTrie:
@@ -45,13 +49,14 @@ class HashTrie:
         Args:
             request (str): The request to chunk and hash.
         Returns:
-            Generator[int, None, None]: A generator that yields hashes of 32-character chunks.
+            Generator[int, None, None]: A generator that yields a hash for each
+            chunk.
         """
 
         for i in range(0, len(request), self.chunk_size):
             yield xxhash.xxh64(request[i : i + self.chunk_size]).intdigest()
 
-    def insert(self, request: str, endpoint: str) -> None:
+    async def insert(self, request: str, endpoint: str) -> None:
         """
         Insert the request and endpoint into the trie.
         Args:
@@ -61,13 +66,13 @@ class HashTrie:
         node = self.root
         node.endpoints.add(endpoint)
         for chunk_hash in self._chunk_and_hash(request):
-            if chunk_hash not in node.children:
-                node.children[chunk_hash] = TrieNode()
-            node = node.children[chunk_hash]
+            async with node.lock:
+                if chunk_hash not in node.children:
+                    node.children[chunk_hash] = TrieNode()
+                node = node.children[chunk_hash]
             node.endpoints.add(endpoint)
-        node.is_end = True
 
-    def longest_prefix_match(
+    async def longest_prefix_match(
         self, request: str, available_endpoints: Set[str] = set()
     ) -> Tuple[int, Set[str]]:
         """
@@ -82,17 +87,18 @@ class HashTrie:
         selected_endpoints = available_endpoints
 
         for i, chunk_hash in enumerate(chunk_hashes):
-            if chunk_hash in node.children:
+            async with node.lock:
+                if chunk_hash in node.children:
 
-                node = node.children[chunk_hash]
+                    node = node.children[chunk_hash]
 
-                # reached longest prefix match in currently-available endpoints.
-                if not node.endpoints.intersection(selected_endpoints):
+                    # reached longest prefix match in currently-available endpoints.
+                    if not node.endpoints.intersection(selected_endpoints):
+                        break
+
+                    match_length += self.chunk_size
+                    selected_endpoints = node.endpoints.intersection(selected_endpoints)
+                else:
                     break
-
-                match_length += self.chunk_size
-                selected_endpoints = node.endpoints.intersection(selected_endpoints)
-            else:
-                break
 
         return match_length, selected_endpoints
