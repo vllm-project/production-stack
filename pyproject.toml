@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
 ]
-# Should be the same as src/router/requirements.txt
+# Should be the same as src/vllm_router/requirements.txt
 dependencies = [
     "aiofiles==24.1.0",
     "fastapi==0.115.8",
@@ -22,6 +22,7 @@ dependencies = [
     "sentry-sdk[fastapi,httpx]==2.27.0",
     "uhashring==2.3",
     "uvicorn==0.34.0",
+    "xxhash==3.5.0",
 ]
 
 [project.scripts]

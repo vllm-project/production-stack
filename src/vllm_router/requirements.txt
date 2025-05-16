@@ -8,3 +8,4 @@ python-multipart==0.0.20
 sentry-sdk[fastapi,httpx]==2.27.0
 uhashring==2.3
 uvicorn==0.34.0
+xxhash==3.5.0

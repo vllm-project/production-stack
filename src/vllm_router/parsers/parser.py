@@ -144,7 +144,7 @@ def parse_args():
     parser.add_argument(
         "--routing-logic",
         type=str,
-        choices=["roundrobin", "session", "kvaware"],
+        choices=["roundrobin", "session", "kvaware", "prefixaware"],
         help="The routing logic to use",
     )
     parser.add_argument(

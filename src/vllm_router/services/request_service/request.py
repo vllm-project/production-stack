@@ -22,7 +22,7 @@ from fastapi import BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from vllm_router.log import init_logger
-from vllm_router.routers.routing_logic import KvawareRouter
+from vllm_router.routers.routing_logic import KvawareRouter, PrefixAwareRouter
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
@@ -216,7 +216,9 @@ async def route_general_request(
         )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
-    if isinstance(request.app.state.router, KvawareRouter):
+    if isinstance(request.app.state.router, KvawareRouter) or isinstance(
+        request.app.state.router, PrefixAwareRouter
+    ):
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
         )
