@@ -46,6 +46,7 @@ class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
     KVAWARE = "kvaware"
+    DISAGGREGATED_PREFILL = "disaggregated_prefill"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -285,6 +286,49 @@ class KvawareRouter(RoutingInterface):
             return self.instance_id_to_ip[instance_id.best_instance_id]
 
 
+class DisaggregatedPrefillRouter(RoutingInterface):
+    """
+    Route the request to the appropriate engine URL by handling prefill and decode operations sequentially.
+    First request goes to prefill endpoint, then second request goes to decode endpoint.
+    """
+
+    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
+        self.prefill_model_labels = prefill_model_labels
+        self.decode_model_labels = decode_model_labels
+        self.request_cache = {}  # Cache to store prefill results
+
+    def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        """
+        Route the request to appropriate endpoints for prefill and decode operations.
+        First request goes to prefill endpoint, then second request goes to decode endpoint.
+        """
+        # Find prefill and decode endpoints
+        is_prefill = request_json.get("max_tokens", 0) == 1
+        if is_prefill:
+            logger.info("Prefill request")
+        else:
+            logger.info("Decode request")
+
+        # Find endpoints with matching model labels
+        prefiller_endpoints = [
+            e for e in endpoints if e.model_label in self.prefill_model_labels
+        ]
+        decoder_endpoints = [
+            e for e in endpoints if e.model_label in self.decode_model_labels
+        ]
+        if is_prefill:
+            return prefiller_endpoints[0].url
+        else:
+            return decoder_endpoints[0].url
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -300,6 +344,11 @@ def initialize_routing_logic(
         router = KvawareRouter(kwargs.get("lmcache_controller_port"))
         router.start_kv_manager()
         return router
+    elif routing_logic == RoutingLogic.DISAGGREGATED_PREFILL:
+        logger.info("Initializing disaggregated prefill routing logic")
+        return DisaggregatedPrefillRouter(
+            kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
+        )
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -308,7 +357,12 @@ def reconfigure_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
     # Remove the existing routers from the singleton registry
-    for cls in (SessionRouter, RoundRobinRouter, KvawareRouter):
+    for cls in (
+        SessionRouter,
+        RoundRobinRouter,
+        KvawareRouter,
+        DisaggregatedPrefillRouter,
+    ):
         if cls in SingletonABCMeta._instances:
             del SingletonABCMeta._instances[cls]
     return initialize_routing_logic(routing_logic, *args, **kwargs)
@@ -316,7 +370,12 @@ def reconfigure_routing_logic(
 
 def get_routing_logic() -> RoutingInterface:
     # Look up in our singleton registry which router (if any) has been created.
-    for cls in (SessionRouter, RoundRobinRouter, KvawareRouter):
+    for cls in (
+        SessionRouter,
+        RoundRobinRouter,
+        KvawareRouter,
+        DisaggregatedPrefillRouter,
+    ):
         if cls in SingletonABCMeta._instances:
             return cls()
     raise ValueError("The global router has not been initialized")

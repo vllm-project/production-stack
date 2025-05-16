@@ -161,7 +161,11 @@ async def route_general_request(
     Returns:
         StreamingResponse: A response object that streams data from the backend server to the client.
     """
-
+    if request.app.state.disaggregated_prefill:
+        response = await route_disaggregated_prefill_request(
+            request, endpoint, background_tasks
+        )
+        return response
     in_router_time = time.time()
     request_id = str(uuid.uuid4())
     request_body = await request.body()
@@ -239,6 +243,93 @@ async def route_general_request(
     headers, status_code = await anext(stream_generator)
     return StreamingResponse(
         stream_generator,
+        status_code=status_code,
+        headers={key: value for key, value in headers.items()},
+        media_type="text/event-stream",
+    )
+
+
+async def route_disaggregated_prefill_request(
+    request: Request,
+    endpoint: str,
+    background_tasks: BackgroundTasks,
+):
+    in_router_time = time.time()
+    request_id = str(uuid.uuid4())
+    request_body = await request.body()
+    request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+
+    if hasattr(request.app.state, "callbacks") and (
+        response_overwrite := request.app.state.callbacks.pre_request(
+            request, request_body, request_json
+        )
+    ):
+        return response_overwrite
+
+    requested_model = request_json.get("model", None)
+    if requested_model is None:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: missing 'model' in request body."},
+        )
+
+    # Apply request rewriting if enabled
+    if is_request_rewriter_initialized():
+        rewriter = get_request_rewriter()
+        rewritten_body = rewriter.rewrite_request(
+            request_body, requested_model, endpoint
+        )
+        logger.info(f"Request for model {requested_model} was rewritten")
+        request_body = rewritten_body
+        # Update request_json if the body was rewritten
+        try:
+            request_json = json.loads(request_body)
+        except:
+            logger.warning("Failed to parse rewritten request body as JSON")
+
+    # TODO (ApostaC): merge two awaits into one
+    endpoints = get_service_discovery().get_endpoint_info()
+    engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
+    request_stats = request.app.state.request_stats_monitor.get_request_stats(
+        time.time()
+    )
+
+    endpoints = list(filter(lambda x: x.model_name == requested_model, endpoints))
+    if not endpoints:
+        return JSONResponse(
+            status_code=400, content={"error": f"Model {requested_model} not found."}
+        )
+    orig_max_tokens = request_json.get("max_tokens", 0)
+    request_json["max_tokens"] = 1
+    server_url = request.app.state.router.route_request(
+        endpoints, engine_stats, request_stats, request, request_json
+    )
+    print(f"Server URL: {server_url}")
+    prefiller_response = process_request(
+        request,
+        request_body,
+        server_url,
+        request_id,
+        endpoint,
+        background_tasks,
+    )
+    headers, status_code = await anext(prefiller_response)
+    request_json["max_tokens"] = orig_max_tokens
+    server_url = request.app.state.router.route_request(
+        endpoints, engine_stats, request_stats, request, request_json
+    )
+    print(f"Server URL: {server_url}")
+    decoder_response = process_request(
+        request,
+        request_body,
+        server_url,
+        request_id,
+        endpoint,
+        background_tasks,
+    )
+    headers, status_code = await anext(decoder_response)
+    return StreamingResponse(
+        decoder_response,
         status_code=status_code,
         headers={key: value for key, value in headers.items()},
         media_type="text/event-stream",
