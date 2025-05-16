@@ -22,25 +22,22 @@ echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://download.o
 sudo apt-get update
 sudo apt-get install -y cri-o
 
+# Update crio config by creating (or editing) /etc/crio/crio.conf
+sudo tee /etc/crio/crio.conf > /dev/null <<EOF
+[crio.image]
+pause_image="registry.k8s.io/pause:3.10"
+
+[crio.runtime]
+conmon_cgroup = "pod"
+cgroup_manager = "systemd"
+EOF
+
 # Start CRI-O
 sudo systemctl start crio.service
 
 sudo swapoff -a
 sudo modprobe br_netfilter
 sudo sysctl -w net.ipv4.ip_forward=1
-
-# Update crio config by creating (or editing) /etc/crio/crio.conf
-# sudo vi /etc/crio/crio.conf
-# [crio.image]
-# pause_image="registry.k8s.io/pause:3.10"
-# [crio.runtime]
-# conmon_cgroup = "pod"
-# cgroup_manager = "systemd"
-
-# sysctl params required by setup, params persist across reboots
-cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
-net.ipv4.ip_forward = 1
-EOF
 
 # Apply sysctl params without reboot
 sudo sysctl --system
