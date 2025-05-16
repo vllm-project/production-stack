@@ -1,0 +1,60 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: VLLMRouter
+metadata:
+  labels:
+    app.kubernetes.io/name: production-stack
+    app.kubernetes.io/managed-by: kustomize
+  name: vllmrouter-sample
+spec:
+  # Enable the router deployment
+  enableRouter: true
+
+  # Number of router replicas
+  replicas: 1
+
+  # Service discovery method (k8s or static)
+  serviceDiscovery: k8s
+
+  # Label selector for vLLM runtime pods
+  k8sLabelSelector: "app=vllmruntime-sample"
+
+  # Routing strategy (roundrobin or session)
+  routingLogic: roundrobin
+
+  # Engine statistics collection interval
+  engineScrapeInterval: 30
+
+  # Request statistics window
+  requestStatsWindow: 60
+
+  # Container port for the router service
+  port: 80
+
+  # Service account name
+  serviceAccountName: vllmrouter-sa
+
+  # Image configuration
+  image:
+    registry: docker.io
+    name: lmcache/lmstack-router
+    pullPolicy: IfNotPresent
+
+  # Resource requirements
+  resources:
+    cpu: "2"
+    memory: "8Gi"
+
+  # Environment variables
+  env:
+    - name: LOG_LEVEL
+      value: "info"
+    - name: METRICS_ENABLED
+      value: "true"
+
+  # Node selector for pod scheduling
+  nodeSelectorTerms:
+    - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+            - linux

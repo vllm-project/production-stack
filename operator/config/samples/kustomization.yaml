@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+## Append samples of your project ##
+resources:
+- production-stack_v1alpha1_vllmruntime.yaml
+- production-stack_v1alpha1_vllmrouter.yaml
+- production-stack_v1alpha1_cacheserver.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
