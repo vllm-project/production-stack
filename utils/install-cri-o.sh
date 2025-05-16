@@ -25,6 +25,25 @@ sudo apt-get install -y cri-o
 # Start CRI-O
 sudo systemctl start crio.service
 
-# Install CNI (container network interface) plugins
-wget https://raw.githubusercontent.com/cri-o/cri-o/refs/heads/main/contrib/cni/11-crio-ipv4-bridge.conflist
-sudo cp 11-crio-ipv4-bridge.conflist /etc/cni/net.d
+sudo swapoff -a
+sudo modprobe br_netfilter
+sudo sysctl -w net.ipv4.ip_forward=1
+
+# Update crio config by creating (or editing) /etc/crio/crio.conf
+# sudo vi /etc/crio/crio.conf
+# [crio.image]
+# pause_image="registry.k8s.io/pause:3.10"
+# [crio.runtime]
+# conmon_cgroup = "pod"
+# cgroup_manager = "systemd"
+
+# sysctl params required by setup, params persist across reboots
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.ipv4.ip_forward = 1
+EOF
+
+# Apply sysctl params without reboot
+sudo sysctl --system
+
+# Verify that net.ipv4.ip_forward is set to 1 with:
+sudo sysctl net.ipv4.ip_forward
