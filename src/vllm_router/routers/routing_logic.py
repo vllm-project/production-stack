@@ -15,6 +15,7 @@
 import abc
 import asyncio
 import enum
+import random
 import socket
 import threading
 from typing import Dict, List
@@ -46,6 +47,7 @@ class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
     KVAWARE = "kvaware"
+    PREFIXAWARE = "prefixaware"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -285,6 +287,59 @@ class KvawareRouter(RoutingInterface):
             return self.instance_id_to_ip[instance_id.best_instance_id]
 
 
+class PrefixAwareRouter(RoutingInterface):
+    """
+    Route the request to the appropriate engine URL by where the longest
+    prefix match is found.
+
+    In this class, we assume that there is no eviction of prefix cache.
+    """
+
+    def __init__(self: int):
+        if hasattr(self, "_initialized"):
+            return
+        from vllm_router.prefix.hashtrie import HashTrie
+
+        self.hashtrie = HashTrie()
+        self._initialized = True
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        """
+        Route the request to the appropriate engine URL by where the longest
+        prefix match is found.
+
+        In this routing logic, we do not consider the eviction of prefix cache.
+
+        Args:
+            endpoints (List[EndpointInfo]): The list of engine URLs
+            engine_stats (Dict[str, EngineStats]): The engine stats indicating
+               the 'physical' load of each engine
+            request_stats (Dict[str, RequestStats]): The request stats
+               indicating the request-level performance of each engine
+            request (Request): The incoming request
+            request_json (Dict): The request body (needed for finding the
+            longest prefix match)
+        """
+
+        available_endpoints = set(endpoint.url for endpoint in endpoints)
+        _, matched_endpoint = await self.hashtrie.longest_prefix_match(
+            request_json["prompt"], available_endpoints
+        )
+
+        selected_endpoint = random.choice(list(matched_endpoint))
+
+        await self.hashtrie.insert(request_json["prompt"], selected_endpoint)
+
+        return selected_endpoint
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -300,6 +355,9 @@ def initialize_routing_logic(
         router = KvawareRouter(kwargs.get("lmcache_controller_port"))
         router.start_kv_manager()
         return router
+    elif routing_logic == RoutingLogic.PREFIXAWARE:
+        logger.info("Initializing prefix-aware routing logic")
+        return PrefixAwareRouter()
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -316,7 +374,12 @@ def reconfigure_routing_logic(
 
 def get_routing_logic() -> RoutingInterface:
     # Look up in our singleton registry which router (if any) has been created.
-    for cls in (SessionRouter, RoundRobinRouter, KvawareRouter):
+    for cls in (
+        SessionRouter,
+        RoundRobinRouter,
+        KvawareRouter,
+        PrefixAwareRouter,
+    ):
         if cls in SingletonABCMeta._instances:
             return cls()
     raise ValueError("The global router has not been initialized")
