@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
     "servingEngineSpec": {
@@ -405,19 +405,19 @@
           "type": "integer"
         },
         "vllmApiKey": {
-           "type": "object",
-            "properties": {
-              "secretName": {
-                "type": "string"
-              },
-              "secretKey": {
-                "type": "string"
-              }
+          "type": "object",
+          "properties": {
+            "secretName": {
+              "type": "string"
             },
-            "required": [
-              "secretName",
-              "secretKey"
-            ]
+            "secretKey": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "secretName",
+            "secretKey"
+          ]
         },
         "labels": {
           "type": "object",
