@@ -1,8 +1,10 @@
 import abc
+import enum
 import json
 import re
 import resource
 
+import requests
 from fastapi.requests import Request
 from starlette.datastructures import MutableHeaders
 
@@ -41,6 +43,35 @@ class SingletonABCMeta(abc.ABCMeta):
             instance = super().__call__(*args, **kwargs)
             cls._instances[cls] = instance
         return cls._instances[cls]
+
+
+class ModelType(enum.Enum):
+    chat = "/v1/chat/completions"
+    completion = "/v1/completions"
+    embeddings = "/v1/embeddings"
+    rerank = "/v1/rerank"
+
+    @staticmethod
+    def get_test_payload(model_type: str):
+        match ModelType[model_type]:
+            case ModelType.chat:
+                return {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": "Hello",
+                        }
+                    ],
+                    "temperature": 0.0,
+                    "max_tokens": 3,
+                    "max_completion_tokens": 3,
+                }
+            case ModelType.completion:
+                return {"prompt": "Hello"}
+            case ModelType.embeddings:
+                return {"input": "Hello"}
+            case ModelType.rerank:
+                return {"query": "Hello", "documents": ["Test"]}
 
 
 def validate_url(url: str) -> bool:
@@ -94,9 +125,8 @@ def parse_static_urls(static_backends: str):
     return backend_urls
 
 
-def parse_static_model_names(static_models: str):
-    models = static_models.split(",")
-    return models
+def parse_comma_separated_args(comma_separated_string: str):
+    return comma_separated_string.split(",")
 
 
 def parse_static_aliases(static_aliases: str):
@@ -118,3 +148,18 @@ def update_content_length(request: Request, request_body: str):
     headers = MutableHeaders(request.headers)
     headers["Content-Length"] = str(len(request_body))
     request._headers = headers
+
+
+def is_model_healthy(url: str, model: str, model_type: str) -> bool:
+    model_details = ModelType[model_type]
+    try:
+        response = requests.post(
+            f"{url}{model_details.value}",
+            headers={"Content-Type": "application/json"},
+            json={"model": model} | model_details.get_test_payload(model_type),
+            timeout=30,
+        )
+    except Exception as e:
+        logger.error(e)
+        return False
+    return response.status_code == 200

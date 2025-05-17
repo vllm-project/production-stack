@@ -77,6 +77,10 @@ def validate_args(args):
             raise ValueError(
                 "Static models must be provided when using static service discovery."
             )
+        if args.static_backend_health_checks and args.static_model_types is None:
+            raise ValueError(
+                "Static model types must be provided when using the backend healthcheck."
+            )
     if args.service_discovery == "k8s" and args.k8s_port is None:
         raise ValueError("K8s port must be provided when using K8s service discovery.")
     if args.routing_logic == "session" and args.session_key is None:
@@ -122,6 +126,12 @@ def parse_args():
         type=str,
         default=None,
         help="The aliases of static backends, separated by commas. E.g., your-custom-model:llama3",
+    )
+    parser.add_argument(
+        "--static-model-types",
+        type=str,
+        default=None,
+        help="Specify the static model types of each model. This is used for the backend health check, separated by commas. E.g. chat,embeddings,rerank",
     )
     parser.add_argument(
         "--k8s-port",

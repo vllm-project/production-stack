@@ -80,8 +80,8 @@ from vllm_router.stats.request_stats import (
     initialize_request_stats_monitor,
 )
 from vllm_router.utils import (
+    parse_comma_separated_args,
     parse_static_aliases,
-    parse_static_model_names,
     parse_static_urls,
     set_ulimit,
 )
@@ -131,12 +131,18 @@ def initialize_all(app: FastAPI, args):
         initialize_service_discovery(
             ServiceDiscoveryType.STATIC,
             urls=parse_static_urls(args.static_backends),
-            models=parse_static_model_names(args.static_models),
+            models=parse_comma_separated_args(args.static_models),
             aliases=(
                 parse_static_aliases(args.static_aliases)
                 if args.static_aliases
                 else None
             ),
+            model_types=(
+                parse_comma_separated_args(args.static_model_types)
+                if args.static_model_types
+                else None
+            ),
+            endpoint_health_check_enabled=args.static_backend_health_checks,
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
