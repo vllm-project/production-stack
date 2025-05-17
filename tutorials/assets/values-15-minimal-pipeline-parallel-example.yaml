@@ -4,7 +4,7 @@ servingEngineSpec:
     headNode:
       requestCPU: 2
       requestMemory: "20Gi"
-      requestGPU: 1
+      requestGPU: 2
   modelSpec:
   - name: "distilgpt2"
     repository: "vllm/vllm-openai"
@@ -15,10 +15,10 @@ servingEngineSpec:
 
     requestCPU: 2
     requestMemory: "20Gi"
-    requestGPU: 1
+    requestGPU: 2
 
     vllmConfig:
-      tensorParallelSize: 1
+      tensorParallelSize: 2
       pipelineParallelSize: 2
 
     shmSize: "20Gi"
