@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This tutorial guides you through the process of setting up a Kubernetes environment on a GPU-enabled server. We will install and configure `kubectl`, `helm`, and `minikube`, ensuring GPU compatibility for workloads requiring accelerated computing. By the end of this tutorial, you will have a fully functional Kubernetes environment ready for deploy the vLLM Production Stack.
+This tutorial guides you through the process of setting up a Kubernetes environment on multiple GPU-enabled server. We will install and configure `kubeadm`, `kubectl` and `helm`, ensuring GPU compatibility for workloads requiring accelerated computing. By the end of this tutorial, you will have a fully functional multi-node Kubernetes environment ready for deploy the vLLM Production Stack.
 
 ## Table of Contents
 
@@ -10,10 +10,12 @@ This tutorial guides you through the process of setting up a Kubernetes environm
 - [Table of Contents](#table-of-contents)
 - [Prerequisites](#prerequisites)
 - [Steps](#steps)
-  - [Step 1: Installing kubectl](#step-1-installing-kubectl)
-  - [Step 2: Installing Helm](#step-2-installing-helm)
-  - [Step 3: Installing Minikube with GPU Support](#step-3-installing-minikube-with-gpu-support)
-  - [Step 4: Verifying GPU Configuration](#step-4-verifying-gpu-configuration)
+  - [Step 1: Installing kubeadm on each node](#step-1-installing-kubeadm-on-each-node)
+  - [Step 2: Installing container runtime on each node](#step-2-installing-container-runtime-on-each-node)
+  - [Step 3: Setting up a control plane node](#step-3-setting-up-a-control-plane-node)
+  - [Step 4: Setting and joining a worker node](#step-4-setting-and-joining-a-worker-node)
+  - [Step 5: Installing container network interface](#step-5-installing-container-network-interface)
+  - [Step 6: Installing nvidia device plugin](#step-6-installing-nvidia-device-plugin)
 
 ## Prerequisites
 
@@ -31,125 +33,343 @@ Before you begin, ensure the following:
    - A Linux-based operating system (e.g., Ubuntu 20.04 or later).
    - Basic understanding of Linux shell commands.
 
+4. **Tested Environment:**
+   - This guide was tested at Debian 11 (bullseye) OS with 24 CPUs, 100Gi of RAM and 300Gi disk space. Thus, some settings might not work on your system depends on your environment.
+
 ## Steps
 
-### Step 1: Installing kubectl
+### Step 1: Installing kubeadm on each node
 
-1. Clone the repository and navigate to the [`utils/`](../utils/) folder:
+1. Access to your baremetal server which will become a control plane node.
+
+2. Clone the repository and navigate to the [`utils/`](../utils/) folder:
 
    ```bash
    git clone https://github.com/vllm-project/production-stack.git
    cd production-stack/utils
    ```
 
-2. Execute the script [`install-kubectl.sh`](../utils/install-kubectl.sh):
+3. Execute the script [`install-kubeadm.sh`](../utils/install-kubectl.sh):
 
    ```bash
    bash install-kubectl.sh
    ```
 
+4. **Expected Output:**
+   - Confirmation that `kubeadm` was downloaded and installed.
+   - Verification message using:
+
+     ```bash
+     kubeadm version
+     ```
+
+   Example output:
+
+   ```plaintext
+   kubeadm version: &version.Info{Major:"1", Minor:"32", GitVersion:"v1.32.4", GitCommit:"59526cd4867447956156ae3a602fcbac10a2c335", GitTreeState:"clean", BuildDate:"2025-04-22T16:02:27Z", GoVersion:"go1.23.6", Compiler:"gc", Platform:"linux/amd64"}
+   ```
+
+5. **Explanation:**
+   This script downloads v1.32 version of [`kubeadm`](https://v1-32.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/), the Kubernetes command-line tool for managing cluster, kubectl and kubelet on your current node.
+
+6. Repeat the above step 1 - 3 on your another baremetal server which will become a worker node.
+
+### Step 2: Installing container runtime on each node
+
+1. Access to your baremetal server which will become a control plane node
+
+2. Execute the script [`install-cri-o.sh`](../utils/install-helm.sh):
+
+   ```bash
+   bash install-cri-o.sh
+   ```
+
 3. **Explanation:**
-   This script downloads the latest version of [`kubectl`](https://kubernetes.io/docs/reference/kubectl), the Kubernetes command-line tool, and places it in your PATH for easy execution.
+   - Downloads, installs and configures v1.32 version of cri-o container runtime for your Kubernetes cluster.
 
 4. **Expected Output:**
-   - Confirmation that `kubectl` was downloaded and installed.
+   - Successful installation of cri-o runtime.
    - Verification message using:
 
      ```bash
-     kubectl version --client
+     sudo systemctl status crio
      ```
 
    Example output:
 
    ```plaintext
-   Client Version: v1.32.1
+   ● crio.service - Container Runtime Interface for OCI (CRI-O)
+      Loaded: loaded (/lib/systemd/system/crio.service; enabled; vendor preset: enabled)
+      Active: active (running) since Fri 2025-05-16 16:32:31 UTC; 20h ago
+         Docs: https://github.com/cri-o/cri-o
+      Main PID: 2332175 (crio)
+         Tasks: 61
+      Memory: 14.4G
+         CPU: 17min 55.486s
+      CGroup: /system.slice/crio.service
    ```
 
-### Step 2: Installing Helm
+5. **Explanation:**
+   This script downloads v1.32 version of [`cri-0`](https://github.com/cri-o/packaging/blob/main/README.md#distributions-using-deb-packages), one of container runtimes for Kubernetes for managing pods on your cluster.
 
-1. Execute the script [`install-helm.sh`](../utils/install-helm.sh):
+6. Repeat the above step 1 - 5 on your another baremetal server which will become a worker node.
+
+### Step 3: Setting up a control plane node
+
+1. Access to your baremetal server which will become a control plane node
+
+2. Execute the following command and wait for completion:
 
    ```bash
-   bash install-helm.sh
+   # Look for a line starting with "default via"
+   # For example: default via 10.128.0.1 dev ens5
+   ip route show
+
+   # Or get your network interface's ip address using the following command:
+   export K8S_NET_IP=$(ip addr show dev $(ip route show | awk '/^default/ {print $5}') | awk '/inet / {print $2}' | cut -d/ -f1)
+   echo "K8S_NET_IP=${K8S_NET_IP}"
+
+   # On one of your nodes which to become a control node, execute following command:
+   sudo kubeadm init \
+      --cri-socket=unix:///var/run/crio/crio.sock \
+      --apiserver-advertise-address=${K8S_NET_IP} \
+      --pod-network-cidr=192.168.0.0/16
    ```
 
-2. **Explanation:**
-   - Downloads and installs Helm, a package manager for Kubernetes.
-   - Places the Helm binary in your PATH.
+   Example output:
+
+   ```plaintext
+   # Your Kubernetes control-plane has initialized successfully!
+
+   # To start using your cluster, you need to run the following as a regular user:
+
+   #   mkdir -p $HOME/.kube
+   #   sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+   #   sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+   # Alternatively, if you are the root user, you can run:
+
+   #   export KUBECONFIG=/etc/kubernetes/admin.conf
+
+   # You should now deploy a pod network to the cluster.
+   # Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+   #   https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+   # Then you can join any number of worker nodes by running the following on each as root:
+
+   # kubeadm join <YOUR_CONTROL_PLANE_NODE_IP> --token <YOUR_GENERATED_TOKEN> \
+   #         --discovery-token-ca-cert-hash <YOUR_GENERATED_CA_CERT_HASH>
+   ```
+
+   Perform following command to set your kube config:
+
+   ```bash
+   mkdir -p $HOME/.kube
+   sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+   sudo chown $(id -u):$(id -g) $HOME/.kube/config
+   ```
+
+   If your control plane node contains GPUs and you want pods with GPUs be scheduled on it, you have to remove a taint from the node:
+
+   ```bash
+   kubectl taint node instance-20250503-060921 node-role.kubernetes.io/control-plane-
+   ```
 
 3. **Expected Output:**
-   - Successful installation of Helm.
+   - Successful initialize of control plane node.
    - Verification message using:
 
      ```bash
-     helm version
+     kubectl get nodes -o wide
      ```
 
    Example output:
 
    ```plaintext
-   version.BuildInfo{Version:"v3.17.0", GitCommit:"301108edc7ac2a8ba79e4ebf5701b0b6ce6a31e4", GitTreeState:"clean", GoVersion:"go1.23.4"}
+   NAME                       STATUS   ROLES           AGE   VERSION   INTERNAL-IP     EXTERNAL-IP   OS-IMAGE                         KERNEL-VERSION          CONTAINER-RUNTIME
+   instance-20250503-060921   Ready    control-plane   20h   v1.32.4   10.xxx.x.xx     <none>        Debian GNU/Linux 11 (bullseye)   5.10.0-33-cloud-amd64   cri-o://1.32.4
    ```
 
-### Step 3: Installing Minikube with GPU Support
+   Refer to [`official kubeadm documentation`](https://v1-32.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) for more information.
 
-Before proceeding, ensure Docker runs without requiring sudo. To add your user to the docker group, run:
+### Step 4: Setting and joining a worker node
 
-```bash
-sudo usermod -aG docker $USER && newgrp docker
-```
+1. Access to your baremetal server which will become a worker node
 
-If Minikube is already installed on your system, we recommend uninstalling the existing version before proceeding. You may use one of the following commands based on your operating system and package manager:
-
-```bash
-# Ubuntu / Debian
-sudo apt remove minikube
-
-# RHEL / CentOS / Fedora
-sudo yum remove minikube
-# or
-sudo dnf remove minikube
-
-# macOS (installed via Homebrew)
-brew uninstall minikube
-
-# Arch Linux
-sudo pacman -Rs minikube
-
-# Windows (via Chocolatey)
-choco uninstall minikube
-
-# Windows (via Scoop)
-scoop uninstall minikube
-```
-
-After removing the previous installation, please execute the script provided below to install the latest version.
-
-1. Execute the script `install-minikube-cluster.sh`:
+2. Execute the following command and wait for completion:
 
    ```bash
-   bash install-minikube-cluster.sh
+   # You got following output from previous control node initialization:
+
+   # --------------------------------------------------------------------------------
+   # Your Kubernetes control-plane has initialized successfully!
+   #
+   # ...
+   #
+   # Then you can join any number of worker nodes by running the following on each as root:
+   #
+   # kubeadm join <YOUR_CONTROL_PLANE_NODE_IP> --token <YOUR_GENERATED_TOKEN> \
+   #         --discovery-token-ca-cert-hash sha256:<YOUR_GENERATED_CA_CERT_HASH>
+   # --------------------------------------------------------------------------------
+
+   # Make sure to execute the following command on your worker node:
+   sudo kubeadm join <YOUR_CONTROL_PLANE_NODE_IP>:6443 --token <YOUR_GENERATED_TOKEN> \
+            --discovery-token-ca-cert-hash sha256:<YOUR_GENERATED_CA_CERT_HASH> \
+            --cri-socket=unix:///var/run/crio/crio.sock
    ```
 
-2. **Explanation:**
-   - Installs Minikube if not already installed.
+   If you lost above information, you can get the token and hash by running following command on your CONTROL PLANE node::
+
+   ```bash
+   # To get <YOUR_CONTROL_PLANE_NODE_IP>:
+   export K8S_NET_IP=$(ip addr show dev $(ip route show | awk '/^default/ {print $5}') | awk '/inet / {print $2}' | cut -d/ -f1)
+   echo "K8S_NET_IP=${K8S_NET_IP}"
+
+   # To get <YOUR_CONTROL_PLANE_NODE_IP>:
+   sudo kubeadm token create
+
+   # To get <YOUR_GENERATED_CA_CERT_HASH>:
+   openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | \
+   openssl rsa -pubin -outform der 2>/dev/null | \
+   sha256sum | awk '{print $1}'
+   ```
+
+   Example output:
+
+   ```plaintext
+   sudo kubeadm join <YOUR_CONTROL_PLANE_NODE_IP>:6443 --token <YOUR_CONTROL_PLANE_NODE_IP> --discovery-token-ca-cert-hash sha256:<YOUR_GENERATED_CA_CERT_HASH> --cri-socket=unix:///var/run/crio/crio.sock
+   [preflight] Running pre-flight checks
+   [preflight] Reading configuration from the "kubeadm-config" ConfigMap in namespace "kube-system"...
+   [preflight] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.
+   [kubelet-start] Writing kubelet configuration to file "/var/lib/kubelet/config.yaml"
+   [kubelet-start] Writing kubelet environment file with flags to file "/var/lib/kubelet/kubeadm-flags.env"
+   [kubelet-start] Starting the kubelet
+   [kubelet-check] Waiting for a healthy kubelet at http://127.0.0.1:10248/healthz. This can take up to 4m0s
+   [kubelet-check] The kubelet is healthy after 500.795239ms
+   [kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap
+
+   This node has joined the cluster:
+   * Certificate signing request was sent to apiserver and a response was received.
+   * The Kubelet was informed of the new secure connection details.
+
+   Run 'kubectl get nodes' on the control-plane to see this node join the cluster.
+   ```
+
+   Copy kube config file from your control plane node to current worker node (with ssh or scp):
+
+   ```bash
+   mkdir -p $HOME/.kube
+   scp YOUR_SSH_ACCOUNT:$HOME/.kube/config $HOME/.kube/config
+   sudo chown $(id -u):$(id -g) $HOME/.kube/config
+   ```
+
+3. **Expected Output:**
+   - Successful initialize of worker node.
+   - Verification message using:
+
+     ```bash
+     kubectl get nodes -o wide
+     ```
+
+   Example output:
+
+   ```plaintext
+   NAME                       STATUS   ROLES           AGE   VERSION   INTERNAL-IP     EXTERNAL-IP   OS-IMAGE                         KERNEL-VERSION          CONTAINER-RUNTIME
+   instance-20250503-060921   Ready    control-plane   20h   v1.32.4   10.xxx.x.xxx     <none>        Debian GNU/Linux 11 (bullseye)   5.10.0-33-cloud-amd64   cri-o://1.32.4
+   insudevmachine             Ready    <none>          14m   v1.32.4   10.yyy.y.yyy   <none>        Debian GNU/Linux 11 (bullseye)   5.10.0-33-cloud-amd64   cri-o://1.32.4
+   ```
+
+   Refer to [`official kubeadm documentation`](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-join/) for more information.
+
+### Step 5: Installing container network interface
+
+1. Access to any of your node (controlplane or worker).
+
+2. Clone the repository and navigate to the [`utils/`](../utils/) folder:
+
+   ```bash
+   git clone https://github.com/vllm-project/production-stack.git
+   cd production-stack/utils
+   ```
+
+3. Execute the script [`install-calico.sh`](../utils/install-calico.sh):
+
+   ```bash
+   bash install-calico.sh
+   ```
+
+4. **Expected Output:**
+   - Confirmation that `Tigera` operator successfully installed and related custom resources were installed.
+   - Verification message using:
+
+     ```bash
+     kubectl get pods -o wide
+     ```
+
+   Example output:
+
+   ```plaintext
+   NAMESPACE          NAME                                                          READY   STATUS      RESTARTS      AGE   IP                NODE                       NOMINATED NODE   READINESS
+   GATES
+   calico-apiserver   calico-apiserver-cccf4bb9f-8lbc7                              1/1     Running     0             21h   192.168.190.7     instance-20250503-060921   <none>           <none>
+   calico-apiserver   calico-apiserver-cccf4bb9f-knn9c                              1/1     Running     0             21h   192.168.190.4     instance-20250503-060921   <none>           <none>
+   calico-system      calico-kube-controllers-56dfdbb787-c24gd                      1/1     Running     0             21h   192.168.190.2     instance-20250503-060921   <none>           <none>
+   calico-system      calico-node-dtbcq                                             1/1     Running     0             21h   10.xxx.xxx.xxx       instance-20250503-060921   <none>           <none>
+   calico-system      calico-node-jptsp                                             1/1     Running     0             33m   10.xxx.xxx.xxx      insudevmachine             <none>           <none>
+   calico-system      calico-typha-b7d75bc58-h6vrb                                  1/1     Running     0             37m   10.xxx.xxx.xxx        instance-20250503-060921   <none>           <none>
+   calico-system      csi-node-driver-884sn                                         2/2     Running     0             26m   192.168.165.193   insudevmachine             <none>           <none>
+   calico-system      csi-node-driver-bb7dl                                         2/2     Running     0             21h   192.168.190.1     instance-20250503-060921   <none>           <none>
+   calico-system      goldmane-7b5b4cd5d9-6bk5p                                     1/1     Running     0             21h   192.168.190.6     instance-20250503-060921   <none>           <none>
+   calico-system      whisker-5dbf545674-hnkpz                                      2/2     Running     0             21h   192.168.190.8     instance-20250503-060921   <none>           <none>
+   ...
+   kube-system        coredns-668d6bf9bc-5hvx7                                      1/1     Running     0             21h   192.168.190.3     instance-20250503-060921   <none>           <none>
+   kube-system        coredns-668d6bf9bc-wb7qq                                      1/1     Running     0             21h   192.168.190.5     instance-20250503-060921   <none>           <none>
+   ```
+
+   Make sure to check if each node status is ready and coredns pods are running:
+
+   ```bash
+   kubectl get nodes
+
+   # NAME                       STATUS   ROLES           AGE   VERSION
+   # instance-20250503-060921   Ready    control-plane   21h   v1.32.4
+   # insudevmachine             Ready    <none>          37m   v1.32.4
+
+   kubectl get pods -n kube-system | grep -i coredns
+
+   # coredns-668d6bf9bc-5hvx7                           1/1     Running   0          21h
+   # coredns-668d6bf9bc-wb7qq                           1/1     Running   0          21h
+   ```
+
+5. **Explanation:**
+   This script downloads v3.30.0 version of [`calico`](https://docs.tigera.io/calico/latest/getting-started/kubernetes/quickstart), which is one of container network interface for Kubernetes cluster.
+
+### Step 6: Installing nvidia device plugin
+
+1. Access to any of your node (controlplane or worker).
+
+2. Clone the repository and navigate to the [`utils/`](../utils/) folder:
+
+   ```bash
+   git clone https://github.com/vllm-project/production-stack.git
+   cd production-stack/utils
+   ```
+
+3. Execute the script [`init-nvidia-gpu-setup-k8s.sh`](../utils/init-nvidia-gpu-setup-k8s.sh):
+
+   ```bash
+   bash init-nvidia-gpu-setup-k8s.sh
+   ```
+
+4. **Explanation:**
    - Configures the system to support GPU workloads by enabling the NVIDIA Container Toolkit and starting Minikube with GPU support.
    - Installs the NVIDIA `gpu-operator` chart to manage GPU resources within the cluster.
 
-3. **Expected Output:**
+5. **Expected Output:**
    If everything goes smoothly, you should see the example output like following:
 
    ```plaintext
-   😄  minikube v1.35.0 on Ubuntu 22.04 (kvm/amd64)
-   ❗  minikube skips various validations when --force is supplied; this may lead to unexpected behavior
-   ✨  Using the docker driver based on user configuration
-   ......
-   ......
-   🏄  Done! kubectl is now configured to use "minikube" cluster and "default" namespace by default
-   "nvidia" has been added to your repositories
-   Hang tight while we grab the latest from your chart repositories...
-   ......
-   ......
+   ...
    NAME: gpu-operator-1737507918
    LAST DEPLOYED: Wed Jan 22 01:05:21 2025
    NAMESPACE: gpu-operator
@@ -158,7 +378,7 @@ After removing the previous installation, please execute the script provided bel
    TEST SUITE: None
    ```
 
-4. Some troubleshooting tips for installing gpu-operator:
+6. Some troubleshooting tips for installing gpu-operator:
 
    If gpu-operator fails to start because of the common seen “too many open files” issue for minikube (and [kind](https://kind.sigs.k8s.io/)), then a quick fix below may be helpful.
 
@@ -182,56 +402,10 @@ After removing the previous installation, please execute the script provided bel
 
    The fix is [well documented](https://kind.sigs.k8s.io/docs/user/known-issues#pod-errors-due-to-too-many-open-files) by kind, it also works for minikube.
 
-### Step 4: Verifying GPU Configuration
-
-1. Ensure Minikube is running:
-
-   ```bash
-   minikube status
-   ```
-
-   Expected output:
-
-   ```plaintext
-   minikube
-   type: Control Plane
-   host: Running
-   kubelet: Running
-   apiserver: Running
-   kubeconfig: Configured
-   ```
-
-2. Verify GPU access within Kubernetes:
-
-   ```bash
-   kubectl describe nodes | grep -i gpu
-   ```
-
-   Expected output:
-
-   ```plaintext
-     nvidia.com/gpu: 1
-     ... (plus many lines related to gpu information)
-   ```
-
-3. Deploy a test GPU workload:
-
-   ```bash
-   kubectl run gpu-test --image=nvidia/cuda:12.2.0-runtime-ubuntu22.04 --restart=Never -- nvidia-smi
-   ```
-
-    Wait for kubernetes to download and create the pod and then check logs to confirm GPU usage:
-
-   ```bash
-   kubectl logs gpu-test
-   ```
-
-   You should see the nvidia-smi output from the terminal
-
 ## Conclusion
 
-By following this tutorial, you have successfully set up a Kubernetes environment with GPU support on your server. You are now ready to deploy and test vLLM Production Stack on Kubernetes. For further configuration and workload-specific setups, consult the official documentation for `kubectl`, `helm`, and `minikube`.
+By following this tutorial, you have successfully set up a multi-node Kubernetes environment with GPU support on your server. You are now ready to deploy and test vLLM Production Stack on Kubernetes. For further configuration and workload-specific setups, consult the official documentation for `kubectl`, `helm`, and `minikube`.
 
 What's next:
 
-- [01-minimal-helm-installation](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)
+- [00-b-install-kuberay-operator](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-b-install-kuberay-operator.md)
