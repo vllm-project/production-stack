@@ -100,6 +100,9 @@ spec:
           - "--lmcache-controller-port"
           - "{{ .Values.routerSpec.lmcacheControllerPort }}"
           {{- end }}
+          {{- if and (hasKey .Values.routerSpec "enablePD") (.Values.routerSpec.enablePD) }}
+          - "--disaggregated-prefill"
+          {{- end }}
         {{- if .Values.routerSpec.resources }}
         resources:
           {{- if .Values.routerSpec.resources.requests }}
