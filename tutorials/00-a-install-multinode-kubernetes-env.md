@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This tutorial guides you through the process of setting up a Kubernetes environment on multiple GPU-enabled server. We will install and configure `kubeadm`, `kubectl` and `helm`, ensuring GPU compatibility for workloads requiring accelerated computing. By the end of this tutorial, you will have a fully functional multi-node Kubernetes environment ready for deploy the vLLM Production Stack.
+This tutorial provides a comprehensive guide to setting up a Kubernetes environment across multiple GPU-enabled servers. It covers the installation and configuration of `kubeadm`, `kubectl`, and `helm`, with a focus on ensuring GPU compatibility for workloads that require accelerated computing. By the end of this tutorial, you will have a fully operational multi-node Kubernetes cluster prepared for deploying the vLLM Production Stack.
 
 ## Table of Contents
 
@@ -34,13 +34,13 @@ Before you begin, ensure the following:
    - Basic understanding of Linux shell commands.
 
 4. **Tested Environment:**
-   - This guide was tested at Debian 11 (bullseye) OS with 24 CPUs, 100Gi of RAM and 300Gi disk space. Thus, some settings might not work on your system depends on your environment.
+   - This guide was tested on a Debian 11 (Bullseye) operating system with 24 CPUs, 100 GiB of RAM, and 300 GiB of disk space. Please note that certain configurations or settings may vary or not function as expected on different systems, depending on your specific environment.
 
 ## Steps
 
 ### Step 1: Installing kubeadm on each node
 
-1. Access to your baremetal server which will become a control plane node.
+1. Access to a bare-metal server that will serve as the control plane node.
 
 2. Clone the repository and navigate to the [`utils/`](../utils/) folder:
 
@@ -49,10 +49,10 @@ Before you begin, ensure the following:
    cd production-stack/utils
    ```
 
-3. Execute the script [`install-kubeadm.sh`](../utils/install-kubectl.sh):
+3. Execute the script [`install-kubeadm.sh`](../utils/install-kubeadm.sh):
 
    ```bash
-   bash install-kubectl.sh
+   bash install-kubeadm.sh
    ```
 
 4. **Expected Output:**
@@ -70,13 +70,13 @@ Before you begin, ensure the following:
    ```
 
 5. **Explanation:**
-   This script downloads v1.32 version of [`kubeadm`](https://v1-32.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/), the Kubernetes command-line tool for managing cluster, kubectl and kubelet on your current node.
+   This script downloads version 1.32 of [`kubeadm`](https://v1-32.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/), the Kubernetes command-line tool for cluster management, along with kubectl and kubelet, on the current node.
 
-6. Repeat the above step 1 - 3 on your another baremetal server which will become a worker node.
+6. Repeat steps 1 to 3 on your other bare-metal server, which will serve as a worker node.
 
 ### Step 2: Installing container runtime on each node
 
-1. Access to your baremetal server which will become a control plane node
+1. Access to a bare-metal server that will serve as the control plane node.
 
 2. Execute the script [`install-cri-o.sh`](../utils/install-helm.sh):
 
@@ -84,10 +84,7 @@ Before you begin, ensure the following:
    bash install-cri-o.sh
    ```
 
-3. **Explanation:**
-   - Downloads, installs and configures v1.32 version of cri-o container runtime for your Kubernetes cluster.
-
-4. **Expected Output:**
+3. **Expected Output:**
    - Successful installation of cri-o runtime.
    - Verification message using:
 
@@ -109,16 +106,19 @@ Before you begin, ensure the following:
       CGroup: /system.slice/crio.service
    ```
 
+4. **Explanation:**
+   - Downloads, installs and configures v1.32 version of cri-o container runtime for your Kubernetes cluster.
+
 5. **Explanation:**
    This script downloads v1.32 version of [`cri-0`](https://github.com/cri-o/packaging/blob/main/README.md#distributions-using-deb-packages), one of container runtimes for Kubernetes for managing pods on your cluster.
 
-6. Repeat the above step 1 - 5 on your another baremetal server which will become a worker node.
+6. Repeat steps 1 to 2 on your other bare-metal server, which will serve as a worker node.
 
 ### Step 3: Setting up a control plane node
 
-1. Access to your baremetal server which will become a control plane node
+1. Access to a bare-metal server that will serve as the control plane node.
 
-2. Execute the following command and wait for completion:
+2. Execute the following command and wait for it to complete:
 
    ```bash
    # Look for a line starting with "default via"
@@ -129,7 +129,7 @@ Before you begin, ensure the following:
    export K8S_NET_IP=$(ip addr show dev $(ip route show | awk '/^default/ {print $5}') | awk '/inet / {print $2}' | cut -d/ -f1)
    echo "K8S_NET_IP=${K8S_NET_IP}"
 
-   # On one of your nodes which to become a control node, execute following command:
+   # On one of the nodes designated to become a control plane node, execute the following command:
    sudo kubeadm init \
       --cri-socket=unix:///var/run/crio/crio.sock \
       --apiserver-advertise-address=${K8S_NET_IP} \
@@ -169,14 +169,14 @@ Before you begin, ensure the following:
    sudo chown $(id -u):$(id -g) $HOME/.kube/config
    ```
 
-   If your control plane node contains GPUs and you want pods with GPUs be scheduled on it, you have to remove a taint from the node:
+   If your control plane node is equipped with GPUs and you want GPU-enabled pods to be scheduled on it, you must remove the default taint from the node:
 
    ```bash
    kubectl taint node instance-20250503-060921 node-role.kubernetes.io/control-plane-
    ```
 
 3. **Expected Output:**
-   - Successful initialize of control plane node.
+   - Successful initialization of control plane node.
    - Verification message using:
 
      ```bash
@@ -194,9 +194,9 @@ Before you begin, ensure the following:
 
 ### Step 4: Setting and joining a worker node
 
-1. Access to your baremetal server which will become a worker node
+1. Access to a bare-metal server that will serve as the worker node.
 
-2. Execute the following command and wait for completion:
+2. Execute the following command and wait for it to complete:
 
    ```bash
    # You got following output from previous control node initialization:
@@ -212,7 +212,7 @@ Before you begin, ensure the following:
    #         --discovery-token-ca-cert-hash sha256:<YOUR_GENERATED_CA_CERT_HASH>
    # --------------------------------------------------------------------------------
 
-   # Make sure to execute the following command on your worker node:
+   # Execute the following command on your worker node:
    sudo kubeadm join <YOUR_CONTROL_PLANE_NODE_IP>:6443 --token <YOUR_GENERATED_TOKEN> \
             --discovery-token-ca-cert-hash sha256:<YOUR_GENERATED_CA_CERT_HASH> \
             --cri-socket=unix:///var/run/crio/crio.sock
@@ -264,7 +264,7 @@ Before you begin, ensure the following:
    ```
 
 3. **Expected Output:**
-   - Successful initialize of worker node.
+   - Successful initialization of worker node.
    - Verification message using:
 
      ```bash
@@ -283,7 +283,7 @@ Before you begin, ensure the following:
 
 ### Step 5: Installing container network interface
 
-1. Access to any of your node (controlplane or worker).
+1. Access to a bare-metal server that will serve as the control plane node.
 
 2. Clone the repository and navigate to the [`utils/`](../utils/) folder:
 
@@ -299,7 +299,7 @@ Before you begin, ensure the following:
    ```
 
 4. **Expected Output:**
-   - Confirmation that `Tigera` operator successfully installed and related custom resources were installed.
+   - Confirmation that the `Tigera` operator and its associated custom resources have been successfully installed.
    - Verification message using:
 
      ```bash
@@ -326,7 +326,7 @@ Before you begin, ensure the following:
    kube-system        coredns-668d6bf9bc-wb7qq                                      1/1     Running     0             21h   192.168.190.5     instance-20250503-060921   <none>           <none>
    ```
 
-   Make sure to check if each node status is ready and coredns pods are running:
+   Ensure that the status of each node is marked as “Ready” and that the CoreDNS pods are running:
 
    ```bash
    kubectl get nodes
@@ -342,11 +342,11 @@ Before you begin, ensure the following:
    ```
 
 5. **Explanation:**
-   This script downloads v3.30.0 version of [`calico`](https://docs.tigera.io/calico/latest/getting-started/kubernetes/quickstart), which is one of container network interface for Kubernetes cluster.
+   This script downloads version 3.30.0 of [`calico`](https://docs.tigera.io/calico/latest/getting-started/kubernetes/quickstart), a container network interface (CNI) plugin for Kubernetes clusters.
 
 ### Step 6: Installing nvidia device plugin
 
-1. Access to any of your node (controlplane or worker).
+1. Access to a bare-metal server that will serve as the control plane node.
 
 2. Clone the repository and navigate to the [`utils/`](../utils/) folder:
 
@@ -404,7 +404,7 @@ Before you begin, ensure the following:
 
 ## Conclusion
 
-By following this tutorial, you have successfully set up a multi-node Kubernetes environment with GPU support on your server. You are now ready to deploy and test vLLM Production Stack on Kubernetes. For further configuration and workload-specific setups, consult the official documentation for `kubectl`, `helm`, and `minikube`.
+By completing this tutorial, you have successfully established a multi-node Kubernetes environment with GPU support on your servers. You are now prepared to deploy and test the vLLM Production Stack within this Kubernetes cluster. For additional configuration and workload-specific guidance, please refer to the official documentation for `kubectl`, `helm`, and `minikube`.
 
 What's next:
 

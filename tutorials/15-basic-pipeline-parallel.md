@@ -122,6 +122,7 @@ TEST SUITE: None
 1. Check the status of the pods:
 
    ```bash
+   kubectl wait --for=condition=ready pod -l environment=router,release=router --namespace=default --timeout=60s && \
    kubectl get pods
    ```
 
@@ -130,6 +131,7 @@ TEST SUITE: None
    You should see the following pods:
 
    ```plaintext
+   pod/vllm-deployment-router-8666bf6464-v97v8 condition met
    NAME                                          READY   STATUS    RESTARTS   AGE   IP                NODE                       NOMINATED NODE   READINESS GATES
    kuberay-operator-f89ddb644-858bw              1/1     Running   0          12h   192.168.165.203   insudevmachine             <none>           <none>
    vllm-deployment-router-8666bf6464-v97v8       1/1     Running   0          12h   192.168.165.206   insudevmachine             <none>           <none>
