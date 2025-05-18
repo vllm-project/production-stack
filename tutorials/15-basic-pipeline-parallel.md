@@ -54,13 +54,16 @@ This tutorial provides a step-by-step guide for configuring and deploying the vL
 - **`requestMemory`**: Memory allocation for each Kuberay worker pod. Sufficient memory is required to load the model.
 - **`requestGPU`**: Specifies the number of GPUs to allocate for each Kuberay worker pod.
 - **`vllmConfig`**: Contains model-specific configurations:
-  - `tensorParallelSize`: Defines the number of GPUs allocated to each worker pod.
-  - `pipelineParallelSize`: Specifies the degree of pipeline parallelism.
+  - `tensorParallelSize`: Specifies the number of GPUs assigned to each worker pod. This value must be identical to both `requestGPU` and `raySpec.headNode.requestGPU`.
+  - `pipelineParallelSize`: Indicates the level of pipeline parallelism. This value must be equal to `replicaCount + 1`, representing the total number of Ray cluster nodes, including both head and worker nodes.
   - **Important Note:**
-    - The total number of GPUs required is calculated as: `pipelineParallelSize` × `tensorParallelSize`
-    - This value must exactly match the sum of:
-      - `replicaCount` × `requestGPU` (i.e., the total number of GPUs allocated to Ray worker nodes)
-      - `raySpec.headNode.requestGPU` (i.e., the number of GPUs allocated to the Ray head node).
+    - The total number of GPUs required is computed as `pipelineParallelSize × tensorParallelSize`.
+    - This total must exactly match the sum of:
+      - `replicaCount × requestGPU` (the total number of GPUs allocated to Ray worker nodes), and
+      - `raySpec.headNode.requestGPU` (the number of GPUs allocated to the Ray head node).
+    - The `requestGPU` value for the Ray head node must be identical to that of each worker node.
+    - `tensorParallelSize` defines the number of GPUs allocated per Ray node (including both head and worker nodes), and must be consistent across all nodes.
+    - `pipelineParallelSize` represents the total number of Ray nodes, and must therefore be set to replicaCount + 1 (i.e., the number of worker nodes plus the head node).
 - **`shmSize`**: Configures the shared memory size to ensure adequate memory is available for inter-process communication during tensor and pipeline parallelism execution.
 - **`hf_token`**: The Hugging Face token for authenticating with the Hugging Face model hub.
 
