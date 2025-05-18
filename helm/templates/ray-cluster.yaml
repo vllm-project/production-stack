@@ -489,7 +489,7 @@ data:
 
     logging.info(f"Ray cluster status: {alive_count}/{expected_nodes} nodes alive.")
 
-    if alive_count >= expected_nodes:
+    if alive_count == expected_nodes:
         logging.info("Cluster is ready.")
         sys.exit(0)
     else:
