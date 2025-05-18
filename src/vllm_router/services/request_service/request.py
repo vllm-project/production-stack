@@ -275,20 +275,6 @@ async def route_disaggregated_prefill_request(
             content={"error": "Invalid request: missing 'model' in request body."},
         )
 
-    # Apply request rewriting if enabled
-    if is_request_rewriter_initialized():
-        rewriter = get_request_rewriter()
-        rewritten_body = rewriter.rewrite_request(
-            request_body, requested_model, endpoint
-        )
-        logger.info(f"Request for model {requested_model} was rewritten")
-        request_body = rewritten_body
-        # Update request_json if the body was rewritten
-        try:
-            request_json = json.loads(request_body)
-        except:
-            logger.warning("Failed to parse rewritten request body as JSON")
-
     # TODO (ApostaC): merge two awaits into one
     endpoints = get_service_discovery().get_endpoint_info()
     engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
@@ -316,6 +302,8 @@ async def route_disaggregated_prefill_request(
         background_tasks,
     )
     headers, status_code = await anext(prefiller_response)
+    async for _ in prefiller_response:
+        pass
     request_json["max_tokens"] = orig_max_tokens
     server_url = request.app.state.router.route_request(
         endpoints, engine_stats, request_stats, request, request_json
