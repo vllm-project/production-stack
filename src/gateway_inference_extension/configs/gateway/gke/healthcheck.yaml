@@ -1,0 +1,16 @@
+kind: HealthCheckPolicy
+apiVersion: networking.gke.io/v1
+metadata:
+  name: health-check-policy
+  namespace: default
+spec:
+  targetRef:
+    group: "inference.networking.x-k8s.io"
+    kind: InferencePool
+    name: vllm-llama3-8b-instruct
+  default:
+    config:
+      type: HTTP
+      httpHealthCheck:
+          requestPath: /health
+          port: 8000

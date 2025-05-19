@@ -9,6 +9,7 @@ repos:
   - id: check-json
   - id: check-toml
   - id: check-yaml
+    args: [--allow-multiple-documents]
     exclude: |
       (?x)(
           ^helm/templates/|
