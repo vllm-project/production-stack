@@ -244,7 +244,6 @@ def initialize_all(app: FastAPI, args):
     app.state.request_stats_monitor = get_request_stats_monitor()
     app.state.router = get_routing_logic()
     app.state.request_rewriter = get_request_rewriter()
-    app.state.disaggregated_prefill = args.disaggregated_prefill
 
 
 app = FastAPI(lifespan=lifespan)

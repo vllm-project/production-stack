@@ -280,12 +280,6 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--disaggregated-prefill",
-        action="store_true",
-        help="Enable disaggregated prefill routing logic.",
-    )
-
-    parser.add_argument(
         "--prefill-model-labels",
         type=str,
         default=None,
