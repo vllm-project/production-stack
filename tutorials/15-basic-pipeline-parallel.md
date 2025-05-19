@@ -44,7 +44,7 @@ This tutorial provides a step-by-step guide for configuring and deploying the vL
 - **`headNode`**: Specifies the resource requirements for the Kuberay head node and must be defined accordingly:
   - **`requestCPU`**: The amount of CPU resources requested for Kuberay head pod.
   - **`requestMemory`**: Memory allocation for Kuberay head pod. Sufficient memory is required to load the model.
-  - **`requestGPU`**: Specifies the number of GPUs to allocate for Kuberay head pod.
+  - **`requestGPU`**: Defines the number of GPUs to allocate for the KubeRay head pod. Currently, the Ray head node must also participate in both tensor parallelism and pipeline parallelism. This requirement exists because the `vllm serve ...` command is executed on the Ray head node, and vLLM mandates that the pod where this command is run must have at least one visible GPU.
 - **`name`**: The unique identifier for your model deployment.
 - **`repository`**: The Docker repository containing the model's serving engine image.
 - **`tag`**: Specifies the version of the model image to use.
@@ -68,6 +68,8 @@ This tutorial provides a step-by-step guide for configuring and deploying the vL
 - **`hf_token`**: The Hugging Face token for authenticating with the Hugging Face model hub.
 
 ### Example Snippet
+
+In the following example, we configure a total of two Ray nodes each equipped with two GPUs (one head node and one worker node) to serve a distilgpt2 model. We set the tensor parallelism size to 2, as each node contains two GPUs, and the pipeline parallelism size to 2, corresponding to the two Ray nodes being utilized.
 
 ```yaml
 servingEngineSpec:
