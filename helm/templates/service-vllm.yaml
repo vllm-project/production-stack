@@ -15,6 +15,10 @@ spec:
       port: {{ include "chart.service-port" $ }}
       targetPort: {{ include "chart.container-port-name" $ }}
       protocol: TCP
+    - name: zmq-port
+      port: 55555
+      targetPort: zmq-port
+      protocol: TCP
   selector:
     model: "{{ $modelSpec.name }}"
     helm-release-name: "{{ $.Release.Name }}"

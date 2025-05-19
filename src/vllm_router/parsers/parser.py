@@ -124,6 +124,12 @@ def parse_args():
         help="The aliases of static backends, separated by commas. E.g., your-custom-model:llama3",
     )
     parser.add_argument(
+        "--static-model-labels",
+        type=str,
+        default=None,
+        help="The model labels of static backends, separated by commas. E.g., model1,model2",
+    )
+    parser.add_argument(
         "--k8s-port",
         type=int,
         default=8000,
@@ -144,7 +150,13 @@ def parse_args():
     parser.add_argument(
         "--routing-logic",
         type=str,
-        choices=["roundrobin", "session", "kvaware", "prefixaware"],
+        choices=[
+            "roundrobin",
+            "session",
+            "kvaware",
+            "prefixaware",
+            "disaggregated_prefill",
+        ],
         help="The routing logic to use",
     )
     parser.add_argument(
@@ -265,6 +277,20 @@ def parse_args():
         "--sentry-dsn",
         type=str,
         help="Enables Sentry Error Reporting to the specified Data Source Name",
+    )
+
+    parser.add_argument(
+        "--prefill-model-labels",
+        type=str,
+        default=None,
+        help="The model labels of prefill backends, separated by commas. E.g., model1,model2",
+    )
+
+    parser.add_argument(
+        "--decode-model-labels",
+        type=str,
+        default=None,
+        help="The model labels of decode backends, separated by commas. E.g., model1,model2",
     )
 
     args = parser.parse_args()

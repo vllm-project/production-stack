@@ -1,3 +1,4 @@
+#!/bin/bash
 # Install KGateway CRDs first
 KGTW_VERSION=v2.0.2
 helm upgrade -i --create-namespace --namespace kgateway-system --version $KGTW_VERSION kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds
