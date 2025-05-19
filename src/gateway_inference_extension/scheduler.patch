@@ -1,0 +1,86 @@
+diff --git a/pkg/epp/scheduling/scheduler.go b/pkg/epp/scheduling/scheduler.go
+index b484cde..c7688a8 100644
+--- a/pkg/epp/scheduling/scheduler.go
++++ b/pkg/epp/scheduling/scheduler.go
+@@ -20,6 +20,7 @@ package scheduling
+ import (
+ 	"context"
+ 	"fmt"
++	"sort"
+ 	"time"
+
+ 	"sigs.k8s.io/controller-runtime/pkg/log"
+@@ -68,7 +69,7 @@ func NewScheduler(datastore Datastore) *Scheduler {
+ 		preSchedulePlugins:  []plugins.PreSchedule{},
+ 		filters:             []plugins.Filter{filter.NewSheddableCapacityFilter(), lowLatencyFilter},
+ 		scorers:             map[plugins.Scorer]int{},
+-		picker:              &picker.RandomPicker{},
++		picker:              &picker.RoundRobinPicker{},
+ 		postSchedulePlugins: []plugins.PostSchedule{},
+ 	}
+
+@@ -151,14 +152,22 @@ func (s *Scheduler) runFilterPlugins(ctx *types.SchedulingContext) []types.Pod {
+ 	for _, filter := range s.filters {
+ 		loggerDebug.Info("Running filter plugin", "plugin", filter.Name())
+ 		before := time.Now()
+-		filteredPods = filter.Filter(ctx, filteredPods)
++		// For prod stack, we don't need to filter pods, we will use
++		// customized routing logic to route requests to the correct pod
++		// filteredPods = filter.Filter(ctx, filteredPods)
++
+ 		metrics.RecordSchedulerPluginProcessingLatency(plugins.FilterPluginType, filter.Name(), time.Since(before))
+ 		loggerDebug.Info("Filter plugin result", "plugin", filter.Name(), "pods", filteredPods)
+ 		if len(filteredPods) == 0 {
+ 			break
+ 		}
+ 	}
+-	loggerDebug.Info("After running filter plugins")
++	loggerDebug.Info("After running filter plugins", "pods", len(filteredPods))
++
++	// Sort pods by name for consistent ordering
++	sort.Slice(filteredPods, func(i, j int) bool {
++		return filteredPods[i].GetPod().NamespacedName.String() < filteredPods[j].GetPod().NamespacedName.String()
++	})
+
+ 	return filteredPods
+ }
+@@ -172,18 +181,18 @@ func (s *Scheduler) runScorerPlugins(ctx *types.SchedulingContext, pods []types.
+ 		weightedScorePerPod[pod] = float64(0) // initialize weighted score per pod with 0 value
+ 	}
+ 	// Iterate through each scorer in the chain and accumulate the weighted scores.
+-	for scorer, weight := range s.scorers {
+-		loggerDebug.Info("Running scorer", "scorer", scorer.Name())
+-		before := time.Now()
+-		scores := scorer.Score(ctx, pods)
+-		metrics.RecordSchedulerPluginProcessingLatency(plugins.ScorerPluginType, scorer.Name(), time.Since(before))
+-		for pod, score := range scores { // weight is relative to the sum of weights
+-			weightedScorePerPod[pod] += score * float64(weight) // TODO normalize score before multiply with weight
+-		}
+-		loggerDebug.Info("After running scorer", "scorer", scorer.Name())
+-	}
+-	loggerDebug.Info("After running scorer plugins")
+-
++	// for scorer, weight := range s.scorers {
++	// 	loggerDebug.Info("Running scorer", "scorer", scorer.Name())
++	// 	before := time.Now()
++	// 	scores := scorer.Score(ctx, pods)
++	// 	metrics.RecordSchedulerPluginProcessingLatency(plugins.ScorerPluginType, scorer.Name(), time.Since(before))
++	// 	for pod, score := range scores { // weight is relative to the sum of weights
++	// 		weightedScorePerPod[pod] += score * float64(weight) // TODO normalize score before multiply with weight
++	// 	}
++	// 	loggerDebug.Info("After running scorer", "scorer", scorer.Name())
++	// }
++	loggerDebug.Info("After running dummy scorer plugins")
++	loggerDebug.Info("Weighted score per pod", "weightedScorePerPod", weightedScorePerPod)
+ 	return weightedScorePerPod
+ }
+
+@@ -196,7 +205,7 @@ func (s *Scheduler) runPickerPlugin(ctx *types.SchedulingContext, weightedScoreP
+ 		i++
+ 	}
+
+-	loggerDebug.Info("Before running picker plugin", "pods weighted score", fmt.Sprint(weightedScorePerPod))
++	loggerDebug.Info("Before running picker plugin", "pods", weightedScorePerPod)
+ 	before := time.Now()
+ 	result := s.picker.Pick(ctx, scoredPods)
+ 	metrics.RecordSchedulerPluginProcessingLatency(plugins.PickerPluginType, s.picker.Name(), time.Since(before))
