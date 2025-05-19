@@ -1,0 +1,13 @@
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: inferencepool-backend-policy
+spec:
+  targetRef:
+    group: "inference.networking.x-k8s.io"
+    kind: InferencePool
+    name: vllm-llama3-8b-instruct
+  default:
+    timeoutSec: 300
+    logging:
+      enabled: true
