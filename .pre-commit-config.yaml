@@ -23,6 +23,7 @@ repos:
   hooks:
   - id: hadolint-docker
     stages: [manual] # Only run in CI, add to .github/workflows/pre-commit.yml
+    exclude: "src/gateway_inference_extension/Dockerfile"
 - repo: https://github.com/gruntwork-io/pre-commit
   rev: v0.1.25
   hooks:

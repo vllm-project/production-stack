@@ -108,6 +108,11 @@ def parse_static_aliases(static_aliases: str):
     return aliases
 
 
+def parse_static_model_labels(static_model_labels: str):
+    model_labels = static_model_labels.split(",")
+    return model_labels
+
+
 def replace_model_in_request_body(request_json: dict, model: str):
     request_json["model"] = model
     request_body = json.dumps(request_json)

@@ -81,6 +81,7 @@ from vllm_router.stats.request_stats import (
 )
 from vllm_router.utils import (
     parse_static_aliases,
+    parse_static_model_labels,
     parse_static_model_names,
     parse_static_urls,
     set_ulimit,
@@ -137,6 +138,7 @@ def initialize_all(app: FastAPI, args):
                 if args.static_aliases
                 else None
             ),
+            model_labels=parse_static_model_labels(args.static_model_labels),
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
@@ -145,6 +147,7 @@ def initialize_all(app: FastAPI, args):
             port=args.k8s_port,
             label_selector=args.k8s_label_selector,
         )
+
     else:
         raise ValueError(f"Invalid service discovery type: {args.service_discovery}")
 
@@ -175,6 +178,8 @@ def initialize_all(app: FastAPI, args):
         args.routing_logic,
         session_key=args.session_key,
         lmcache_controller_port=args.lmcache_controller_port,
+        prefill_model_labels=args.prefill_model_labels,
+        decode_model_labels=args.decode_model_labels,
     )
 
     # Initialize feature gates
