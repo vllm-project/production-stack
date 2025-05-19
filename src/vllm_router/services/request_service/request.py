@@ -22,7 +22,11 @@ from fastapi import BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from vllm_router.log import init_logger
-from vllm_router.routers.routing_logic import KvawareRouter, PrefixAwareRouter, DisaggregatedPrefillRouter
+from vllm_router.routers.routing_logic import (
+    DisaggregatedPrefillRouter,
+    KvawareRouter,
+    PrefixAwareRouter,
+)
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,

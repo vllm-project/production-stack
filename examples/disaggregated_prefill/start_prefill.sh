@@ -27,4 +27,3 @@ docker run --runtime nvidia --gpus all \
     --disable-log-requests \
     --kv-transfer-config \
     '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_producer","kv_connector_extra_config": {"discard_partial_chunks": false, "lmcache_rpc_port": "receiver"}}'
-
