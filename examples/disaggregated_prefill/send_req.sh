@@ -1,3 +1,4 @@
+#!/bin/bash
 curl -X POST http://localhost:8005/v1/completions \
    -H "Content-Type: application/json" \
    -d '{
