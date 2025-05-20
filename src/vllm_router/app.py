@@ -142,7 +142,11 @@ def initialize_all(app: FastAPI, args):
                 if args.static_model_types
                 else None
             ),
-            model_labels=parse_comma_separated_args(args.static_model_labels),
+            model_labels=(
+                parse_comma_separated_args(args.static_model_labels)
+                if args.static_model_labels
+                else None
+            ),
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
