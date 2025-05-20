@@ -1,0 +1,17 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: LoraAdapter
+metadata:
+  labels:
+    app.kubernetes.io/name: lora-controller-dev
+    app.kubernetes.io/managed-by: kustomize
+  name: loraadapter-sample
+spec:
+  baseModel: "llama-3-1-8b"
+  vllmApiKey:
+    value: "abc123"
+  adapterSource:
+    type: "local"
+    adapterName: "loraadapter-sample"
+    adapterPath: "/data/lora-adapters/llama-3.1-nemoguard-8b-lora"
+  deploymentConfig:
+    algorithm: "default"
