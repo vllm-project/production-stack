@@ -17,11 +17,12 @@ echo "Installing kubectl and helm..."
 bash "$SCRIPT_DIR/install-kubectl.sh"
 bash "$SCRIPT_DIR/install-helm.sh"
 
-
 # --- Configure BPF (if available) ---
 if [ -f /proc/sys/net/core/bpf_jit_harden ]; then
     echo "Configuring BPF: Setting net.core.bpf_jit_harden=0"
-    echo "net.core.bpf_jit_harden=0" | sudo tee -a /etc/sysctl.conf
+    if ! grep -q "net.core.bpf_jit_harden=0" /etc/sysctl.conf; then
+        echo "net.core.bpf_jit_harden=0" | sudo tee -a /etc/sysctl.conf
+    fi
     sudo sysctl -p
 else
     echo "BPF JIT hardening configuration not available, skipping..."
@@ -44,6 +45,7 @@ if [ "$GPU_AVAILABLE" = true ]; then
     echo "Configuring Docker runtime for GPU support..."
     if sudo "$NVIDIA_CTK_PATH" runtime configure --runtime=docker; then
       echo "Restarting Docker to apply changes..."
+      echo "WARNING: Restarting Docker will stop and restart all containers."
       sudo systemctl restart docker
       echo "Docker runtime configured successfully."
     else
