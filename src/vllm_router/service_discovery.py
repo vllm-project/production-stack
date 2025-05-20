@@ -20,6 +20,7 @@ import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+import httpx
 import requests
 from kubernetes import client, config, watch
 
@@ -81,17 +82,23 @@ class ServiceDiscovery(metaclass=abc.ABCMeta):
 class StaticServiceDiscovery(ServiceDiscovery):
     def __init__(
         self,
+        app,
         urls: List[str],
         models: List[str],
         aliases: List[str],
         model_labels: List[str],
+        prefill_model_labels: List[str],
+        decode_model_labels: List[str],
     ):
         assert len(urls) == len(models), "URLs and models should have the same length"
+        self.app = app
         self.urls = urls
         self.models = models
         self.aliases = aliases
         self.model_labels = model_labels
         self.added_timestamp = int(time.time())
+        self.prefill_model_labels = prefill_model_labels
+        self.decode_model_labels = decode_model_labels
 
     def get_endpoint_info(self) -> List[EndpointInfo]:
         """
@@ -108,11 +115,30 @@ class StaticServiceDiscovery(ServiceDiscovery):
                 self.urls, self.models, self.model_labels
             )
         ]
+        for endpoint_info in endpoint_infos:
+            if endpoint_info.model_label in self.prefill_model_labels:
+                self.app.state.prefill_client = httpx.AsyncClient(
+                    base_url=endpoint_info.url,
+                    timeout=None,
+                )
+            elif endpoint_info.model_label in self.decode_model_labels:
+                self.app.state.decode_client = httpx.AsyncClient(
+                    base_url=endpoint_info.url,
+                    timeout=None,
+                )
         return endpoint_infos
 
 
 class K8sServiceDiscovery(ServiceDiscovery):
-    def __init__(self, namespace: str, port: str, label_selector=None):
+    def __init__(
+        self,
+        app,
+        namespace: str,
+        port: str,
+        prefill_model_labels: List[str],
+        decode_model_labels: List[str],
+        label_selector=None,
+    ):
         """
         Initialize the Kubernetes service discovery module. This module
         assumes all serving engine pods are in the same namespace, listening
@@ -126,11 +152,14 @@ class K8sServiceDiscovery(ServiceDiscovery):
             port: the port of the engines
             label_selector: the label selector of the engines
         """
+        self.app = app
         self.namespace = namespace
         self.port = port
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
         self.label_selector = label_selector
+        self.prefill_model_labels = prefill_model_labels
+        self.decode_model_labels = decode_model_labels
 
         # Init kubernetes watcher
         try:
@@ -245,6 +274,16 @@ class K8sServiceDiscovery(ServiceDiscovery):
                 added_timestamp=int(time.time()),
                 model_label=model_label,
             )
+            if model_label in self.prefill_model_labels:
+                self.app.state.prefill_client = httpx.AsyncClient(
+                    base_url=f"http://{engine_ip}:{self.port}",
+                    timeout=None,
+                )
+            elif model_label in self.decode_model_labels:
+                self.app.state.decode_client = httpx.AsyncClient(
+                    base_url=f"http://{engine_ip}:{self.port}",
+                    timeout=None,
+                )
 
     def _delete_engine(self, engine_name: str):
         logger.info(f"Serving engine {engine_name} is deleted")

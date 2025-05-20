@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IMAGE=lmcache/vllm-openai:2025-05-17-v1
+IMAGE=lmcache/test:2025-05-19-v1
 docker run --runtime nvidia --gpus all \
     --env "HF_TOKEN=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" \
     --env "LMCACHE_LOG_LEVEL=DEBUG" \
@@ -22,7 +22,7 @@ docker run --runtime nvidia --gpus all \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --network host \
     $IMAGE \
-     meta-llama/Llama-3.2-1B-Instruct \
+     meta-llama/Llama-3.1-8B-Instruct \
     --port 8100 \
     --disable-log-requests \
     --kv-transfer-config \
