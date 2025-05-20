@@ -217,7 +217,11 @@ async def route_general_request(
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
 
-    endpoints = list(filter(lambda x: x.model_name == requested_model, endpoints))
+    endpoints = list(
+        filter(
+            lambda x: x.model_name == requested_model and x.sleep == False, endpoints
+        )
+    )
     if not endpoints:
         return JSONResponse(
             status_code=400, content={"error": f"Model {requested_model} not found."}
@@ -286,7 +290,11 @@ async def route_disaggregated_prefill_request(
         time.time()
     )
 
-    endpoints = list(filter(lambda x: x.model_name == requested_model, endpoints))
+    endpoints = list(
+        filter(
+            lambda x: x.model_name == requested_model and x.sleep == False, endpoints
+        )
+    )
     if not endpoints:
         return JSONResponse(
             status_code=400, content={"error": f"Model {requested_model} not found."}

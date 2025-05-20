@@ -49,6 +49,9 @@ class EndpointInfo:
     # Model label
     model_label: str
 
+    # Endpoint's sleep status
+    sleep: bool
+
 
 class ServiceDiscovery(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -103,7 +106,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         """
 
         endpoint_infos = [
-            EndpointInfo(url, model, self.added_timestamp, model_label)
+            EndpointInfo(url, model, self.added_timestamp, model_label, False)
             for url, model, model_label in zip(
                 self.urls, self.models, self.model_labels
             )
@@ -156,6 +159,33 @@ class K8sServiceDiscovery(ServiceDiscovery):
             return False
         ready_count = sum(1 for status in container_statuses if status.ready)
         return ready_count == len(container_statuses)
+
+    def _get_engine_sleep_status(self, pod_ip) -> Optional[bool]:
+        """
+        Get the engine sleeping status by querying the engine's
+        '/is_sleeping' endpoint.
+
+        Args:
+            pod_ip: the IP address of the pod running the engine
+
+        Returns:
+            the sleep status of the target engine
+        """
+        url = f"http://{pod_ip}:{self.port}/is_sleeping"
+        sleep = False
+        try:
+            headers = None
+            if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
+                logger.info(f"Using vllm server authentication")
+                headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            sleep = response.json()["is_sleeping"]
+        except Exception as e:
+            logger.error(f"Failed to get the sleep status for engine at {url}: {e}")
+            return None
+
+        return sleep
 
     def _get_model_name(self, pod_ip) -> Optional[str]:
         """
@@ -238,12 +268,14 @@ class K8sServiceDiscovery(ServiceDiscovery):
             f"Discovered new serving engine {engine_name} at "
             f"{engine_ip}, running model: {model_name}"
         )
+
         with self.available_engines_lock:
             self.available_engines[engine_name] = EndpointInfo(
                 url=f"http://{engine_ip}:{self.port}",
                 model_name=model_name,
                 added_timestamp=int(time.time()),
                 model_label=model_label,
+                sleep=self._get_engine_sleep_status(engine_ip),
             )
 
     def _delete_engine(self, engine_name: str):
