@@ -15,6 +15,7 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 
+import httpx
 import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
@@ -131,6 +132,7 @@ def initialize_all(app: FastAPI, args):
     if args.service_discovery == "static":
         initialize_service_discovery(
             ServiceDiscoveryType.STATIC,
+            app,
             urls=parse_static_urls(args.static_backends),
             models=parse_static_model_names(args.static_models),
             aliases=(
@@ -139,12 +141,17 @@ def initialize_all(app: FastAPI, args):
                 else None
             ),
             model_labels=parse_static_model_labels(args.static_model_labels),
+            prefill_model_labels=args.prefill_model_labels,
+            decode_model_labels=args.decode_model_labels,
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
             ServiceDiscoveryType.K8S,
+            app,
             namespace=args.k8s_namespace,
             port=args.k8s_port,
+            prefill_model_labels=args.prefill_model_labels,
+            decode_model_labels=args.decode_model_labels,
             label_selector=args.k8s_label_selector,
         )
 
