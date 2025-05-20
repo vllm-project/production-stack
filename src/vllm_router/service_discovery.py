@@ -17,6 +17,7 @@ import enum
 import os
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -42,6 +43,9 @@ class EndpointInfo:
 
     # Model name
     model_name: str
+
+    # Endpoint Id
+    Id: str
 
     # Added timestamp
     added_timestamp: float
@@ -91,6 +95,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.models = models
         self.aliases = aliases
         self.model_labels = model_labels
+        self.engines = [str(uuid.uuid4()) for i in range(0, len(urls))]
         self.added_timestamp = int(time.time())
 
     def get_endpoint_info(self) -> List[EndpointInfo]:
@@ -103,9 +108,11 @@ class StaticServiceDiscovery(ServiceDiscovery):
         """
 
         endpoint_infos = [
-            EndpointInfo(url, model, self.added_timestamp, model_label)
-            for url, model, model_label in zip(
-                self.urls, self.models, self.model_labels
+            EndpointInfo(
+                url, model, Id, self.added_timestamp, model_label
+            )  # Fix this to support sleep and wake_up for vLLM v1
+            for url, model, Id, model_label in zip(
+                self.urls, self.models, self.engines, self.model_labels
             )
         ]
         return endpoint_infos
@@ -243,6 +250,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
                 url=f"http://{engine_ip}:{self.port}",
                 model_name=model_name,
                 added_timestamp=int(time.time()),
+                Id=str(uuid.uuid5(uuid.NAMESPACE_DNS, engine_name)),
                 model_label=model_label,
             )
 

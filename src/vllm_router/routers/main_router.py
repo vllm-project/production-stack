@@ -137,6 +137,38 @@ async def show_models():
     return JSONResponse(content=model_list.model_dump())
 
 
+@main_router.get("/engines")
+async def get_engine_instances():
+    """
+    Returns a list of all models available in the stack.
+
+    Args:
+        None
+
+    Returns:
+        JSONResponse: A JSON response containing the list of models.
+
+    Raises:
+        Exception: If there is an error in retrieving the endpoint information.
+    """
+    endpoints = get_service_discovery().get_endpoint_info()
+    existing_engines = set()
+    engines_cards = []
+    for endpoint in endpoints:
+        if endpoint.model_name in existing_engines:
+            continue
+        engine_card = {
+            "engine_id": endpoint.Id,
+            "serving_model": endpoint.model_name,
+            "created": endpoint.added_timestamp,
+        }
+
+        engines_cards.append(engine_card)
+        existing_engines.add(endpoint.model_name)
+
+    return JSONResponse(content=engines_cards)
+
+
 @main_router.get("/health")
 async def health() -> Response:
     """
