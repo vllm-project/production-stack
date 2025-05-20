@@ -30,9 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	productionstackv1alpha1 "production-stack/api/v1alpha1"
 
@@ -202,8 +207,70 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 func (r *LoraAdapterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&productionstackv1alpha1.LoraAdapter{}).
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(r.findLoraAdaptersForPod),
+			builder.WithPredicates(predicate.Funcs{
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					oldPod := e.ObjectOld.(*corev1.Pod)
+					newPod := e.ObjectNew.(*corev1.Pod)
+					// Trigger if pod becomes ready
+					oldReady := false
+					for _, cond := range oldPod.Status.Conditions {
+						if cond.Type == corev1.PodReady {
+							oldReady = cond.Status == corev1.ConditionTrue
+							break
+						}
+					}
+					newReady := false
+					for _, cond := range newPod.Status.Conditions {
+						if cond.Type == corev1.PodReady {
+							newReady = cond.Status == corev1.ConditionTrue
+							break
+						}
+					}
+					return !oldReady && newReady
+				},
+				DeleteFunc: func(e event.DeleteEvent) bool {
+					return true // Always trigger on deletion
+				},
+				GenericFunc: func(e event.GenericEvent) bool {
+					return false // Don't trigger on generic events
+				},
+			}),
+		).
 		Named("loraadapter").
 		Complete(r)
+}
+
+// findLoraAdaptersForPod finds all LoraAdapters that should be reconciled when a pod changes
+func (r *LoraAdapterReconciler) findLoraAdaptersForPod(ctx context.Context, pod client.Object) []reconcile.Request {
+	// Check if the pod has the model label
+	modelName, hasModel := pod.GetLabels()["model"]
+	if !hasModel {
+		return nil
+	}
+
+	// Get all LoraAdapters
+	loraAdapters := &productionstackv1alpha1.LoraAdapterList{}
+	if err := r.List(ctx, loraAdapters); err != nil {
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, adapter := range loraAdapters.Items {
+		// If the pod's model matches the adapter's base model, add it to the requests
+		if adapter.Spec.BaseModel == modelName {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      adapter.Name,
+					Namespace: adapter.Namespace,
+				},
+			})
+		}
+	}
+
+	return requests
 }
 
 // discoverAdapter discovers the adapter from its source location
@@ -247,8 +314,12 @@ func (r *LoraAdapterReconciler) getOptimalPlacement(ctx context.Context, adapter
 	// Filter for pods that are ready
 	var validPods []corev1.Pod
 	for _, pod := range pods.Items {
-		if pod.Status.Phase == corev1.PodRunning {
-			validPods = append(validPods, pod)
+		// Check if pod is ready by looking at pod conditions
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+				validPods = append(validPods, pod)
+				break
+			}
 		}
 	}
 
