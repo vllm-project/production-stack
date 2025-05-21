@@ -38,7 +38,7 @@ Forward the Prometheus dashboard
 kubectl --namespace monitoring port-forward prometheus-kube-prom-stack-kube-prome-prometheus-0 9090:9090
 ```
 
-Open the webpage at `http://<IP of your node>:3000` to access the Grafana web page. The default user name is `admin` and the password can be configured in `values.yaml` (default is `prom-operator`).
+Open the webpage at `http://<IP of your node>:3000` to access the Grafana web page. The default user name is `admin` and the password can be configured in `kube-prom-stack.yaml` field `adminPassword` (default is `prom-operator`).
 
 Import the dashboard using the `vllm-dashboard.json` in this folder.
 
