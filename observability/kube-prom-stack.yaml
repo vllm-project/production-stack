@@ -100,7 +100,6 @@ prometheus:
           environment: test
           release: test
       namespaceSelector:
-        matchNames:
-          - default
+        any: true
       endpoints:
         - port: "service-port"
