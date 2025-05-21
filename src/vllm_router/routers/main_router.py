@@ -122,25 +122,25 @@ async def show_models():
     endpoints = get_service_discovery().get_endpoint_info()
     existing_models = set()
     model_cards = []
-    
+
     for endpoint in endpoints:
         if not endpoint.model_info:
             continue
-            
+
         for model_id, model_info in endpoint.model_info.items():
             if model_id in existing_models:
                 continue
-                
+
             model_card = ModelCard(
                 id=model_id,
                 object="model",
                 created=model_info["created"],
                 owned_by=model_info["owned_by"],
-                parent=model_info["parent"]
+                parent=model_info["parent"],
             )
             model_cards.append(model_card)
             existing_models.add(model_id)
-            
+
     model_list = ModelList(data=model_cards)
     return JSONResponse(content=model_list.model_dump())
 

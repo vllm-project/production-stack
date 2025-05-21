@@ -70,7 +70,11 @@ class EndpointInfo:
         """
         if not self.model_info:
             return []
-        return [model_id for model_id, info in self.model_info.items() if not info.get("parent")]
+        return [
+            model_id
+            for model_id, info in self.model_info.items()
+            if not info.get("parent")
+        ]
 
     def get_adapters(self) -> List[str]:
         """
@@ -78,30 +82,35 @@ class EndpointInfo:
         """
         if not self.model_info:
             return []
-        return [model_id for model_id, info in self.model_info.items() if info.get("parent")]
+        return [
+            model_id for model_id, info in self.model_info.items() if info.get("parent")
+        ]
 
     def get_adapters_for_model(self, base_model: str) -> List[str]:
         """
         Get the list of adapters available for a specific base model.
-        
+
         Args:
             base_model: The ID of the base model
-            
+
         Returns:
             List of adapter IDs that are based on the specified model
         """
         if not self.model_info:
             return []
-        return [model_id for model_id, info in self.model_info.items() 
-                if info.get("parent") == base_model]
+        return [
+            model_id
+            for model_id, info in self.model_info.items()
+            if info.get("parent") == base_model
+        ]
 
     def has_model(self, model_id: str) -> bool:
         """
         Check if a specific model (base model or adapter) is available on this endpoint.
-        
+
         Args:
             model_id: The ID of the model to check
-            
+
         Returns:
             True if the model is available, False otherwise
         """
@@ -110,10 +119,10 @@ class EndpointInfo:
     def get_model_info(self, model_id: str) -> Optional[Dict]:
         """
         Get detailed information about a specific model.
-        
+
         Args:
             model_id: The ID of the model to get information for
-            
+
         Returns:
             Dictionary containing model information if available, None otherwise
         """
@@ -286,13 +295,13 @@ class K8sServiceDiscovery(ServiceDiscovery):
             response = requests.get(url, headers=headers)
             response.raise_for_status()
             models = response.json()["data"]
-            
+
             # Collect all model names, including both base models and adapters
             model_names = []
             for model in models:
                 model_id = model["id"]
                 model_names.append(model_id)
-            
+
             logger.info(f"Found models on pod {pod_ip}: {model_names}")
             return model_names
         except Exception as e:
@@ -318,7 +327,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
             response = requests.get(url, headers=headers)
             response.raise_for_status()
             models = response.json()["data"]
-            
+
             # Create a dictionary of model information
             model_info = {}
             for model in models:
@@ -330,9 +339,9 @@ class K8sServiceDiscovery(ServiceDiscovery):
                     "owned_by": model["owned_by"],
                     "root": model["root"],
                     "parent": model.get("parent"),
-                    "is_adapter": model.get("parent") is not None
+                    "is_adapter": model.get("parent") is not None,
                 }
-            
+
             return model_info
         except Exception as e:
             logger.error(f"Failed to get model info from {url}: {e}")
@@ -393,10 +402,10 @@ class K8sServiceDiscovery(ServiceDiscovery):
             f"Discovered new serving engine {engine_name} at "
             f"{engine_ip}, running models: {model_names}"
         )
-        
+
         # Get detailed model information
         model_info = self._get_model_info(engine_ip)
-        
+
         with self.available_engines_lock:
             self.available_engines[engine_name] = EndpointInfo(
                 url=f"http://{engine_ip}:{self.port}",
@@ -406,7 +415,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
                 pod_name=engine_name,
                 namespace=self.namespace,
             )
-            
+
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 

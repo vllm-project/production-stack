@@ -65,7 +65,7 @@ def log_stats(app: FastAPI, interval: int = 10):
                     logstr += "\n"
             else:
                 logstr += "Models: No model information available\n"
-                
+
             if url in engine_stats:
                 es = engine_stats[url]
                 logstr += (
