@@ -224,6 +224,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "CacheServer")
 		os.Exit(1)
 	}
+	if err = (&controller.LoraAdapterReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "LoraAdapter")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if metricsCertWatcher != nil {

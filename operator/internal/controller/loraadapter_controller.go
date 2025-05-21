@@ -237,6 +237,9 @@ func (r *LoraAdapterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				GenericFunc: func(e event.GenericEvent) bool {
 					return false // Don't trigger on generic events
 				},
+				CreateFunc: func(e event.CreateEvent) bool {
+					return false // Don't trigger on creation
+				},
 			}),
 		).
 		Named("loraadapter").
@@ -530,7 +533,15 @@ func (r *LoraAdapterReconciler) getAdapterRegistrations(ctx context.Context, ada
 
 	var registrations []productionstackv1alpha1.LoadedAdapter
 	for _, pod := range pods.Items {
-		if pod.Status.Phase != corev1.PodRunning {
+		// Check if pod is ready by looking at pod conditions
+		podReady := false
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+				podReady = true
+				break
+			}
+		}
+		if !podReady {
 			logger.Info("Skipping pod", "pod", pod.Name, "namespace", pod.Namespace, "phase", pod.Status.Phase)
 			continue
 		}

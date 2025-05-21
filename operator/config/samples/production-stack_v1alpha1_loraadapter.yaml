@@ -15,3 +15,4 @@ spec:
     adapterPath: "/data/lora-adapters/llama-3.1-nemoguard-8b-lora"
   deploymentConfig:
     algorithm: "default"
+    replicas: 1
