@@ -26,7 +26,7 @@ kubectl create secret generic huggingface-credentials \
 
 #### 2.1: Create Configuration File
 
-Locate the file under path [tutorial/assets/values-07-lora-enabled.yaml](assets/values-07-lora-enabled.yaml) with the following content:
+Locate the file under path [tutorial/assets/values-09-lora-enabled.yaml](assets/values-09-lora-enabled.yaml) with the following content:
 
 ```yaml
 servingEngineSpec:
@@ -70,7 +70,7 @@ servingEngineSpec:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm-lora vllm/vllm-stack -f tutorials/assets/values-07-lora-enabled.yaml
+helm install vllm-lora vllm/vllm-stack -f tutorials/assets/values-09-lora-enabled.yaml
 ```
 
 ### 3. Using LoRA Adapters
