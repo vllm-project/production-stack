@@ -33,6 +33,12 @@ while true; do
                 echo "[$timestamp] PVC $pvc_name status:"
                 kubectl describe pvc "$pvc_name"
             fi
+
+            # Get pod logs if in BackOff state
+            if [[ "$status" == "BackOff" ]]; then
+                echo "[$timestamp] Pod $pod_name logs:"
+                kubectl logs "$pod_name"
+            fi
         fi
     done
 

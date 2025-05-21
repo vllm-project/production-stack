@@ -104,9 +104,10 @@ jobs:
 
       - name: Clean up Docker system before building image
         run: |
-          echo "Cleaning up Docker system..."
-          docker system prune --all --volumes --force
-          # Remove dangling images specifically
+          echo "Cleaning up git-act-router Docker system..."
+          # Remove only git-act-router related images
+          docker images --format "{{.ID}} {{.Repository}}" | grep "git-act-router" | awk '{print $1}' | xargs -r docker rmi -f
+          # Clean up dangling images
           docker image prune --force
 
       - name: Build and Load Docker image
@@ -192,7 +193,7 @@ jobs:
       - name: Validate the installation and send query to the stack
         run: |
           bash .github/port-forward.sh curl-pod
-        timeout-minutes: 5
+        timeout-minutes: 10
       - name: Archive functionality results
         uses: actions/upload-artifact@v4
         if: always()
