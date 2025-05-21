@@ -26,8 +26,10 @@ while true; do
 
         if [[ "$status" != "Running" ]] || [[ "$ready" != "1/1" ]]; then
             echo "[$timestamp] Pod $pod_name diagnostics:"
+            kubectl get pod "$pod_name"
+            kubectl logs "$pod_name"
             # kubectl get events --field-selector involvedObject.name="$pod_name" --sort-by='.lastTimestamp'
-            kubectl describe node | grep -C 15 "Allocated resources:"
+            # kubectl describe node | grep -C 15 "Allocated resources:"
             pvc_name=$(kubectl get pod "$pod_name" -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}')
             if [ -n "$pvc_name" ]; then
                 pvc_status=$(kubectl get pvc "$pvc_name" -o jsonpath='{.status.phase}')
@@ -38,8 +40,6 @@ while true; do
                     echo "[$timestamp] PVC $pvc_name is already Bound"
                 fi
             fi
-            kubectl get pod "$pod_name"
-            kubectl logs "$pod_name"
         fi
     done
 
