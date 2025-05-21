@@ -26,19 +26,20 @@ while true; do
 
         if [[ "$status" != "Running" ]] || [[ "$ready" != "1/1" ]]; then
             echo "[$timestamp] Pod $pod_name diagnostics:"
-            kubectl get events --field-selector involvedObject.name="$pod_name" --sort-by='.lastTimestamp'
+            # kubectl get events --field-selector involvedObject.name="$pod_name" --sort-by='.lastTimestamp'
             kubectl describe node | grep -C 15 "Allocated resources:"
             pvc_name=$(kubectl get pod "$pod_name" -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}')
             if [ -n "$pvc_name" ]; then
-                echo "[$timestamp] PVC $pvc_name status:"
-                kubectl describe pvc "$pvc_name"
+                pvc_status=$(kubectl get pvc "$pvc_name" -o jsonpath='{.status.phase}')
+                if [[ "$pvc_status" != "Bound" ]]; then
+                    echo "[$timestamp] PVC $pvc_name status:"
+                    kubectl describe pvc "$pvc_name"
+                else
+                    echo "[$timestamp] PVC $pvc_name is already Bound"
+                fi
             fi
-
-            # Get pod logs if in BackOff state
-            if [[ "$status" == "BackOff" ]]; then
-                echo "[$timestamp] Pod $pod_name logs:"
-                kubectl logs "$pod_name"
-            fi
+            kubectl get pod "$pod_name"
+            kubectl logs "$pod_name"
         fi
     done
 
