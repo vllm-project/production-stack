@@ -61,3 +61,24 @@ def test_update_content_length_modifies_content_length_header() -> None:
             "Content-Type": "application/json",
         }
     )
+
+
+def test_parse_comma_separated_args_when_comma_separated_list_supplied_returns_list_of_string() -> (
+    None
+):
+    assert utils.parse_comma_separated_args("test1,test2,test3") == [
+        "test1",
+        "test2",
+        "test3",
+    ]
+
+
+def test_get_test_payload_returns_values_for_known_types() -> None:
+    for model_type in utils.ModelType:
+        assert isinstance(utils.ModelType.get_test_payload(model_type.name), dict)
+
+
+def test_get_all_fields_returns_list_of_strings() -> None:
+    fields = utils.ModelType.get_all_fields()
+    assert isinstance(fields, list)
+    assert isinstance(fields[0], str)
