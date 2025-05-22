@@ -27,7 +27,7 @@ while true; do
         if [[ "$status" != "Running" ]] || [[ "$ready" != "1/1" ]]; then
             echo "[$timestamp] Pod $pod_name diagnostics:"
             kubectl get pod "$pod_name"
-            kubectl logs "$pod_name"
+            kubectl logs "$pod_name" -f
             # kubectl get events --field-selector involvedObject.name="$pod_name" --sort-by='.lastTimestamp'
             # kubectl describe node | grep -C 15 "Allocated resources:"
             pvc_name=$(kubectl get pod "$pod_name" -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}')
@@ -53,7 +53,7 @@ while true; do
     fi
 
     echo "Not all pods are ready yet. Checking again in 5 seconds..."
-    sleep 5
+    sleep 10
 done
 
 # Expose router service
