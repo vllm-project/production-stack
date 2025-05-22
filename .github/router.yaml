@@ -1,0 +1,32 @@
+routerSpec:
+  repository: "localhost:5000/git-act-router"
+  imagePullPolicy: "IfNotPresent"
+  enableRouter: true
+  resources:
+    requests:
+      cpu: "1"
+      memory: "6G"
+    limits:
+      cpu: "1"
+      memory: "6G"
+servingEngineSpec:
+  strategy:
+    type: Recreate
+  runtimeClassName: ""
+  modelSpec:
+  - name: "opt125m"
+    repository: "public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo"
+    tag: "v0.8.3"
+    modelURL: "facebook/opt-125m"
+
+    replicaCount: 1
+
+    requestCPU: 1
+    requestMemory: "2Gi"
+
+    pvcStorage: "10Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
+
+    vllmConfig:
+      maxModelLen: 256
