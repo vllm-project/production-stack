@@ -30,7 +30,9 @@ Before you begin, ensure the following:
    - Basic understanding of Linux shell commands.
 
 4. **Kubernetes Installation:**
-   - Follow the instructions in [`00-install-kubernetes-env.md`](00-install-kubernetes-env.md) to set up your Kubernetes environment.
+   - To quickly and easily set up a single-node Kubernetes environment, you may install Minikube by following the instructions provided in[`00-install-kubernetes-env.md`](00-install-kubernetes-env.md).
+   - For setting up a multi-node cluster or a more generalized Kubernetes environment, you may install Kubernetes from scratch using Kubeadm. This involves configuring the container runtime and container network interface (CNI), as outlined in [`00-a-install-multinode-kubernetes-env.md`](00-a-install-multinode-kubernetes-env.md)
+   - If you already have a running Kubernetes cluster, you may skip this step.
 
 5. **Kuberay Concept Review:**
    - Review the [`official KubeRay documentation`](https://docs.ray.io/en/latest/cluster/kubernetes/index.html) for additional context and best practices.
