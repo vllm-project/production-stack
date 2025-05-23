@@ -39,7 +39,7 @@ semantic_cache = [
     "huggingface-hub==0.25.2",  # downgrade to 0.25.2 to avoid breaking changes
 ]
 lmcache = [
-    "lmcache==0.2.11",
+    "lmcache==0.2.1",
 ]
 
 [tool.pytest.ini_options]
