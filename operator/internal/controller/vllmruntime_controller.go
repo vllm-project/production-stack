@@ -518,13 +518,15 @@ func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *production
 		latestVR.Status.LastUpdated = metav1.Now()
 
 		// Update model status based on deployment status
-		if dep.Status.AvailableReplicas > 0 {
+		if dep.Status.AvailableReplicas == *dep.Spec.Replicas && dep.Status.UnavailableReplicas == 0 {
 			latestVR.Status.ModelStatus = "Ready"
-		} else if dep.Status.UpdatedReplicas > 0 {
+		} else if dep.Status.UpdatedReplicas > 0 && dep.Status.AvailableReplicas != *dep.Spec.Replicas && dep.Status.UnavailableReplicas > 0 {
 			// If we have updated replicas but they're not yet available, mark as updating
 			latestVR.Status.ModelStatus = "Updating"
-		} else {
+		} else if dep.Status.UnavailableReplicas > 0 {
 			latestVR.Status.ModelStatus = "NotReady"
+		} else {
+			latestVR.Status.ModelStatus = "Unknown"
 		}
 
 		return r.Status().Update(ctx, latestVR)
