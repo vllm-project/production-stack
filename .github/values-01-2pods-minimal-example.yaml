@@ -4,7 +4,7 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
   - name: "opt125m"
-    repository: "vllm/vllm-openai"
+    repository: "zhuohangu/vllm-test"
     tag: "latest"
     modelURL: "facebook/opt-125m"
 
@@ -12,7 +12,7 @@ servingEngineSpec:
 
     requestCPU: 6
     requestMemory: "16Gi"
-    requestGPU: 0.5
+    requestGPU: 0
 
     pvcStorage: "10Gi"
     pvcAccessMode:
