@@ -22,6 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the {{ .ProjectName }} itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- loraadapter_admin_role.yaml
+- loraadapter_editor_role.yaml
+- loraadapter_viewer_role.yaml
 - cacheserver_admin_role.yaml
 - cacheserver_editor_role.yaml
 - cacheserver_viewer_role.yaml
