@@ -42,6 +42,11 @@ lmcache = [
     "lmcache==0.2.1",
 ]
 
+[tool.pytest.ini_options]
+addopts = "--cov . --cov-report term --cov-report html"
+filterwarnings = "ignore"
+junit_family = "xunit2"
+
 [build-system]
 requires = ["setuptools>=68", "setuptools_scm[toml]>=8.0"]
 
@@ -52,6 +57,9 @@ write_to = "src/vllm_router/_version.py"
 profile = "black"
 
 [dependency-groups]
+dev = [
+    "pytest-cov>=6.1.1",
+]
 lint = [
     "pre-commit>=4.1.0",
 ]
