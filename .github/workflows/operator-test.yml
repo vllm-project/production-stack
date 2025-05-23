@@ -2,7 +2,7 @@ name: Operator CRD and CR Testing
 run-name: ${{ github.actor }} is testing operator CRDs and CRs 🚀
 
 concurrency:
-  group: ${{ github.ref }}
+  group: ${{ github.ref }}-crd
   cancel-in-progress: true
 
 on:
