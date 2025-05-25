@@ -103,13 +103,18 @@ class StaticServiceDiscovery(ServiceDiscovery):
         Returns:
             a list of engine URLs
         """
-
-        endpoint_infos = [
-            EndpointInfo(url, model, self.added_timestamp, model_label)
-            for url, model, model_label in zip(
-                self.urls, self.models, self.model_labels
-            )
-        ]
+        if self.model_labels is None:
+            endpoint_infos = [
+                EndpointInfo(url, model, self.added_timestamp, "default")
+                for url, model in zip(self.urls, self.models)
+            ]
+        else:
+            endpoint_infos = [
+                EndpointInfo(url, model, self.added_timestamp, model_label)
+                for url, model, model_label in zip(
+                    self.urls, self.models, self.model_labels
+                )
+            ]
         return endpoint_infos
 
 
