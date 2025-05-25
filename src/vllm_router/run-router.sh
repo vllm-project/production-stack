@@ -4,15 +4,15 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-Use this command when testing with k8s service discovery
-python3 -m vllm_router.app --port "8100" \
-    --service-discovery k8s \
-    --k8s-label-selector release=test \
-    --k8s-namespace default \
-    --routing-logic session \
-    --session-key "x-user-id" \
-    --engine-stats-interval 10 \
-    --log-stats
+# Use this command when testing with k8s service discovery
+# python3 -m vllm_router.app --port "$1" \
+#     --service-discovery k8s \
+#     --k8s-label-selector release=test \
+#     --k8s-namespace default \
+#     --routing-logic session \
+#     --session-key "x-user-id" \
+#     --engine-stats-interval 10 \
+#     --log-stats
 
 # Use this command when testing with static service discovery
 python3 -m vllm_router.app --port "$1" \
