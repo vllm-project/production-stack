@@ -65,7 +65,7 @@ spec:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
           command:
-          {{- if eq $modelSpec.tag "2025-05-17-v1" }}
+          {{- if or (eq $modelSpec.tag "2025-05-17-v1") (and (eq $modelSpec.tag "latest") (eq $modelSpec.repository "lmcache/vllm-openai")) }}
           - "/opt/venv/bin/vllm"
           {{- else }}
           - "vllm"
