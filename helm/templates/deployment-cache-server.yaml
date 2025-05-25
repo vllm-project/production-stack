@@ -29,7 +29,11 @@ spec:
         - name: "lmcache-server"
           image: "{{ required "Required value 'cacheserverSpec.repository' must be defined !" .Values.cacheserverSpec.repository }}:{{ required "Required value 'cacheserverSpec.tag' must be defined !" .Values.cacheserverSpec.tag }}"
           command:
+          {{- if eq .Values.cacheserverSpec.tag "latest" }}
+          - "/opt/venv/bin/lmcache_experimental_server"
+          {{- else }}
           - "lmcache_experimental_server"
+          {{- end }}
           - "0.0.0.0"
           - "{{ .Values.cacheserverSpec.containerPort }}"
           {{- if .Values.cacheserverSpec.resources }}
