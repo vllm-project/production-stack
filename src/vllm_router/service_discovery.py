@@ -239,7 +239,10 @@ class StaticServiceDiscovery(ServiceDiscovery):
         """
         endpoint_infos = []
         for i, (url, model) in enumerate(zip(self.urls, self.models)):
-            if self.get_model_endpoint_hash(url, model) in self.unhealthy_endpoint_hashes:
+            if (
+                self.get_model_endpoint_hash(url, model)
+                in self.unhealthy_endpoint_hashes
+            ):
                 continue
             model_label = self.model_labels[i] if self.model_labels else "default"
             endpoint_info = EndpointInfo(
