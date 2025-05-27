@@ -208,6 +208,27 @@ class StaticServiceDiscovery(ServiceDiscovery):
     def get_model_endpoint_hash(self, url: str, model: str) -> str:
         return hashlib.md5(f"{url}{model}".encode()).hexdigest()
 
+    def _get_model_info(self, model: str) -> Dict[str, Dict]:
+        """
+        Get detailed model information. For static serving engines, we don't query the engine, instead we use predefined
+        static model info.
+
+        Args:
+            model: the model name
+
+        Returns:
+            Dictionary mapping model IDs to their information, including parent-child relationships
+        """
+        return {
+            model: {
+                "id": model,
+                "object": "model",
+                "owned_by": "vllm",
+                "parent": None,
+                "is_adapter": False,
+            }
+        }
+
     def get_endpoint_info(self) -> List[EndpointInfo]:
         """
         Get the URLs of the serving engines that are available for
@@ -216,16 +237,20 @@ class StaticServiceDiscovery(ServiceDiscovery):
         Returns:
             a list of engine URLs
         """
-        if not self.model_labels:
-            self.model_labels = ["default"] * len(self.models)
-        endpoint_infos = [
-            EndpointInfo(url, model, self.added_timestamp, model_label)
-            for url, model, model_label in zip(
-                self.urls, self.models, self.model_labels
+        endpoint_infos = []
+        for i, (url, model) in enumerate(zip(self.urls, self.models)):
+            if self.get_model_endpoint_hash(url, model) in self.unhealthy_endpoint_hashes:
+                continue
+            model_label = self.model_labels[i] if self.model_labels else "default"
+            endpoint_info = EndpointInfo(
+                url=url,
+                model_names=[model],  # Convert single model to list
+                added_timestamp=self.added_timestamp,
+                model_label=model_label,
+                model_info=self._get_model_info(model),
             )
-            if self.get_model_endpoint_hash(url, model)
-            not in self.unhealthy_endpoint_hashes
-        ]
+            endpoint_infos.append(endpoint_info)
+
         return endpoint_infos
 
 

@@ -287,7 +287,7 @@ async def route_disaggregated_prefill_request(
         time.time()
     )
 
-    endpoints = list(filter(lambda x: x.model_name == requested_model, endpoints))
+    endpoints = list(filter(lambda x: requested_model in x.model_names, endpoints))
     if not endpoints:
         return JSONResponse(
             status_code=400, content={"error": f"Model {requested_model} not found."}
