@@ -5,6 +5,7 @@ resources:
 - bases/production-stack.vllm.ai_vllmruntimes.yaml
 - bases/production-stack.vllm.ai_vllmrouters.yaml
 - bases/production-stack.vllm.ai_cacheservers.yaml
+- bases/production-stack.vllm.ai_loraadapters.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

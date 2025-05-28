@@ -48,6 +48,7 @@ class ModelCard(OpenAIBaseModel):
     created: int = Field(default_factory=lambda: int(time.time()))
     owned_by: str = "vllm"
     root: Optional[str] = None
+    parent: Optional[str] = None
 
 
 class ModelList(OpenAIBaseModel):
