@@ -108,4 +108,4 @@ def test_get_endpoint_info_when_model_endpoint_hash_is_in_unhealthy_endpoint_doe
         discovery_instance, "get_model_endpoint_hash", mock_get_model_endpoint_hash
     )
     assert len(discovery_instance.get_endpoint_info()) == 1
-    assert discovery_instance.get_endpoint_info()[0].model_name == "llama3"
+    assert "llama3" in discovery_instance.get_endpoint_info()[0].model_names
