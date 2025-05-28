@@ -51,10 +51,15 @@ spec:
           {{- if $container.resources }}
           resources: {{ toYaml $container.resources | nindent 12 }}
           {{- end }}
-          {{- if and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage") }}
+          {{- if or (and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage")) (hasKey $container "extraVolumeMounts") }}
           volumeMounts:
+          {{- end }}
+          {{- if and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage") }}
             - name: {{ .Release.Name }}-storage
               mountPath: /data
+          {{- end }}
+          {{- if hasKey $container "extraVolumeMounts" }}
+          {{- toYaml $container.extraVolumeMounts | nindent 10 }}
           {{- end }}
       {{- end }}
       {{- if .Values.servingEngineSpec.securityContext }}
@@ -326,7 +331,11 @@ spec:
           {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
-        - name: {{ $modelSpec.imagePullSecret }}
+      {{- if kindIs "string" $modelSpec.imagePullSecret }}
+      - name: {{ $modelSpec.imagePullSecret }}
+      {{- else }}
+      {{- toYaml $modelSpec.imagePullSecret | nindent 6 }}
+      {{- end }}
       {{- end }}
       {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
       volumes:
