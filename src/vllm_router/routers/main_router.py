@@ -12,19 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import time
 
-from fastapi import APIRouter, BackgroundTasks, Request
+import httpx
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import JSONResponse, Response
 
 from vllm_router.dynamic_config import get_dynamic_config_watcher
 from vllm_router.log import init_logger
 from vllm_router.protocols import ModelCard, ModelList
+from vllm_router.routers.routing_logic import get_routing_logic
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.request import (
     route_general_request,
     route_sleep_wakeup_request,
 )
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
+from vllm_router.stats.request_stats import RequestStatsMonitor
 from vllm_router.version import __version__
 
 try:
@@ -198,8 +210,7 @@ async def get_engine_instances():
 
 @main_router.get("/health")
 async def health() -> Response:
-    """
-    Endpoint to check the health status of various components.
+    """Endpoint to check the health status of various components.
 
     This function verifies the health of the service discovery module and
     the engine stats scraper. If either component is down, it returns a
@@ -232,3 +243,135 @@ async def health() -> Response:
         )
     else:
         return JSONResponse(content={"status": "healthy"}, status_code=200)
+
+
+@main_router.post("/v1/audio/transcriptions")
+async def audio_transcriptions(
+    file: UploadFile = File(...),
+    model: str = Form(...),
+    prompt: str | None = Form(None),
+    response_format: str | None = Form("json"),
+    temperature: float | None = Form(None),
+    language: str = Form("en"),
+):
+
+    logger.debug("==== Enter audio_transcriptions ====")
+    logger.debug("Received upload: %s (%s)", file.filename, file.content_type)
+    logger.debug(
+        "Params: model=%s prompt=%r response_format=%r temperature=%r language=%s",
+        model,
+        prompt,
+        response_format,
+        temperature,
+        language,
+    )
+
+    # read file bytes
+    payload_bytes = await file.read()
+    files = {
+        "file": (file.filename, payload_bytes, file.content_type),
+    }
+    # logger.debug("=========files=========")
+    # logger.debug(files)
+    # logger.debug("=========files=========")
+
+    data = {
+        "model": model,
+        "language": language,
+    }
+
+    if prompt:
+        data["prompt"] = prompt
+
+    if response_format:
+        data["response_format"] = response_format
+
+    if temperature is not None:
+        data["temperature"] = str(temperature)
+
+    logger.debug("==== data payload keys ====")
+    logger.debug(list(data.keys()))
+    logger.debug("==== data payload keys ====")
+
+    # get the backend url
+    endpoints = get_service_discovery().get_endpoint_info()
+
+    logger.debug("==== Total endpoints ====")
+    logger.debug(endpoints)
+    logger.debug("==== Total endpoints ====")
+
+    # TODO: right now is skipping label check in code for local testing
+    endpoints = [
+        ep
+        for ep in endpoints
+        if model in ep.model_names  # that actually serve your model
+    ]
+
+    logger.debug("==== Discovered endpoints after filtering ====")
+    logger.debug(endpoints)
+    logger.debug("==== Discovered endpoints after filtering ====")
+
+    # filter the endpoints url for transcriptions
+    transcription_endpoints = [ep for ep in endpoints if model in ep.model_names]
+
+    logger.debug("====List of transcription endpoints====")
+    logger.debug(transcription_endpoints)
+    logger.debug("====List of transcription endpoints====")
+
+    if not transcription_endpoints:
+        logger.error("No transcription backend available for model %s", model)
+        raise HTTPException(
+            status_code=503, detail=f"No transcription backend for model {model}"
+        )
+
+    # grab the current engin and request stats
+    engine_stats = get_engine_stats_scraper().get_engine_stats()
+    request_stats = RequestStatsMonitor().get_request_stats(time.time())
+    router = get_routing_logic()
+
+    # pick one using the router's configured logic (roundrobin, least-loaded, etc.)
+    chosen_url = router.route_request(
+        transcription_endpoints,
+        engine_stats,
+        request_stats,
+        # we don’t need to pass the original FastAPI Request object here,
+        # but you can if your routing logic looks at headers or body
+        None,
+    )
+
+    logger.info("Proxying transcription request to %s", chosen_url)
+
+    # proxy the request
+    # by default httpx will only wait for 5 seconds, large audio transcriptions generally
+    # take longer than that
+    async with httpx.AsyncClient(
+        base_url=chosen_url,
+        timeout=httpx.Timeout(
+            connect=60.0,  # connect timeout
+            read=300.0,  # read timeout
+            write=30.0,  # if you’re streaming uploads
+            pool=None,  # no pool timeout
+        ),
+    ) as client:
+        logger.debug("Sending multipart to %s/v1/audio/transcriptions …", chosen_url)
+        proxied = await client.post("/v1/audio/transcriptions", data=data, files=files)
+    logger.info("Received %d from whisper backend", proxied.status_code)
+
+    # return the whisper response unmodified
+    resp = proxied.json()
+    logger.debug("==== Whisper response payload ====")
+    logger.debug(resp)
+    logger.debug("==== Whisper response payload ====")
+
+    logger.debug("Backend response headers: %s", proxied.headers)
+    logger.debug("Backend response body (truncated): %r", proxied.content[:200])
+
+    return JSONResponse(
+        content=resp,
+        status_code=proxied.status_code,
+        headers={
+            k: v
+            for k, v in proxied.headers.items()
+            if k.lower() not in ("content-encoding", "transfer-encoding", "connection")
+        },
+    )
