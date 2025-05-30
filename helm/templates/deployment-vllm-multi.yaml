@@ -33,6 +33,8 @@ spec:
         model: {{ $modelSpec.name }}
         helm-release-name: {{ .Release.Name }}
       {{- include "chart.engineLabels" . | nindent 8 }}
+      annotations:
+      {{- include "chart.engineAnnotations" . | nindent 8 }}
     spec:
       {{- if hasKey $modelSpec "initContainer" }}
       {{- $container := $modelSpec.initContainer }}

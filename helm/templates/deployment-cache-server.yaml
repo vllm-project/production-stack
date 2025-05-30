@@ -15,6 +15,10 @@ spec:
     metadata:
       labels:
       {{- include "chart.cacheserverLabels" . | nindent 8 }}
+      {{- with .Values.cacheserverSpec.podAnnotations }}
+      annotations:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- if .Values.cacheserverSpec.nodeSelectorTerms}}
       affinity:

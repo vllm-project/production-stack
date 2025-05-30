@@ -146,6 +146,15 @@ limits:
 {{- end }}
 
 {{/*
+  Define Annotations for serving engine and its service
+*/}}
+{{- define "chart.engineAnnotations" -}}
+{{-   with .Values.servingEngineSpec.podAnnotations -}}
+{{      toYaml . }}
+{{-   end }}
+{{- end }}
+
+{{/*
   Define helper function to convert labels to a comma separated list
 */}}
 {{- define "labels.toCommaSeparatedList" -}}

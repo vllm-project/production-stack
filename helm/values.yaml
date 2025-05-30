@@ -313,6 +313,9 @@ routerSpec:
     environment: "router"
     release: "router"
 
+  # -- Pod Annotations the router deployment
+  podAnnotations: {}
+
   ingress:
     # -- Enable ingress controller resource
     enabled: false
