@@ -51,6 +51,7 @@ class ModelType(enum.Enum):
     embeddings = "/v1/embeddings"
     rerank = "/v1/rerank"
     score = "/v1/score"
+    transcription = "/v1/audio/transcriptions"
 
     @staticmethod
     def get_test_payload(model_type: str):
@@ -75,6 +76,11 @@ class ModelType(enum.Enum):
                 return {"query": "Hello", "documents": ["Test"]}
             case ModelType.score:
                 return {"encoding_format": "float", "text_1": "Test", "test_2": "Test2"}
+            case ModelType.transcription:
+                return {
+                    "file": "",
+                    "model": "openai/whisper-small",
+                }
 
     @staticmethod
     def get_all_fields():
