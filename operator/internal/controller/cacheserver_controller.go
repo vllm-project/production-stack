@@ -265,7 +265,7 @@ func (r *CacheServerReconciler) serviceForCacheServer(cacheServer *productionsta
 				{
 					Name:       "http",
 					Port:       80,
-					TargetPort: intstr.FromInt(int(cacheServer.Spec.Port)),
+					TargetPort: intstr.FromInt32(cacheServer.Spec.Port),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},

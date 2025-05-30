@@ -276,7 +276,7 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
 										Path: "/health",
-										Port: intstr.FromInt(int(router.Spec.Port)),
+										Port: intstr.FromInt32(router.Spec.Port),
 									},
 								},
 							},
@@ -366,7 +366,7 @@ func (r *VLLMRouterReconciler) serviceForVLLMRouter(router *servingv1alpha1.VLLM
 				{
 					Name:       "http",
 					Port:       80,
-					TargetPort: intstr.FromInt(int(router.Spec.Port)),
+					TargetPort: intstr.FromInt32(router.Spec.Port),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
