@@ -14,7 +14,9 @@ def test_init_when_static_backend_health_checks_calls_start_health_checks(
         start_health_check_mock,
     )
     discovery_instance = StaticServiceDiscovery(
-        [], [], None, None, None, static_backend_health_checks=True
+        [], [], None, None, None, static_backend_health_checks=True, 
+        prefill_model_labels=None,
+        decode_model_labels=None,
     )
     discovery_instance.start_health_check_task.assert_called_once()
 
@@ -28,7 +30,9 @@ def test_init_when_endpoint_health_check_disabled_does_not_call_start_health_che
         start_health_check_mock,
     )
     discovery_instance = StaticServiceDiscovery(
-        [], [], None, None, None, static_backend_health_checks=False
+        [], [], None, None, None, static_backend_health_checks=False,
+        prefill_model_labels=None,
+        decode_model_labels=None,
     )
     discovery_instance.start_health_check_task.assert_not_called()
 
@@ -44,6 +48,8 @@ def test_get_unhealthy_endpoint_hashes_when_only_healthy_models_exist_does_not_r
         None,
         ["chat"],
         static_backend_health_checks=True,
+        prefill_model_labels=None,
+        decode_model_labels=None,
     )
     assert discovery_instance.get_unhealthy_endpoint_hashes() == []
 
@@ -59,6 +65,8 @@ def test_get_unhealthy_endpoint_hashes_when_unhealthy_model_exist_returns_unheal
         None,
         ["chat"],
         static_backend_health_checks=False,
+        prefill_model_labels=None,
+        decode_model_labels=None,
     )
     assert discovery_instance.get_unhealthy_endpoint_hashes() == [
         "ee7d421a744e07595b70f98c11be93e7"
@@ -81,6 +89,8 @@ def test_get_unhealthy_endpoint_hashes_when_healthy_and_unhealthy_models_exist_r
         None,
         ["chat", "embeddings"],
         static_backend_health_checks=False,
+        prefill_model_labels=None,
+        decode_model_labels=None,
     )
     assert discovery_instance.get_unhealthy_endpoint_hashes() == [
         "01e1b07eca36d39acacd55a33272a225"
@@ -102,6 +112,8 @@ def test_get_endpoint_info_when_model_endpoint_hash_is_in_unhealthy_endpoint_doe
         None,
         ["chat", "chat"],
         static_backend_health_checks=False,
+        prefill_model_labels=None,
+        decode_model_labels=None,
     )
     discovery_instance.unhealthy_endpoint_hashes = ["some-hash"]
     monkeypatch.setattr(

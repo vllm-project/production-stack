@@ -30,6 +30,7 @@ extensions = [
     "sphinx_design",
     "sphinx_togglebutton",
     "sphinx_click",
+    "httpx"
 ]
 
 # -- General configuration ---------------------------------------------------

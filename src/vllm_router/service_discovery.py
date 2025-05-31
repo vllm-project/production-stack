@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import httpx
 import abc
 import asyncio
 import enum
@@ -162,13 +162,17 @@ class ServiceDiscovery(metaclass=abc.ABCMeta):
 class StaticServiceDiscovery(ServiceDiscovery):
     def __init__(
         self,
+        app,
         urls: List[str],
         models: List[str],
         aliases: List[str] | None,
         model_labels: List[str] | None,
         model_types: List[str] | None,
         static_backend_health_checks: bool,
+        prefill_model_labels: List[str] | None,
+        decode_model_labels: List[str] | None,
     ):
+        self.app = app
         assert len(urls) == len(models), "URLs and models should have the same length"
         self.urls = urls
         self.models = models
@@ -179,6 +183,8 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.unhealthy_endpoint_hashes = []
         if static_backend_health_checks:
             self.start_health_check_task()
+        self.prefill_model_labels = prefill_model_labels
+        self.decode_model_labels = decode_model_labels
 
     def get_unhealthy_endpoint_hashes(self) -> list[str]:
         unhealthy_endpoints = []
@@ -253,12 +259,26 @@ class StaticServiceDiscovery(ServiceDiscovery):
                 model_info=self._get_model_info(model),
             )
             endpoint_infos.append(endpoint_info)
-
+        if (
+            self.prefill_model_labels is not None
+            and self.decode_model_labels is not None
+        ):
+            for endpoint_info in endpoint_infos:
+                if endpoint_info.model_label in self.prefill_model_labels:
+                    self.app.state.prefill_client = httpx.AsyncClient(
+                        base_url=endpoint_info.url,
+                        timeout=None,
+                    )
+                elif endpoint_info.model_label in self.decode_model_labels:
+                    self.app.state.decode_client = httpx.AsyncClient(
+                        base_url=endpoint_info.url,
+                        timeout=None,
+                    )
         return endpoint_infos
 
 
 class K8sServiceDiscovery(ServiceDiscovery):
-    def __init__(self, namespace: str, port: str, label_selector=None):
+    def __init__(self, app, namespace: str, port: str, label_selector=None):
         """
         Initialize the Kubernetes service discovery module. This module
         assumes all serving engine pods are in the same namespace, listening
@@ -272,6 +292,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
             port: the port of the engines
             label_selector: the label selector of the engines
         """
+        self.app = app
         self.namespace = namespace
         self.port = port
         self.available_engines: Dict[str, EndpointInfo] = {}
@@ -443,7 +464,16 @@ class K8sServiceDiscovery(ServiceDiscovery):
                 pod_name=engine_name,
                 namespace=self.namespace,
             )
-
+            if model_label in self.prefill_model_labels:
+                self.app.state.prefill_client = httpx.AsyncClient(
+                    base_url=f"http://{engine_ip}:{self.port}",
+                    timeout=None,
+                )
+            elif model_label in self.decode_model_labels:
+                self.app.state.decode_client = httpx.AsyncClient(
+                    base_url=f"http://{engine_ip}:{self.port}",
+                    timeout=None,
+                )
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
