@@ -14,7 +14,12 @@ def test_init_when_static_backend_health_checks_calls_start_health_checks(
         start_health_check_mock,
     )
     discovery_instance = StaticServiceDiscovery(
-        [], [], None, None, None, static_backend_health_checks=True, 
+        [],
+        [],
+        None,
+        None,
+        None,
+        static_backend_health_checks=True,
         prefill_model_labels=None,
         decode_model_labels=None,
     )
@@ -30,7 +35,12 @@ def test_init_when_endpoint_health_check_disabled_does_not_call_start_health_che
         start_health_check_mock,
     )
     discovery_instance = StaticServiceDiscovery(
-        [], [], None, None, None, static_backend_health_checks=False,
+        [],
+        [],
+        None,
+        None,
+        None,
+        static_backend_health_checks=False,
         prefill_model_labels=None,
         decode_model_labels=None,
     )
