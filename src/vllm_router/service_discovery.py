@@ -284,8 +284,8 @@ class K8sServiceDiscovery(ServiceDiscovery):
         namespace: str,
         port: str,
         label_selector=None,
-        prefill_model_labels: List[str] = None,
-        decode_model_labels: List[str] = None,
+        prefill_model_labels: List[str] | None = None,
+        decode_model_labels: List[str] | None = None,
     ):
         """
         Initialize the Kubernetes service discovery module. This module
