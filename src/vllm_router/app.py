@@ -159,6 +159,8 @@ def initialize_all(app: FastAPI, args):
             namespace=args.k8s_namespace,
             port=args.k8s_port,
             label_selector=args.k8s_label_selector,
+            prefill_model_labels=args.prefill_model_labels,
+            decode_model_labels=args.decode_model_labels,
         )
 
     else:
