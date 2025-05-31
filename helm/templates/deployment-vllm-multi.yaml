@@ -63,6 +63,8 @@ spec:
       {{- end }}
       hostIPC: true
       hostPID: true
+      hostname: "{{ $.Release.Name }}-{{ $modelSpec.name }}-{{ $.Chart.Name }}"
+      subdomain: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
@@ -318,7 +320,7 @@ spec:
             mountPath: /data
           {{- end }}
           {{- with $modelSpec.vllmConfig }}
-          {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
+          {{- if or (hasKey $modelSpec.vllmConfig "tensorParallelSize" ) (hasKey $modelSpec.lmcacheConfig "enablePD" )}}
           - name: shm
             mountPath: /dev/shm
           {{- end}}
@@ -343,7 +345,7 @@ spec:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
         {{- end }}
         {{- with $modelSpec.vllmConfig }}
-        {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
+        {{- if or (hasKey $modelSpec.vllmConfig "tensorParallelSize" ) (hasKey $modelSpec.lmcacheConfig "enablePD" )}}
         - name: shm
           emptyDir:
             medium: Memory

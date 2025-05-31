@@ -30,7 +30,6 @@ extensions = [
     "sphinx_design",
     "sphinx_togglebutton",
     "sphinx_click",
-    "httpx",
 ]
 
 # -- General configuration ---------------------------------------------------
@@ -96,6 +95,7 @@ autodoc_mock_imports = [
     "prometheus_client",
     "uhashring",
     "lmcache",
+    "httpx",
 ]
 
 intersphinx_mapping = {
