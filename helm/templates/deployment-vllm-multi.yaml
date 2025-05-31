@@ -73,7 +73,7 @@ spec:
               add:
                 - SYS_PTRACE
           command:
-          {{- if or (eq $modelSpec.tag "2025-05-27-v1") (and (eq $modelSpec.tag "latest") (eq $modelSpec.repository "lmcache/vllm-openai")) }}
+          {{- if or (eq $modelSpec.tag "2025-05-19-v1") (eq $modelSpec.tag "2025-05-17-v1") (and (eq $modelSpec.tag "latest") (eq $modelSpec.repository "lmcache/vllm-openai")) }}
           - "/opt/venv/bin/vllm"
           {{- else }}
           - "vllm"
@@ -226,6 +226,10 @@ spec:
           - name: VLLM_RPC_TIMEOUT
             value: "1000000"
           {{-   end }}
+          {{- if hasKey $modelSpec.lmcacheConfig "cudaVisibleDevices" }}
+          - name: CUDA_VISIBLE_DEVICES
+            value: {{ $modelSpec.lmcacheConfig.cudaVisibleDevices | quote }}
+          {{-   end }}
           {{-   if and (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
           - name: LMCACHE_LOCAL_CPU
             value: "False"
@@ -310,6 +314,8 @@ spec:
               containerPort: {{ include "chart.container-port" . }}
             - name: zmq-port
               containerPort: 55555
+            - name: ucx-port
+              containerPort: 9999
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
           {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
@@ -319,12 +325,8 @@ spec:
           - name: {{ .Release.Name }}-storage
             mountPath: /data
           {{- end }}
-          {{- with $modelSpec.vllmConfig }}
-          {{- if or (hasKey $modelSpec.vllmConfig "tensorParallelSize" ) (hasKey $modelSpec.lmcacheConfig "enablePD" )}}
           - name: shm
             mountPath: /dev/shm
-          {{- end}}
-          {{- end}}
           {{- if $modelSpec.chatTemplate }}
           - name: vllm-templates
             mountPath: /templates
@@ -344,14 +346,10 @@ spec:
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
         {{- end }}
-        {{- with $modelSpec.vllmConfig }}
-        {{- if or (hasKey $modelSpec.vllmConfig "tensorParallelSize" ) (hasKey $modelSpec.lmcacheConfig "enablePD" )}}
         - name: shm
           emptyDir:
             medium: Memory
             sizeLimit: {{ default "20Gi" $modelSpec.shmSize }}
-        {{- end}}
-        {{- end}}
         {{- if $modelSpec.chatTemplate}}
         {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
         - name: {{ .Release.Name }}-chat-templates

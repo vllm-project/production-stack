@@ -6,7 +6,7 @@ Disaggregated Prefill
 This tutorial explains how to run the disaggregated prefill system, which splits the model execution into prefill and decode phases across different servers. This approach can improve throughput and resource utilization by separating the initial processing (prefill) from the token generation (decode) phases.
 
 Prerequisites
-------------
+-------------
 
 * Docker installed with NVIDIA runtime support
 * NVIDIA GPUs available (at least 2 GPUs recommended)
@@ -15,7 +15,7 @@ Prerequisites
 * vLLM and its dependencies installed
 
 Local Deployment
---------------
+---------------
 
 Step 1: Start the Prefill Server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -35,7 +35,7 @@ This script starts a Docker container with the following key configurations:
 * Configured as a KV producer and a Nixl sender
 
 Step 2: Start the Decode Server
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The decode server handles the generation of new tokens. This server runs on GPU 1 and uses port 8200.
 
@@ -52,7 +52,7 @@ This script starts a Docker container with the following key configurations:
 * Configured as a KV consumer and a nixl receiver
 
 Step 3: Start the Router
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 The router coordinates between the prefill and decode servers, handling request routing.
 
@@ -80,7 +80,7 @@ Key router configurations:
 * Routes requests based on model labels
 
 Step 4: Submit Requests
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 Once all servers are running, you can submit requests to the router at ``localhost:8005``. Here's an example curl request:
 
@@ -102,7 +102,7 @@ You should see logs from LMCache like the following on the decoder instance's si
     [2025-05-26 20:12:21,915] LMCache DEBUG: Retrieved 6 out of 6 out of total 6 tokens (cache_engine.py:330:lmcache.experimental.cache_engine)
 
 Kubernetes Deployment
--------------------
+--------------------
 
 For production environments, you can deploy the disaggregated prefill system using Kubernetes and Helm. This approach provides better scalability, resource management, and high availability.
 
@@ -206,7 +206,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
         - "llama-decode"
 
 Step 2: Deploy Using Helm
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Install the deployment using Helm with the configuration file:
 
@@ -228,7 +228,7 @@ The configuration includes:
 * Router settings for disaggregated prefill
 
 Step 3: Verify Deployment
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Check the status of your deployment:
 
@@ -244,7 +244,7 @@ You should see pods for:
 * The router
 
 Step 4: Access the Service
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 First do port forwarding to access the service:
 
