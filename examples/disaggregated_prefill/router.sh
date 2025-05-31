@@ -1,3 +1,4 @@
+#!/bin/bash
 python3 -m vllm_router.app --port "$1" \
     --service-discovery static \
     --static-backends "http://localhost:8100,http://localhost:8200" \
