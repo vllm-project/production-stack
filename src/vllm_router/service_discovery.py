@@ -278,7 +278,15 @@ class StaticServiceDiscovery(ServiceDiscovery):
 
 
 class K8sServiceDiscovery(ServiceDiscovery):
-    def __init__(self, app, namespace: str, port: str, label_selector=None):
+    def __init__(
+        self,
+        app,
+        namespace: str,
+        port: str,
+        label_selector=None,
+        prefill_model_labels: List[str] = None,
+        decode_model_labels: List[str] = None,
+    ):
         """
         Initialize the Kubernetes service discovery module. This module
         assumes all serving engine pods are in the same namespace, listening
@@ -312,6 +320,8 @@ class K8sServiceDiscovery(ServiceDiscovery):
         self.running = True
         self.watcher_thread = threading.Thread(target=self._watch_engines, daemon=True)
         self.watcher_thread.start()
+        self.prefill_model_labels = prefill_model_labels
+        self.decode_model_labels = decode_model_labels
 
     @staticmethod
     def _check_pod_ready(container_statuses):

@@ -14,6 +14,7 @@ def test_init_when_static_backend_health_checks_calls_start_health_checks(
         start_health_check_mock,
     )
     discovery_instance = StaticServiceDiscovery(
+        None,
         [],
         [],
         None,
@@ -35,6 +36,7 @@ def test_init_when_endpoint_health_check_disabled_does_not_call_start_health_che
         start_health_check_mock,
     )
     discovery_instance = StaticServiceDiscovery(
+        None,
         [],
         [],
         None,
@@ -52,6 +54,7 @@ def test_get_unhealthy_endpoint_hashes_when_only_healthy_models_exist_does_not_r
 ) -> None:
     monkeypatch.setattr("vllm_router.utils.is_model_healthy", lambda *_: True)
     discovery_instance = StaticServiceDiscovery(
+        None,
         ["http://localhost.com"],
         ["llama3"],
         None,
@@ -69,6 +72,7 @@ def test_get_unhealthy_endpoint_hashes_when_unhealthy_model_exist_returns_unheal
 ) -> None:
     monkeypatch.setattr("vllm_router.utils.is_model_healthy", lambda *_: False)
     discovery_instance = StaticServiceDiscovery(
+        None,
         ["http://localhost.com"],
         ["llama3"],
         None,
@@ -93,6 +97,7 @@ def test_get_unhealthy_endpoint_hashes_when_healthy_and_unhealthy_models_exist_r
 
     monkeypatch.setattr("vllm_router.utils.is_model_healthy", mock_is_model_healthy)
     discovery_instance = StaticServiceDiscovery(
+        None,
         ["http://localhost.com", "http://10.123.112.412"],
         ["llama3", unhealthy_model],
         None,
@@ -116,6 +121,7 @@ def test_get_endpoint_info_when_model_endpoint_hash_is_in_unhealthy_endpoint_doe
         return "some-hash" if model == unhealthy_model else "other-hash"
 
     discovery_instance = StaticServiceDiscovery(
+        None,
         ["http://localhost.com", "http://10.123.112.412"],
         ["llama3", unhealthy_model],
         None,
