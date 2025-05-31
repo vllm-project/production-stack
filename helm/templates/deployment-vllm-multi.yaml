@@ -61,11 +61,19 @@ spec:
       securityContext:
         {{- toYaml .Values.servingEngineSpec.securityContext | nindent 8 }}
       {{- end }}
+      hostIPC: true
+      hostPID: true
+      hostname: "{{ $.Release.Name }}-{{ $modelSpec.name }}-{{ $.Chart.Name }}"
+      subdomain: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+          securityContext:
+            capabilities:
+              add:
+                - SYS_PTRACE
           command:
-          {{- if or (eq $modelSpec.tag "2025-05-17-v1") (and (eq $modelSpec.tag "latest") (eq $modelSpec.repository "lmcache/vllm-openai")) }}
+          {{- if or (eq $modelSpec.tag "2025-05-27-v1") (eq $modelSpec.tag "2025-05-17-v1") (and (eq $modelSpec.tag "latest") (eq $modelSpec.repository "lmcache/vllm-openai")) }}
           - "/opt/venv/bin/vllm"
           {{- else }}
           - "vllm"
@@ -218,6 +226,10 @@ spec:
           - name: VLLM_RPC_TIMEOUT
             value: "1000000"
           {{-   end }}
+          {{- if hasKey $modelSpec.lmcacheConfig "cudaVisibleDevices" }}
+          - name: CUDA_VISIBLE_DEVICES
+            value: {{ $modelSpec.lmcacheConfig.cudaVisibleDevices | quote }}
+          {{-   end }}
           {{-   if and (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
           - name: LMCACHE_LOCAL_CPU
             value: "False"
@@ -302,6 +314,8 @@ spec:
               containerPort: {{ include "chart.container-port" . }}
             - name: zmq-port
               containerPort: 55555
+            - name: ucx-port
+              containerPort: 9999
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
           {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}

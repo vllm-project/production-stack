@@ -95,6 +95,7 @@ autodoc_mock_imports = [
     "prometheus_client",
     "uhashring",
     "lmcache",
+    "httpx",
 ]
 
 intersphinx_mapping = {
