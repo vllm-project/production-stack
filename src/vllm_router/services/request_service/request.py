@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # --- Request Processing & Routing ---
-# TODO: better request id system
 import json
 import time
 import uuid
@@ -171,7 +170,8 @@ async def route_general_request(
         )
         return response
     in_router_time = time.time()
-    request_id = str(uuid.uuid4())
+    # Same as vllm, Get request_id from X-Request-Id header if available
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
     request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
 
@@ -180,6 +180,7 @@ async def route_general_request(
             request, request_body, request_json
         )
     ):
+        response_overwrite.headers["X-Request-Id"] = request_id
         return response_overwrite
 
     requested_model = request_json.get("model", None)
@@ -187,6 +188,7 @@ async def route_general_request(
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid request: missing 'model' in request body."},
+            headers={"X-Request-Id": request_id}
         )
 
     # Apply request rewriting if enabled
@@ -248,10 +250,12 @@ async def route_general_request(
         background_tasks,
     )
     headers, status_code = await anext(stream_generator)
+    headers_dict = {key: value for key, value in headers.items()}
+    headers_dict["X-Request-Id"] = request_id
     return StreamingResponse(
         stream_generator,
         status_code=status_code,
-        headers={key: value for key, value in headers.items()},
+        headers=headers_dict,
         media_type="text/event-stream",
     )
 
@@ -262,7 +266,8 @@ async def route_disaggregated_prefill_request(
     background_tasks: BackgroundTasks,
 ):
     in_router_time = time.time()
-    request_id = str(uuid.uuid4())
+    # Same as vllm, Get request_id from X-Request-Id header if available
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
     request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
 
@@ -271,6 +276,7 @@ async def route_disaggregated_prefill_request(
             request, request_body, request_json
         )
     ):
+        response_overwrite.headers["X-Request-Id"] = request_id
         return response_overwrite
 
     requested_model = request_json.get("model", None)
@@ -278,6 +284,7 @@ async def route_disaggregated_prefill_request(
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid request: missing 'model' in request body."},
+            headers={"X-Request-Id": request_id}
         )
 
     # TODO (ApostaC): merge two awaits into one
@@ -323,9 +330,11 @@ async def route_disaggregated_prefill_request(
         background_tasks,
     )
     headers, status_code = await anext(decoder_response)
+    headers_dict = {key: value for key, value in headers.items()}
+    headers_dict["X-Request-Id"] = request_id
     return StreamingResponse(
         decoder_response,
         status_code=status_code,
-        headers={key: value for key, value in headers.items()},
+        headers=headers_dict,
         media_type="text/event-stream",
     )
