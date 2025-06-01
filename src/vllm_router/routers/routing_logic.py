@@ -424,8 +424,10 @@ class TimeTrackingRouter(RoutingInterface):
             std = endpoint.std_completion_time or 0.0
             load = endpoint.current_load or 0
 
+            # assign endpoint score based on mean & std of completion time
             score = (self.alpha * mean) + (self.beta * load) + (self.gamma * std)
 
+            # choose the lowest score
             if score < best_score:
                 best_score = score
                 best_endpoint = endpoint
