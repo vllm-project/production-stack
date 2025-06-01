@@ -5,7 +5,7 @@
 
 ---
 
-## 🚀 Features
+## Features
 
 - Tracks per-endpoint **mean** and **standard deviation** of completion times.
 - Considers **current load** to avoid overloading busy endpoints.
@@ -14,7 +14,7 @@
 
 ---
 
-## ⚙️ Parameters
+## Parameters
 
 You can customize the importance of each routing factor using:
 
@@ -30,7 +30,7 @@ TimeTrackingRouter(alpha=1.0, beta=1.0, gamma=0.5)
 
 ---
 
-## 📦 Classes
+## Classes
 
 ### `TimeTrackingRouter(RoutingInterface)`
 
@@ -67,7 +67,7 @@ class EndpointInfo:
 
 ---
 
-## 📈 Routing Algorithm
+## Routing Algorithm
 
 The score for each endpoint is computed as:
 
@@ -81,7 +81,7 @@ If an endpoint lacks data, it defaults to a score of zero for missing metrics (f
 
 ---
 
-## 🧪 Example Usage
+## Example Usage
 
 ```python
 router = TimeTrackingRouter(alpha=1.0, beta=2.0, gamma=0.3)
@@ -91,14 +91,14 @@ router.record_completion(endpoint, duration=1.25)
 
 ---
 
-## 📋 Notes
+## Notes
 
 - Uses a fixed-size rolling window (`maxlen=100`) for tracking completion time history.
 - Designed to plug into systems implementing `RoutingInterface`.
 
 ---
 
-## 🔧 Future Enhancements
+## Future Enhancements
 
 - Add support for exponential decay or recency bias in stats.
 - Consider request priority or user-level QoE history.
