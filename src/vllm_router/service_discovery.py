@@ -17,6 +17,8 @@ import enum
 import os
 import threading
 import time
+import statistics
+from collections import deque
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -49,7 +51,32 @@ class EndpointInfo:
     # Model label
     model_label: str
 
+    # endpoint's mean request completion time
+    mean_completion_time: Optional[float]
 
+    #standard deviation of request completion time
+    std_completion_time: Optional[float]
+
+    #current number of requests routed to an endpoint
+    current_load: Optional[int]
+
+class EndpointStats():
+    def __init__(self, maxlen=100):
+        self.completion_times = deque(maxlen=maxlen)
+
+    def add_completion_time(self, completion_time: float):
+        self.completion_times.append(completion_time)
+
+    def mean(self):
+        if not self.completion_times:
+            return None
+        return statistics.mean(self.completion_times)
+
+    def stdev(self):
+        if len(self.completion_times) < 2:
+            return 0.0
+        return statistics.stdev(self.completion_times)
+    
 class ServiceDiscovery(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_endpoint_info(self) -> List[EndpointInfo]:
