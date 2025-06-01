@@ -22,6 +22,8 @@ import threading
 from typing import Dict, List
 
 import requests
+import math
+
 from fastapi import Request
 
 try:
@@ -397,12 +399,10 @@ class TimeTrackingRouter(RoutingInterface):
     def register_endpoint(self, endpoint: EndpointInfo):
         if endpoint.url not in self.endpoint_stats:
             self.endpoint_stats[endpoint.url] = EndpointStats()
-
     def update_stats(self, endpoint: EndpointInfo):
         stats = self.endpoint_stats[endpoint.url]
         endpoint.mean_completion_time = stats.mean()
         endpoint.std_completion_time = stats.stdev()
-
     async def route_request(
         self,
         endpoints: List[EndpointInfo],
