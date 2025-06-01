@@ -8,7 +8,6 @@ from vllm_router.service_discovery import EndpointInfo, EndpointStats
 from vllm_router.stats.engine_stats import EngineStats
 from vllm_router.stats.request_stats import RequestStats
 
-
 # Mock definitions
 class EndpointStats:
     def __init__(self):
@@ -25,7 +24,6 @@ class EndpointStats:
             return 0.0
         mean = self.mean()
         return (sum((x - mean) ** 2 for x in self.times) / (len(self.times) - 1)) ** 0.5
-
 
 class EndpointInfo:
     def __init__(self, url: str, current_load: int = 0):
