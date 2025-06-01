@@ -21,6 +21,8 @@ import threading
 from typing import Dict, List
 
 import requests
+import math
+
 from fastapi import Request
 
 try:
@@ -35,7 +37,7 @@ except ImportError:
 from uhashring import HashRing
 
 from vllm_router.log import init_logger
-from vllm_router.service_discovery import EndpointInfo
+from vllm_router.service_discovery import EndpointInfo, EndpointStats
 from vllm_router.stats.engine_stats import EngineStats
 from vllm_router.stats.request_stats import RequestStats
 from vllm_router.utils import SingletonABCMeta
@@ -49,6 +51,7 @@ class RoutingLogic(str, enum.Enum):
     KVAWARE = "kvaware"
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
+    TIME_TRACKING = "timetracking"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -384,6 +387,55 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             return decoder_endpoints[0].url
 
 
+class TimeTrackingRouter(RoutingInterface):
+    def __init__(self, alpha=1.0, beta=1.0, gamma=0.5):
+        self.alpha = alpha # weight for mean time
+        self.beta = beta # weight for load
+        self.gamma = gamma # weight for std deviation
+
+        self.endpoint_stats: Dict[str, EndpointStats] = {}
+
+    def register_endpoint(self, endpoint: EndpointInfo):
+        if endpoint.url not in self.endpoint_stats:
+            self.endpoint_stats[endpoint.url] = EndpointStats()
+    
+    def update_stats(self, endpoint: EndpointInfo):
+        stats = self.endpoint_stats[endpoint.url]
+        endpoint.mean_completion_time = stats.mean()
+        endpoint.std_completion_time = stats.stdev()
+    
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        best_score = math.inf
+        best_endpoint = None
+
+        for endpoint in endpoints:
+            self.register_endpoint(endpoint)
+            self.update_stats(endpoint)
+
+            # if no data yet, treat it as best
+            mean = endpoint.mean_completion_time or 0.0
+            std = endpoint.std_completion_time or 0.0
+            load = endpoint.current_load or 0
+
+            score = (self.alpha * mean) + (self.beta * load) + (self.gamma * std)
+
+            if score < best_score:
+                best_score = score
+                best_endpoint = endpoint
+        
+        return best_endpoint.url
+    
+    def record_completion(self, endpoint: EndpointInfo, duration: float):
+        self.endpoint_stats[endpoint.url].add_completion_time(duration)
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -407,6 +459,9 @@ def initialize_routing_logic(
         return DisaggregatedPrefillRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
+    elif routing_logic == RoutingLogic.TIME_TRACKING:
+        logger.info("Initializing endpoint load balancing routing logic")
+        return TimeTrackingRouter() #TODO
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -420,6 +475,7 @@ def reconfigure_routing_logic(
         RoundRobinRouter,
         KvawareRouter,
         DisaggregatedPrefillRouter,
+        TimeTrackingRouter
     ):
         if cls in SingletonABCMeta._instances:
             del SingletonABCMeta._instances[cls]
@@ -434,6 +490,7 @@ def get_routing_logic() -> RoutingInterface:
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
+        TimeTrackingRouter
     ):
         if cls in SingletonABCMeta._instances:
             return cls()
