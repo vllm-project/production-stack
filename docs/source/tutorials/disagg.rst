@@ -4,12 +4,12 @@ Disaggregated Prefill
 =====================
 
 Introduction
-------------
+------------------------
 
 This tutorial explains how to run the disaggregated prefill system, which splits the model execution into prefill and decode phases across different servers. This approach can improve throughput and resource utilization by separating the initial processing (prefill) from the token generation (decode) phases.
 
 Prerequisites
--------------
+-------------------------
 
 * Docker installed with NVIDIA runtime support
 * NVIDIA GPUs available (at least 2 GPUs recommended)
@@ -18,7 +18,7 @@ Prerequisites
 * vLLM and its dependencies installed
 
 Local Deployment
----------------
+---------------------------
 
 Step 1: Start the Prefill Server
 ++++++++++++++++++++++++++++++++++
@@ -105,7 +105,7 @@ You should see logs from LMCache like the following on the decoder instance's si
     [2025-05-26 20:12:21,915] LMCache DEBUG: Retrieved 6 out of 6 out of total 6 tokens (cache_engine.py:330:lmcache.experimental.cache_engine)
 
 Kubernetes Deployment
--------------------
+-------------------------------
 
 For production environments, you can deploy the disaggregated prefill system using Kubernetes and Helm. This approach provides better scalability, resource management, and high availability.
 
@@ -184,7 +184,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
     routerSpec:
       enableRouter: true
       repository: "lmcache/lmstack-router"
-      tag: "pd-05-26"
+      tag: "pd"
       replicaCount: 1
       containerPort: 8000
       servicePort: 80
