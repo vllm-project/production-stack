@@ -42,6 +42,18 @@ Open the webpage at `http://<IP of your node>:3000` to access the Grafana web pa
 
 Import the dashboard using the `vllm-dashboard.json` in this folder.
 
+## Enable metrics collection with ServiceMonitor
+
+The helm chart includes built-in support for metrics collection using the ServiceMonitor resource for Prometheus. To enable this feature, set `serviceMonitor.enabled` to `true` in your `values.yaml` file:
+
+```yaml
+serviceMonitor:
+  enabled: true
+
+```
+
+This will automatically create a ServiceMonitor resource that configures Prometheus to scrape metrics from your vLLM deployments. The ServiceMonitor is discovered by the Prometheus Operator deployed by kube-prometheus-stack.
+
 ## Use Prometheus Adapter to export vLLM metrics
 
 The vLLM router can export metrics to Prometheus using the [Prometheus Adapter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter).
