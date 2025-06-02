@@ -34,7 +34,7 @@ This script starts a Docker container with the following key configurations:
 * Uses GPU 0 (``CUDA_VISIBLE_DEVICES=0``)
 * Runs on port 8100
 * Acts as a NIXL sender
-* Uses the Llama-3.2-1B-Instruct model
+* Uses the Llama-3.1-8B-Instruct model
 * Configured as a KV producer and a Nixl sender
 
 Step 2: Start the Decode Server
@@ -51,7 +51,7 @@ This script starts a Docker container with the following key configurations:
 * Uses GPU 1 (``CUDA_VISIBLE_DEVICES=1``)
 * Runs on port 8200
 * Acts as a NIXL receiver
-* Uses the Llama-3.2-1B-Instruct model
+* Uses the Llama-3.1-8B-Instruct model
 * Configured as a KV consumer and a nixl receiver
 
 Step 3: Start the Router
@@ -65,14 +65,14 @@ The router coordinates between the prefill and decode servers, handling request 
         --service-discovery static \
         --static-backends "http://localhost:8100,http://localhost:8200" \
         --static-models "meta-llama/Llama-3.1-8B-Instruct,meta-llama/Llama-3.1-70B-Instruct" \
-        --static-model-labels "mistral-prefill,mistral-decode" \
+        --static-model-labels "llama-prefill,llama-decode" \
         --log-stats \
         --log-stats-interval 10 \
         --engine-stats-interval 10 \
         --request-stats-window 10 \
         --routing-logic disaggregated_prefill \
-        --prefill-model-labels "mistral-prefill" \
-        --decode-model-labels "mistral-decode"
+        --prefill-model-labels "llama-prefill" \
+        --decode-model-labels "llama-decode"
 
 Key router configurations:
 
@@ -126,7 +126,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
         - name: "llama-prefill"
           repository: "lmcache/vllm-openai"
           tag: "2025-05-17-v1"
-          modelURL: "meta-llama/Llama-3.2-1B-Instruct"
+          modelURL: "meta-llama/Llama-3.1-8B-Instruct"
           replicaCount: 1
           requestCPU: 8
           requestMemory: "30Gi"
@@ -226,7 +226,7 @@ This will deploy:
 The configuration includes:
 
 * Resource requests and limits for each component
-* NIXL communication settings
+* NIXL communication settings for LMCache
 * Model configurations
 * Router settings for disaggregated prefill
 
@@ -266,3 +266,10 @@ And then send a request to the router by:
             "prompt": "Your prompt here",
             "max_tokens": 100
         }'
+
+You should see logs from LMCache like the following on the decoder instance's side:
+
+.. code-block:: console
+
+    [2025-05-26 20:12:21,913] LMCache DEBUG: Scheduled to load 5 tokens for request cmpl-058cf35e022a479f849a60daefbade9e-0 (vllm_v1_adapter.py:299:lmcache.integration.vllm.vllm_v1_adapter)
+    [2025-05-26 20:12:21,915] LMCache DEBUG: Retrieved 6 out of 6 out of total 6 tokens (cache_engine.py:330:lmcache.experimental.cache_engine)
