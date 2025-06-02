@@ -4,10 +4,10 @@
 
 ## Latest News
 
-- 📄 Official documentation released for production-stack! [Link](https://docs.vllm.ai/projects/production-stack)
-- ✨ Cloud Deployment Tutorials for Lambda Labs, AWS EKS, Google GCP are out! [Link](https://github.com/vllm-project/production-stack/blob/main/tutorials)
-- 🛤️ 2025 Q1 Road Map Released! Join the discussion [here](https://github.com/vllm-project/production-stack/issues/26)!
-- 🔥 vLLM Production Stack is released! Checkout our [release blogs](https://blog.lmcache.ai/2025-01-21-stack-release) [01-22-2025]
+- 📄 [Official documentation](https://docs.vllm.ai/projects/production-stack) released for production-stack!
+- ✨ [Cloud Deployment Tutorials](https://github.com/vllm-project/production-stack/blob/main/tutorials) for Lambda Labs, AWS EKS, Google GCP are out!
+- 🛤️ 2025 Q1 roadmap is released! [Join the discussion now](https://github.com/vllm-project/production-stack/issues/26)!
+- 🔥 vLLM Production Stack is released! Check out our [release blogs](https://blog.lmcache.ai/2025-01-21-stack-release) posted on January 22, 2025.
 
 ## Community Events
 
@@ -21,15 +21,15 @@ Meetings alternate weekly between the two times. All are welcome to join!
 
 **vLLM Production Stack** project provides a reference implementation on how to build an inference stack on top of vLLM, which allows you to:
 
-- 🚀 Scale from single vLLM instance to distributed vLLM deployment without changing any application code
-- 💻 Monitor the  through a web dashboard
+- 🚀 Scale from a single vLLM instance to a distributed vLLM deployment without changing any application code
+- 💻 Monitor the metrics through a web dashboard
 - 😄 Enjoy the performance benefits brought by request routing and KV cache offloading
 
 ## Step-By-Step Tutorials
 
 0. How To [*Install Kubernetes (kubectl, helm, minikube, etc)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)?
 1. How to [*Deploy Production Stack on Major Cloud Platforms (AWS, GCP, Lambda Labs, Azure)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/cloud_deployments)?
-2. How To [*Setup a Minimal vLLM Production Stack*](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)?
+2. How To [*Set up a Minimal vLLM Production Stack*](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)?
 3. How To [*Customize vLLM Configs (optional)*](https://github.com/vllm-project/production-stack/blob/main/tutorials/02-basic-vllm-config.md)?
 4. How to [*Load Your LLM Weights*](https://github.com/vllm-project/production-stack/blob/main/tutorials/03-load-model-from-pv.md)?
 5. How to [*Launch Different LLMs in vLLM Production Stack*](https://github.com/vllm-project/production-stack/blob/main/tutorials/04-launch-multiple-model.md)?
@@ -39,7 +39,7 @@ Meetings alternate weekly between the two times. All are welcome to join!
 
 The stack is set up using [Helm](https://helm.sh/docs/), and contains the following key parts:
 
-- **Serving engine**: The vLLM engines that run different LLMs
+- **Serving engine**: The vLLM engines that run different LLMs.
 - **Request router**: Directs requests to appropriate backends based on routing keys or session IDs to maximize KV cache reuse.
 - **Observability stack**: monitors the metrics of the backends through [Prometheus](https://github.com/prometheus/prometheus) + [Grafana](https://grafana.com/)
 
@@ -76,7 +76,7 @@ helm install vllm vllm/vllm-stack -f tutorials/assets/values-01-minimal-example.
 
 The deployed stack provides the same [**OpenAI API interface**](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html?ref=blog.mozilla.ai#openai-compatible-server) as vLLM, and can be accessed through kubernetes service.
 
-To validate the installation and and send query to the stack, refer to [this tutorial](tutorials/01-minimal-helm-installation.md).
+To validate the installation and send a query to the stack, refer to [this tutorial](tutorials/01-minimal-helm-installation.md).
 
 For more information about customizing the helm chart, please refer to [values.yaml](https://github.com/vllm-project/production-stack/blob/main/helm/values.yaml) and our other [tutorials](https://github.com/vllm-project/production-stack/tree/main/tutorials).
 
@@ -114,18 +114,18 @@ The router ensures efficient request distribution among backends. It supports:
 
 - Routing to endpoints that run different models
 - Exporting observability metrics for each serving engine instance, including QPS, time-to-first-token (TTFT), number of pending/running/finished requests, and uptime
-- Automatic service discovery and fault tolerance by Kubernetes API
+- Automatic service discovery and fault tolerance via the Kubernetes API
 - Model aliases
-- Multiple different routing algorithms
+- Multiple routing algorithms:
   - Round-robin routing
   - Session-ID based routing
-  - (WIP) prefix-aware routing
+  - Prefix-aware routing (WIP)
 
 Please refer to the [router documentation](./src/vllm_router/README.md) for more details.
 
 ## Contributing
 
-We welcome and value any contributions and collaborations.  Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved.
+We welcome and value any contributions and collaborations. Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved.
 
 ## License
 
