@@ -18,6 +18,10 @@ metadata:
     model: {{ $modelSpec.name }}
     helm-release-name: {{ .Release.Name }}
   {{- include "chart.engineLabels" . | nindent 4 }}
+  {{- with $modelSpec.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ $modelSpec.replicaCount }}
   {{- include "chart.engineStrategy" . | nindent 2 }}
