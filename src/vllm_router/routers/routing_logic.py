@@ -278,12 +278,15 @@ class KvawareRouter(RoutingInterface):
                         for part in prompt
                         if part.get("type") == "text"
                     )
-                data = {"model": endpoints[0].model_name, "prompt": prompt}
+                data = {"model": endpoints[0].model_names[0], "prompt": prompt}
             else:
-                data = {"model": endpoints[0].model_name, "prompt": ""}
+                data = {"model": endpoints[0].model_names[0], "prompt": ""}
         else:
             # Handle regular completions
-            data = {"model": endpoints[0].model_name, "prompt": request_json["prompt"]}
+            data = {
+                "model": endpoints[0].model_names[0],
+                "prompt": request_json["prompt"],
+            }
         response = requests.post(url, headers=headers, json=data).json()
         token_ids = response["tokens"]
         msg = LookupMsg(tokens=token_ids)
@@ -309,7 +312,6 @@ class KvawareRouter(RoutingInterface):
                         endpoint.url
                     )
                 logger.info(f"Instance id to ip: {self.instance_id_to_ip}")
-
             logger.info(
                 f"Routing request to {queried_instance_ids[0]} found by kvaware router"
             )

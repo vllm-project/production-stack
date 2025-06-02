@@ -28,7 +28,7 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: "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"
+    hf_token: <your-hf-token>
   - name: "mistral2"
     repository: "lmcache/vllm-openai"
     tag: "2025-05-27-v1"
@@ -55,10 +55,10 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: "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"
+    hf_token: <your-hf-token>
 
 routerSpec:
-  repository: "lmcache/lmstack-router"
+  repository: "lmcache/test"
   tag: "kvaware"
   resources:
     requests:
