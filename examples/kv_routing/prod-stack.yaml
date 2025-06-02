@@ -58,7 +58,7 @@ servingEngineSpec:
     hf_token: <your-hf-token>
 
 routerSpec:
-  repository: "lmcache/test"
+  repository: "lmcache/lmstack-router"
   tag: "kvaware"
   resources:
     requests:
