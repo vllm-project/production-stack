@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import abc
 import asyncio
 import enum
@@ -19,9 +18,11 @@ import hashlib
 import os
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+import httpx
 import requests
 from kubernetes import client, config, watch
 
@@ -45,6 +46,9 @@ class EndpointInfo:
 
     # Model names
     model_names: List[str]
+
+    # Endpoint Id
+    Id: str
 
     # Added timestamp
     added_timestamp: float
@@ -162,23 +166,30 @@ class ServiceDiscovery(metaclass=abc.ABCMeta):
 class StaticServiceDiscovery(ServiceDiscovery):
     def __init__(
         self,
+        app,
         urls: List[str],
         models: List[str],
         aliases: List[str] | None,
         model_labels: List[str] | None,
         model_types: List[str] | None,
         static_backend_health_checks: bool,
+        prefill_model_labels: List[str] | None,
+        decode_model_labels: List[str] | None,
     ):
+        self.app = app
         assert len(urls) == len(models), "URLs and models should have the same length"
         self.urls = urls
         self.models = models
         self.aliases = aliases
         self.model_labels = model_labels
         self.model_types = model_types
+        self.engines_id = [str(uuid.uuid4()) for i in range(0, len(urls))]
         self.added_timestamp = int(time.time())
         self.unhealthy_endpoint_hashes = []
         if static_backend_health_checks:
             self.start_health_check_task()
+        self.prefill_model_labels = prefill_model_labels
+        self.decode_model_labels = decode_model_labels
 
     def get_unhealthy_endpoint_hashes(self) -> list[str]:
         unhealthy_endpoints = []
@@ -248,17 +259,40 @@ class StaticServiceDiscovery(ServiceDiscovery):
             endpoint_info = EndpointInfo(
                 url=url,
                 model_names=[model],  # Convert single model to list
+                Id=self.engines_id[i],
                 added_timestamp=self.added_timestamp,
                 model_label=model_label,
                 model_info=self._get_model_info(model),
             )
             endpoint_infos.append(endpoint_info)
-
+        if (
+            self.prefill_model_labels is not None
+            and self.decode_model_labels is not None
+        ):
+            for endpoint_info in endpoint_infos:
+                if endpoint_info.model_label in self.prefill_model_labels:
+                    self.app.state.prefill_client = httpx.AsyncClient(
+                        base_url=endpoint_info.url,
+                        timeout=None,
+                    )
+                elif endpoint_info.model_label in self.decode_model_labels:
+                    self.app.state.decode_client = httpx.AsyncClient(
+                        base_url=endpoint_info.url,
+                        timeout=None,
+                    )
         return endpoint_infos
 
 
 class K8sServiceDiscovery(ServiceDiscovery):
-    def __init__(self, namespace: str, port: str, label_selector=None):
+    def __init__(
+        self,
+        app,
+        namespace: str,
+        port: str,
+        label_selector=None,
+        prefill_model_labels: List[str] | None = None,
+        decode_model_labels: List[str] | None = None,
+    ):
         """
         Initialize the Kubernetes service discovery module. This module
         assumes all serving engine pods are in the same namespace, listening
@@ -272,6 +306,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
             port: the port of the engines
             label_selector: the label selector of the engines
         """
+        self.app = app
         self.namespace = namespace
         self.port = port
         self.available_engines: Dict[str, EndpointInfo] = {}
@@ -291,6 +326,8 @@ class K8sServiceDiscovery(ServiceDiscovery):
         self.running = True
         self.watcher_thread = threading.Thread(target=self._watch_engines, daemon=True)
         self.watcher_thread.start()
+        self.prefill_model_labels = prefill_model_labels
+        self.decode_model_labels = decode_model_labels
 
     @staticmethod
     def _check_pod_ready(container_statuses):
@@ -439,11 +476,25 @@ class K8sServiceDiscovery(ServiceDiscovery):
                 url=f"http://{engine_ip}:{self.port}",
                 model_names=model_names,
                 added_timestamp=int(time.time()),
+                Id=str(uuid.uuid5(uuid.NAMESPACE_DNS, engine_name)),
                 model_label=model_label,
                 pod_name=engine_name,
                 namespace=self.namespace,
             )
-
+            if (
+                self.prefill_model_labels is not None
+                and self.decode_model_labels is not None
+            ):
+                if model_label in self.prefill_model_labels:
+                    self.app.state.prefill_client = httpx.AsyncClient(
+                        base_url=f"http://{engine_ip}:{self.port}",
+                        timeout=None,
+                    )
+                elif model_label in self.decode_model_labels:
+                    self.app.state.decode_client = httpx.AsyncClient(
+                        base_url=f"http://{engine_ip}:{self.port}",
+                        timeout=None,
+                    )
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
