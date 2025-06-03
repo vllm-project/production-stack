@@ -2,12 +2,12 @@ Prefix Aware Routing
 ===================
 
 Introduction
-------------------------
+--------------------------------
 
 This tutorial demonstrates how to use prefix aware routing in the vLLM Production Stack. Prefix aware routing ensures that subsequent requests with the same prompt prefix are routed to the same instance, maximizing KV cache utilization and improving performance.
 
 Prerequisites
-------------------------
+--------------------------------
 
 - Completion of the following tutorials:
   - :doc:`00-install-kubernetes-env`
@@ -16,7 +16,7 @@ Prerequisites
 - Basic familiarity with Kubernetes and Helm
 
 Deploy with Prefix Aware Routing
-------------------------
+--------------------------------
 
 We'll use the predefined configuration file ``values-18-prefix-aware.yaml`` which sets up two vLLM instances with prefix aware routing enabled.
 
@@ -33,7 +33,7 @@ We'll use the predefined configuration file ``values-18-prefix-aware.yaml`` whic
    kubectl get pods -w
 
 Port Forwarding
-------------------------
+--------------------------------
 
 Forward the router service port to your local machine:
 
@@ -42,7 +42,7 @@ Forward the router service port to your local machine:
    kubectl port-forward svc/vllm-router-service 30080:80
 
 Testing Prefix Aware Routing
-------------------------
+--------------------------------
 
 1. First, send a request to the router:
 
@@ -78,7 +78,7 @@ Specifically, you should see some log like the following:
    [2025-06-03 06:16:28,966] LMCache DEBUG: Retrieved 6 out of 6 out of total 6 tokens (cache_engine.py:330:lmcache.experimental.cache_engine)
 
 Clean Up
-------------------------
+--------------------------------
 
 To clean up the deployment:
 
@@ -87,7 +87,7 @@ To clean up the deployment:
    helm uninstall vllm
 
 Conclusion
-------------------------
+--------------------------------
 
 In this tutorial, we've demonstrated how to:
 
