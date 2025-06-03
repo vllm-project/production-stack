@@ -7,6 +7,7 @@ helm upgrade --install kube-prom-stack prometheus-community/kube-prometheus-stac
   --create-namespace \
   -f kube-prom-stack.yaml --wait
 
-helm install prometheus-adapter prometheus-community/prometheus-adapter \
+helm upgrade --install prometheus-adapter prometheus-community/prometheus-adapter \
     --namespace monitoring \
+    --create-namespace \
     -f "$SCRIPT_DIR/prom-adapter.yaml"
