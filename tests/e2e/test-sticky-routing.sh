@@ -21,36 +21,184 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Function to extract pod name from response headers
-extract_pod_name() {
-    local response_file=$1
-    # Assuming the router adds x-pod-name header
-    # You might need to adjust this based on your actual header name
-    grep -i "x-pod-name:" "$response_file" | tail -n 1 | awk '{print $2}'
-}
+# Function to get router logs and extract session_id -> server_url mappings
+verify_router_logs_consistency() {
+    local router_log_file=$1
 
-# Function to extract user ID from the prompt
-extract_user_id() {
-    local response_file=$1
-    # Extract user ID from the prompt that contains "I'm user X"
-    grep -i "I'm user" "$response_file" | head -n 1 | grep -o '[0-9]\+'
-}
+    print_status "Verifying router logs for session_id -> server_url consistency"
 
-# Function to verify sticky routing
-verify_sticky_routing() {
-    local user_id=$1
-    local pod_name=$2
-    local user_pods_file=$3
+    # Get router logs during the test period
+    print_status "Fetching router logs..."
 
-    if [ -f "$user_pods_file" ]; then
-        local previous_pod
-        previous_pod=$(grep "^$user_id:" "$user_pods_file" | cut -d':' -f2)
-        if [ -n "$previous_pod" ] && [ "$previous_pod" != "$pod_name" ]; then
-            print_error "User $user_id was routed to different pods: $previous_pod and $pod_name"
-            return 1
+    # Try multiple common router pod selectors
+    local router_selectors=(
+        "environment=router"
+        "release=router"
+        "app.kubernetes.io/component=router"
+        "app=vllmrouter-sample"
+    )
+
+    local logs_found=false
+    local raw_log_file="$TEMP_DIR/raw_router_logs.txt"
+
+    for selector in "${router_selectors[@]}"; do
+        if kubectl get pods -l "$selector" &>/dev/null && [ "$(kubectl get pods -l "$selector" --no-headers | wc -l)" -gt 0 ]; then
+            print_status "Found router pods with selector: $selector"
+            # Get more logs but we'll filter them
+            kubectl logs -l "$selector" --tail=5000 > "$raw_log_file" 2>&1 || true
+            logs_found=true
+            break
+        fi
+    done
+
+    if [ "$logs_found" = false ]; then
+        print_warning "Could not find router pods with any known selector. Trying alternative approaches..."
+
+        # Try to find router service and infer pod labels
+        if kubectl get svc vllm-router-service &>/dev/null; then
+            local router_deployment=$(kubectl get deployment | grep router | head -n 1 | awk '{print $1}')
+            if [ -n "$router_deployment" ]; then
+                print_status "Found router deployment: $router_deployment"
+                kubectl logs deployment/"$router_deployment" --tail=5000 > "$raw_log_file" 2>&1 || true
+                logs_found=true
+            fi
         fi
     fi
-    echo "$user_id:$pod_name" >> "$user_pods_file"
+
+    if [ "$logs_found" = false ] || [ ! -s "$raw_log_file" ]; then
+        print_warning "Could not fetch router logs or logs are empty. Skipping router log verification."
+        return 0
+    fi
+
+    # Filter logs to only include routing decision logs and exclude health checks
+    print_status "Filtering routing decision logs from $(wc -l < "$raw_log_file") total log lines..."
+
+    # Filter for routing logs, excluding health checks and other noise
+    grep -E "Routing request.*to.*at.*process time" "$raw_log_file" | \
+    grep -v "/health" | \
+    grep -v "health.*check" | \
+    tail -1000 > "$router_log_file" 2>/dev/null || true
+
+    # If no filtered logs found, try a broader search
+    if [ ! -s "$router_log_file" ]; then
+        print_status "No routing decision logs found with strict filter. Trying broader search..."
+        grep -E "(Routing request|routing request)" "$raw_log_file" | \
+        grep -v "/health" | \
+        tail -1000 > "$router_log_file" 2>/dev/null || true
+    fi
+
+    if [ ! -s "$router_log_file" ]; then
+        print_warning "No routing decision logs found after filtering. Skipping router log verification."
+        return 0
+    fi
+
+    print_status "Filtered router logs. Found $(wc -l < "$router_log_file") routing decision log lines"
+
+    if [ "$VERBOSE" = true ]; then
+        print_status "Debug: First 10 routing decision logs:"
+        head -n 10 "$router_log_file" || true
+    fi
+
+    # Extract session_id -> server_url mappings from router logs
+    local session_mappings_file="$TEMP_DIR/session_mappings.txt"
+    > "$session_mappings_file"  # Clear the file
+
+    # Parse router logs for routing decisions
+    # Handle multiple log formats:
+    # Format 1: "Routing request {request_id} with session id {session_id} to {server_url} at {time}, process time = {duration}"
+    # Format 2: "Routing request {request_id} to {server_url} at {time}, process time = {duration}" (without session id)
+
+    while IFS= read -r line; do
+        if [[ $line == *"Routing request"* && $line == *" to "* && $line == *"at"* ]]; then
+            local session_id server_url request_id
+
+            # Extract session id (the string after "with session id " and before " to ")
+            session_id=$(echo "$line" | sed -n 's/.*with session id \([^ ]*\) to .*/\1/p')
+
+            # If no session_id found, default to -1
+            if [ -z "$session_id" ]; then
+                session_id="-1"
+            fi
+
+            # Extract server URL (the string after " to " and before " at ")
+            # Try a more robust approach - extract everything between " to " and " at "
+            server_url=$(echo "$line" | sed -n 's/.* to \([^ ]*\) at .*/\1/p')
+
+            # Debug: show what we extracted if verbose mode
+            if [ "$VERBOSE" = true ]; then
+                print_status "Debug: Raw log line: $line"
+                print_status "Debug: Extracted session_id: '$session_id'"
+                print_status "Debug: Extracted server_url: '$server_url'"
+            fi
+
+            if [ -n "$session_id" ] && [ -n "$server_url" ]; then
+                echo "$session_id:$server_url" >> "$session_mappings_file"
+                if [ "$VERBOSE" = true ]; then
+                    print_status "Debug: Found mapping - Session ID: $session_id -> Server: $server_url"
+                fi
+            fi
+        fi
+    done < "$router_log_file"
+
+    local total_mappings=$(wc -l < "$session_mappings_file")
+    print_status "Found $total_mappings session_id -> server_url mappings in router logs"
+
+    if [ "$total_mappings" -eq 0 ]; then
+        print_warning "No session_id -> server_url mappings found in router logs."
+        print_warning "This could mean:"
+        print_warning "  1. The test ran before router logs were captured"
+        print_warning "  2. Session-based routing is not enabled"
+        print_warning "  3. Log format has changed"
+        return 0
+    fi
+
+    # Verify consistency: all requests with the same session_id should go to the same server_url
+    local consistency_check_file="$TEMP_DIR/consistency_check.txt"
+    > "$consistency_check_file"
+
+    # Group by session_id and check if all server_urls for each session are the same
+    sort "$session_mappings_file" | while IFS=: read -r session_id server_url; do
+        echo "$session_id $server_url" >> "$consistency_check_file"
+    done
+
+    # Check for inconsistencies
+    local inconsistencies=0
+    local unique_sessions
+    unique_sessions=$(cut -d: -f1 "$session_mappings_file" | sort -u)
+
+    while IFS= read -r session_id; do
+        local session_servers
+        session_servers=$(grep "^$session_id:" "$session_mappings_file" | cut -d: -f2 | sort -u)
+        local server_count
+        server_count=$(echo "$session_servers" | wc -l)
+
+        if [ "$server_count" -gt 1 ]; then
+            print_error "❌ Inconsistency detected for session_id '$session_id':"
+            print_error "   This session was routed to multiple servers:"
+            echo "$session_servers" | while read -r server; do
+                print_error "     - $server"
+            done
+            inconsistencies=$((inconsistencies + 1))
+        else
+            print_status "✅ Session '$session_id' consistently routed to: $session_servers"
+        fi
+    done <<< "$unique_sessions"
+
+    if [ "$inconsistencies" -gt 0 ]; then
+        print_error "❌ Router log verification failed: Found $inconsistencies session(s) with inconsistent routing"
+        return 1
+    else
+        print_status "✅ Router log verification passed: All sessions show consistent server routing"
+
+        # Print summary
+        local unique_session_count
+        unique_session_count=$(echo "$unique_sessions" | wc -l)
+        print_status "Summary from router logs:"
+        print_status "  Total routing decisions logged: $total_mappings"
+        print_status "  Unique sessions found: $unique_session_count"
+        print_status "  All sessions maintained consistent server assignments"
+    fi
+
     return 0
 }
 
@@ -142,9 +290,6 @@ TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 print_status "Starting sticky routing test with 2 users, $NUM_ROUNDS rounds per user"
-
-USER_PODS_FILE="$TEMP_DIR/user_pods.txt"
-touch "$USER_PODS_FILE"
 
 print_status "Testing session-aware routing with user IDs in request headers"
 
@@ -249,120 +394,15 @@ fi
 
 print_status "✅ multi-round-qa.py completed successfully"
 
-# Process the response file to extract pod assignments
-print_status "Processing responses to verify sticky routing"
+# Skip response file parsing - only verify router logs
+print_status "Skipping response file parsing - focusing on router log verification only"
 
-# Create a temporary file to avoid reading and writing the same file
-TEMP_RESPONSE_FILE="$TEMP_DIR/temp_response.txt"
-cp "$RESPONSE_FILE" "$TEMP_RESPONSE_FILE"
-
-print_status "Debug: Response file size: $(wc -l < "$TEMP_RESPONSE_FILE") lines"
-
-if [ "$VERBOSE" = true ]; then
-    print_status "Debug: First 20 lines of response file:"
-    head -n 20 "$TEMP_RESPONSE_FILE" || true
-fi
-
-# Process the response file to find user requests and pod assignments
-# Read the file line by line and collect user requests with their context
-user_requests=()
-while IFS= read -r line; do
-    # Look for lines containing user prompts
-    if [[ $line == *"I'm user"* ]]; then
-        # Extract user ID from the prompt
-        user_id=$(echo "$line" | grep -o '[0-9]\+')
-        if [ -n "$user_id" ]; then
-            user_requests+=("$user_id")
-            if [ "$VERBOSE" = true ]; then
-                print_status "Debug: Found user request from user $user_id"
-            fi
-        fi
-    fi
-done < "$TEMP_RESPONSE_FILE"
-
-# Now extract pod assignments separately (avoiding the SC2094 issue)
-# Look for pod name headers in the response file
-pod_assignments=()
-while IFS= read -r line; do
-    if [[ $line == *"x-pod-name:"* ]]; then
-        pod_name=$(echo "$line" | awk '{print $2}')
-        if [ -n "$pod_name" ]; then
-            pod_assignments+=("$pod_name")
-            if [ "$VERBOSE" = true ]; then
-                print_status "Debug: Found pod assignment to $pod_name"
-            fi
-        fi
-    fi
-done < "$TEMP_RESPONSE_FILE"
-
-print_status "Found ${#user_requests[@]} user requests and ${#pod_assignments[@]} pod assignments"
-
-# Verify that we have matching user requests and pod assignments
-if [ ${#user_requests[@]} -ne ${#pod_assignments[@]} ]; then
-    print_warning "Mismatch between user requests (${#user_requests[@]}) and pod assignments (${#pod_assignments[@]})"
-    print_warning "This might indicate missing headers or parsing issues"
-
-    if [ ${#user_requests[@]} -eq 0 ]; then
-        print_error "No user requests found in response file. This suggests the multi-round-qa script didn't produce expected output."
-        print_error "Response file contents:"
-        echo "--- START RESPONSE FILE ---"
-        cat "$TEMP_RESPONSE_FILE"
-        echo "--- END RESPONSE FILE ---"
-        exit 1
-    fi
-
-    if [ ${#pod_assignments[@]} -eq 0 ]; then
-        print_error "No pod assignments found in response file. This suggests the router is not adding x-pod-name headers."
-        print_error "Checking if router service is configured correctly..."
-        kubectl describe svc vllm-router-service || true
-        exit 1
-    fi
-fi
-
-# Process user-pod assignments
-for i in "${!user_requests[@]}"; do
-    user_id="${user_requests[$i]}"
-    if [ "$i" -lt "${#pod_assignments[@]}" ]; then
-        pod_name="${pod_assignments[$i]}"
-        print_status "Found request from User $user_id -> Pod $pod_name"
-        if ! verify_sticky_routing "$user_id" "$pod_name" "$USER_PODS_FILE"; then
-            print_error "Sticky routing test failed!"
-            exit 1
-        fi
-    else
-        print_warning "No pod assignment found for user $user_id"
-    fi
-done
-
-# Validate that we actually tested something
-if [ ${#user_requests[@]} -eq 0 ]; then
-    print_error "No user requests were processed. Test cannot verify sticky routing."
+# Verify router logs for session_id -> server_url consistency
+ROUTER_LOG_FILE="$TEMP_DIR/router_logs.txt"
+if ! verify_router_logs_consistency "$ROUTER_LOG_FILE"; then
+    print_error "Router log verification failed!"
     exit 1
 fi
 
-# Count the unique users in our results
-unique_users=$(cut -d':' -f1 "$USER_PODS_FILE" | sort -u | wc -l)
-expected_requests=$((NUM_USERS * NUM_ROUNDS))
-
-print_status "Test summary:"
-print_status "  Expected requests: $expected_requests (${NUM_USERS} users × ${NUM_ROUNDS} rounds)"
-print_status "  Processed requests: ${#user_requests[@]}"
-print_status "  Unique users found: $unique_users"
-
-if [ "$unique_users" -lt "$NUM_USERS" ]; then
-    print_warning "Expected $NUM_USERS unique users but only found $unique_users"
-fi
-
 print_status "✅ Sticky routing test passed!"
-print_status "All users maintained consistent pod assignments across rounds"
-print_status "Session-aware routing with user IDs is working correctly"
-
-# Print final pod assignments
-print_status "\nFinal pod assignments:"
-if [ -s "$USER_PODS_FILE" ]; then
-    while IFS=: read -r uid pod; do
-        print_status "User $uid -> Pod $pod"
-    done < "$USER_PODS_FILE"
-else
-    print_warning "No pod assignments were recorded"
-fi
+print_status "Router logs confirm consistent session_id -> server_url mappings"

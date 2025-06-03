@@ -259,7 +259,7 @@ async def route_general_request(
 
     curr_time = time.time()
     logger.info(
-        f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+        f"Routing request {request_id} with session id {request.app.state.router.session_key} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
     )
     stream_generator = process_request(
         request,
