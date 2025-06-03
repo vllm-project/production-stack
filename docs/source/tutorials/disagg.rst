@@ -117,6 +117,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
 .. code-block:: yaml
 
     # Unified configuration for disaggregated prefill setup
+    # Unified configuration for disaggregated prefill setup
     servingEngineSpec:
       enableEngine: true
       runtimeClassName: ""
@@ -125,24 +126,26 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
         # Prefill node configuration
         - name: "llama-prefill"
           repository: "lmcache/vllm-openai"
-          tag: "2025-05-17-v1"
+          tag: "2025-05-27-v1"
           modelURL: "meta-llama/Llama-3.1-8B-Instruct"
           replicaCount: 1
           requestCPU: 8
           requestMemory: "30Gi"
-          requestGPU: 1
+          # requestGPU: 1
           pvcStorage: "50Gi"
           vllmConfig:
             enableChunkedPrefill: false
             enablePrefixCaching: false
             maxModelLen: 32000
             v1: 1
+            gpuMemoryUtilization: 0.6
           lmcacheConfig:
+            cudaVisibleDevices: "0"
             enabled: true
             kvRole: "kv_producer"
             enableNixl: true
             nixlRole: "sender"
-            nixlPeerHost: "pd-llama-decode-engine-service"
+            nixlPeerHost: "vllm-llama-decode-engine-service"
             nixlPeerPort: "55555"
             nixlBufferSize: "1073741824"  # 1GB
             nixlBufferDevice: "cuda"
@@ -155,12 +158,12 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
         # Decode node configuration
         - name: "llama-decode"
           repository: "lmcache/vllm-openai"
-          tag: "2025-05-17-v1"
-          modelURL: "meta-llama/Llama-3.2-1B-Instruct"
+          tag: "2025-05-27-v1"
+          modelURL: "meta-llama/Llama-3.1-8B-Instruct"
           replicaCount: 1
           requestCPU: 8
           requestMemory: "30Gi"
-          requestGPU: 1
+          # requestGPU: 1
           pvcStorage: "50Gi"
           vllmConfig:
             enableChunkedPrefill: false
@@ -168,8 +171,9 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
             maxModelLen: 32000
             v1: 1
           lmcacheConfig:
+            cudaVisibleDevices: "1"
             enabled: true
-            kvRole: "kv_consumer"
+            kvRole: "kv_consumer"  # Set decode node as consumer
             enableNixl: true
             nixlRole: "receiver"
             nixlPeerHost: "0.0.0.0"
@@ -207,6 +211,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
         - "llama-prefill"
         - "--decode-model-labels"
         - "llama-decode"
+
 
 Step 2: Deploy Using Helm
 ++++++++++++++++++++++++++++++++++
@@ -271,5 +276,5 @@ You should see logs from LMCache like the following on the decoder instance's si
 
 .. code-block:: console
 
-    [2025-05-26 20:12:21,913] LMCache DEBUG: Scheduled to load 5 tokens for request cmpl-058cf35e022a479f849a60daefbade9e-0 (vllm_v1_adapter.py:299:lmcache.integration.vllm.vllm_v1_adapter)
+    [2025-05-26 20:12:21,913] LMCache DEBUG: Scheduled to load 6 tokens for request cmpl-058cf35e022a479f849a60daefbade9e-0 (vllm_v1_adapter.py:299:lmcache.integration.vllm.vllm_v1_adapter)
     [2025-05-26 20:12:21,915] LMCache DEBUG: Retrieved 6 out of 6 out of total 6 tokens (cache_engine.py:330:lmcache.experimental.cache_engine)

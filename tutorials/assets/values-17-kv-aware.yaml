@@ -1,0 +1,70 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "llama1"
+    repository: "lmcache/vllm-openai"
+    tag: "2025-05-17-v1"
+    modelURL: "meta-llama/Llama-3.2-1B-Instruct"
+    replicaCount: 1
+    requestCPU: 6
+    requestMemory: "30Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      maxModelLen: 16384
+      v1: 1
+
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "20"
+      enableController: true
+      instanceId: "default1"
+      controllerPort: "9000"
+      workerPort: 8001
+
+    env:
+      - name: LMCACHE_LOG_LEVEL
+        value: "DEBUG"
+    hf_token: "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"
+  - name: "llama2"
+    repository: "lmcache/vllm-openai"
+    tag: "2025-05-17-v1"
+    modelURL: "meta-llama/Llama-3.2-1B-Instruct"
+    replicaCount: 1
+    requestCPU: 6
+    requestMemory: "30Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      maxModelLen: 16384
+      v1: 1
+
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "20"
+      enableController: true
+      instanceId: "default2"
+      controllerPort: "9000"
+      workerPort: 8002
+
+    env:
+      - name: LMCACHE_LOG_LEVEL
+        value: "DEBUG"
+    hf_token: "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"
+
+routerSpec:
+  repository: "lmcache/lmstack-router"
+  tag: "kvaware"
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2G"
+    limits:
+      cpu: "1"
+      memory: "2G"
+  routingLogic: "kvaware"
+  lmcacheControllerPort: 9000
