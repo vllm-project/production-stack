@@ -27,7 +27,7 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: "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"
+    hf_token: <your-huggingface-token>
   - name: "llama2"
     repository: "lmcache/vllm-openai"
     tag: "2025-05-17-v1"
@@ -54,7 +54,7 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: "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"
+    hf_token: <your-huggingface-token>
 
 routerSpec:
   repository: "lmcache/lmstack-router"
