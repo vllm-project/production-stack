@@ -9,11 +9,9 @@ This tutorial demonstrates how to use prefix aware routing in the vLLM Productio
 Prerequisites
 --------------------------------
 
-- Completion of the following tutorials:
-  - :doc:`00-install-kubernetes-env`
-  - :doc:`01-minimal-helm-installation`
-- A Kubernetes environment with GPU support
-- Basic familiarity with Kubernetes and Helm
+* Installation of minimal example shown in :ref:`examples`
+* Kubernetes environment with GPU support
+
 
 Deploy with Prefix Aware Routing
 ---------------------------------------------

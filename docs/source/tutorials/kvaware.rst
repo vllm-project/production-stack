@@ -9,11 +9,8 @@ This tutorial demonstrates how to use KV cache aware routing in the vLLM Product
 Prerequisites
 ------------------------------------------------
 
-- Completion of the following tutorials:
-  - :doc:`00-install-kubernetes-env`
-  - :doc:`01-minimal-helm-installation`
-- A Kubernetes environment with GPU support
-- Basic familiarity with Kubernetes and Helm
+* Installation of minimal example shown in :ref:`examples`
+* Kubernetes environment with GPU support
 
 Deploy with KV Cache Aware Routing
 ------------------------------------------------
