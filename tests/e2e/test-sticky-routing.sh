@@ -43,7 +43,8 @@ verify_sticky_routing() {
     local user_pods_file=$3
 
     if [ -f "$user_pods_file" ]; then
-        local previous_pod=$(grep "^$user_id:" "$user_pods_file" | cut -d':' -f2)
+        local previous_pod
+        previous_pod=$(grep "^$user_id:" "$user_pods_file" | cut -d':' -f2)
         if [ -n "$previous_pod" ] && [ "$previous_pod" != "$pod_name" ]; then
             print_error "User $user_id was routed to different pods: $previous_pod and $pod_name"
             return 1
@@ -110,7 +111,7 @@ if [ -z "$BASE_URL" ]; then
     cleanup() {
         if [ -n "$PORT_FORWARD_PID" ]; then
             print_status "Cleaning up port forwarding (PID: $PORT_FORWARD_PID)"
-            kill $PORT_FORWARD_PID 2>/dev/null
+            kill "$PORT_FORWARD_PID" 2>/dev/null
         fi
         if [ "$DEBUG" = true ]; then
             print_status "Debug mode: Preserving temp directory: $TEMP_DIR"
@@ -167,21 +168,31 @@ print_status "Debug: MODEL being used: $MODEL"
 
 # Test the URL first
 print_status "Testing BASE_URL with curl..."
-curl -s "$BASE_URL/chat/completions" \
+if curl -s "$BASE_URL/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer dummy" \
   -d '{
-    "model": "'$MODEL'",
+    "model": "'"$MODEL"'",
     "messages": [{"role": "user", "content": "test"}],
     "temperature": 0.0,
     "max_tokens": 1
-  }' > /dev/null && print_status "✅ Base URL is working" || print_error "❌ Base URL test failed"
+  }' > /dev/null; then
+    print_status "✅ Base URL is working"
+else
+    print_error "❌ Base URL test failed"
+fi
 
 # Calculate reasonable timeout:
 # With 2 users, 3 rounds each, QPS of 1.0, we expect roughly 6 requests total
 # Add buffer time for warmup, ramp-up, and request processing
 # Each request might take 10-30 seconds to complete, so 25 seconds should be plenty
 TIMEOUT_SECONDS=25
+
+# Build verbose argument array
+verbose_args=()
+if [ "$VERBOSE" = true ]; then
+    verbose_args+=("--verbose")
+fi
 
 python3 benchmarks/multi-round-qa/multi-round-qa.py \
     --base-url "$BASE_URL" \
@@ -195,31 +206,62 @@ python3 benchmarks/multi-round-qa/multi-round-qa.py \
     --time "$TIMEOUT_SECONDS" \
     --request-with-user-id \
     --output "$OUTPUT_FILE" \
-    $([ "$VERBOSE" = true ] && echo "--verbose") \
+    "${verbose_args[@]}" \
     > "$RESPONSE_FILE" 2>&1
 
 # Process the response file to extract pod assignments
 print_status "Processing responses to verify sticky routing"
 
-# Read the response file and process each request
+# Create a temporary file to avoid reading and writing the same file
+TEMP_RESPONSE_FILE="$TEMP_DIR/temp_response.txt"
+cp "$RESPONSE_FILE" "$TEMP_RESPONSE_FILE"
+
+# Process the response file to find user requests and pod assignments
+# Read the file line by line and collect user requests with their context
+user_requests=()
 while IFS= read -r line; do
-    # Look for lines containing user prompts and pod names
+    # Look for lines containing user prompts
     if [[ $line == *"I'm user"* ]]; then
         # Extract user ID from the prompt
         user_id=$(echo "$line" | grep -o '[0-9]\+')
         if [ -n "$user_id" ]; then
-            # Get the next few lines to find the pod name
-            pod_name=$(extract_pod_name "$RESPONSE_FILE")
-            if [ -n "$pod_name" ]; then
-                print_status "Found request from User $user_id -> Pod $pod_name"
-                if ! verify_sticky_routing "$user_id" "$pod_name" "$USER_PODS_FILE"; then
-                    print_error "Sticky routing test failed!"
-                    exit 1
-                fi
-            fi
+            user_requests+=("$user_id")
         fi
     fi
-done < "$RESPONSE_FILE"
+done < "$TEMP_RESPONSE_FILE"
+
+# Now extract pod assignments separately (avoiding the SC2094 issue)
+# Look for pod name headers in the response file
+pod_assignments=()
+while IFS= read -r line; do
+    if [[ $line == *"x-pod-name:"* ]]; then
+        pod_name=$(echo "$line" | awk '{print $2}')
+        if [ -n "$pod_name" ]; then
+            pod_assignments+=("$pod_name")
+        fi
+    fi
+done < "$TEMP_RESPONSE_FILE"
+
+# Verify that we have matching user requests and pod assignments
+if [ ${#user_requests[@]} -ne ${#pod_assignments[@]} ]; then
+    print_warning "Mismatch between user requests (${#user_requests[@]}) and pod assignments (${#pod_assignments[@]})"
+    print_warning "This might indicate missing headers or parsing issues"
+fi
+
+# Process user-pod assignments
+for i in "${!user_requests[@]}"; do
+    user_id="${user_requests[$i]}"
+    if [ "$i" -lt "${#pod_assignments[@]}" ]; then
+        pod_name="${pod_assignments[$i]}"
+        print_status "Found request from User $user_id -> Pod $pod_name"
+        if ! verify_sticky_routing "$user_id" "$pod_name" "$USER_PODS_FILE"; then
+            print_error "Sticky routing test failed!"
+            exit 1
+        fi
+    else
+        print_warning "No pod assignment found for user $user_id"
+    fi
+done
 
 print_status "✅ Sticky routing test passed!"
 print_status "All users maintained consistent pod assignments across rounds"
