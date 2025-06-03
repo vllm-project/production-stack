@@ -19,6 +19,14 @@ rules:
   - update
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - apps
   resources:
   - deployments
@@ -34,6 +42,7 @@ rules:
   - production-stack.vllm.ai
   resources:
   - cacheservers
+  - loraadapters
   - vllmrouters
   - vllmruntimes
   verbs:
@@ -48,6 +57,7 @@ rules:
   - production-stack.vllm.ai
   resources:
   - cacheservers/finalizers
+  - loraadapters/finalizers
   - vllmrouters/finalizers
   - vllmruntimes/finalizers
   verbs:
@@ -56,6 +66,7 @@ rules:
   - production-stack.vllm.ai
   resources:
   - cacheservers/status
+  - loraadapters/status
   - vllmrouters/status
   - vllmruntimes/status
   verbs:

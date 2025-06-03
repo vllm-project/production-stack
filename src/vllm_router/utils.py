@@ -4,6 +4,7 @@ import json
 import re
 import resource
 
+import requests
 from fastapi.requests import Request
 from starlette.datastructures import MutableHeaders
 
@@ -49,6 +50,7 @@ class ModelType(enum.Enum):
     completion = "/v1/completions"
     embeddings = "/v1/embeddings"
     rerank = "/v1/rerank"
+    score = "/v1/score"
 
     @staticmethod
     def get_test_payload(model_type: str):
@@ -71,6 +73,8 @@ class ModelType(enum.Enum):
                 return {"input": "Hello"}
             case ModelType.rerank:
                 return {"query": "Hello", "documents": ["Test"]}
+            case ModelType.score:
+                return {"encoding_format": "float", "text_1": "Test", "test_2": "Test2"}
 
     @staticmethod
     def get_all_fields():
@@ -151,3 +155,18 @@ def update_content_length(request: Request, request_body: str):
     headers = MutableHeaders(request.headers)
     headers["Content-Length"] = str(len(request_body))
     request._headers = headers
+
+
+def is_model_healthy(url: str, model: str, model_type: str) -> bool:
+    model_details = ModelType[model_type]
+    try:
+        response = requests.post(
+            f"{url}{model_details.value}",
+            headers={"Content-Type": "application/json"},
+            json={"model": model} | model_details.get_test_payload(model_type),
+            timeout=30,
+        )
+    except Exception as e:
+        logger.error(e)
+        return False
+    return response.status_code == 200
