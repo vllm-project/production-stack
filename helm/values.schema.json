@@ -55,6 +55,18 @@
               "modelURL": {
                 "type": "string"
               },
+              "annotations": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "podAnnotations": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
               "replicaCount": {
                 "type": "integer"
               },
@@ -84,6 +96,9 @@
                 "additionalProperties": {
                   "type": "string"
                 }
+              },
+              "serviceAccountName": {
+                "type": "string"
               },
               "initContainer": {
                 "type": "object",
