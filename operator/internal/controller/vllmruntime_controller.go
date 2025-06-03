@@ -396,7 +396,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
 										Path:   "/health",
-										Port:   intstr.FromInt(int(vllmRuntime.Spec.Port)),
+										Port:   intstr.FromInt32(vllmRuntime.Spec.Port),
 										Scheme: corev1.URISchemeHTTP,
 									},
 								},
@@ -410,7 +410,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
 										Path:   "/health",
-										Port:   intstr.FromInt(int(vllmRuntime.Spec.Port)),
+										Port:   intstr.FromInt32(vllmRuntime.Spec.Port),
 										Scheme: corev1.URISchemeHTTP,
 									},
 								},
@@ -549,7 +549,7 @@ func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *productionsta
 				{
 					Name:       "http",
 					Port:       80,
-					TargetPort: intstr.FromInt(int(vllmRuntime.Spec.Port)),
+					TargetPort: intstr.FromInt32(vllmRuntime.Spec.Port),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},

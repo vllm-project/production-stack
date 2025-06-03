@@ -12,7 +12,7 @@ helm search repo kuberay --devel
 # Install both CRDs and KubeRay operator v1.2.0.
 helm install kuberay-operator kuberay/kuberay-operator --version 1.2.0
 
-# Check the KubeRay operator Pod in `default` namespace
-kubectl get pods
+# Check the KubeRay operator Pod
+kubectl get pods -A | grep kuberay-operator
 # NAME                                READY   STATUS    RESTARTS   AGE
 # kuberay-operator-f89ddb644-psts7    1/1     Running   0          33m
