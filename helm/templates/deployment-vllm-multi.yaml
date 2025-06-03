@@ -1,5 +1,6 @@
-{{- if and .Values.servingEngineSpec.enableEngine (not (hasKey .Values.servingEngineSpec "raySpec")) -}}
+{{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+{{- if not (hasKey $modelSpec "raySpec") }}
 {{- $kv_role := "kv_both" }}
 {{- $kv_rank := 0 }}
 {{- $kv_parallel_size := 1 }}
@@ -409,5 +410,6 @@ data:
 {{- end }}
 {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}

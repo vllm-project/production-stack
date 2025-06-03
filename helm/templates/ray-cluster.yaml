@@ -1,5 +1,6 @@
-{{- if and .Values.servingEngineSpec.enableEngine (hasKey .Values.servingEngineSpec "raySpec")}}
+{{- if .Values.servingEngineSpec.enableEngine }}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+{{- if (hasKey $modelSpec "raySpec") }}
 {{- with $ -}}
 apiVersion: ray.io/v1
 kind: RayCluster
@@ -154,10 +155,10 @@ spec:
                 command: ["/bin/bash", "-c", "echo TBD"]
             resources:
               limits:
-                cpu: {{ default "2" .Values.servingEngineSpec.raySpec.headNode.requestCPU }}
-                memory: {{ default "8Gi" .Values.servingEngineSpec.raySpec.headNode.requestMemory }}
-                {{- if hasKey .Values.servingEngineSpec.raySpec.headNode "requestGPU" }}
-                nvidia.com/gpu: {{ .Values.servingEngineSpec.raySpec.headNode.requestGPU }}
+                cpu: {{ default "2" $modelSpec.raySpec.headNode.requestCPU }}
+                memory: {{ default "8Gi" $modelSpec.raySpec.headNode.requestMemory }}
+                {{- if hasKey $modelSpec.raySpec.headNode "requestGPU" }}
+                nvidia.com/gpu: {{ $modelSpec.raySpec.headNode.requestGPU }}
                 {{- end }}
             startupProbe:
               exec:
@@ -616,5 +617,6 @@ data:
 {{- end }}
 {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}
