@@ -188,7 +188,7 @@ async def route_general_request(
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid request: missing 'model' in request body."},
-            headers={"X-Request-Id": request_id}
+            headers={"X-Request-Id": request_id},
         )
 
     # Apply request rewriting if enabled
@@ -284,7 +284,7 @@ async def route_disaggregated_prefill_request(
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid request: missing 'model' in request body."},
-            headers={"X-Request-Id": request_id}
+            headers={"X-Request-Id": request_id},
         )
 
     # TODO (ApostaC): merge two awaits into one
