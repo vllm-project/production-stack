@@ -148,9 +148,9 @@ jobs:
 
       - name: Wait for pods to be ready
         run: |
-          echo "⏳ Waiting for all vllm pods to be in Running state"
-          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vllm-stack --timeout=300s
-          kubectl get pods -l app.kubernetes.io/name=vllm-stack
+          echo "⏳ Making wait-for-pods script executable and running it"
+          chmod +x .github/wait-for-pods.sh
+          ./.github/wait-for-pods.sh --pod-prefix vllm --timeout 300 --verbose
 
       - name: Make test script executable
         run: |
