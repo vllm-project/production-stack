@@ -359,10 +359,7 @@ async def audio_transcriptions(
 
     # return the whisper response unmodified
     resp = proxied.json()
-    logger.debug("==== Whisper response payload ====")
-    logger.debug(resp)
-    logger.debug("==== Whisper response payload ====")
-
+    
     logger.debug("Backend response headers: %s", proxied.headers)
     logger.debug("Backend response body (truncated): %r", proxied.content[:200])
 
