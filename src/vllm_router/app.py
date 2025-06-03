@@ -80,8 +80,8 @@ from vllm_router.stats.request_stats import (
     initialize_request_stats_monitor,
 )
 from vllm_router.utils import (
+    parse_comma_separated_args,
     parse_static_aliases,
-    parse_static_model_names,
     parse_static_urls,
     set_ulimit,
 )
@@ -130,21 +130,39 @@ def initialize_all(app: FastAPI, args):
     if args.service_discovery == "static":
         initialize_service_discovery(
             ServiceDiscoveryType.STATIC,
+            app=app,
             urls=parse_static_urls(args.static_backends),
-            models=parse_static_model_names(args.static_models),
+            models=parse_comma_separated_args(args.static_models),
             aliases=(
                 parse_static_aliases(args.static_aliases)
                 if args.static_aliases
                 else None
             ),
+            model_types=(
+                parse_comma_separated_args(args.static_model_types)
+                if args.static_model_types
+                else None
+            ),
+            model_labels=(
+                parse_comma_separated_args(args.static_model_labels)
+                if args.static_model_labels
+                else None
+            ),
+            static_backend_health_checks=args.static_backend_health_checks,
+            prefill_model_labels=args.prefill_model_labels,
+            decode_model_labels=args.decode_model_labels,
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
             ServiceDiscoveryType.K8S,
+            app=app,
             namespace=args.k8s_namespace,
             port=args.k8s_port,
             label_selector=args.k8s_label_selector,
+            prefill_model_labels=args.prefill_model_labels,
+            decode_model_labels=args.decode_model_labels,
         )
+
     else:
         raise ValueError(f"Invalid service discovery type: {args.service_discovery}")
 
@@ -175,6 +193,8 @@ def initialize_all(app: FastAPI, args):
         args.routing_logic,
         session_key=args.session_key,
         lmcache_controller_port=args.lmcache_controller_port,
+        prefill_model_labels=args.prefill_model_labels,
+        decode_model_labels=args.decode_model_labels,
     )
 
     # Initialize feature gates

@@ -1,0 +1,63 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: VLLMRuntime
+metadata:
+  labels:
+    app.kubernetes.io/name: production-stack
+    app.kubernetes.io/managed-by: kustomize
+  name: vllmruntime-sample
+spec:
+
+  # vLLM specific configurations
+  enableChunkedPrefill: false
+  enablePrefixCaching: false
+  tensorParallelSize: 1
+  gpuMemoryUtilization: "0.8"
+  maxLoras: 4
+  extraArgs: ["--disable-log-requests"]
+  v1: true
+
+  # LM Cache configuration
+  lmCacheConfig:
+    enabled: true
+    cpuOffloadingBufferSize: "15"
+    diskOffloadingBufferSize: "0"
+    remoteUrl: "lm://cacheserver-sample.default.svc.cluster.local:80"
+    remoteSerde: "naive"
+
+  # Model configuration
+  model:
+    modelURL: "meta-llama/Llama-3.1-8B"
+    enableLoRA: false
+    enableTool: false
+    toolCallParser: ""
+    maxModelLen: 4096
+    dtype: "bfloat16"
+    maxNumSeqs: 32
+
+  # Environment variables
+  env:
+    - name: HF_HOME
+      value: "/data"
+
+  # Resource requirements
+  resources:
+    cpu: "10"
+    memory: "32Gi"
+    gpu: "1"
+
+  # Image configuration
+  image:
+    registry: "docker.io"
+    name: "lmcache/vllm-openai:2025-04-18"
+    pullPolicy: "IfNotPresent"
+    pullSecretName: ""
+
+  # HuggingFace token secret (optional)
+  hfTokenSecret:
+    name: "huggingface-token"
+
+  # Number of replicas
+  replicas: 1
+
+  # Deployment strategy
+  deploymentStrategy: "Recreate"

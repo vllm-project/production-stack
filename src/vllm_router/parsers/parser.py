@@ -16,6 +16,7 @@ import json
 import logging
 import sys
 
+from vllm_router import utils
 from vllm_router.version import __version__
 
 try:
@@ -65,6 +66,19 @@ def load_initial_config_from_config_json_if_required(
     return args
 
 
+def validate_static_model_types(model_types: str | None) -> None:
+    if model_types is None:
+        raise ValueError(
+            "Static model types must be provided when using the backend healthcheck."
+        )
+    all_models = utils.ModelType.get_all_fields()
+    for model_type in utils.parse_comma_separated_args(model_types):
+        if model_type not in all_models:
+            raise ValueError(
+                f"The model type '{model_type}' is not supported. Supported model types are '{','.join(all_models)}'"
+            )
+
+
 # --- Argument Parsing and Initialization ---
 def validate_args(args):
     verify_required_args_provided(args)
@@ -77,6 +91,8 @@ def validate_args(args):
             raise ValueError(
                 "Static models must be provided when using static service discovery."
             )
+        if args.static_backend_health_checks:
+            validate_static_model_types(args.static_model_types)
     if args.service_discovery == "k8s" and args.k8s_port is None:
         raise ValueError("K8s port must be provided when using K8s service discovery.")
     if args.routing_logic == "session" and args.session_key is None:
@@ -124,6 +140,23 @@ def parse_args():
         help="The aliases of static backends, separated by commas. E.g., your-custom-model:llama3",
     )
     parser.add_argument(
+        "--static-model-types",
+        type=str,
+        default=None,
+        help="Specify the static model types of each model. This is used for the backend health check, separated by commas. E.g. chat,embeddings,rerank",
+    )
+    parser.add_argument(
+        "--static-model-labels",
+        type=str,
+        default=None,
+        help="The model labels of static backends, separated by commas. E.g., model1,model2",
+    )
+    parser.add_argument(
+        "--static-backend-health-checks",
+        action="store_true",
+        help="Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.",
+    )
+    parser.add_argument(
         "--k8s-port",
         type=int,
         default=8000,
@@ -144,7 +177,13 @@ def parse_args():
     parser.add_argument(
         "--routing-logic",
         type=str,
-        choices=["roundrobin", "session", "kvaware"],
+        choices=[
+            "roundrobin",
+            "session",
+            "kvaware",
+            "prefixaware",
+            "disaggregated_prefill",
+        ],
         help="The routing logic to use",
     )
     parser.add_argument(
@@ -265,6 +304,20 @@ def parse_args():
         "--sentry-dsn",
         type=str,
         help="Enables Sentry Error Reporting to the specified Data Source Name",
+    )
+
+    parser.add_argument(
+        "--prefill-model-labels",
+        type=str,
+        default=None,
+        help="The model labels of prefill backends, separated by commas. E.g., model1,model2",
+    )
+
+    parser.add_argument(
+        "--decode-model-labels",
+        type=str,
+        default=None,
+        help="The model labels of decode backends, separated by commas. E.g., model1,model2",
     )
 
     args = parser.parse_args()
