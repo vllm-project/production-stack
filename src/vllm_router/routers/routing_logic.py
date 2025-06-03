@@ -24,8 +24,8 @@ import requests
 from fastapi import Request
 
 try:
-    from lmcache.experimental.cache_controller import controller_manager
-    from lmcache.experimental.cache_controller.message import (
+    from lmcache.v1.cache_controller import controller_manager
+    from lmcache.v1.cache_controller.message import (
         LookupMsg,
         QueryInstMsg,
         QueryInstRetMsg,
@@ -212,6 +212,9 @@ class KvawareRouter(RoutingInterface):
 
     def __init__(self, lmcache_controller_port: int):
         self.lmcache_controller_port = lmcache_controller_port
+        logger.info(
+            f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
+        )
         self.kv_manager = controller_manager.LMCacheControllerManager(
             f"0.0.0.0:{self.lmcache_controller_port}"
         )
@@ -260,32 +263,59 @@ class KvawareRouter(RoutingInterface):
         """
         url = endpoints[0].url + "/tokenize"
         headers = {"Content-Type": "application/json"}
-        data = {"model": endpoints[0].model_name, "prompt": request_json["prompt"]}
+
+        # Handle chat completions
+        if "messages" in request_json:
+            # Get the last message from the messages array
+            messages = request_json["messages"]
+            if messages:
+                last_message = messages[-1]
+                prompt = last_message.get("content", "")
+                if isinstance(prompt, list):
+                    # Handle multimodal messages
+                    prompt = " ".join(
+                        part.get("text", "")
+                        for part in prompt
+                        if part.get("type") == "text"
+                    )
+                data = {"model": endpoints[0].model_names[0], "prompt": prompt}
+            else:
+                data = {"model": endpoints[0].model_names[0], "prompt": ""}
+        else:
+            # Handle regular completions
+            data = {
+                "model": endpoints[0].model_names[0],
+                "prompt": request_json["prompt"],
+            }
         response = requests.post(url, headers=headers, json=data).json()
         token_ids = response["tokens"]
         msg = LookupMsg(tokens=token_ids)
         instance_id = await self.query_manager(msg)
-
-        if instance_id is None or instance_id.best_instance_id is None:
+        if instance_id is None or len(instance_id.layout_info) == 0:
             len_engines = len(endpoints)
             chosen = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
             self.req_id += 1
+            logger.info(f"Routing request to {chosen.url} because no instance id found")
             return chosen.url
         else:
-            self.req_id += 1
-            if instance_id.best_instance_id not in self.instance_id_to_ip:
+            queried_instance_ids = [info for info in instance_id.layout_info]
+            if queried_instance_ids[0] not in self.instance_id_to_ip:
                 for endpoint in endpoints:
                     query_message = QueryInstMsg(
                         ip=endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
                             0
                         ].split("//")[1]
                     )
-                    instance_id = await self.query_manager(query_message)
-                    self.instance_id_to_ip[instance_id.instance_id] = endpoint.url
+                    endpoint_instance_id = await self.query_manager(query_message)
+
+                    self.instance_id_to_ip[endpoint_instance_id.instance_id] = (
+                        endpoint.url
+                    )
+                logger.info(f"Instance id to ip: {self.instance_id_to_ip}")
             logger.info(
-                f"Routing request to {instance_id.best_instance_id} found by kvaware router"
+                f"Routing request to {queried_instance_ids[0]} found by kvaware router"
             )
-            return self.instance_id_to_ip[instance_id.best_instance_id]
+            return self.instance_id_to_ip[queried_instance_ids[0]]
 
 
 class PrefixAwareRouter(RoutingInterface):

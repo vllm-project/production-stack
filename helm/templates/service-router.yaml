@@ -13,6 +13,10 @@ spec:
       port: {{ .Values.routerSpec.servicePort }}
       targetPort: {{ .Values.routerSpec.containerPort }}
       protocol: TCP
+    - name: "lmcache-port"
+      port: 9000
+      targetPort: lmcache-port
+      protocol: TCP
   selector:
   {{- include "chart.routerLabels" . | nindent 4 }}
 {{- end }}

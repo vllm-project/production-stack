@@ -32,6 +32,8 @@ spec:
         image: "{{ .Values.routerSpec.repository | default "lmcache/lmstack-router" }}:{{ .Values.routerSpec.tag | default "latest" }}"
         imagePullPolicy: "{{ .Values.routerSpec.imagePullPolicy | default "Always" }}"
         env:
+          - name: LMCACHE_LOG_LEVEL
+            value: "DEBUG"
           {{- if .Values.servingEngineSpec.enableEngine -}}
           {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
           {{- if $vllmApiKey }}
@@ -116,6 +118,8 @@ spec:
         ports:
           - name: "router-cport"
             containerPort: {{ .Values.routerSpec.containerPort }}
+          - name: "lmcache-port"
+            containerPort: 9000
         livenessProbe:
           initialDelaySeconds: 30
           periodSeconds: 5

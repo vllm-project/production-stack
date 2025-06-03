@@ -1,43 +1,71 @@
 servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
-  - name: "mistral"
-    repository: "lmcache/test"
-    tag: "2025-05-04"
-    modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+  - name: "mistral1"
+    repository: "lmcache/vllm-openai"
+    tag: "2025-05-27-v1"
+    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
-    requestCPU: 6
-    requestMemory: "30Gi"
+    requestCPU: 10
+    requestMemory: "80Gi"
     requestGPU: 1
     pvcStorage: "50Gi"
     vllmConfig:
       enableChunkedPrefill: false
       enablePrefixCaching: false
-      maxModelLen: 16384
+      maxModelLen: 32000
+      v1: 1
 
     lmcacheConfig:
       enabled: true
-      cpuOffloadingBufferSize: "20"
+      cpuOffloadingBufferSize: "60"
       enableController: true
       instanceId: "default1"
-      controllerPort: "9001"
+      controllerPort: "9000"
       workerPort: 8002
+
 
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: <YOUR_HF_TOKEN>
+    hf_token: <your-hf-token>
+  - name: "mistral2"
+    repository: "lmcache/vllm-openai"
+    tag: "2025-05-27-v1"
+    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+    replicaCount: 1
+    requestCPU: 10
+    requestMemory: "80Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      maxModelLen: 32000
+      v1: 1
 
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "60"
+      enableController: true
+      instanceId: "default2"
+      controllerPort: "9000"
+      workerPort: 8003
+
+    env:
+      - name: LMCACHE_LOG_LEVEL
+        value: "DEBUG"
+    hf_token: <your-hf-token>
 
 routerSpec:
   repository: "lmcache/lmstack-router"
-  tag: "v0.1.2"
+  tag: "kvaware"
   resources:
     requests:
-      cpu: "1"
-      memory: "2G"
+      cpu: "2"
+      memory: "8G"
     limits:
-      cpu: "1"
-      memory: "2G"
+      cpu: "2"
+      memory: "8G"
   routingLogic: "kvaware"
-  lmcacheControllerPort: 9001
+  lmcacheControllerPort: 9000
