@@ -162,7 +162,7 @@ jobs:
           echo "🧪 Running sticky routing test"
           cd ${{ github.workspace }}
           # Set the model to match what's deployed in the helm values
-          ./tests/e2e/test-sticky-routing.sh --model "facebook/opt-125m" --num-rounds 3
+          ./tests/e2e/test-sticky-routing.sh --model "facebook/opt-125m" --num-rounds 3 --verbose
         timeout-minutes: 10
 
       - name: Archive sticky routing test results
