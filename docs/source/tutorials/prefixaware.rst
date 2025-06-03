@@ -16,7 +16,7 @@ Prerequisites
 - Basic familiarity with Kubernetes and Helm
 
 Deploy with Prefix Aware Routing
---------------------------------
+---------------------------------------------
 
 We'll use the predefined configuration file ``values-18-prefix-aware.yaml`` which sets up two vLLM instances with prefix aware routing enabled.
 
