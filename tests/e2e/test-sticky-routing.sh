@@ -194,6 +194,15 @@ if [ "$VERBOSE" = true ]; then
     verbose_args+=("--verbose")
 fi
 
+print_status "Executing multi-round-qa.py with the following parameters:"
+print_status "  Base URL: $BASE_URL"
+print_status "  Model: $MODEL"
+print_status "  Users: $NUM_USERS"
+print_status "  Rounds: $NUM_ROUNDS"
+print_status "  Timeout: $TIMEOUT_SECONDS seconds"
+
+# Run the python script and capture exit code
+set +e  # Temporarily disable exit on error
 python3 benchmarks/multi-round-qa/multi-round-qa.py \
     --base-url "$BASE_URL" \
     --model "$MODEL" \
@@ -209,12 +218,50 @@ python3 benchmarks/multi-round-qa/multi-round-qa.py \
     "${verbose_args[@]}" \
     > "$RESPONSE_FILE" 2>&1
 
+PYTHON_EXIT_CODE=$?
+set -e  # Re-enable exit on error
+
+# Check if the python script succeeded
+if [ $PYTHON_EXIT_CODE -ne 0 ]; then
+    print_error "multi-round-qa.py failed with exit code $PYTHON_EXIT_CODE"
+    print_error "Script output:"
+    echo "--- START SCRIPT OUTPUT ---"
+    cat "$RESPONSE_FILE"
+    echo "--- END SCRIPT OUTPUT ---"
+
+    print_error "Output file contents (if exists):"
+    if [ -f "$OUTPUT_FILE" ]; then
+        echo "--- START OUTPUT FILE ---"
+        cat "$OUTPUT_FILE"
+        echo "--- END OUTPUT FILE ---"
+    else
+        print_error "Output file $OUTPUT_FILE was not created"
+    fi
+
+    print_error "Debugging information:"
+    print_error "  Working directory: $(pwd)"
+    print_error "  Python version: $(python3 --version)"
+    print_error "  Available Python packages:"
+    pip list | grep -E "(requests|aiohttp|asyncio)" || true
+
+    exit $PYTHON_EXIT_CODE
+fi
+
+print_status "✅ multi-round-qa.py completed successfully"
+
 # Process the response file to extract pod assignments
 print_status "Processing responses to verify sticky routing"
 
 # Create a temporary file to avoid reading and writing the same file
 TEMP_RESPONSE_FILE="$TEMP_DIR/temp_response.txt"
 cp "$RESPONSE_FILE" "$TEMP_RESPONSE_FILE"
+
+print_status "Debug: Response file size: $(wc -l < "$TEMP_RESPONSE_FILE") lines"
+
+if [ "$VERBOSE" = true ]; then
+    print_status "Debug: First 20 lines of response file:"
+    head -n 20 "$TEMP_RESPONSE_FILE" || true
+fi
 
 # Process the response file to find user requests and pod assignments
 # Read the file line by line and collect user requests with their context
@@ -226,6 +273,9 @@ while IFS= read -r line; do
         user_id=$(echo "$line" | grep -o '[0-9]\+')
         if [ -n "$user_id" ]; then
             user_requests+=("$user_id")
+            if [ "$VERBOSE" = true ]; then
+                print_status "Debug: Found user request from user $user_id"
+            fi
         fi
     fi
 done < "$TEMP_RESPONSE_FILE"
@@ -238,14 +288,35 @@ while IFS= read -r line; do
         pod_name=$(echo "$line" | awk '{print $2}')
         if [ -n "$pod_name" ]; then
             pod_assignments+=("$pod_name")
+            if [ "$VERBOSE" = true ]; then
+                print_status "Debug: Found pod assignment to $pod_name"
+            fi
         fi
     fi
 done < "$TEMP_RESPONSE_FILE"
+
+print_status "Found ${#user_requests[@]} user requests and ${#pod_assignments[@]} pod assignments"
 
 # Verify that we have matching user requests and pod assignments
 if [ ${#user_requests[@]} -ne ${#pod_assignments[@]} ]; then
     print_warning "Mismatch between user requests (${#user_requests[@]}) and pod assignments (${#pod_assignments[@]})"
     print_warning "This might indicate missing headers or parsing issues"
+
+    if [ ${#user_requests[@]} -eq 0 ]; then
+        print_error "No user requests found in response file. This suggests the multi-round-qa script didn't produce expected output."
+        print_error "Response file contents:"
+        echo "--- START RESPONSE FILE ---"
+        cat "$TEMP_RESPONSE_FILE"
+        echo "--- END RESPONSE FILE ---"
+        exit 1
+    fi
+
+    if [ ${#pod_assignments[@]} -eq 0 ]; then
+        print_error "No pod assignments found in response file. This suggests the router is not adding x-pod-name headers."
+        print_error "Checking if router service is configured correctly..."
+        kubectl describe svc vllm-router-service || true
+        exit 1
+    fi
 fi
 
 # Process user-pod assignments
@@ -263,12 +334,35 @@ for i in "${!user_requests[@]}"; do
     fi
 done
 
+# Validate that we actually tested something
+if [ ${#user_requests[@]} -eq 0 ]; then
+    print_error "No user requests were processed. Test cannot verify sticky routing."
+    exit 1
+fi
+
+# Count the unique users in our results
+unique_users=$(cut -d':' -f1 "$USER_PODS_FILE" | sort -u | wc -l)
+expected_requests=$((NUM_USERS * NUM_ROUNDS))
+
+print_status "Test summary:"
+print_status "  Expected requests: $expected_requests (${NUM_USERS} users × ${NUM_ROUNDS} rounds)"
+print_status "  Processed requests: ${#user_requests[@]}"
+print_status "  Unique users found: $unique_users"
+
+if [ "$unique_users" -lt "$NUM_USERS" ]; then
+    print_warning "Expected $NUM_USERS unique users but only found $unique_users"
+fi
+
 print_status "✅ Sticky routing test passed!"
 print_status "All users maintained consistent pod assignments across rounds"
 print_status "Session-aware routing with user IDs is working correctly"
 
 # Print final pod assignments
 print_status "\nFinal pod assignments:"
-while IFS=: read -r uid pod; do
-    print_status "User $uid -> Pod $pod"
-done < "$USER_PODS_FILE"
+if [ -s "$USER_PODS_FILE" ]; then
+    while IFS=: read -r uid pod; do
+        print_status "User $uid -> Pod $pod"
+    done < "$USER_PODS_FILE"
+else
+    print_warning "No pod assignments were recorded"
+fi
