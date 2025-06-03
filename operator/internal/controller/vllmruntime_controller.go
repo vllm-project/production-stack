@@ -560,7 +560,7 @@ func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *productionsta
 				{
 					Name:       "http",
 					Port:       80,
-					TargetPort: intstr.FromInt(int(vllmRuntime.Spec.VLLMConfig.Port)),
+					TargetPort: intstr.FromInt32(vllmRuntime.Spec.VLLMConfig.Port),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},

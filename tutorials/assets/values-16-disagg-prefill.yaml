@@ -7,24 +7,26 @@ servingEngineSpec:
     # Prefill node configuration
     - name: "llama-prefill"
       repository: "lmcache/vllm-openai"
-      tag: "2025-05-17-v1"
+      tag: "2025-05-27-v1"
       modelURL: "meta-llama/Llama-3.1-8B-Instruct"
       replicaCount: 1
       requestCPU: 8
       requestMemory: "30Gi"
-      requestGPU: 1
+      # requestGPU: 1
       pvcStorage: "50Gi"
       vllmConfig:
         enableChunkedPrefill: false
         enablePrefixCaching: false
         maxModelLen: 32000
         v1: 1
+        gpuMemoryUtilization: 0.6
       lmcacheConfig:
+        cudaVisibleDevices: "0"
         enabled: true
         kvRole: "kv_producer"
         enableNixl: true
         nixlRole: "sender"
-        nixlPeerHost: "pd-llama-decode-engine-service"
+        nixlPeerHost: "vllm-llama-decode-engine-service"
         nixlPeerPort: "55555"
         nixlBufferSize: "1073741824"  # 1GB
         nixlBufferDevice: "cuda"
@@ -37,12 +39,12 @@ servingEngineSpec:
     # Decode node configuration
     - name: "llama-decode"
       repository: "lmcache/vllm-openai"
-      tag: "2025-05-17-v1"
+      tag: "2025-05-27-v1"
       modelURL: "meta-llama/Llama-3.1-8B-Instruct"
       replicaCount: 1
       requestCPU: 8
       requestMemory: "30Gi"
-      requestGPU: 1
+      # requestGPU: 1
       pvcStorage: "50Gi"
       vllmConfig:
         enableChunkedPrefill: false
@@ -50,6 +52,7 @@ servingEngineSpec:
         maxModelLen: 32000
         v1: 1
       lmcacheConfig:
+        cudaVisibleDevices: "1"
         enabled: true
         kvRole: "kv_consumer"  # Set decode node as consumer
         enableNixl: true

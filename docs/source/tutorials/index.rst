@@ -12,3 +12,5 @@ Here you will find tutorials on how to use the various features of the system.
     disagg.rst
     kv_cache.rst
     lora_load.rst
+    kvaware.rst
+    prefixaware.rst

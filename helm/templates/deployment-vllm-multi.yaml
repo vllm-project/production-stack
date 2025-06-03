@@ -292,16 +292,16 @@ spec:
             value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.enableController | quote }}
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "instanceId" }}
-          - name: LMCACHE_INSTANCE_ID
+          - name: LMCACHE_LMCACHE_INSTANCE_ID
             value: {{ $modelSpec.lmcacheConfig.instanceId | quote }}
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "controllerPort" }}
           - name: LMCACHE_CONTROLLER_URL
-            value: "{{ .Release.Name }}-{{$modelSpec.name}}-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
+            value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
           - name: LMCACHE_WORKER_PORT
-            value: "{{ .Release.Name }}-service:{{ $modelSpec.lmcacheConfig.workerPort }}"
+            value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
           {{-   end }}
           {{- end }}
           {{- if .Values.servingEngineSpec.configs }}

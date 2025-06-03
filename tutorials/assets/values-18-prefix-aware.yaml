@@ -1,11 +1,11 @@
 servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
-  - name: "mistral"
-    repository: "lmcache/test"
-    tag: "2025-05-04"
-    modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
-    replicaCount: 1
+  - name: "llama"
+    repository: "lmcache/vllm-openai"
+    tag: "2025-05-17-v1"
+    modelURL: "meta-llama/Llama-3.2-1B-Instruct"
+    replicaCount: 2
     requestCPU: 6
     requestMemory: "30Gi"
     requestGPU: 1
@@ -14,24 +14,20 @@ servingEngineSpec:
       enableChunkedPrefill: false
       enablePrefixCaching: false
       maxModelLen: 16384
+      v1: 1
 
     lmcacheConfig:
       enabled: true
-      cpuOffloadingBufferSize: "20"
-      enableController: true
-      instanceId: "default1"
-      controllerPort: "9001"
-      workerPort: 8002
+      cpuOffloadingBufferSize: "60"
 
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: <YOUR_HF_TOKEN>
-
+    hf_token: <your-huggingface-token>
 
 routerSpec:
   repository: "lmcache/lmstack-router"
-  tag: "v0.1.2"
+  tag: "kvaware"
   resources:
     requests:
       cpu: "1"
@@ -39,5 +35,4 @@ routerSpec:
     limits:
       cpu: "1"
       memory: "2G"
-  routingLogic: "kvaware"
-  lmcacheControllerPort: 9001
+  routingLogic: "prefixaware"
