@@ -1,13 +1,13 @@
 KV Cache Aware Routing
-=====================
+======================================
 
 Introduction
-------------------------
+------------------------------------------------
 
 This tutorial demonstrates how to use KV cache aware routing in the vLLM Production Stack. KV cache aware routing ensures that subsequent requests with the same prompt prefix are routed to the same instance, maximizing KV cache utilization and improving performance.
 
 Prerequisites
-------------------------
+------------------------------------------------
 
 - Completion of the following tutorials:
   - :doc:`00-install-kubernetes-env`
@@ -16,7 +16,7 @@ Prerequisites
 - Basic familiarity with Kubernetes and Helm
 
 Deploy with KV Cache Aware Routing
---------------------------------
+------------------------------------------------
 
 We'll use the predefined configuration file ``values-17-kv-aware.yaml`` which sets up two vLLM instances with KV cache aware routing enabled.
 
@@ -35,7 +35,7 @@ Wait for the deployment to complete:
    kubectl get pods -w
 
 Port Forwarding
-------------------------
+------------------------------------------------
 
 Forward the router service port to your local machine:
 
@@ -44,7 +44,7 @@ Forward the router service port to your local machine:
    kubectl port-forward svc/vllm-router-service 30080:80
 
 Testing KV Cache Aware Routing
-------------------------
+------------------------------------------------
 
 First, send a request to the router:
 
@@ -73,7 +73,7 @@ Then, send another request with the same prompt prefix:
 You should observe that the second request is routed to the same instance as the first request. This is because the KV cache aware router detects that the second request shares a prefix with the first request and routes it to the same instance to maximize KV cache utilization.
 
 Clean Up
-------------------------
+------------------------------------------------
 
 To clean up the deployment:
 
@@ -82,7 +82,7 @@ To clean up the deployment:
    helm uninstall vllm
 
 Conclusion
-------------------------
+------------------------------------------------
 
 In this tutorial, we've demonstrated how to:
 
