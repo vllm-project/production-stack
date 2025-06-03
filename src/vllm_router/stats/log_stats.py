@@ -1,3 +1,16 @@
+# Copyright 2024-2025 The vLLM Production Stack Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import time
 
 from fastapi import FastAPI
@@ -42,8 +55,17 @@ def log_stats(app: FastAPI, interval: int = 10):
         request_stats = app.state.request_stats_monitor.get_request_stats(time.time())
         for endpoint in endpoints:
             url = endpoint.url
-            logstr += f"Model: {endpoint.model_name}\n"
             logstr += f"Server: {url}\n"
+            if endpoint.model_info:
+                logstr += "Models:\n"
+                for model_id, model_info in endpoint.model_info.items():
+                    logstr += f"  - {model_id}"
+                    if model_info.get("parent"):
+                        logstr += f" (adapter for {model_info['parent']})"
+                    logstr += "\n"
+            else:
+                logstr += "Models: No model information available\n"
+
             if url in engine_stats:
                 es = engine_stats[url]
                 logstr += (

@@ -1,0 +1,22 @@
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferenceModel
+metadata:
+  name: legogpt
+spec:
+  modelName: legogpt
+  criticality: Standard
+  poolRef:
+    name: vllm-llama3-1b-instruct
+  targetModels:
+  - name: legogpt
+    weight: 100
+---
+apiVersion: inference.networking.x-k8s.io/v1alpha2
+kind: InferenceModel
+metadata:
+  name: base-model
+spec:
+  modelName: meta-llama/Llama-3.2-1B-Instruct
+  criticality: Critical
+  poolRef:
+    name: vllm-llama3-1b-instruct

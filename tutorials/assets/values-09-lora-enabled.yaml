@@ -1,10 +1,21 @@
 servingEngineSpec:
   runtimeClassName: ""
+
+  # If you want to use vllm api key, uncomment the following section, you can either use secret or directly set the value
+  # Option 1: Secret reference
+  # vllmApiKey:
+  #   secretName: "vllm-api-key"
+  #   secretKey: "VLLM_API_KEY"
+
+  # Option 2: Direct value
+  # vllmApiKey:
+  #   value: "abc123"
+
   modelSpec:
-    - name: "llama2-7b"
+    - name: "llama3-8b-instr"
       repository: "vllm/vllm-openai"
       tag: "latest"
-      modelURL: "meta-llama/Llama-2-7b-hf"
+      modelURL: "meta-llama/Llama-3.1-8B-Instruct"
       enableLoRA: true
 
       # Option 1: Direct token
@@ -32,7 +43,7 @@ servingEngineSpec:
 
       replicaCount: 1
 
-      # Resource requirements for Llama-2-7b
+      # Resource requirements for Llama-3.1-8b
       requestCPU: 8
       requestMemory: "32Gi"
       requestGPU: 1
@@ -46,3 +57,9 @@ servingEngineSpec:
     initialDelaySeconds: 60
     periodSeconds: 30
     failureThreshold: 120 # Allow up to 1 hour for startup
+
+routerSpec:
+  repository: "lmcache/lmstack-router"
+  tag: "lora"
+  imagePullPolicy: "IfNotPresent"
+  enableRouter: true

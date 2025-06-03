@@ -6,7 +6,6 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: vllmruntime-sample
 spec:
-
   # Model configuration
   model:
     modelURL: "meta-llama/Llama-3.1-8B"
