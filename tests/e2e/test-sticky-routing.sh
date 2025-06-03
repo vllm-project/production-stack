@@ -56,7 +56,8 @@ verify_router_logs_consistency() {
 
         # Try to find router service and infer pod labels
         if kubectl get svc vllm-router-service &>/dev/null; then
-            local router_deployment=$(kubectl get deployment | grep router | head -n 1 | awk '{print $1}')
+            local router_deployment
+            router_deployment=$(kubectl get deployment | grep router | head -n 1 | awk '{print $1}')
             if [ -n "$router_deployment" ]; then
                 print_status "Found router deployment: $router_deployment"
                 kubectl logs deployment/"$router_deployment" --tail=5000 > "$raw_log_file" 2>&1 || true
@@ -101,7 +102,7 @@ verify_router_logs_consistency() {
 
     # Extract session_id -> server_url mappings from router logs
     local session_mappings_file="$TEMP_DIR/session_mappings.txt"
-    > "$session_mappings_file"  # Clear the file
+    true > "$session_mappings_file"  # Clear the file
 
     # Parse router logs for routing decisions
     # Handle multiple log formats:
@@ -110,7 +111,7 @@ verify_router_logs_consistency() {
 
     while IFS= read -r line; do
         if [[ $line == *"Routing request"* && $line == *" to "* && $line == *"at"* ]]; then
-            local session_id server_url request_id
+            local session_id server_url
 
             # Extract session id (the string after "with session id " and before " to ")
             session_id=$(echo "$line" | sed -n 's/.*with session id \([^ ]*\) to .*/\1/p')
@@ -140,7 +141,8 @@ verify_router_logs_consistency() {
         fi
     done < "$router_log_file"
 
-    local total_mappings=$(wc -l < "$session_mappings_file")
+    local total_mappings
+    total_mappings=$(wc -l < "$session_mappings_file")
     print_status "Found $total_mappings session_id -> server_url mappings in router logs"
 
     if [ "$total_mappings" -eq 0 ]; then
@@ -154,7 +156,7 @@ verify_router_logs_consistency() {
 
     # Verify consistency: all requests with the same session_id should go to the same server_url
     local consistency_check_file="$TEMP_DIR/consistency_check.txt"
-    > "$consistency_check_file"
+    true > "$consistency_check_file"
 
     # Group by session_id and check if all server_urls for each session are the same
     sort "$session_mappings_file" | while IFS=: read -r session_id server_url; do
