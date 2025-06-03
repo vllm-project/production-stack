@@ -336,7 +336,7 @@ async def route_disaggregated_prefill_request(
         request.app.state.prefill_client, endpoint, request_json, request_id
     )
     et = time.time()
-    logger.info(f"Prefiller time (TTFT): {et - st:.4f}")
+    logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
     request_json["max_tokens"] = orig_max_tokens
 
     async def generate_stream():
