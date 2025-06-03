@@ -74,11 +74,6 @@ In the following example, we configure a total of two Ray nodes each equipped wi
 ```yaml
 servingEngineSpec:
   runtimeClassName: ""
-  raySpec:
-    headNode:
-      requestCPU: 2
-      requestMemory: "20Gi"
-      requestGPU: 2
   modelSpec:
   - name: "distilgpt2"
     repository: "vllm/vllm-openai"
@@ -96,6 +91,12 @@ servingEngineSpec:
       pipelineParallelSize: 2
 
     shmSize: "20Gi"
+
+    raySpec:
+      headNode:
+        requestCPU: 2
+        requestMemory: "20Gi"
+        requestGPU: 2
 
     hf_token: <YOUR HF TOKEN>
 ```
