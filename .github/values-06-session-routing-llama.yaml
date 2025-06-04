@@ -10,19 +10,17 @@ servingEngineSpec:
 
     replicaCount: 2
 
-    requestCPU: 8
-    requestMemory: "32Gi"
-    requestGPU: 1
+    requestCPU: 6
+    requestMemory: "16Gi"
+    requestGPU: 0.5
 
-    pvcStorage: "50Gi"
+    pvcStorage: "10Gi"
     pvcAccessMode:
       - ReadWriteMany
 
     vllmConfig:
-      maxModelLen: 4096
-      dtype: "bfloat16"
-      gpuMemoryUtilization: 0.85
-      extraArgs: ["--disable-log-requests", "--trust-remote-code"]
+      maxModelLen: 1024
+      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.4"]
 
 routerSpec:
   repository: "localhost:5000/git-act-router"
