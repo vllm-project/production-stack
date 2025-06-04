@@ -7,18 +7,23 @@ VAR="${1#curl-}"
 [ ! -d "output-$VAR" ] && mkdir "output-$VAR"
 chmod -R 777 "output-$VAR"
 
-# Print router logs
-POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep '^vllm-deployment-router')
-kubectl wait --for=condition=ready pod/"$POD_NAME" --timeout=120s
-kubectl logs -f "$POD_NAME" 2>&1 | tee "output-$VAR/router.log" &
+# # Print router logs
+# POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep '^vllm-deployment-router')
+# kubectl wait --for=condition=ready pod/"$POD_NAME" --timeout=120s
+# kubectl logs -f "$POD_NAME" 2>&1 | tee "output-$VAR/router.log" &
 
 # Loop to check if all llmstack-related pods are in the Running state
 while true; do
-    # Check each vllm pod individually
+    all_ready=true
+
     kubectl get pods --no-headers | grep "vllm" | while read -r line; do
         pod_name=$(echo "$line" | awk '{print $1}')
         status=$(echo "$line" | awk '{print $3}')
         ready=$(echo "$line" | awk '{print $2}')
+
+        if [[ "$status" != "Running" ]] || [[ "$ready" != "1/1" ]]; then
+            all_ready=false
+        fi
 
         # Log timestamp and pod info
         timestamp=$(date '+%Y-%m-%d %H:%M:%S')
@@ -43,6 +48,11 @@ while true; do
             fi
         fi
     done
+
+    if $all_ready; then
+        echo "All vllm pods are now Ready and in Running state."
+        break
+    fi
 
     echo "Not all pods are ready yet. Checking again in 20 seconds..."
     sleep 20
