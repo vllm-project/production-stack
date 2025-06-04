@@ -336,12 +336,14 @@ func (r *VLLMRouterReconciler) updateStatus(ctx context.Context, router *serving
 		latestRouter.Status.LastUpdated = metav1.Now()
 
 		// Update VLLMRouter status based on deployment status
-		if dep.Status.AvailableReplicas > 0 {
+		if dep.Status.AvailableReplicas == *dep.Spec.Replicas && dep.Status.UnavailableReplicas == 0 {
 			latestRouter.Status.Status = "Ready"
-		} else if dep.Status.UpdatedReplicas > 0 {
+		} else if dep.Status.UpdatedReplicas > 0 && dep.Status.AvailableReplicas != *dep.Spec.Replicas && dep.Status.UnavailableReplicas > 0 {
 			latestRouter.Status.Status = "Updating"
-		} else {
+		} else if dep.Status.UnavailableReplicas > 0 {
 			latestRouter.Status.Status = "NotReady"
+		} else {
+			latestRouter.Status.Status = "Unknown"
 		}
 
 		return r.Status().Update(ctx, latestRouter)
