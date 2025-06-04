@@ -1,0 +1,29 @@
+# KEDA ScaledObject for vLLM deployment
+# This configuration enables automatic scaling of vLLM pods based on queue length metrics
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: vllm-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: vllm-llama3-deployment-vllm
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  # How often KEDA should check the metrics (in seconds)
+  pollingInterval: 15
+  # How long to wait before scaling down after scaling up (in seconds)
+  cooldownPeriod: 30
+  # Scaling triggers configuration
+  triggers:
+    - type: prometheus
+      metadata:
+        # Prometheus server address within the cluster
+        serverAddress: http://prometheus-operated.monitoring.svc:9090
+        # Name of the metric to monitor
+        metricName: vllm:num_requests_waiting
+        # Prometheus query to fetch the metric
+        query: vllm:num_requests_waiting
+        # Threshold value that triggers scaling
+        # When queue length exceeds this value, KEDA will scale up
+        threshold: '5'
