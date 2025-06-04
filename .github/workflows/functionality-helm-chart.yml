@@ -34,13 +34,24 @@ jobs:
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
       - name: Helm uninstall
         run: |
-            helm uninstall vllm
-            echo "Waiting for all vllm pods to terminate..."
-            while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
-              echo "  Pods still terminating… sleeping for 5s"
-              sleep 5
+          releases=$(helm list -q)
+
+          if [ -n "$releases" ]; then
+            echo "Found releases: $releases"
+            for r in $releases; do
+              echo "Uninstalling $r..."
+              helm uninstall "$r"
             done
-            echo "All vllm pods have terminated."
+          else
+            echo "No Helm releases found; skipping uninstall."
+          fi
+
+          # Wait until no pods remain
+          echo "Waiting for all pods to terminate..."
+          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
+            sleep 5
+          done
+          echo "All pods have terminated."
       - name: Deploy via helm charts
         env:
           DOCKER_BUILDKIT: 1
@@ -76,13 +87,24 @@ jobs:
     steps:
       - name: Helm uninstall
         run: |
-            helm uninstall vllm
-            echo "Waiting for all vllm pods to terminate..."
-            while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
-              echo "  Pods still terminating… sleeping for 5s"
-              sleep 5
+          releases=$(helm list -q)
+
+          if [ -n "$releases" ]; then
+            echo "Found releases: $releases"
+            for r in $releases; do
+              echo "Uninstalling $r..."
+              helm uninstall "$r"
             done
-            echo "All vllm pods have terminated."
+          else
+            echo "No Helm releases found; skipping uninstall."
+          fi
+
+          # Wait until no pods remain
+          echo "Waiting for all pods to terminate..."
+          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
+            sleep 5
+          done
+          echo "All pods have terminated."
       - name: Deploy via helm charts
         run: |
           cd ${{ github.workspace }}
@@ -110,13 +132,24 @@ jobs:
     steps:
       - name: Helm uninstall
         run: |
-            helm uninstall vllm
-            echo "Waiting for all vllm pods to terminate..."
-            while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
-              echo "  Pods still terminating… sleeping for 5s"
-              sleep 5
+          releases=$(helm list -q)
+
+          if [ -n "$releases" ]; then
+            echo "Found releases: $releases"
+            for r in $releases; do
+              echo "Uninstalling $r..."
+              helm uninstall "$r"
             done
-            echo "All vllm pods have terminated."
+          else
+            echo "No Helm releases found; skipping uninstall."
+          fi
+
+          # Wait until no pods remain
+          echo "Waiting for all pods to terminate..."
+          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
+            sleep 5
+          done
+          echo "All pods have terminated."
       - name: Deploy via helm charts
         run: |
           helm install vllm ./helm -f .github/values-04-multiple-models.yaml
