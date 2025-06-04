@@ -245,7 +245,10 @@ async def route_general_request(
 
     if not endpoints:
         return JSONResponse(
-            status_code=400, content={"error": f"Model {requested_model} not found."}
+            status_code=400,
+            content={
+                "error": f"Model {requested_model} not found or vLLM engine is sleeping."
+            },
         )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
@@ -360,4 +363,65 @@ async def route_disaggregated_prefill_request(
         generate_stream(),
         media_type="application/json",
         headers={"X-Request-Id": request_id},
+    )
+
+
+async def route_sleep_wakeup_request(
+    request: Request,
+    endpoint: str,
+    background_tasks: BackgroundTasks,
+):
+    in_router_time = time.time()
+    # Same as vllm, Get request_id from X-Request-Id header if available
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+    request_body = await request.body()
+
+    if request.query_params:
+        request_endpoint = request.query_params.get("id")
+    else:
+        request_endpoint = None
+
+    if request_endpoint is None:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: missing target Engine Id."},
+            headers={"X-Request-Id": request_id},
+        )
+
+    service_discovery = get_service_discovery()
+    endpoints = service_discovery.get_endpoint_info()
+
+    endpoints = list(filter(lambda x: x.Id == request_endpoint, endpoints))
+    logger.debug(f"Routing request {request_id} to engine with Id: {endpoints[0].Id}")
+
+    server_url = endpoints[0].url
+    curr_time = time.time()
+    logger.info(
+        f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+    )
+
+    stream_generator = process_request(
+        request,
+        request_body,
+        server_url,
+        request_id,
+        endpoint,
+        background_tasks,
+    )
+    headers, status_code = await anext(stream_generator)
+    headers_dict = {key: value for key, value in headers.items()}
+    headers_dict["X-Request-Id"] = request_id
+
+    if status_code == 200:
+        pod_name = endpoints[0].pod_name
+        if endpoint == "/sleep":
+            service_discovery.add_sleep_label(pod_name)
+        elif endpoint == "/wake_up":
+            service_discovery.remove_sleep_label(pod_name)
+
+    return StreamingResponse(
+        stream_generator,
+        status_code=status_code,
+        headers=headers_dict,
+        media_type="text/event-stream",
     )
