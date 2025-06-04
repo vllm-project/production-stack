@@ -82,10 +82,11 @@ class EndpointStats:
     #standard deviation of request completion time
     std_completion_time: Optional[float]
 
-    #current number of requests routed to an endpoint
+    # current number of requests routed to an endpoint
     current_load: Optional[int]
 
-class EndpointStats():
+
+class EndpointStats:
     def __init__(self, maxlen=100):
         self.completion_times = deque(maxlen=maxlen)
 
@@ -101,7 +102,8 @@ class EndpointStats():
         if len(self.completion_times) < 2:
             return 0.0
         return statistics.stdev(self.completion_times)
-    
+
+
 class ServiceDiscovery(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_endpoint_info(self) -> List[EndpointInfo]:
