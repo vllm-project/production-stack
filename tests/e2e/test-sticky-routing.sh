@@ -335,12 +335,6 @@ fi
 # Each request might take 10-30 seconds to complete, so 25 seconds should be plenty
 TIMEOUT_SECONDS=25
 
-# Build verbose argument array
-verbose_args=()
-if [ "$VERBOSE" = true ]; then
-    verbose_args+=("--verbose")
-fi
-
 print_status "Executing multi-round-qa.py with the following parameters:"
 print_status "  Base URL: $BASE_URL"
 print_status "  Model: $MODEL"
@@ -362,7 +356,6 @@ python3 benchmarks/multi-round-qa/multi-round-qa.py \
     --time "$TIMEOUT_SECONDS" \
     --request-with-user-id \
     --output "$OUTPUT_FILE" \
-    "${verbose_args[@]}" \
     > "$RESPONSE_FILE" 2>&1
 
 PYTHON_EXIT_CODE=$?
