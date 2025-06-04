@@ -245,7 +245,10 @@ async def route_general_request(
 
     if not endpoints:
         return JSONResponse(
-            status_code=400, content={"error": f"Model {requested_model} not found."}
+            status_code=400,
+            content={
+                "error": f"Model {requested_model} not found or vLLM engine is sleeping."
+            },
         )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
@@ -380,3 +383,78 @@ async def route_disaggregated_prefill_request(
         media_type="application/json",
         headers={"X-Request-Id": request_id},
     )
+
+
+async def route_sleep_wakeup_request(
+    request: Request,
+    endpoint: str,
+    background_tasks: BackgroundTasks,
+):
+    in_router_time = time.time()
+    # Same as vllm, Get request_id from X-Request-Id header if available
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+
+    if request.query_params:
+        request_endpoint = request.query_params.get("id")
+    else:
+        request_endpoint = None
+
+    if request_endpoint is None:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: missing target Engine Id."},
+            headers={"X-Request-Id": request_id},
+        )
+
+    service_discovery = get_service_discovery()
+    endpoints = service_discovery.get_endpoint_info()
+
+    endpoints = list(filter(lambda x: x.Id == request_endpoint, endpoints))
+    if not endpoints:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Engine with Id {request_endpoint} not found."},
+        )
+    logger.debug(f"Routing request {request_id} to engine with Id: {endpoints[0].Id}")
+
+    server_url = endpoints[0].url
+    curr_time = time.time()
+    logger.info(
+        f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+    )
+
+    headers = {
+        "X-Request-Id": request_id,
+    }
+
+    if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
+        logger.info(f"Using vllm server authentication")
+        headers["Authorization"] = f"Bearer {VLLM_API_KEY}"
+
+    url = server_url + endpoint
+
+    async with httpx.AsyncClient() as client:
+        if endpoint == "/is_sleeping":
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        else:
+            request_body = await request.body()
+            if request_body:
+                req_data = json.loads(request_body)
+                response = await client.post(url, json=req_data, headers=headers)
+            else:
+                response = await client.post(url, headers=headers)
+            response.raise_for_status()
+
+            pod_name = endpoints[0].pod_name
+            if endpoint == "/sleep":
+                service_discovery.add_sleep_label(pod_name)
+            elif endpoint == "/wake_up":
+                service_discovery.remove_sleep_label(pod_name)
+
+            return JSONResponse(
+                status_code=response.status_code,
+                content={"status": "success"},
+                headers={"X-Request-Id": request_id},
+            )
