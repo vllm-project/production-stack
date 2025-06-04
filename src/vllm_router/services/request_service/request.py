@@ -26,7 +26,7 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillRouter,
     KvawareRouter,
     PrefixAwareRouter,
-    TimeTrackingRouter
+    TimeTrackingRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
@@ -138,8 +138,9 @@ async def process_request(
     )
 
     if isinstance(request.app.state.router, TimeTrackingRouter):
-        request.app.state.router.record_completion(endpoint, completion_time-start_time)
-        
+        request.app.state.router.record_completion(
+            endpoint, completion_time - start_time
+        )
 
     # if debug_request:
     #    logger.debug(f"Finished the request with request id: {debug_request.headers.get('x-request-id', None)} at {time.time()}")
