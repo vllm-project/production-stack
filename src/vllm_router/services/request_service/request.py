@@ -293,9 +293,11 @@ async def send_request_to_prefiller(
     if "max_completion_tokens" in req_data:
         req_data["max_completion_tokens"] = 1
 
-    headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
-               "X-Request-Id": request_id}
-    
+    headers = {
+        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
+        "X-Request-Id": request_id,
+    }
+
     response = await client.post(endpoint, json=req_data, headers=headers)
     response.raise_for_status()
     return response
@@ -307,9 +309,11 @@ async def send_request_to_decode(
     """
     Asynchronously stream the response from a service using a persistent client.
     """
-    headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
-               "X-Request-Id": request_id}
-    
+    headers = {
+        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
+        "X-Request-Id": request_id,
+    }
+
     async with client.stream(
         "POST", endpoint, json=req_data, headers=headers
     ) as response:
@@ -346,7 +350,7 @@ async def route_disaggregated_prefill_request(
             yield chunk
 
     return StreamingResponse(
-        generate_stream(), 
+        generate_stream(),
         media_type="application/json",
-        headers={"X-Request-Id": request_id}
+        headers={"X-Request-Id": request_id},
     )
