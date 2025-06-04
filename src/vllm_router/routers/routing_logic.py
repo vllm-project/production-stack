@@ -15,14 +15,13 @@
 import abc
 import asyncio
 import enum
+import math
 import random
 import socket
 import threading
 from typing import Dict, List
 
 import requests
-import math
-
 from fastapi import Request
 
 try:
@@ -389,21 +388,21 @@ class DisaggregatedPrefillRouter(RoutingInterface):
 
 class TimeTrackingRouter(RoutingInterface):
     def __init__(self, alpha=1.0, beta=1.0, gamma=0.5):
-        self.alpha = alpha # weight for mean time
-        self.beta = beta # weight for load
-        self.gamma = gamma # weight for std deviation
+        self.alpha = alpha  # weight for mean time
+        self.beta = beta  # weight for load
+        self.gamma = gamma  # weight for std deviation
 
         self.endpoint_stats: Dict[str, EndpointStats] = {}
 
     def register_endpoint(self, endpoint: EndpointInfo):
         if endpoint.url not in self.endpoint_stats:
             self.endpoint_stats[endpoint.url] = EndpointStats()
-    
+
     def update_stats(self, endpoint: EndpointInfo):
         stats = self.endpoint_stats[endpoint.url]
         endpoint.mean_completion_time = stats.mean()
         endpoint.std_completion_time = stats.stdev()
-    
+
     async def route_request(
         self,
         endpoints: List[EndpointInfo],
@@ -431,9 +430,9 @@ class TimeTrackingRouter(RoutingInterface):
             if score < best_score:
                 best_score = score
                 best_endpoint = endpoint
-        
+
         return best_endpoint.url
-    
+
     def record_completion(self, endpoint: EndpointInfo, duration: float):
         self.endpoint_stats[endpoint.url].add_completion_time(duration)
 
@@ -463,7 +462,7 @@ def initialize_routing_logic(
         )
     elif routing_logic == RoutingLogic.TIME_TRACKING:
         logger.info("Initializing endpoint load balancing routing logic")
-        return TimeTrackingRouter() #TODO
+        return TimeTrackingRouter()  # TODO
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -477,7 +476,7 @@ def reconfigure_routing_logic(
         RoundRobinRouter,
         KvawareRouter,
         DisaggregatedPrefillRouter,
-        TimeTrackingRouter
+        TimeTrackingRouter,
     ):
         if cls in SingletonABCMeta._instances:
             del SingletonABCMeta._instances[cls]
@@ -492,7 +491,7 @@ def get_routing_logic() -> RoutingInterface:
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
-        TimeTrackingRouter
+        TimeTrackingRouter,
     ):
         if cls in SingletonABCMeta._instances:
             return cls()

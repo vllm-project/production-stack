@@ -71,7 +71,7 @@ class EndpointInfo:
 
 The score for each endpoint is computed as:
 
-```
+```python
 score = (alpha * mean_completion_time) + (beta * current_load) + (gamma * std_completion_time)
 ```
 
