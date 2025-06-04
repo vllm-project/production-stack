@@ -3,7 +3,7 @@ servingEngineSpec:
     type: Recreate
   runtimeClassName: "nvidia"
   modelSpec:
-  - name: "llama-3.1-8b"
+  - name: "llama-3-1-8b"
     repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
