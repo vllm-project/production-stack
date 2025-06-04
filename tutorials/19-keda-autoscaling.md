@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This tutorial shows you how to automatically scale a vLLM deployment using [KEDA](https://keda.sh/) and Prometheus-based metrics. You’ll configure KEDA to monitor queue length and dynamically adjust the number of replicas based on load.
+This tutorial shows you how to automatically scale a vLLM deployment using [KEDA](https://keda.sh/) and Prometheus-based metrics. You'll configure KEDA to monitor queue length and dynamically adjust the number of replicas based on load.
 
 ## Table of Contents
 
@@ -148,7 +148,7 @@ kubectl get hpa -n default -w
 
 You should initially see:
 
-```
+```plaintext
 NAME                         REFERENCE                                TARGETS     MINPODS   MAXPODS   REPLICAS
 keda-hpa-vllm-scaledobject   Deployment/vllm-llama3-deployment-vllm   0/5 (avg)   1         2         1
 ```
@@ -159,11 +159,12 @@ keda-hpa-vllm-scaledobject   Deployment/vllm-llama3-deployment-vllm   0/5 (avg) 
 Generate load:
 
 ```bash
-kubectl port-forward svc/vllm-router-service 30080:80 
+kubectl port-forward svc/vllm-router-service 30080:80
 ```
 
-In a seperate terminal
-```bash 
+In a separate terminal:
+
+```bash
 python3 assets/example-10-load-generator.py --num-requests 100 --prompt-len 3000
 ```
 
