@@ -258,8 +258,18 @@ async def route_general_request(
         )
 
     curr_time = time.time()
+    # Extract actual session ID from request headers for logging
+    session_id = (
+        request.headers.get(
+            getattr(request.app.state.router, "session_key", None), None
+        )
+        if hasattr(request.app.state.router, "session_key")
+        else None
+    )
+    session_id_display = session_id if session_id is not None else "None"
+
     logger.info(
-        f"Routing request {request_id} with session id {request.app.state.router.session_key} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+        f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
     )
     stream_generator = process_request(
         request,
