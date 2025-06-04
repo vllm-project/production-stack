@@ -1,11 +1,13 @@
-import pytest
-from unittest.mock import Mock
 from typing import Dict, List
+from unittest.mock import Mock
+
+import pytest
 
 from vllm_router.routers.routing_logic import TimeTrackingRouter
 from vllm_router.service_discovery import EndpointInfo, EndpointStats
 from vllm_router.stats.engine_stats import EngineStats
 from vllm_router.stats.request_stats import RequestStats
+
 
 # Mock definitions
 class EndpointStats:
@@ -24,6 +26,7 @@ class EndpointStats:
         mean = self.mean()
         return (sum((x - mean) ** 2 for x in self.times) / (len(self.times) - 1)) ** 0.5
 
+
 class EndpointInfo:
     def __init__(self, url: str, current_load: int = 0):
         self.url = url
@@ -31,11 +34,14 @@ class EndpointInfo:
         self.mean_completion_time = None
         self.std_completion_time = None
 
+
 class Request:
     pass  # can be expanded as needed
 
+
 # Import the router class here if defined externally
 # from my_router_module import TimeTrackingRouter
+
 
 @pytest.mark.asyncio
 async def test_time_tracking_router_prefers_fastest_endpoint():
@@ -59,6 +65,10 @@ async def test_time_tracking_router_prefers_fastest_endpoint():
     request = Request()
     request_json = {}
 
-    selected = await router.route_request(endpoints, engine_stats, request_stats, request, request_json)
+    selected = await router.route_request(
+        endpoints, engine_stats, request_stats, request, request_json
+    )
 
-    assert selected == "http://endpoint-b", "Router should prefer the faster and less loaded endpoint"
+    assert (
+        selected == "http://endpoint-b"
+    ), "Router should prefer the faster and less loaded endpoint"
