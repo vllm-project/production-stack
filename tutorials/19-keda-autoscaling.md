@@ -43,7 +43,7 @@ Install the production stack using a single pod by following the instructions in
 This stack includes Prometheus, Grafana, and necessary exporters.
 
 ```bash
-cd production-stack/observability
+cd observability
 bash install.sh
 ```
 
@@ -99,7 +99,7 @@ This means that at the given timestamp, there were 0 pending requests in the que
 
 ### 5. Configure the ScaledObject
 
-Create the file `assets/values-19-keda.yaml`:
+The following `ScaledObject` configuration is provided in `tutorials/assets/values-19-keda.yaml`. Review its contents:
 
 ```yaml
 apiVersion: keda.sh/v1alpha1
