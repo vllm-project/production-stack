@@ -22,8 +22,6 @@ import threading
 from typing import Dict, List
 
 import requests
-import math
-
 from fastapi import Request
 
 try:
