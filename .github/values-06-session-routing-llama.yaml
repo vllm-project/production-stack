@@ -3,10 +3,10 @@ servingEngineSpec:
     type: Recreate
   runtimeClassName: "nvidia"
   modelSpec:
-  - name: "llama-3-1-8b"
+  - name: "opt125m"
     repository: "vllm/vllm-openai"
     tag: "latest"
-    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+    modelURL: "facebook/opt-125m"
 
     replicaCount: 2
 
