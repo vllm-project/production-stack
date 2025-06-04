@@ -206,8 +206,7 @@ verify_router_logs_consistency() {
 
 # Parse command line arguments
 BASE_URL=""
-# MODEL="meta-llama/Llama-3.1-8B-Instruct"  # Set default model
-MODEL="facebook/opt-125m"
+MODEL="meta-llama/Llama-3.1-8B-Instruct"  # Set default model
 NUM_ROUNDS=3
 VERBOSE=false
 DEBUG=false

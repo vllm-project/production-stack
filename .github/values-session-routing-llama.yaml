@@ -1,0 +1,35 @@
+servingEngineSpec:
+  strategy:
+    type: Recreate
+  runtimeClassName: "nvidia"
+  modelSpec:
+  - name: "llama-3.1-8b"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+
+    replicaCount: 2
+
+    requestCPU: 8
+    requestMemory: "32Gi"
+    requestGPU: 1
+
+    pvcStorage: "50Gi"
+    pvcAccessMode:
+      - ReadWriteMany
+
+    vllmConfig:
+      maxModelLen: 4096
+      dtype: "bfloat16"
+      gpuMemoryUtilization: 0.85
+      extraArgs: ["--disable-log-requests", "--trust-remote-code"]
+
+routerSpec:
+  repository: "localhost:5000/git-act-router"
+  imagePullPolicy: "IfNotPresent"
+  enableRouter: true
+  routingLogic: "session"
+  sessionKey: "x-user-id"
+  extraArgs:
+    - "--log-level"
+    - "info"

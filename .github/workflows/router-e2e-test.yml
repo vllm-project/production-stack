@@ -145,7 +145,7 @@ jobs:
         run: |
           echo "🚀 Deploying two-pods setup with helm"
           cd ${{ github.workspace }}
-          helm install vllm ./helm -f .github/values-01-2pods-minimal-example.yaml
+          helm install vllm ./helm -f .github/values-session-routing-llama.yaml
 
       - name: Wait for pods to be ready
         run: |
@@ -162,7 +162,7 @@ jobs:
           echo "🧪 Running sticky routing test"
           cd ${{ github.workspace }}
           # Set the model to match what's deployed in the helm values
-          ./tests/e2e/test-sticky-routing.sh --model "facebook/opt-125m" --num-rounds 3 --verbose
+          ./tests/e2e/test-sticky-routing.sh --model "meta-llama/Llama-3.1-8B-Instruct" --num-rounds 3 --verbose
         timeout-minutes: 10
 
       - name: Archive sticky routing test results
