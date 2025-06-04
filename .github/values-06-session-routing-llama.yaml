@@ -1,7 +1,7 @@
 servingEngineSpec:
   strategy:
     type: Recreate
-  runtimeClassName: "nvidia"
+  runtimeClassName: ""
   modelSpec:
   - name: "opt125m"
     repository: "vllm/vllm-openai"
@@ -23,7 +23,8 @@ servingEngineSpec:
       extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.4"]
 
 routerSpec:
-  repository: "localhost:5000/git-act-router"
+  # repository: "localhost:5000/git-act-router"
+  repository: "lmrouter:tmp"
   imagePullPolicy: "IfNotPresent"
   enableRouter: true
   routingLogic: "session"
