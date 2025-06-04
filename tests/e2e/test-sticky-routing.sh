@@ -67,8 +67,8 @@ verify_router_logs_consistency() {
     fi
 
     if [ "$logs_found" = false ] || [ ! -s "$raw_log_file" ]; then
-        print_warning "Could not fetch router logs or logs are empty. Skipping router log verification."
-        return 0
+        print_error "Could not fetch router logs or logs are empty. Router log verification failed."
+        return 1
     fi
 
     # Filter logs to only include routing decision logs and exclude health checks
@@ -89,8 +89,8 @@ verify_router_logs_consistency() {
     fi
 
     if [ ! -s "$router_log_file" ]; then
-        print_warning "No routing decision logs found after filtering. Skipping router log verification."
-        return 0
+        print_error "No routing decision logs found after filtering. Router log verification failed."
+        return 1
     fi
 
     print_status "Filtered router logs. Found $(wc -l < "$router_log_file") routing decision log lines"
@@ -116,9 +116,12 @@ verify_router_logs_consistency() {
             # Extract session id (the string after "with session id " and before " to ")
             session_id=$(echo "$line" | sed -n 's/.*with session id \([^ ]*\) to .*/\1/p')
 
-            # If no session_id found, default to -1
-            if [ -z "$session_id" ]; then
-                session_id="-1"
+            # For session-aware routing, session_id should always exist and not be None
+            if [ -z "$session_id" ] || [ "$session_id" = "none" ] || [ "$session_id" = "None" ]; then
+                print_error "❌ Found routing request without valid session_id in log line:"
+                print_error "   $line"
+                print_error "   Session-aware routing should always include a valid session_id"
+                return 1
             fi
 
             # Extract server URL (the string after " to " and before " at ")
@@ -146,12 +149,13 @@ verify_router_logs_consistency() {
     print_status "Found $total_mappings session_id -> server_url mappings in router logs"
 
     if [ "$total_mappings" -eq 0 ]; then
-        print_warning "No session_id -> server_url mappings found in router logs."
-        print_warning "This could mean:"
-        print_warning "  1. The test ran before router logs were captured"
-        print_warning "  2. Session-based routing is not enabled"
-        print_warning "  3. Log format has changed"
-        return 0
+        print_error "No session_id -> server_url mappings found in router logs."
+        print_error "This could mean:"
+        print_error "  1. The test ran before router logs were captured"
+        print_error "  2. Session-based routing is not enabled"
+        print_error "  3. Log format has changed"
+        print_error "Router log verification failed."
+        return 1
     fi
 
     # Verify consistency: all requests with the same session_id should go to the same server_url
