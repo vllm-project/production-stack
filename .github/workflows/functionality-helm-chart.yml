@@ -36,7 +36,7 @@ jobs:
         run: |
             helm uninstall vllm
             echo "Waiting for all vllm pods to terminate..."
-            while kubectl get pods -l app.kubernetes.io/instance=vllm --no-headers 2>/dev/null | grep -q .; do
+            while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
               echo "  Pods still terminating… sleeping for 5s"
               sleep 5
             done
@@ -78,7 +78,7 @@ jobs:
         run: |
             helm uninstall vllm
             echo "Waiting for all vllm pods to terminate..."
-            while kubectl get pods -l app.kubernetes.io/instance=vllm --no-headers 2>/dev/null | grep -q .; do
+            while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
               echo "  Pods still terminating… sleeping for 5s"
               sleep 5
             done
@@ -112,7 +112,7 @@ jobs:
         run: |
             helm uninstall vllm
             echo "Waiting for all vllm pods to terminate..."
-            while kubectl get pods -l app.kubernetes.io/instance=vllm --no-headers 2>/dev/null | grep -q .; do
+            while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
               echo "  Pods still terminating… sleeping for 5s"
               sleep 5
             done
