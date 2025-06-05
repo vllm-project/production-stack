@@ -53,6 +53,9 @@ jobs:
           # Clean up dangling images
           docker image prune --force
 
+      - name: Verify Minikube cluster is ready
+        run: |
+          kubectl config use-context minikube
       - name: Build and Load Docker image
         env:
           DOCKER_IMAGE_NAME: localhost:5000/git-act-router
