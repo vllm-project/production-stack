@@ -64,7 +64,7 @@ The router coordinates between the prefill and decode servers, handling request 
     python3 -m vllm_router.app --port 8005 \
         --service-discovery static \
         --static-backends "http://localhost:8100,http://localhost:8200" \
-        --static-models "meta-llama/Llama-3.1-8B-Instruct,meta-llama/Llama-3.1-70B-Instruct" \
+        --static-models "meta-llama/Llama-3.1-8B-Instruct,meta-llama/Llama-3.1-8B-Instruct" \
         --static-model-labels "llama-prefill,llama-decode" \
         --log-stats \
         --log-stats-interval 10 \
@@ -134,8 +134,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
           # requestGPU: 1
           pvcStorage: "50Gi"
           vllmConfig:
-            enableChunkedPrefill: false
-            enablePrefixCaching: false
+            enablePrefixCaching: true
             maxModelLen: 32000
             v1: 1
             gpuMemoryUtilization: 0.6
@@ -166,8 +165,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
           # requestGPU: 1
           pvcStorage: "50Gi"
           vllmConfig:
-            enableChunkedPrefill: false
-            enablePrefixCaching: false
+            enablePrefixCaching: true
             maxModelLen: 32000
             v1: 1
           lmcacheConfig:
