@@ -14,7 +14,6 @@
 * [Drawbacks](#drawbacks)
 * [Alternatives](#alternatives)
 * [Implementation Timeline / Phases](#implementation-timeline--phases)
-* [References](#references)
 
 ---
 
