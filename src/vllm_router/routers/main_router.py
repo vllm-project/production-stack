@@ -134,9 +134,9 @@ async def show_models():
             model_card = ModelCard(
                 id=model_id,
                 object="model",
-                created=model_info["created"],
-                owned_by=model_info["owned_by"],
-                parent=model_info["parent"],
+                created=model_info.created,
+                owned_by=model_info.owned_by,
+                parent=model_info.parent,
             )
             model_cards.append(model_card)
             existing_models.add(model_id)
@@ -154,7 +154,7 @@ async def get_engine_instances():
         None
 
     Returns:
-        JSONResponse: A JSON response containing the list of models.
+        JSONResponse: A JSON response containing the list of models and their relationships.
 
     Raises:
         Exception: If there is an error in retrieving the endpoint information.
