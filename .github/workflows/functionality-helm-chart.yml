@@ -127,7 +127,6 @@ jobs:
 
             echo "⏳ Waiting for pods to be ready..."
             RETRIES=5
-            kubectl config use-context minikube
             for i in $(seq 1 "${RETRIES}"); do
               if kubectl wait --for=condition=ready pod -l environment=router,release=router --namespace=default --timeout=60s; then
                 echo "✅ Pods are ready after ${i} attempt(s)"
@@ -151,27 +150,27 @@ jobs:
 
       - name: Validate the installation of vllm backend pod
         run: |
-          set +e
-          kubectl config use-context minikube
-          kubectl config view --minify --output 'jsonpath={..name}'
-          set -e
+          set -ex
 
-          timeout=600
-          interval=20
-          elapsed=0
+          # Maximum number of retry attempts
+          MAX_RETRIES=10
+          # Interval between retries (in seconds)
+          INTERVAL=20
 
-          while ((elapsed < timeout)); do
+          # Loop for MAX_RETRIES attempts
+          for ((i=1; i<=MAX_RETRIES; i++)); do
+            # Get all pods with 'vllm' in their name
             pods=$(kubectl get pods --no-headers | grep "vllm" | awk '{print $1}')
             if [ -z "$pods" ]; then
-              echo "::warning:: No vllm pods found yet, checking again in $interval seconds..."
-              sleep $interval
-              ((elapsed+=interval))
+              echo "::warning:: No vllm pods found yet, checking again in $INTERVAL seconds..."
+              sleep $INTERVAL
               continue
             fi
 
             total_pods=0
             ready_pods=0
 
+            # Iterate through each vllm pod
             for pod_name in $pods; do
               line=$(kubectl get pod "$pod_name" --no-headers)
               if [ $? -ne 0 ]; then
@@ -179,6 +178,7 @@ jobs:
                 continue
               fi
 
+              # Extract readiness status and phase
               ready=$(echo "$line" | awk '{print $2}')
               status=$(echo "$line" | awk '{print $3}')
               phase=$(kubectl get pod "$pod_name" -o jsonpath='{.status.phase}')
@@ -187,6 +187,7 @@ jobs:
               timestamp=$(date '+%Y-%m-%d %H:%M:%S')
               echo "::debug::[$timestamp] Checking pod: $pod_name (Status: $status, Ready: $ready, Phase: $phase)"
 
+              # Check if pod is fully ready
               if [[ "$status" == "Running" && "$ready" =~ ^([1-9][0-9]*)/\1$ ]]; then
                 ((ready_pods++))
               else
@@ -196,23 +197,24 @@ jobs:
               fi
             done
 
+            # Check if all pods are ready
             if (( ready_pods == total_pods )) && (( total_pods > 0 )); then
               echo "::success:: All $total_pods vllm pods are now Ready and in Running state."
               exit 0
             fi
 
-            echo "::debug:: Not all pods are ready yet. Checking again in $interval seconds..."
-            sleep $interval
-            ((elapsed+=interval))
+            # Log progress
+            echo "::debug:: Not all pods are ready yet. Attempt $i/$MAX_RETRIES. Checking again in $INTERVAL seconds..."
+            sleep $INTERVAL
           done
 
-          echo "::error:: Timeout waiting for pods to be ready."
+          # Final timeout message
+          echo "::error:: Timeout waiting for pods to be ready after $MAX_RETRIES attempts."
           kubectl get pods --all-namespaces
           exit 1
       - name: Curl the router to verify the functionality
         run: |
           set -ex
-          kubectl config use-context minikube
           kubectl patch service vllm-router-service -p '{"spec":{"type":"NodePort"}}'
           ip=$(minikube ip)
           port=$(kubectl get svc vllm-router-service -o=jsonpath='{.spec.ports[0].nodePort}')
