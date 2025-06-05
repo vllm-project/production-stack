@@ -52,10 +52,6 @@ jobs:
           docker images --filter=reference='git-act-router*' -q | xargs -r docker rmi -f
           # Clean up dangling images
           docker image prune --force
-
-      - name: Verify Minikube cluster is ready
-        run: |
-          kubectl config use-context minikube
       - name: Build and Load Docker image
         env:
           DOCKER_IMAGE_NAME: localhost:5000/git-act-router
@@ -136,37 +132,41 @@ jobs:
         run: |
           set -e
           kubectl config use-context minikube
-          while true; do
-          # Check each vllm pod individually
-          kubectl get pods --no-headers | grep "vllm" | while read -r line; do
-              pod_name=$(echo "$line" | awk '{print $1}')
-              status=$(echo "$line" | awk '{print $3}')
+          timeout=600
+          interval=20
+          elapsed=0
+          while ((elapsed < timeout)); do
+            pods=$(kubectl get pods --no-headers | grep "vllm" | awk '{print $1}')
+            total_pods=0
+            ready_pods=0
+
+            for pod_name in $pods; do
+              line=$(kubectl get pod $pod_name --no-headers)
               ready=$(echo "$line" | awk '{print $2}')
-
-              # Log timestamp and pod info
+              status=$(echo "$line" | awk '{print $3}')
+              ((total_pods++))
               timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-              echo "[$timestamp] Checking pod: $pod_name"
-
-              if [[ "$status" != "Running" ]] || [[ "$ready" != "1/1" ]]; then
-                  # Save detailed pod events
-                  echo "[$timestamp] Pod $pod_name not ready (Status: $status, Ready: $ready)"
-                  kubectl describe pod "$pod_name"
-                  kubectl logs "$pod_name" -p
+              echo "[$timestamp] Checking pod: $pod_name (Status: $status, Ready: $ready)"
+              if [[ "$status" == "Running" ]] && [[ "$ready" =~ ^([1-9][0-9]*)/\1$ ]]; then
+                ((ready_pods++))
+              else
+                echo "[$timestamp] Pod $pod_name not ready (Status: $status, Ready: $ready)"
+                kubectl describe pod "$pod_name"
+                kubectl logs "$pod_name" --all-containers --tail=50
               fi
+            done
+
+            if (( ready_pods == total_pods )) && (( total_pods > 0 )); then
+              echo "All $total_pods vllm pods are now Ready and in Running state."
+              exit 0
+            fi
+            echo "Not all pods are ready yet. Checking again in $interval seconds..."
+            sleep $interval
+            ((elapsed+=interval))
           done
-
-          # Check if all pods are ready
-          ready_count=$(kubectl get pods --no-headers | grep "vllm" | grep "Running" | grep "1/1" | wc -l)
-          total_pods=$(kubectl get pods --no-headers | grep "vllm" | wc -l)
-
-          if [[ $ready_count -eq $total_pods ]]; then
-              echo "All $total_pods llmstack pods are now Ready and in Running state."
-              break
-          fi
-
-          echo "Not all pods are ready yet. Checking again in 20 seconds..."
-          sleep 20
-          done
+          echo "Timeout waiting for pods to be ready."
+          kubectl get pods
+          exit 1
         timeout-minutes: 10
       - name: Curl the router to verify the functionality
         run: |
