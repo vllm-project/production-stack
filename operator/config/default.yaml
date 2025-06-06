@@ -864,15 +864,6 @@ metadata:
   name: production-stack-controller-manager
   namespace: production-stack-system
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/name: production-stack
-  name: production-stack-vllmrouter-sa
-  namespace: production-stack-system
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -913,24 +904,6 @@ rules:
   verbs:
   - create
   - patch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  labels:
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/name: production-stack
-  name: production-stack-pod-viewer-role
-  namespace: production-stack-system
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -1084,6 +1057,7 @@ rules:
   resources:
   - configmaps
   - secrets
+  - serviceaccounts
   - services
   verbs:
   - create
@@ -1148,6 +1122,19 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -1334,23 +1321,6 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: production-stack-controller-manager
-  namespace: production-stack-system
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  labels:
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/name: production-stack
-  name: production-stack-pod-viewer-binding
-  namespace: production-stack-system
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: production-stack-pod-viewer-role
-subjects:
-- kind: ServiceAccount
-  name: production-stack-vllmrouter-sa
   namespace: production-stack-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
