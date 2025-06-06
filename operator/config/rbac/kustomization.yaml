@@ -35,6 +35,4 @@ resources:
   - vllmruntime_editor_role.yaml
   - vllmruntime_viewer_role.yaml
   # Pod viewer role is used to view pods for vllmrouter's service discovery
-  - pod_viewer_role.yaml
-  - vllmrouter_service_account.yaml
   - vllmrouter_role_binding.yaml
