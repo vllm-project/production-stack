@@ -78,7 +78,7 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Create ServiceAccount if it doesn't exist
 	sa := &corev1.ServiceAccount{}
-	err = r.Get(ctx, types.NamespacedName{Name: "vllmrouter-sa", Namespace: router.Namespace}, sa)
+	err = r.Get(ctx, types.NamespacedName{Name: router.Spec.ServiceAccountName, Namespace: router.Namespace}, sa)
 	if err != nil && errors.IsNotFound(err) {
 		sa = r.serviceAccountForVLLMRouter(router)
 		log.Info("Creating a new ServiceAccount", "ServiceAccount.Namespace", sa.Namespace, "ServiceAccount.Name", sa.Name)
@@ -442,7 +442,7 @@ func (r *VLLMRouterReconciler) serviceForVLLMRouter(router *servingv1alpha1.VLLM
 func (r *VLLMRouterReconciler) serviceAccountForVLLMRouter(router *servingv1alpha1.VLLMRouter) *corev1.ServiceAccount {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "vllmrouter-sa",
+			Name:      router.Spec.ServiceAccountName,
 			Namespace: router.Namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name":       "production-stack",
@@ -491,7 +491,7 @@ func (r *VLLMRouterReconciler) roleBindingForVLLMRouter(router *servingv1alpha1.
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
-				Name:      "vllmrouter-sa",
+				Name:      router.Spec.ServiceAccountName,
 				Namespace: router.Namespace,
 			},
 		},
