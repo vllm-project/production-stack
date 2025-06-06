@@ -94,6 +94,9 @@ class EndpointInfo:
     # Model label
     model_label: str
 
+    # Endpoint's sleep status
+    sleep: bool
+
     # Pod name
     pod_name: Optional[str] = None
 
@@ -296,6 +299,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
                 url=url,
                 model_names=[model],  # Convert single model to list
                 Id=self.engines_id[i],
+                sleep=False,
                 added_timestamp=self.added_timestamp,
                 model_label=model_label,
                 model_info=self._get_model_info(model),
@@ -375,6 +379,33 @@ class K8sServiceDiscovery(ServiceDiscovery):
             return False
         ready_count = sum(1 for status in container_statuses if status.ready)
         return ready_count == len(container_statuses)
+
+    def _get_engine_sleep_status(self, pod_ip) -> Optional[bool]:
+        """
+        Get the engine sleeping status by querying the engine's
+        '/is_sleeping' endpoint.
+
+        Args:
+            pod_ip: the IP address of the pod running the engine
+
+        Returns:
+            the sleep status of the target engine
+        """
+        url = f"http://{pod_ip}:{self.port}/is_sleeping"
+        sleep = False
+        try:
+            headers = None
+            if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
+                logger.info(f"Using vllm server authentication")
+                headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            sleep = response.json()["is_sleeping"]
+        except Exception as e:
+            logger.warning(
+                f"Failed to get the sleep status for engine at {url} - sleep status is set to `False`: {e}"
+            )
+        return sleep
 
     def _get_model_names(self, pod_ip) -> List[str]:
         """
@@ -505,6 +536,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
                 added_timestamp=int(time.time()),
                 Id=str(uuid.uuid5(uuid.NAMESPACE_DNS, engine_name)),
                 model_label=model_label,
+                sleep=self._get_engine_sleep_status(engine_ip),
                 pod_name=engine_name,
                 namespace=self.namespace,
                 model_info=model_info,
