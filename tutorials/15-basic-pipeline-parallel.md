@@ -32,13 +32,13 @@ This tutorial provides a step-by-step guide for configuring and deploying the vL
 
 ## Step 2: Preparing the Configuration File
 
-1. Locate the example configuration file [`tutorials/assets/values-15-minimal-pipeline-parallel-example.yaml`](assets/values-15-minimal-pipeline-parallel-example.yaml).
+1. Locate the example configuration file [`tutorials/assets/values-15-a-minimal-pipeline-parallel-example-raycluster.yaml`](assets/values-15-a-minimal-pipeline-parallel-example-raycluster.yaml).
 
 2. Open the file and update the following fields:
 
 - Write your actual huggingface token in `hf_token: <YOUR HF TOKEN>` in the yaml file.
 
-### Explanation of Key Items in `values-15-minimal-pipeline-parallel-example.yaml`
+### Explanation of Key Items in `values-15-a-minimal-pipeline-parallel-example-raycluster.yaml`
 
 - **`raySpec`**: Required when using KubeRay to enable pipeline parallelism.
 - **`headNode`**: Specifies the resource requirements for the Kuberay head node and must be defined accordingly:
@@ -74,11 +74,6 @@ In the following example, we configure a total of two Ray nodes each equipped wi
 ```yaml
 servingEngineSpec:
   runtimeClassName: ""
-  raySpec:
-    headNode:
-      requestCPU: 2
-      requestMemory: "20Gi"
-      requestGPU: 2
   modelSpec:
   - name: "distilgpt2"
     repository: "vllm/vllm-openai"
@@ -96,6 +91,12 @@ servingEngineSpec:
       pipelineParallelSize: 2
 
     shmSize: "20Gi"
+
+    raySpec:
+      headNode:
+        requestCPU: 2
+        requestMemory: "20Gi"
+        requestGPU: 2
 
     hf_token: <YOUR HF TOKEN>
 ```
@@ -307,3 +308,5 @@ TEST SUITE: None
 ## Conclusion
 
 In this tutorial, you configured and deployed the vLLM serving engine with support for pipeline parallelism across multiple GPUs within a multi-node Kubernetes environment using KubeRay. Additionally, you learned how to verify the deployment and monitor the associated pods to ensure proper operation. For further customization and configuration options, please consult the `values.yaml` file and the Helm chart documentation.
+
+To deploy both a Ray cluster and standard Kubernetes deployments using a single Helm release, please refer to the example configuration file available at [`tutorials/assets/values-15-b-minimal-pipeline-parallel-example-multiple-modelspec.yaml`](assets/values-15-b-minimal-pipeline-parallel-example-multiple-modelspec.yaml).

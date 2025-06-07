@@ -60,12 +60,11 @@ def log_stats(app: FastAPI, interval: int = 10):
                 logstr += "Models:\n"
                 for model_id, model_info in endpoint.model_info.items():
                     logstr += f"  - {model_id}"
-                    if model_info.get("parent"):
-                        logstr += f" (adapter for {model_info['parent']})"
+                    if model_info.parent:
+                        logstr += f" (adapter for {model_info.parent})"
                     logstr += "\n"
             else:
                 logstr += "Models: No model information available\n"
-
             if url in engine_stats:
                 es = engine_stats[url]
                 logstr += (

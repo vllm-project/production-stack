@@ -67,7 +67,7 @@ var _ = Describe("LoraAdapterReconciler", func() {
 						AdapterName: "test-adapter",
 						AdapterPath: "/path/to/adapter",
 					},
-					DeploymentConfig: productionstackv1alpha1.DeploymentConfig{
+					LoraAdapterDeploymentConfig: productionstackv1alpha1.LoraAdapterDeploymentConfig{
 						Replicas: nil, // Use all available pods
 					},
 				},

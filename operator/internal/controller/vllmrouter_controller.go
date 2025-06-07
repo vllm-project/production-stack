@@ -23,6 +23,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,6 +52,9 @@ type VLLMRouterReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -69,6 +73,60 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		// Error reading the object - requeue the request.
 		log.Error(err, "Failed to get VLLMRouter")
+		return ctrl.Result{}, err
+	}
+
+	// Create ServiceAccount if it doesn't exist
+	sa := &corev1.ServiceAccount{}
+	err = r.Get(ctx, types.NamespacedName{Name: router.Spec.ServiceAccountName, Namespace: router.Namespace}, sa)
+	if err != nil && errors.IsNotFound(err) {
+		sa = r.serviceAccountForVLLMRouter(router)
+		log.Info("Creating a new ServiceAccount", "ServiceAccount.Namespace", sa.Namespace, "ServiceAccount.Name", sa.Name)
+		err = r.Create(ctx, sa)
+		if err != nil {
+			log.Error(err, "Failed to create new ServiceAccount", "ServiceAccount.Namespace", sa.Namespace, "ServiceAccount.Name", sa.Name)
+			return ctrl.Result{}, err
+		}
+		// ServiceAccount created successfully - return and requeue
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get ServiceAccount")
+		return ctrl.Result{}, err
+	}
+
+	// Create Role if it doesn't exist
+	role := &rbacv1.Role{}
+	err = r.Get(ctx, types.NamespacedName{Name: "pod-viewer-role", Namespace: router.Namespace}, role)
+	if err != nil && errors.IsNotFound(err) {
+		role = r.roleForVLLMRouter(router)
+		log.Info("Creating a new Role", "Role.Namespace", role.Namespace, "Role.Name", role.Name)
+		err = r.Create(ctx, role)
+		if err != nil {
+			log.Error(err, "Failed to create new Role", "Role.Namespace", role.Namespace, "Role.Name", role.Name)
+			return ctrl.Result{}, err
+		}
+		// Role created successfully - return and requeue
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get Role")
+		return ctrl.Result{}, err
+	}
+
+	// Create RoleBinding if it doesn't exist
+	roleBinding := &rbacv1.RoleBinding{}
+	err = r.Get(ctx, types.NamespacedName{Name: "pod-viewer-binding", Namespace: router.Namespace}, roleBinding)
+	if err != nil && errors.IsNotFound(err) {
+		roleBinding = r.roleBindingForVLLMRouter(router)
+		log.Info("Creating a new RoleBinding", "RoleBinding.Namespace", roleBinding.Namespace, "RoleBinding.Name", roleBinding.Name)
+		err = r.Create(ctx, roleBinding)
+		if err != nil {
+			log.Error(err, "Failed to create new RoleBinding", "RoleBinding.Namespace", roleBinding.Namespace, "RoleBinding.Name", roleBinding.Name)
+			return ctrl.Result{}, err
+		}
+		// RoleBinding created successfully - return and requeue
+		return ctrl.Result{Requeue: true}, nil
+	} else if err != nil {
+		log.Error(err, "Failed to get RoleBinding")
 		return ctrl.Result{}, err
 	}
 
@@ -378,6 +436,73 @@ func (r *VLLMRouterReconciler) serviceForVLLMRouter(router *servingv1alpha1.VLLM
 	// Set the owner reference
 	ctrl.SetControllerReference(router, svc, r.Scheme)
 	return svc
+}
+
+// serviceAccountForVLLMRouter returns a ServiceAccount object
+func (r *VLLMRouterReconciler) serviceAccountForVLLMRouter(router *servingv1alpha1.VLLMRouter) *corev1.ServiceAccount {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      router.Spec.ServiceAccountName,
+			Namespace: router.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":       "production-stack",
+				"app.kubernetes.io/managed-by": "kustomize",
+			},
+		},
+	}
+	ctrl.SetControllerReference(router, sa, r.Scheme)
+	return sa
+}
+
+// roleForVLLMRouter returns a Role object
+func (r *VLLMRouterReconciler) roleForVLLMRouter(router *servingv1alpha1.VLLMRouter) *rbacv1.Role {
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-viewer-role",
+			Namespace: router.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":       "production-stack",
+				"app.kubernetes.io/managed-by": "kustomize",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	}
+	ctrl.SetControllerReference(router, role, r.Scheme)
+	return role
+}
+
+// roleBindingForVLLMRouter returns a RoleBinding object
+func (r *VLLMRouterReconciler) roleBindingForVLLMRouter(router *servingv1alpha1.VLLMRouter) *rbacv1.RoleBinding {
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-viewer-binding",
+			Namespace: router.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":       "production-stack",
+				"app.kubernetes.io/managed-by": "kustomize",
+			},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      router.Spec.ServiceAccountName,
+				Namespace: router.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     "pod-viewer-role",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+	ctrl.SetControllerReference(router, roleBinding, r.Scheme)
+	return roleBinding
 }
 
 // SetupWithManager sets up the controller with the Manager.
