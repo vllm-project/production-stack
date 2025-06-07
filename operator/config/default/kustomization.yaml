@@ -41,6 +41,11 @@ patches:
     target:
       kind: Deployment
 
+  # Set the controller image
+  - path: manager_image_patch.yaml
+    target:
+      kind: Deployment
+
   # Uncomment the patches line if you enable Metrics and CertManager
   # [METRICS-WITH-CERTS] To enable metrics protected with certManager, uncomment the following line.
   # This patch will protect the metrics with certManager self-signed certs.

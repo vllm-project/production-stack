@@ -1403,7 +1403,7 @@ spec:
         - --health-probe-bind-address=:8081
         command:
         - /manager
-        image: 1nfinity/production-stack-controller:latest
+        image: lmcache/production-stack-operator:latest
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
