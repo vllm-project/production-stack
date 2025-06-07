@@ -1,0 +1,1468 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+    control-plane: controller-manager
+  name: production-stack-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: cacheservers.production-stack.vllm.ai
+spec:
+  group: production-stack.vllm.ai
+  names:
+    kind: CacheServer
+    listKind: CacheServerList
+    plural: cacheservers
+    singular: cacheserver
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns:
+        - jsonPath: .status.status
+          name: Status
+          type: string
+        - jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: CacheServer is the Schema for the cacheservers API
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: CacheServerSpec defines the desired state of CacheServer
+              properties:
+                deploymentStrategy:
+                  default: RollingUpdate
+                  description: Deployment strategy
+                  enum:
+                    - RollingUpdate
+                    - Recreate
+                  type: string
+                image:
+                  description: Image configuration for the cache server
+                  properties:
+                    name:
+                      type: string
+                    pullPolicy:
+                      type: string
+                    pullSecretName:
+                      type: string
+                    registry:
+                      type: string
+                  required:
+                    - name
+                    - registry
+                  type: object
+                port:
+                  default: 8000
+                  description: Container port for the cache server
+                  format: int32
+                  type: integer
+                replicas:
+                  default: 1
+                  description: Number of replicas
+                  format: int32
+                  type: integer
+                resources:
+                  description: Resource requirements
+                  properties:
+                    cpu:
+                      type: string
+                    gpu:
+                      type: string
+                    memory:
+                      type: string
+                  type: object
+              required:
+                - deploymentStrategy
+                - image
+                - port
+                - replicas
+                - resources
+              type: object
+            status:
+              description: CacheServerStatus defines the observed state of CacheServer
+              properties:
+                lastUpdated:
+                  description: Last time the status was updated
+                  format: date-time
+                  type: string
+                status:
+                  description: Current status of the cache server
+                  type: string
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: loraadapters.production-stack.vllm.ai
+spec:
+  group: production-stack.vllm.ai
+  names:
+    kind: LoraAdapter
+    listKind: LoraAdapterList
+    plural: loraadapters
+    singular: loraadapter
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns:
+        - jsonPath: .status.phase
+          name: Phase
+          type: string
+        - jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: LoraAdapter is the Schema for the loraadapters API.
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: LoraAdapterSpec defines the desired state of LoraAdapter.
+              properties:
+                adapterSource:
+                  description: AdapterSource defines where to get the LoRA adapter from.
+                  properties:
+                    adapterName:
+                      description: AdapterName is the name of the adapter to apply.
+                      type: string
+                    adapterPath:
+                      description:
+                        "AdapterPath is the path to the LoRA adapter weights.
+                        For local sources: required, specifies the path to the adapter
+                        For remote sources: optional, will be updated by the controller
+                        with the download path"
+                      type: string
+                    credentialsSecretRef:
+                      description:
+                        CredentialsSecretRef references a secret containing
+                        storage credentials.
+                      properties:
+                        name:
+                          description:
+                            "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?"
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    maxAdapters:
+                      description:
+                        MaxAdapters is the maximum number of adapters to
+                        load.
+                      format: int32
+                      type: integer
+                    pattern:
+                      description: Pattern is the pattern to use for the adapter name.
+                      type: string
+                    repository:
+                      description:
+                        Repository is the repository to get the LoRA adapter
+                        from.
+                      type: string
+                    type:
+                      description: Type is the type of the adapter source.
+                      enum:
+                        - local
+                        - s3
+                        - http
+                        - huggingface
+                      type: string
+                  required:
+                    - adapterName
+                    - type
+                  type: object
+                baseModel:
+                  description:
+                    BaseModel is the name of the base model this adapter
+                    is for.
+                  type: string
+                loraAdapterDeploymentConfig:
+                  description: DeploymentConfig defines how the adapter should be deployed
+                  properties:
+                    algorithm:
+                      default: default
+                      description:
+                        Algorithm specifies which placement algorithm to
+                        use.
+                      enum:
+                        - default
+                        - ordered
+                        - equalized
+                      type: string
+                    replicas:
+                      description:
+                        Replicas is the number of replicas that should load
+                        this adapter.
+                      format: int32
+                      minimum: 0
+                      type: integer
+                  required:
+                    - algorithm
+                  type: object
+                vllmApiKey:
+                  description:
+                    VLLMApiKey defines the configuration for vLLM API key
+                    authentication
+                  properties:
+                    secretRef:
+                      description: Reference to a secret containing the API key
+                      properties:
+                        secretKey:
+                          description: Key in the secret containing the API key
+                          type: string
+                        secretName:
+                          description: Name of the secret
+                          type: string
+                      required:
+                        - secretKey
+                        - secretName
+                      type: object
+                    value:
+                      description: Direct API key value
+                      type: string
+                  type: object
+              required:
+                - adapterSource
+                - baseModel
+              type: object
+            status:
+              description: LoraAdapterStatus defines the observed state of LoraAdapter.
+              properties:
+                conditions:
+                  description:
+                    Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  items:
+                    description:
+                      Condition contains details for one aspect of the current
+                      state of this API Resource.
+                    properties:
+                      lastTransitionTime:
+                        description:
+                          LastTransitionTime is the last time the condition
+                          transitioned from one status to another.
+                        format: date-time
+                        type: string
+                      message:
+                        description:
+                          Message is a human-readable message indicating
+                          details about why the current state is set.
+                        maxLength: 32768
+                        type: string
+                      reason:
+                        description:
+                          Reason is a brief reason for the condition's current
+                          status.
+                        maxLength: 1024
+                        minLength: 1
+                        pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                        type: string
+                      status:
+                        description: Status is the status of the condition.
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                        type: string
+                      type:
+                        description: type of condition in CamelCase.
+                        maxLength: 316
+                        pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                        type: string
+                    required:
+                      - lastTransitionTime
+                      - message
+                      - reason
+                      - status
+                      - type
+                    type: object
+                  type: array
+                loadedAdapters:
+                  description:
+                    LoadedAdapters tracks the loading status of adapters
+                    and their pod assignments.
+                  items:
+                    description:
+                      LoadedAdapter represents an adapter that has been loaded
+                      into a pod
+                    properties:
+                      loadTime:
+                        description: LoadTime is when the adapter was loaded
+                        format: date-time
+                        type: string
+                      name:
+                        description: Name is the name of the adapter
+                        type: string
+                      path:
+                        description: Path is the path where the adapter is loaded
+                        type: string
+                      podAssignments:
+                        description:
+                          PodAssignments represents the pods this adapter
+                          has been assigned to
+                        properties:
+                          namespace:
+                            description: Namespace is the namespace of the pod
+                            type: string
+                          podName:
+                            description: Pod represents the pod information
+                            type: string
+                        required:
+                          - namespace
+                          - podName
+                        type: object
+                      status:
+                        description: Status is the status of the adapter
+                        type: string
+                    required:
+                      - name
+                      - path
+                      - podAssignments
+                      - status
+                    type: object
+                  type: array
+                message:
+                  description:
+                    Message provides additional information about the current
+                    phase.
+                  type: string
+                observedGeneration:
+                  description:
+                    ObservedGeneration represents the .metadata.generation
+                    that the condition was set based upon.
+                  format: int64
+                  minimum: 0
+                  type: integer
+                phase:
+                  description: Phase represents the current phase of the adapter deployment.
+                  type: string
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: vllmrouters.production-stack.vllm.ai
+spec:
+  group: production-stack.vllm.ai
+  names:
+    kind: VLLMRouter
+    listKind: VLLMRouterList
+    plural: vllmrouters
+    singular: vllmrouter
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: VLLMRouter is the Schema for the vllmrouters API
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: VLLMRouterSpec defines the desired state of VLLMRouter
+              properties:
+                enableRouter:
+                  default: true
+                  description: EnableRouter determines if the router should be deployed
+                  type: boolean
+                engineScrapeInterval:
+                  description: EngineScrapeInterval for collecting engine statistics
+                  format: int32
+                  type: integer
+                env:
+                  description: Environment variables
+                  items:
+                    description: EnvVar represents an environment variable
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                    required:
+                      - name
+                      - value
+                    type: object
+                  type: array
+                extraArgs:
+                  description: ExtraArgs for additional router arguments
+                  items:
+                    type: string
+                  type: array
+                image:
+                  description: Image configuration
+                  properties:
+                    name:
+                      type: string
+                    pullPolicy:
+                      type: string
+                    pullSecretName:
+                      type: string
+                    registry:
+                      type: string
+                  required:
+                    - name
+                    - registry
+                  type: object
+                k8sLabelSelector:
+                  description:
+                    K8sLabelSelector specifies the label selector for vLLM
+                    runtime pods when using k8s service discovery
+                  type: string
+                nodeSelectorTerms:
+                  description: NodeSelectorTerms for pod scheduling
+                  items:
+                    description: |-
+                      A null or empty node selector term matches no objects. The requirements of
+                      them are ANDed.
+                      The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
+                    properties:
+                      matchExpressions:
+                        description:
+                          A list of node selector requirements by node's
+                          labels.
+                        items:
+                          description: |-
+                            A node selector requirement is a selector that contains values, a key, and an operator
+                            that relates the key and values.
+                          properties:
+                            key:
+                              description: The label key that the selector applies to.
+                              type: string
+                            operator:
+                              description: |-
+                                Represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                              type: string
+                            values:
+                              description: |-
+                                An array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. If the operator is Gt or Lt, the values
+                                array must have a single element, which will be interpreted as an integer.
+                                This array is replaced during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          required:
+                            - key
+                            - operator
+                          type: object
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      matchFields:
+                        description:
+                          A list of node selector requirements by node's
+                          fields.
+                        items:
+                          description: |-
+                            A node selector requirement is a selector that contains values, a key, and an operator
+                            that relates the key and values.
+                          properties:
+                            key:
+                              description: The label key that the selector applies to.
+                              type: string
+                            operator:
+                              description: |-
+                                Represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                              type: string
+                            values:
+                              description: |-
+                                An array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. If the operator is Gt or Lt, the values
+                                array must have a single element, which will be interpreted as an integer.
+                                This array is replaced during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          required:
+                            - key
+                            - operator
+                          type: object
+                        type: array
+                        x-kubernetes-list-type: atomic
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  type: array
+                port:
+                  default: 80
+                  description: ContainerPort for the router service
+                  format: int32
+                  type: integer
+                replicas:
+                  default: 1
+                  description: Replicas specifies the number of router replicas
+                  format: int32
+                  type: integer
+                requestStatsWindow:
+                  description: RequestStatsWindow for request statistics
+                  format: int32
+                  type: integer
+                resources:
+                  description: Resource requirements
+                  properties:
+                    cpu:
+                      type: string
+                    gpu:
+                      type: string
+                    memory:
+                      type: string
+                  type: object
+                routingLogic:
+                  default: roundrobin
+                  description: RoutingLogic specifies the routing strategy
+                  enum:
+                    - roundrobin
+                    - session
+                  type: string
+                serviceAccountName:
+                  description: ServiceAccountName for the router pod
+                  type: string
+                serviceDiscovery:
+                  default: k8s
+                  description:
+                    ServiceDiscovery specifies the service discovery method
+                    (k8s or static)
+                  enum:
+                    - k8s
+                    - static
+                  type: string
+                sessionKey:
+                  default: ""
+                  description: SessionKey for session-based routing
+                  type: string
+                staticBackends:
+                  description:
+                    StaticBackends is required when using static service
+                    discovery
+                  type: string
+                staticModels:
+                  description: StaticModels is required when using static service discovery
+                  type: string
+                vllmApiKeyName:
+                  type: string
+                vllmApiKeySecret:
+                  description: VLLM API Key configuration
+                  properties:
+                    name:
+                      default: ""
+                      description: |-
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
+              required:
+                - image
+                - resources
+              type: object
+            status:
+              description: VLLMRouterStatus defines the observed state of VLLMRouter
+              properties:
+                activeRuntimes:
+                  description: Number of active runtimes
+                  format: int32
+                  type: integer
+                lastUpdated:
+                  description: Last updated timestamp
+                  format: date-time
+                  type: string
+                status:
+                  description: Router status
+                  type: string
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: vllmruntimes.production-stack.vllm.ai
+spec:
+  group: production-stack.vllm.ai
+  names:
+    kind: VLLMRuntime
+    listKind: VLLMRuntimeList
+    plural: vllmruntimes
+    shortNames:
+      - vr
+    singular: vllmruntime
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: VLLMRuntime is the Schema for the vllmruntimes API
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: VLLMRuntimeSpec defines the desired state of VLLMRuntime
+              properties:
+                deploymentConfig:
+                  description: Deployment configuration
+                  properties:
+                    deploymentStrategy:
+                      default: RollingUpdate
+                      description: Deploy strategy
+                      enum:
+                        - RollingUpdate
+                        - Recreate
+                      type: string
+                    image:
+                      description: Image configuration
+                      properties:
+                        name:
+                          type: string
+                        pullPolicy:
+                          type: string
+                        pullSecretName:
+                          type: string
+                        registry:
+                          type: string
+                      required:
+                        - name
+                        - registry
+                      type: object
+                    replicas:
+                      default: 1
+                      description: Replicas
+                      format: int32
+                      type: integer
+                    resources:
+                      description: Resource requirements
+                      properties:
+                        cpu:
+                          type: string
+                        gpu:
+                          type: string
+                        memory:
+                          type: string
+                      type: object
+                  required:
+                    - image
+                    - resources
+                  type: object
+                lmCacheConfig:
+                  description: LM Cache configuration
+                  properties:
+                    cpuOffloadingBufferSize:
+                      default: 4Gi
+                      description:
+                        CPUOffloadingBufferSize is the size of the CPU offloading
+                        buffer
+                      type: string
+                    diskOffloadingBufferSize:
+                      default: 8Gi
+                      description:
+                        DiskOffloadingBufferSize is the size of the disk
+                        offloading buffer
+                      type: string
+                    enabled:
+                      default: false
+                      description: Enabled enables LM Cache
+                      type: boolean
+                    remoteSerde:
+                      description:
+                        RemoteSerde is the serialization format for the remote
+                        cache
+                      type: string
+                    remoteUrl:
+                      description: RemoteURL is the URL of the remote cache server
+                      type: string
+                  type: object
+                model:
+                  description: Model configuration
+                  properties:
+                    dtype:
+                      description: Data type
+                      type: string
+                    enableLoRA:
+                      description: Enable LoRA
+                      type: boolean
+                    enableTool:
+                      description: Enable tool
+                      type: boolean
+                    hfTokenName:
+                      default: token
+                      type: string
+                    hfTokenSecret:
+                      description: HuggingFace token secret
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    maxModelLen:
+                      description: Maximum model length
+                      format: int32
+                      type: integer
+                    maxNumSeqs:
+                      description: Maximum number of sequences
+                      format: int32
+                      type: integer
+                    modelURL:
+                      description: Model URL
+                      type: string
+                    toolCallParser:
+                      description: Tool call parser
+                      type: string
+                  required:
+                    - modelURL
+                  type: object
+                vllmConfig:
+                  description: vLLM server configuration
+                  properties:
+                    enableChunkedPrefill:
+                      description: Enable chunked prefill
+                      type: boolean
+                    enablePrefixCaching:
+                      description: Enable prefix caching
+                      type: boolean
+                    env:
+                      description: Environment variables
+                      items:
+                        description: EnvVar represents an environment variable
+                        properties:
+                          name:
+                            type: string
+                          value:
+                            type: string
+                        required:
+                          - name
+                          - value
+                        type: object
+                      type: array
+                    extraArgs:
+                      description: Extra arguments for vllm serve
+                      items:
+                        type: string
+                      type: array
+                    gpuMemoryUtilization:
+                      description: GPU memory utilization
+                      type: string
+                    maxLoras:
+                      description: Maximum number of LoRAs
+                      format: int32
+                      type: integer
+                    port:
+                      default: 8000
+                      description: Port for vLLM server
+                      format: int32
+                      type: integer
+                    tensorParallelSize:
+                      description: Tensor parallel size
+                      format: int32
+                      type: integer
+                    v1:
+                      description: Use V1 API
+                      type: boolean
+                  type: object
+              required:
+                - deploymentConfig
+                - model
+                - vllmConfig
+              type: object
+            status:
+              description: VLLMRuntimeStatus defines the observed state of VLLMRuntime
+              properties:
+                lastUpdated:
+                  description: Last updated timestamp
+                  format: date-time
+                  type: string
+                modelStatus:
+                  description: Model status
+                  type: string
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-controller-manager
+  namespace: production-stack-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-leader-election-role
+  namespace: production-stack-system
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-cacheserver-admin-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - cacheservers
+    verbs:
+      - "*"
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - cacheservers/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-cacheserver-editor-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - cacheservers
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - cacheservers/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-cacheserver-viewer-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - cacheservers
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - cacheservers/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-loraadapter-admin-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - loraadapters
+    verbs:
+      - "*"
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - loraadapters/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-loraadapter-editor-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - loraadapters
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - loraadapters/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-loraadapter-viewer-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - loraadapters
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - loraadapters/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: production-stack-manager-role
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - secrets
+      - serviceaccounts
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - cacheservers
+      - loraadapters
+      - vllmrouters
+      - vllmruntimes
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - cacheservers/finalizers
+      - loraadapters/finalizers
+      - vllmrouters/finalizers
+      - vllmruntimes/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - cacheservers/status
+      - loraadapters/status
+      - vllmrouters/status
+      - vllmruntimes/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - rolebindings
+      - roles
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: production-stack-metrics-auth-role
+rules:
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+  - apiGroups:
+      - authorization.k8s.io
+    resources:
+      - subjectaccessreviews
+    verbs:
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: production-stack-metrics-reader
+rules:
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-vllmrouter-admin-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmrouters
+    verbs:
+      - "*"
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmrouters/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-vllmrouter-editor-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmrouters
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmrouters/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-vllmrouter-viewer-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmrouters
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmrouters/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-vllmruntime-admin-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmruntimes
+    verbs:
+      - "*"
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmruntimes/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-vllmruntime-editor-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmruntimes
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmruntimes/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-vllmruntime-viewer-role
+rules:
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmruntimes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - production-stack.vllm.ai
+    resources:
+      - vllmruntimes/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-leader-election-rolebinding
+  namespace: production-stack-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: production-stack-leader-election-role
+subjects:
+  - kind: ServiceAccount
+    name: production-stack-controller-manager
+    namespace: production-stack-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+  name: production-stack-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: production-stack-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: production-stack-controller-manager
+    namespace: production-stack-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: production-stack-metrics-auth-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: production-stack-metrics-auth-role
+subjects:
+  - kind: ServiceAccount
+    name: production-stack-controller-manager
+    namespace: production-stack-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+    control-plane: controller-manager
+  name: production-stack-controller-manager-metrics-service
+  namespace: production-stack-system
+spec:
+  ports:
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: 8443
+  selector:
+    app.kubernetes.io/name: production-stack
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: production-stack
+    app.kubernetes.io/instance: production-stack
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: production-stack
+    app.kubernetes.io/part-of: production-stack
+  name: production-stack-production-stack-controller-manager
+  namespace: production-stack-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: manager
+      app.kubernetes.io/instance: production-stack
+      app.kubernetes.io/name: production-stack
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: manager
+        app.kubernetes.io/instance: production-stack
+        app.kubernetes.io/name: production-stack
+    spec:
+      containers:
+        - args:
+            - --metrics-bind-address=:8443
+            - --leader-elect
+            - --health-probe-bind-address=:8081
+          command:
+            - /manager
+          image: lmcache/production-stack-operator:latest
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: manager
+          ports: []
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts: []
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: production-stack-controller-manager
+      terminationGracePeriodSeconds: 10
+      volumes: []
