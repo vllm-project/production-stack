@@ -116,12 +116,9 @@ verify_router_logs_consistency() {
             # Extract session id (the string after "with session id " and before " to ")
             session_id=$(echo "$line" | sed -n 's/.*with session id \([^ ]*\) to .*/\1/p')
 
-            # For session-aware routing, session_id should always exist and not be None
-            if [ -z "$session_id" ] || [ "$session_id" = "none" ] || [ "$session_id" = "None" ]; then
-                print_error "❌ Found routing request without valid session_id in log line:"
-                print_error "   $line"
-                print_error "   Session-aware routing should always include a valid session_id"
-                return 1
+            # Handle missing session_id - set default for non-session requests
+            if [ -z "$session_id" ]; then
+                session_id=-1
             fi
 
             # Extract server URL (the string after " to " and before " at ")
@@ -136,9 +133,14 @@ verify_router_logs_consistency() {
             fi
 
             if [ -n "$session_id" ] && [ -n "$server_url" ]; then
-                echo "$session_id:$server_url" >> "$session_mappings_file"
-                if [ "$VERBOSE" = true ]; then
-                    print_status "Debug: Found mapping - Session ID: $session_id -> Server: $server_url"
+                # Only record session-aware routing (skip session_id -1)
+                if [ "$session_id" != "-1" ] && [ "$session_id" != "None" ]; then
+                    echo "$session_id|$server_url" >> "$session_mappings_file"
+                    if [ "$VERBOSE" = true ]; then
+                        print_status "Debug: Found session-aware mapping - Session ID: $session_id -> Server: $server_url"
+                    fi
+                elif [ "$VERBOSE" = true ]; then
+                    print_status "Debug: Skipping non-session request - Session ID: $session_id -> Server: $server_url"
                 fi
             fi
         fi
@@ -146,14 +148,15 @@ verify_router_logs_consistency() {
 
     local total_mappings
     total_mappings=$(wc -l < "$session_mappings_file")
-    print_status "Found $total_mappings session_id -> server_url mappings in router logs"
+    print_status "Found $total_mappings session-aware routing mappings in router logs (excluding non-session requests)"
 
     if [ "$total_mappings" -eq 0 ]; then
-        print_error "No session_id -> server_url mappings found in router logs."
+        print_error "No session-aware routing mappings found in router logs."
         print_error "This could mean:"
         print_error "  1. The test ran before router logs were captured"
         print_error "  2. Session-based routing is not enabled"
-        print_error "  3. Log format has changed"
+        print_error "  3. All requests were non-session requests (session_id -1 or None)"
+        print_error "  4. Log format has changed"
         print_error "Router log verification failed."
         return 1
     fi
@@ -163,18 +166,18 @@ verify_router_logs_consistency() {
     true > "$consistency_check_file"
 
     # Group by session_id and check if all server_urls for each session are the same
-    sort "$session_mappings_file" | while IFS=: read -r session_id server_url; do
+    sort "$session_mappings_file" | while IFS=\| read -r session_id server_url; do
         echo "$session_id $server_url" >> "$consistency_check_file"
     done
 
     # Check for inconsistencies
     local inconsistencies=0
     local unique_sessions
-    unique_sessions=$(cut -d: -f1 "$session_mappings_file" | sort -u)
+    unique_sessions=$(cut -d\| -f1 "$session_mappings_file" | sort -u)
 
     while IFS= read -r session_id; do
         local session_servers
-        session_servers=$(grep "^$session_id:" "$session_mappings_file" | cut -d: -f2 | sort -u)
+        session_servers=$(grep "^$session_id|" "$session_mappings_file" | cut -d\| -f2 | sort -u)
         local server_count
         server_count=$(echo "$session_servers" | wc -l)
 
@@ -200,9 +203,10 @@ verify_router_logs_consistency() {
         local unique_session_count
         unique_session_count=$(echo "$unique_sessions" | wc -l)
         print_status "Summary from router logs:"
-        print_status "  Total routing decisions logged: $total_mappings"
+        print_status "  Total session-aware routing decisions: $total_mappings"
         print_status "  Unique sessions found: $unique_session_count"
         print_status "  All sessions maintained consistent server assignments"
+        print_status "  (Non-session requests with session_id -1 or None were excluded from analysis)"
     fi
 
     return 0
@@ -300,30 +304,18 @@ print_status "Testing session-aware routing with user IDs in request headers"
 
 # Test parameters
 NUM_USERS=2
-SHARED_SYSTEM_PROMPT=10
-USER_HISTORY_PROMPT=10
-ANSWER_LEN=50
-QPS=1.0
 
-# Run multi-round-qa.py once with multiple users and rounds
-OUTPUT_FILE="$TEMP_DIR/test_output.txt"
-RESPONSE_FILE="$TEMP_DIR/response.txt"
-
-print_status "Running multi-round-qa test with $NUM_USERS users and $NUM_ROUNDS rounds"
-print_status "Using --request-with-user-id to enable session-aware routing"
-
-# Add this right before the python3 call
-print_status "Debug: BASE_URL being passed to script: $BASE_URL"
-print_status "Debug: MODEL being used: $MODEL"
+print_status "Running custom request test with $NUM_USERS users and $NUM_ROUNDS rounds"
+print_status "Using x-user-id header to enable session-aware routing"
 
 # Test the URL first
 print_status "Testing BASE_URL with curl..."
-if curl -s "$BASE_URL/chat/completions" \
+if curl -s "$BASE_URL/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer dummy" \
   -d '{
     "model": "'"$MODEL"'",
-    "messages": [{"role": "user", "content": "test"}],
+    "prompt": "test",
     "temperature": 0.0,
     "max_tokens": 1
   }' > /dev/null; then
@@ -332,65 +324,153 @@ else
     print_error "❌ Base URL test failed"
 fi
 
-# Calculate reasonable timeout:
-# With 2 users, 3 rounds each, QPS of 1.0, we expect roughly 6 requests total
-# Add buffer time for warmup, ramp-up, and request processing
-# Each request might take 10-30 seconds to complete, so 25 seconds should be plenty
-TIMEOUT_SECONDS=25
-
-print_status "Executing multi-round-qa.py with the following parameters:"
+# Custom script to send n x m requests with session headers
+print_status "Executing custom request script with the following parameters:"
 print_status "  Base URL: $BASE_URL"
 print_status "  Model: $MODEL"
 print_status "  Users: $NUM_USERS"
 print_status "  Rounds: $NUM_ROUNDS"
-print_status "  Timeout: $TIMEOUT_SECONDS seconds"
 
-# Run the python script and capture exit code
-set +e  # Temporarily disable exit on error
-python3 benchmarks/multi-round-qa/multi-round-qa.py \
-    --base-url "$BASE_URL" \
-    --model "$MODEL" \
-    --num-users "$NUM_USERS" \
-    --shared-system-prompt "$SHARED_SYSTEM_PROMPT" \
-    --user-history-prompt "$USER_HISTORY_PROMPT" \
-    --answer-len "$ANSWER_LEN" \
-    --num-rounds "$NUM_ROUNDS" \
-    --qps "$QPS" \
-    --time "$TIMEOUT_SECONDS" \
-    --request-with-user-id \
-    --output "$OUTPUT_FILE" \
-    > "$RESPONSE_FILE" 2>&1
+# Function to send requests for a single user (runs in background)
+send_user_requests() {
+    local user=$1
+    local session_id=$2
+    local user_log_file="$TEMP_DIR/user_${user}_log.txt"
+    local user_error_file="$TEMP_DIR/user_${user}_error.txt"
 
-PYTHON_EXIT_CODE=$?
-set -e  # Re-enable exit on error
+    exec > "$user_log_file" 2>"$user_error_file"
 
-# Check if the python script succeeded
-if [ $PYTHON_EXIT_CODE -ne 0 ]; then
-    print_error "multi-round-qa.py failed with exit code $PYTHON_EXIT_CODE"
-    print_error "Script output:"
-    echo "--- START SCRIPT OUTPUT ---"
-    cat "$RESPONSE_FILE"
-    echo "--- END SCRIPT OUTPUT ---"
+    echo "[User $user] Starting requests with session_id: $session_id"
 
-    print_error "Output file contents (if exists):"
-    if [ -f "$OUTPUT_FILE" ]; then
-        echo "--- START OUTPUT FILE ---"
-        cat "$OUTPUT_FILE"
-        echo "--- END OUTPUT FILE ---"
-    else
-        print_error "Output file $OUTPUT_FILE was not created"
+    # For each round per user
+    for round in $(seq 1 "$NUM_ROUNDS"); do
+        echo "[User $user] Sending round $round/$NUM_ROUNDS (session_id: $session_id)"
+
+        # Send the request with x-user-id header
+        local response_file="$TEMP_DIR/response_${session_id}_${round}.json"
+
+        curl -s "$BASE_URL/completions" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer dummy" \
+            -H "x-user-id: $session_id" \
+            -d '{
+                "model": "'"$MODEL"'",
+                "prompt": "Hello, this is round '"$round"' from user '"$user"' with session '"$session_id"'. Please respond briefly.",
+                "temperature": 0.7,
+                "max_tokens": 50
+            }' \
+            -o "$response_file" \
+            --max-time 30
+
+        local curl_exit_code=$?
+        if [ $curl_exit_code -ne 0 ]; then
+            echo "[User $user] ERROR: Request failed for Round $round (session_id: $session_id) with curl exit code: $curl_exit_code"
+            exit 1
+        fi
+
+        # Verify response is valid JSON and contains expected content
+        if ! jq empty "$response_file" 2>/dev/null; then
+            echo "[User $user] ERROR: Invalid JSON response for Round $round (session_id: $session_id)"
+            echo "[User $user] Response content:"
+            cat "$response_file"
+            exit 1
+        fi
+
+        echo "[User $user] ✅ Response received for round $round (session_id: $session_id)"
+
+        # Small delay between requests from same user to avoid overwhelming
+        sleep 0.5
+    done
+
+    echo "[User $user] ✅ All $NUM_ROUNDS requests completed successfully"
+    exit 0
+}
+
+# Function to send requests with session headers (parallel execution)
+send_custom_requests() {
+    local total_requests=$((NUM_USERS * NUM_ROUNDS))
+    local pids=()
+
+    print_status "Sending $total_requests total requests ($NUM_USERS users × $NUM_ROUNDS rounds) in parallel"
+
+    # Start background processes for each user
+    local session_id=1
+    for user in $(seq 1 "$NUM_USERS"); do
+        print_status "Starting background process for User $user (session_id: $session_id)"
+
+        # Start user requests in background
+        send_user_requests "$user" "$session_id" &
+        local pid=$!
+        pids+=("$pid")
+
+        print_status "  User $user process started with PID: $pid"
+
+        # Move to next session_id for next user
+        session_id=$((session_id + 1))
+    done
+
+    print_status "All $NUM_USERS user processes started. Waiting for completion..."
+
+    # Wait for all background processes and collect exit codes
+    local failed_users=()
+    local user=1
+    for pid in "${pids[@]}"; do
+        if wait "$pid"; then
+            print_status "✅ User $user completed successfully"
+        else
+            local exit_code=$?
+            print_error "❌ User $user failed with exit code: $exit_code"
+            failed_users+=("$user")
+        fi
+        user=$((user + 1))
+    done
+
+    # Display logs from all users
+    if [ "$VERBOSE" = true ]; then
+        print_status "User process logs:"
+        for user in $(seq 1 "$NUM_USERS"); do
+            local user_log_file="$TEMP_DIR/user_${user}_log.txt"
+            if [ -f "$user_log_file" ]; then
+                echo "--- User $user Log ---"
+                cat "$user_log_file"
+                echo ""
+            fi
+        done
     fi
 
-    print_error "Debugging information:"
-    print_error "  Working directory: $(pwd)"
-    print_error "  Python version: $(python3 --version)"
-    print_error "  Available Python packages:"
-    pip list | grep -E "(requests|aiohttp|asyncio)" || true
+    # Check if any users failed
+    if [ ${#failed_users[@]} -gt 0 ]; then
+        print_error "Failed users: ${failed_users[*]}"
 
-    exit $PYTHON_EXIT_CODE
+        # Show error logs for failed users
+        for user in "${failed_users[@]}"; do
+            local user_error_file="$TEMP_DIR/user_${user}_error.txt"
+            if [ -f "$user_error_file" ] && [ -s "$user_error_file" ]; then
+                print_error "Error log for User $user:"
+                cat "$user_error_file"
+            fi
+        done
+
+        return 1
+    fi
+
+    print_status "✅ All $total_requests requests completed successfully across $NUM_USERS parallel users"
+    return 0
+}
+
+# Run the custom request script and capture exit code
+set +e  # Temporarily disable exit on error
+send_custom_requests
+SCRIPT_EXIT_CODE=$?
+set -e  # Re-enable exit on error
+
+# Check if the custom script succeeded
+if [ $SCRIPT_EXIT_CODE -ne 0 ]; then
+    print_error "Custom request script failed with exit code $SCRIPT_EXIT_CODE"
+    exit $SCRIPT_EXIT_CODE
 fi
 
-print_status "✅ multi-round-qa.py completed successfully"
+print_status "✅ Custom request script completed successfully"
 
 # Skip response file parsing - only verify router logs
 print_status "Skipping response file parsing - focusing on router log verification only"
