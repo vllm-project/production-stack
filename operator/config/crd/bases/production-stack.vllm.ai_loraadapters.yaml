@@ -96,7 +96,7 @@ spec:
                 description: BaseModel is the name of the base model this adapter
                   is for.
                 type: string
-              deploymentConfig:
+              loraAdapterDeploymentConfig:
                 description: DeploymentConfig defines how the adapter should be deployed
                 properties:
                   algorithm:

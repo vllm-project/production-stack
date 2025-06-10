@@ -11,8 +11,7 @@ servingEngineSpec:
     requestGPU: 1
     pvcStorage: "50Gi"
     vllmConfig:
-      enableChunkedPrefill: false
-      enablePrefixCaching: false
+      enablePrefixCaching: true
       maxModelLen: 16384
       v1: 1
 
@@ -38,8 +37,7 @@ servingEngineSpec:
     requestGPU: 1
     pvcStorage: "50Gi"
     vllmConfig:
-      enableChunkedPrefill: false
-      enablePrefixCaching: false
+      enablePrefixCaching: true
       maxModelLen: 16384
       v1: 1
 

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # --- Request Processing & Routing ---
-# TODO: better request id system
 import json
 import os
 import time
@@ -173,7 +172,8 @@ async def route_general_request(
         )
         return response
     in_router_time = time.time()
-    request_id = str(uuid.uuid4())
+    # Same as vllm, Get request_id from X-Request-Id header if available
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
     request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
 
@@ -187,6 +187,7 @@ async def route_general_request(
             request, request_body, request_json
         )
     ):
+        response_overwrite.headers["X-Request-Id"] = request_id
         return response_overwrite
 
     requested_model = request_json.get("model", None)
@@ -194,6 +195,7 @@ async def route_general_request(
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid request: missing 'model' in request body."},
+            headers={"X-Request-Id": request_id},
         )
 
     # Apply request rewriting if enabled
@@ -270,16 +272,18 @@ async def route_general_request(
         background_tasks,
     )
     headers, status_code = await anext(stream_generator)
+    headers_dict = {key: value for key, value in headers.items()}
+    headers_dict["X-Request-Id"] = request_id
     return StreamingResponse(
         stream_generator,
         status_code=status_code,
-        headers={key: value for key, value in headers.items()},
+        headers=headers_dict,
         media_type="text/event-stream",
     )
 
 
 async def send_request_to_prefiller(
-    client: httpx.AsyncClient, endpoint: str, req_data: dict
+    client: httpx.AsyncClient, endpoint: str, req_data: dict, request_id: str
 ):
     """
     Send a request to a prefiller service.
@@ -289,19 +293,27 @@ async def send_request_to_prefiller(
     if "max_completion_tokens" in req_data:
         req_data["max_completion_tokens"] = 1
 
-    headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"}
+    headers = {
+        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
+        "X-Request-Id": request_id,
+    }
+
     response = await client.post(endpoint, json=req_data, headers=headers)
     response.raise_for_status()
     return response
 
 
 async def send_request_to_decode(
-    client: httpx.AsyncClient, endpoint: str, req_data: dict
+    client: httpx.AsyncClient, endpoint: str, req_data: dict, request_id: str
 ):
     """
     Asynchronously stream the response from a service using a persistent client.
     """
-    headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"}
+    headers = {
+        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
+        "X-Request-Id": request_id,
+    }
+
     async with client.stream(
         "POST", endpoint, json=req_data, headers=headers
     ) as response:
@@ -316,23 +328,29 @@ async def route_disaggregated_prefill_request(
     background_tasks: BackgroundTasks,
 ):
     in_router_time = time.time()
-    request_id = str(uuid.uuid4())
+    # Same as vllm, Get request_id from X-Request-Id header if available
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
     request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+
     orig_max_tokens = request_json.get("max_tokens", 0)
     request_json["max_tokens"] = 1
     st = time.time()
     prefiller_response = await send_request_to_prefiller(
-        request.app.state.prefill_client, endpoint, request_json
+        request.app.state.prefill_client, endpoint, request_json, request_id
     )
     et = time.time()
-    logger.info(f"Prefiller time (TTFT): {et - st:.4f}")
+    logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
     request_json["max_tokens"] = orig_max_tokens
 
     async def generate_stream():
         async for chunk in send_request_to_decode(
-            request.app.state.decode_client, endpoint, request_json
+            request.app.state.decode_client, endpoint, request_json, request_id
         ):
             yield chunk
 
-    return StreamingResponse(generate_stream(), media_type="application/json")
+    return StreamingResponse(
+        generate_stream(),
+        media_type="application/json",
+        headers={"X-Request-Id": request_id},
+    )

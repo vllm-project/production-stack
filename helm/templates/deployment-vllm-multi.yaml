@@ -1,5 +1,6 @@
-{{- if and .Values.servingEngineSpec.enableEngine (not (hasKey .Values.servingEngineSpec "raySpec")) -}}
+{{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+{{- if not (hasKey $modelSpec "raySpec") }}
 {{- $kv_role := "kv_both" }}
 {{- $kv_rank := 0 }}
 {{- $kv_parallel_size := 1 }}
@@ -72,8 +73,10 @@ spec:
       {{- if hasKey $modelSpec "serviceAccountName" }}
       serviceAccountName: {{ $modelSpec.serviceAccountName }}
       {{- end }}
+      {{- if and (hasKey $modelSpec "lmcacheConfig") (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
       hostIPC: true
       hostPID: true
+      {{- end }}
       hostname: "{{ $.Release.Name }}-{{ $modelSpec.name }}-{{ $.Chart.Name }}"
       subdomain: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
       containers:
@@ -420,5 +423,6 @@ data:
 {{- end }}
 {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}

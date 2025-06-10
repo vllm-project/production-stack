@@ -32,7 +32,7 @@ type LoraAdapterSpec struct {
 	// +kubebuilder:validation:Required
 	BaseModel string `json:"baseModel"`
 	// DeploymentConfig defines how the adapter should be deployed
-	DeploymentConfig DeploymentConfig `json:"deploymentConfig,omitempty"`
+	LoraAdapterDeploymentConfig LoraAdapterDeploymentConfig `json:"loraAdapterDeploymentConfig,omitempty"`
 	// VLLMApiKey defines the configuration for vLLM API key authentication
 	VLLMApiKey *VLLMApiKeyConfig `json:"vllmApiKey,omitempty"`
 }
@@ -63,7 +63,7 @@ type SecretRef struct {
 	Name string `json:"name,omitempty"`
 }
 
-type DeploymentConfig struct {
+type LoraAdapterDeploymentConfig struct {
 	// Algorithm specifies which placement algorithm to use.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=default;ordered;equalized
