@@ -4,7 +4,7 @@ This tutorial explains how to run the disaggregated prefill system, which splits
 
 ## Prerequisites
 
-- A Kubernetes cluster with GPU support
+- A Kubernetes cluster with GPU support and NVLink enabled
 - NVIDIA GPUs available (at least 2 GPUs recommended)
 - `kubectl` configured to talk to your cluster
 - Helm installed and initialized locally
