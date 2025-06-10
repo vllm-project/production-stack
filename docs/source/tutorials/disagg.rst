@@ -13,11 +13,12 @@ Prerequisites
 
 * A Kubernetes cluster with GPU support and NVLink enabled
 * NVIDIA GPUs available (at least 2 GPUs recommended)
-* `kubectl` configured to talk to your cluster
+* ``kubectl`` configured to talk to your cluster
 * Helm installed and initialized locally
 * Completion of the following setup tutorials:
-  * [00-a-install-multinode-kubernetes-env.md](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-a-install-multinode-kubernetes-env.md)
-  * [01-b-minimal-helm-installation.md](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-b-minimal-helm-installation.md)
+
+  * `00-install-kubernetes-env.md <https://github.com/vllm-project/production-stack/blob/main/tutorials/00-a-install-multinode-kubernetes-env.md>`__
+  * `01-minimal-helm-installation.md <https://github.com/vllm-project/production-stack/blob/main/tutorials/01-b-minimal-helm-installation.md>`__
 
 Kubernetes Deployment
 -------------------------------
