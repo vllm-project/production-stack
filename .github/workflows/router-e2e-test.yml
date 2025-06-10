@@ -100,3 +100,64 @@ jobs:
           path: |
             ~/.kube/config
             src/tests/perftest/logs
+
+  local-deployment-test:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Make test script executable
+        run: |
+          chmod +x tests/e2e/test-local-deployment.sh
+
+      - name: Debug Environment Variables
+        run: |
+          echo "Checking HF_TOKEN availability..."
+          if [ -n "${HF_TOKEN:-}" ]; then
+            echo "✅ HF_TOKEN is set (length: ${#HF_TOKEN})"
+          else
+            echo "❌ HF_TOKEN is not set or empty"
+          fi
+
+      - name: Run Local Deployment Test
+        run: |
+          # The script will automatically:
+          # 1. Install uv if not present
+          # 2. Set up virtual environment
+          # 3. Install vLLM and dependencies
+          # 4. Start vLLM server with real model
+          # 5. Start router
+          # 6. Run comprehensive tests
+          # 7. Clean up automatically
+          bash tests/e2e/test-local-deployment.sh
+
+      - name: Upload vLLM logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vllm-logs-${{ github.event.pull_request.number || github.sha }}
+          path: |
+            vllm_server.log
+            router.log
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-deployment-failure-logs-${{ github.event.pull_request.number || github.sha }}
+          path: |
+            vllm_server.log
+            router.log

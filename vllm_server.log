@@ -1,0 +1,79 @@
+INFO 06-10 06:16:16 [__init__.py:243] Automatically detected platform cuda.
+INFO 06-10 06:16:19 [__init__.py:31] Available plugins for group vllm.general_plugins:
+INFO 06-10 06:16:19 [__init__.py:33] - lora_filesystem_resolver -> vllm.plugins.lora_resolvers.filesystem_resolver:register_filesystem_resolver
+INFO 06-10 06:16:19 [__init__.py:36] All plugins in this group will be loaded. Set `VLLM_PLUGINS` to control which plugins to load.
+INFO 06-10 06:16:19 [api_server.py:1289] vLLM API server version 0.9.0.1
+INFO 06-10 06:16:20 [cli_args.py:300] non-default args: {'model': 'meta-llama/Llama-3.2-1B-Instruct', 'enforce_eager': True, 'disable_log_requests': True}
+INFO 06-10 06:16:30 [config.py:793] This model supports multiple tasks: {'generate', 'reward', 'score', 'embed', 'classify'}. Defaulting to 'generate'.
+INFO 06-10 06:16:31 [config.py:2118] Chunked prefill is enabled with max_num_batched_tokens=2048.
+WARNING 06-10 06:16:31 [cuda.py:87] To see benefits of async output processing, enable CUDA graph. Since, enforce-eager is enabled, async output processor cannot be used
+INFO 06-10 06:16:38 [__init__.py:243] Automatically detected platform cuda.
+INFO 06-10 06:16:42 [core.py:438] Waiting for init message from front-end.
+INFO 06-10 06:16:42 [__init__.py:31] Available plugins for group vllm.general_plugins:
+INFO 06-10 06:16:42 [__init__.py:33] - lora_filesystem_resolver -> vllm.plugins.lora_resolvers.filesystem_resolver:register_filesystem_resolver
+INFO 06-10 06:16:42 [__init__.py:36] All plugins in this group will be loaded. Set `VLLM_PLUGINS` to control which plugins to load.
+INFO 06-10 06:16:42 [core.py:65] Initializing a V1 LLM engine (v0.9.0.1) with config: model='meta-llama/Llama-3.2-1B-Instruct', speculative_config=None, tokenizer='meta-llama/Llama-3.2-1B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config={}, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=131072, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=True, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_backend=''), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None), seed=0, served_model_name=meta-llama/Llama-3.2-1B-Instruct, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=True, chunked_prefill_enabled=True, use_async_output_proc=False, pooler_config=None, compilation_config={"compile_sizes": [], "inductor_compile_config": {"enable_auto_functionalized_v2": false}, "cudagraph_capture_sizes": [], "max_capture_size": 0}
+WARNING 06-10 06:16:42 [utils.py:2671] Methods determine_num_available_blocks,device_config,get_cache_block_size_bytes,initialize_cache not implemented in <vllm.v1.worker.gpu_worker.Worker object at 0x7d4c84cd6600>
+INFO 06-10 06:16:43 [parallel_state.py:1064] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0
+WARNING 06-10 06:16:43 [topk_topp_sampler.py:58] FlashInfer is not available. Falling back to the PyTorch-native implementation of top-p & top-k sampling. For the best performance, please install FlashInfer.
+INFO 06-10 06:16:43 [gpu_model_runner.py:1531] Starting to load model meta-llama/Llama-3.2-1B-Instruct...
+INFO 06-10 06:16:43 [cuda.py:217] Using Flash Attention backend on V1 engine.
+INFO 06-10 06:16:43 [weight_utils.py:291] Using model weights format ['*.safetensors']
+INFO 06-10 06:16:43 [weight_utils.py:344] No model.safetensors.index.json found in remote.
+Loading safetensors checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  2.83it/s]
+Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  2.83it/s]
+
+INFO 06-10 06:16:43 [default_loader.py:280] Loading weights took 0.47 seconds
+INFO 06-10 06:16:44 [gpu_model_runner.py:1549] Model loading took 2.3185 GiB and 0.812440 seconds
+INFO 06-10 06:16:44 [kv_cache_utils.py:637] GPU KV cache size: 1,028,832 tokens
+INFO 06-10 06:16:44 [kv_cache_utils.py:640] Maximum concurrency for 131,072 tokens per request: 7.85x
+INFO 06-10 06:16:44 [core.py:167] init engine (profile, create kv cache, warmup model) took 0.61 seconds
+INFO 06-10 06:16:45 [loggers.py:134] vllm cache_config_info with initialization after num_gpu_blocks is: 64302
+WARNING 06-10 06:16:45 [config.py:1339] Default sampling parameters have been overridden by the model's Hugging Face generation config recommended from the model creator. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+INFO 06-10 06:16:45 [serving_chat.py:117] Using default chat sampling params from model: {'temperature': 0.6, 'top_p': 0.9}
+INFO 06-10 06:16:45 [serving_completion.py:65] Using default completion sampling params from model: {'temperature': 0.6, 'top_p': 0.9}
+INFO 06-10 06:16:45 [api_server.py:1336] Starting vLLM API server on http://0.0.0.0:8000
+INFO 06-10 06:16:45 [launcher.py:28] Available routes are:
+INFO 06-10 06:16:45 [launcher.py:36] Route: /openapi.json, Methods: GET, HEAD
+INFO 06-10 06:16:45 [launcher.py:36] Route: /docs, Methods: GET, HEAD
+INFO 06-10 06:16:45 [launcher.py:36] Route: /docs/oauth2-redirect, Methods: GET, HEAD
+INFO 06-10 06:16:45 [launcher.py:36] Route: /redoc, Methods: GET, HEAD
+INFO 06-10 06:16:45 [launcher.py:36] Route: /health, Methods: GET
+INFO 06-10 06:16:45 [launcher.py:36] Route: /load, Methods: GET
+INFO 06-10 06:16:45 [launcher.py:36] Route: /ping, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /ping, Methods: GET
+INFO 06-10 06:16:45 [launcher.py:36] Route: /tokenize, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /detokenize, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /v1/models, Methods: GET
+INFO 06-10 06:16:45 [launcher.py:36] Route: /version, Methods: GET
+INFO 06-10 06:16:45 [launcher.py:36] Route: /v1/chat/completions, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /v1/completions, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /v1/embeddings, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /pooling, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /classify, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /score, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /v1/score, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /v1/audio/transcriptions, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /rerank, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /v1/rerank, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /v2/rerank, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /invocations, Methods: POST
+INFO 06-10 06:16:45 [launcher.py:36] Route: /metrics, Methods: GET
+INFO:     Started server process [3842637]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:59054 - "GET /v1/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47330 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47336 - "GET /v1/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47344 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO 06-10 06:16:57 [chat_utils.py:419] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+INFO:     127.0.0.1:47346 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47356 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47356 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47356 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO 06-10 06:17:00 [launcher.py:79] Shutting down FastAPI HTTP server.
+[rank0]:[W610 06:17:01.666789213 ProcessGroupNCCL.cpp:1476] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
