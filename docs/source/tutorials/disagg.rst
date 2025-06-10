@@ -16,8 +16,8 @@ Prerequisites
 * `kubectl` configured to talk to your cluster
 * Helm installed and initialized locally
 * Completion of the following setup tutorials:
-  - [00-a-install-multinode-kubernetes-env.md](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)
-  - [01-b-minimal-helm-installation.md](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)
+  * [00-a-install-multinode-kubernetes-env.md](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-a-install-multinode-kubernetes-env.md)
+  * [01-b-minimal-helm-installation.md](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-b-minimal-helm-installation.md)
 
 Kubernetes Deployment
 -------------------------------
