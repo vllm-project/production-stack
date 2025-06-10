@@ -12,7 +12,6 @@ This tutorial explains how to run the disaggregated prefill system, which splits
   - [00-install-kubernetes-env.md](00-install-kubernetes-env.md)
   - [01-minimal-helm-installation.md](01-minimal-helm-installation.md)
 
-
 ## Kubernetes Deployment
 
 For production environments, you can deploy the disaggregated prefill system using Kubernetes and Helm. This approach provides better scalability, resource management, and high availability.
