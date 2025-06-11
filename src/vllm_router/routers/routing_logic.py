@@ -59,6 +59,52 @@ class RoutingLogic(str, enum.Enum):
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
+
+    def _qps_routing(
+        self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
+    ) -> str:
+        """
+        Route the request to the appropriate engine URL based on the QPS of
+        each engine
+
+        Args:
+            endpoints (List[EndpointInfo]): The list of engine URLs
+            request_stats (Dict[str, RequestStats]): The request stats
+                indicating the request-level performance of each engine
+        """
+        lowest_qps = float("inf")
+        ret = None
+        for info in endpoints:
+            url = info.url
+            if url not in request_stats:
+                return url  # This engine does not have any requests
+            request_stat = request_stats[url]
+            if request_stat.qps < lowest_qps:
+                lowest_qps = request_stat.qps
+                ret = url
+        return ret
+
+    def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
+        """
+        Update the hash ring with the current list of endpoints.
+        """
+        # Extract endpoint URLs
+        endpoint_urls = [endpoint.url for endpoint in endpoints]
+
+        # Get the current nodes in the hash ring
+        current_nodes = set(self.hash_ring.get_nodes())
+
+        # Convert the new endpoint URLs to a set for easy comparison
+        new_nodes = set(endpoint_urls)
+
+        # Remove nodes that are no longer in the list
+        for node in current_nodes - new_nodes:
+            self.hash_ring.remove_node(node)
+
+        # Add new nodes that are not already in the hash ring
+        for node in new_nodes - current_nodes:
+            self.hash_ring.add_node(node)
+
     @abc.abstractmethod
     def route_request(
         self,
@@ -130,50 +176,6 @@ class SessionRouter(RoutingInterface):
         self.hash_ring = HashRing()
         self._initialized = True
 
-    def _qps_routing(
-        self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
-    ) -> str:
-        """
-        Route the request to the appropriate engine URL based on the QPS of
-        each engine
-
-        Args:
-            request_stats (Dict[str, RequestStats]): The request stats
-                indicating the request-level performance of each engine
-        """
-        lowest_qps = float("inf")
-        ret = None
-        for info in endpoints:
-            url = info.url
-            if url not in request_stats:
-                return url  # This engine does not have any requests
-            request_stat = request_stats[url]
-            if request_stat.qps < lowest_qps:
-                lowest_qps = request_stat.qps
-                ret = url
-        return ret
-
-    def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
-        """
-        Update the hash ring with the current list of endpoints.
-        """
-        # Extract endpoint URLs
-        endpoint_urls = [endpoint.url for endpoint in endpoints]
-
-        # Get the current nodes in the hash ring
-        current_nodes = set(self.hash_ring.get_nodes())
-
-        # Convert the new endpoint URLs to a set for easy comparison
-        new_nodes = set(endpoint_urls)
-
-        # Remove nodes that are no longer in the list
-        for node in current_nodes - new_nodes:
-            self.hash_ring.remove_node(node)
-
-        # Add new nodes that are not already in the hash ring
-        for node in new_nodes - current_nodes:
-            self.hash_ring.add_node(node)
-
     def route_request(
         self,
         endpoints: List[EndpointInfo],
@@ -236,50 +238,6 @@ class KvawareRouter(RoutingInterface):
         self.hash_ring = HashRing()
         self.tokenizer = None
         self.threshold = kv_aware_threshold
-
-    def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
-        """
-        Update the hash ring with the current list of endpoints.
-        """
-        # Extract endpoint URLs
-        endpoint_urls = [endpoint.url for endpoint in endpoints]
-
-        # Get the current nodes in the hash ring
-        current_nodes = set(self.hash_ring.get_nodes())
-
-        # Convert the new endpoint URLs to a set for easy comparison
-        new_nodes = set(endpoint_urls)
-
-        # Remove nodes that are no longer in the list
-        for node in current_nodes - new_nodes:
-            self.hash_ring.remove_node(node)
-
-        # Add new nodes that are not already in the hash ring
-        for node in new_nodes - current_nodes:
-            self.hash_ring.add_node(node)
-
-    def _qps_routing(
-        self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
-    ) -> str:
-        """
-        Route the request to the appropriate engine URL based on the QPS of
-        each engine
-
-        Args:
-            request_stats (Dict[str, RequestStats]): The request stats
-                indicating the request-level performance of each engine
-        """
-        lowest_qps = float("inf")
-        ret = None
-        for info in endpoints:
-            url = info.url
-            if url not in request_stats:
-                return url  # This engine does not have any requests
-            request_stat = request_stats[url]
-            if request_stat.qps < lowest_qps:
-                lowest_qps = request_stat.qps
-                ret = url
-        return ret
 
     def start_kv_manager(self):
         """
