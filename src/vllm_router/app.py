@@ -195,6 +195,7 @@ def initialize_all(app: FastAPI, args):
         lmcache_controller_port=args.lmcache_controller_port,
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
+        kv_aware_threshold=args.kv_aware_threshold,
     )
 
     # Initialize feature gates

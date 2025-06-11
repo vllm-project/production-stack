@@ -24,7 +24,11 @@ from typing import Dict, List
 
 import requests
 from fastapi import Request
-from transformers import AutoTokenizer
+
+try:
+    from transformers import AutoTokenizer
+except ImportError:
+    pass
 
 try:
     from lmcache.v1.cache_controller import controller_manager
@@ -213,7 +217,12 @@ class KvawareRouter(RoutingInterface):
     of the longest prefix match is found.
     """
 
-    def __init__(self, lmcache_controller_port: int, session_key: str):
+    def __init__(
+        self,
+        lmcache_controller_port: int,
+        session_key: str,
+        kv_aware_threshold: int = 2000,
+    ):
         self.lmcache_controller_port = lmcache_controller_port
         logger.info(
             f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
@@ -227,6 +236,7 @@ class KvawareRouter(RoutingInterface):
         self.session_key = session_key
         self.hash_ring = HashRing()
         self.tokenizer = None
+        self.threshold = kv_aware_threshold
 
     def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
         """
@@ -353,7 +363,7 @@ class KvawareRouter(RoutingInterface):
         if (
             instance_id is None
             or len(instance_id.layout_info) == 0
-            or matched_tokens < max(len(token_ids) - 2000, 0)
+            or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
 
             session_id = request.headers.get(self.session_key, None)
@@ -498,7 +508,11 @@ def initialize_routing_logic(
         return SessionRouter(kwargs.get("session_key"))
     elif routing_logic == RoutingLogic.KVAWARE:
         logger.info("Initializing kvaware routing logic")
-        router = KvawareRouter(kwargs.get("lmcache_controller_port"))
+        router = KvawareRouter(
+            kwargs.get("lmcache_controller_port"),
+            kwargs.get("session_key"),
+            kwargs.get("kv_aware_threshold"),
+        )
         router.start_kv_manager()
         return router
     elif routing_logic == RoutingLogic.PREFIXAWARE:
