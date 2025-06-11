@@ -223,7 +223,12 @@ async def route_general_request(
         update_content_length(request, request_body)
 
     if not request_endpoint:
-        endpoints = list(filter(lambda x: requested_model in x.model_names, endpoints))
+        endpoints = list(
+            filter(
+                lambda x: requested_model in x.model_names and x.sleep == False,
+                endpoints,
+            )
+        )
         engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
         request_stats = request.app.state.request_stats_monitor.get_request_stats(
             time.time()
@@ -231,7 +236,9 @@ async def route_general_request(
     else:
         endpoints = list(
             filter(
-                lambda x: requested_model in x.model_names and x.Id == request_endpoint,
+                lambda x: requested_model in x.model_names
+                and x.Id == request_endpoint
+                and x.sleep == False,
                 endpoints,
             )
         )
