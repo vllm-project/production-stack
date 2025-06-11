@@ -18,7 +18,7 @@ COPY src/ src/
 ARG INSTALL_OPTIONAL_DEP=semantic_cache,lmcache
 ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
 
-# Install dependencies (use cache, and delete after install, to speed up the build)
+# hadolint ignore=SC1091
 RUN source /opt/venv/bin/activate && \
     uv pip install --upgrade --no-cache-dir pip setuptools_scm && \
     uv pip install --no-cache-dir .
