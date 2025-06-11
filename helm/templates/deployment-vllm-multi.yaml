@@ -184,8 +184,9 @@ spec:
             value: "DEBUG"
           {{- if hasKey . "v1" }}
           {{- if eq (int $modelSpec.vllmConfig.v1) 1 }}
-          - name: PROMETHEUS_MULTIPROC_DIR
-            value: "/tmp"
+            {{- $dir := default "/tmp" $modelSpec.vllmConfig.prometheusMultiprocDir }}
+            - name: PROMETHEUS_MULTIPROC_DIR
+              value: {{ $dir | quote }}
           {{- end }}
           - name: VLLM_USE_V1
             value: {{ $modelSpec.vllmConfig.v1 | quote }}
