@@ -15,6 +15,8 @@
 import abc
 import asyncio
 import enum
+import math
+import os
 import random
 import socket
 import threading
@@ -22,6 +24,11 @@ from typing import Dict, List
 
 import requests
 from fastapi import Request
+
+try:
+    from transformers import AutoTokenizer
+except ImportError:
+    pass
 
 try:
     from lmcache.v1.cache_controller import controller_manager
@@ -52,6 +59,52 @@ class RoutingLogic(str, enum.Enum):
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
+
+    def _qps_routing(
+        self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
+    ) -> str:
+        """
+        Route the request to the appropriate engine URL based on the QPS of
+        each engine
+
+        Args:
+            endpoints (List[EndpointInfo]): The list of engine URLs
+            request_stats (Dict[str, RequestStats]): The request stats
+                indicating the request-level performance of each engine
+        """
+        lowest_qps = float("inf")
+        ret = None
+        for info in endpoints:
+            url = info.url
+            if url not in request_stats:
+                return url  # This engine does not have any requests
+            request_stat = request_stats[url]
+            if request_stat.qps < lowest_qps:
+                lowest_qps = request_stat.qps
+                ret = url
+        return ret
+
+    def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
+        """
+        Update the hash ring with the current list of endpoints.
+        """
+        # Extract endpoint URLs
+        endpoint_urls = [endpoint.url for endpoint in endpoints]
+
+        # Get the current nodes in the hash ring
+        current_nodes = set(self.hash_ring.get_nodes())
+
+        # Convert the new endpoint URLs to a set for easy comparison
+        new_nodes = set(endpoint_urls)
+
+        # Remove nodes that are no longer in the list
+        for node in current_nodes - new_nodes:
+            self.hash_ring.remove_node(node)
+
+        # Add new nodes that are not already in the hash ring
+        for node in new_nodes - current_nodes:
+            self.hash_ring.add_node(node)
+
     @abc.abstractmethod
     def route_request(
         self,
@@ -123,50 +176,6 @@ class SessionRouter(RoutingInterface):
         self.hash_ring = HashRing()
         self._initialized = True
 
-    def _qps_routing(
-        self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
-    ) -> str:
-        """
-        Route the request to the appropriate engine URL based on the QPS of
-        each engine
-
-        Args:
-            request_stats (Dict[str, RequestStats]): The request stats
-                indicating the request-level performance of each engine
-        """
-        lowest_qps = float("inf")
-        ret = None
-        for info in endpoints:
-            url = info.url
-            if url not in request_stats:
-                return url  # This engine does not have any requests
-            request_stat = request_stats[url]
-            if request_stat.qps < lowest_qps:
-                lowest_qps = request_stat.qps
-                ret = url
-        return ret
-
-    def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
-        """
-        Update the hash ring with the current list of endpoints.
-        """
-        # Extract endpoint URLs
-        endpoint_urls = [endpoint.url for endpoint in endpoints]
-
-        # Get the current nodes in the hash ring
-        current_nodes = set(self.hash_ring.get_nodes())
-
-        # Convert the new endpoint URLs to a set for easy comparison
-        new_nodes = set(endpoint_urls)
-
-        # Remove nodes that are no longer in the list
-        for node in current_nodes - new_nodes:
-            self.hash_ring.remove_node(node)
-
-        # Add new nodes that are not already in the hash ring
-        for node in new_nodes - current_nodes:
-            self.hash_ring.add_node(node)
-
     def route_request(
         self,
         endpoints: List[EndpointInfo],
@@ -210,7 +219,12 @@ class KvawareRouter(RoutingInterface):
     of the longest prefix match is found.
     """
 
-    def __init__(self, lmcache_controller_port: int):
+    def __init__(
+        self,
+        lmcache_controller_port: int,
+        session_key: str,
+        kv_aware_threshold: int = 2000,
+    ):
         self.lmcache_controller_port = lmcache_controller_port
         logger.info(
             f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
@@ -220,6 +234,10 @@ class KvawareRouter(RoutingInterface):
         )
         self.req_id = 0
         self.instance_id_to_ip = {}
+        self.session_key = session_key
+        self.hash_ring = HashRing()
+        self.tokenizer = None
+        self.threshold = kv_aware_threshold
 
     def start_kv_manager(self):
         """
@@ -261,6 +279,8 @@ class KvawareRouter(RoutingInterface):
             request_json (Dict): The request body (needed for finding the
             longest prefix match)
         """
+        if self.tokenizer is None:
+            self.tokenizer = AutoTokenizer.from_pretrained(endpoints[0].model_names[0])
         url = endpoints[0].url + "/tokenize"
         headers = {"Content-Type": "application/json"}
 
@@ -287,16 +307,35 @@ class KvawareRouter(RoutingInterface):
                 "model": endpoints[0].model_names[0],
                 "prompt": request_json["prompt"],
             }
-        response = requests.post(url, headers=headers, json=data).json()
-        token_ids = response["tokens"]
+        token_ids = self.tokenizer.encode(request_json["prompt"])
         msg = LookupMsg(tokens=token_ids)
         instance_id = await self.query_manager(msg)
-        if instance_id is None or len(instance_id.layout_info) == 0:
-            len_engines = len(endpoints)
-            chosen = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
-            self.req_id += 1
-            logger.info(f"Routing request to {chosen.url} because no instance id found")
-            return chosen.url
+        matched_tokens = math.inf
+        if len(list(instance_id.layout_info.keys())) > 0:
+            matched_instance_id = list(instance_id.layout_info.keys())[
+                0
+            ]  # Get the first key
+            matched_tokens = instance_id.layout_info[matched_instance_id][1]
+
+        if (
+            instance_id is None
+            or len(instance_id.layout_info) == 0
+            or matched_tokens < max(len(token_ids) - self.threshold, 0)
+        ):
+
+            session_id = request.headers.get(self.session_key, None)
+            logger.debug(f"Got session id: {session_id}")
+
+            # Update the hash ring with the current list of endpoints
+            self._update_hash_ring(endpoints)
+
+            if session_id is None:
+                # Route based on QPS if no session ID is present
+                url = self._qps_routing(endpoints, request_stats)
+            else:
+                # Use the hash ring to get the endpoint for the session ID
+                url = self.hash_ring.get_node(session_id)
+            return url
         else:
             queried_instance_ids = [info for info in instance_id.layout_info]
             if queried_instance_ids[0] not in self.instance_id_to_ip:
@@ -426,7 +465,11 @@ def initialize_routing_logic(
         return SessionRouter(kwargs.get("session_key"))
     elif routing_logic == RoutingLogic.KVAWARE:
         logger.info("Initializing kvaware routing logic")
-        router = KvawareRouter(kwargs.get("lmcache_controller_port"))
+        router = KvawareRouter(
+            kwargs.get("lmcache_controller_port"),
+            kwargs.get("session_key"),
+            kwargs.get("kv_aware_threshold"),
+        )
         router.start_kv_manager()
         return router
     elif routing_logic == RoutingLogic.PREFIXAWARE:
