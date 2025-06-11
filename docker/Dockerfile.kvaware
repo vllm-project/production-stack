@@ -22,7 +22,6 @@ ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
 RUN source /opt/venv/bin/activate && \
     uv pip install --upgrade --no-cache-dir pip setuptools_scm && \
     uv pip install --no-cache-dir .
-    # [$INSTALL_OPTIONAL_DEP]
 
 # Set the entrypoint
 ENTRYPOINT ["/opt/venv/bin/vllm-router"]
