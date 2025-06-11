@@ -227,7 +227,6 @@ class KvawareRouter(RoutingInterface):
         logger.info(
             f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
         )
-        os.environ["HF_TOKEN"] = "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"
         self.kv_manager = controller_manager.LMCacheControllerManager(
             f"0.0.0.0:{self.lmcache_controller_port}"
         )

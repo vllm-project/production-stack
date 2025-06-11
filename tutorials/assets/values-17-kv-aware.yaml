@@ -26,7 +26,7 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: "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"
+    hf_token: <HF_TOKEN>
   - name: "llama2"
     repository: "lmcache/vllm-openai"
     tag: "2025-05-17-v1"
@@ -52,7 +52,7 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: "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"
+    hf_token: <HF_TOKEN>
 
   - name: "llama3"
     repository: "lmcache/vllm-openai"
@@ -79,7 +79,7 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: "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"
+    hf_token: <HF_TOKEN>
   - name: "llama4"
     repository: "lmcache/vllm-openai"
     tag: "2025-05-17-v1"
@@ -105,7 +105,7 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: "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"
+    hf_token: <HF_TOKEN>
 
 routerSpec:
   repository: "lmcache/lmstack-router"
@@ -119,5 +119,5 @@ routerSpec:
       memory: "2G"
   routingLogic: "session"
   lmcacheControllerPort: 9000
-  hf_token: "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"
+  hf_token: <HF_TOKEN>
   sessionKey: "x-user-id"

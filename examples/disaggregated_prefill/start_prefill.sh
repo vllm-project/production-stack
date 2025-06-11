@@ -2,7 +2,6 @@
 
 IMAGE=lmcache/vllm-openai:2025-05-27-v1
 docker run --runtime nvidia --gpus all \
-    --env "HF_TOKEN=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" \
     --env "LMCACHE_LOG_LEVEL=DEBUG" \
     --env "LMCACHE_ENABLE_NIXL=True" \
     --env "LMCACHE_NIXL_ROLE=sender" \
