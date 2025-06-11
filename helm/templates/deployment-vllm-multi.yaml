@@ -183,6 +183,11 @@ spec:
           - name: LMCACHE_LOG_LEVEL
             value: "DEBUG"
           {{- if hasKey . "v1" }}
+          {{- if eq ($modelSpec.vllmConfig.v1 | toString) "1" }}
+          {{- $dir := default "/tmp" $modelSpec.vllmConfig.prometheusMultiprocDir }}
+          - name: PROMETHEUS_MULTIPROC_DIR
+            value: {{ $dir | quote }}
+          {{- end }}
           - name: VLLM_USE_V1
             value: {{ $modelSpec.vllmConfig.v1 | quote }}
           {{- else }}
