@@ -79,7 +79,6 @@ class ModelType(enum.Enum):
             case ModelType.transcription:
                 return {
                     "file": "",
-                    "model": "openai/whisper-small",
                 }
 
     @staticmethod
