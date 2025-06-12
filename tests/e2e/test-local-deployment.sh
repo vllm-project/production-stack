@@ -279,6 +279,15 @@ print_status "Router port: $ROUTER_PORT"
 print_status "vLLM port: $VLLM_PORT"
 print_status "Model: $MODEL"
 
+# Print environment information for debugging
+print_status "Environment information:"
+print_status "  CI: ${CI:-not set}"
+print_status "  GITHUB_ACTIONS: ${GITHUB_ACTIONS:-not set}"
+print_status "  Runner OS: $(uname -s 2>/dev/null || echo 'unknown')"
+print_status "  Available memory: $(free -h 2>/dev/null | grep '^Mem:' | awk '{print $2}' || echo 'unknown')"
+print_status "  CPU cores: $(nproc 2>/dev/null || echo 'unknown')"
+print_status "  CUDA available: $(command -v nvidia-smi &> /dev/null && echo 'yes' || echo 'no')"
+
 # Check if required commands exist
 for cmd in curl jq python3; do
     if ! command -v "$cmd" &> /dev/null; then
