@@ -24,7 +24,7 @@ print_warning() {
 # Configuration
 ROUTER_PORT=8080
 VLLM_PORT=8000
-MODEL="meta-llama/Llama-3.2-1B-Instruct"
+MODEL="unsloth/Llama-3.2-1B-Instruct"
 ROUTER_PID=""
 VLLM_PID=""
 
@@ -290,19 +290,11 @@ done
 # Set up Python environment
 setup_environment
 
-# Check if HF_TOKEN is set
-if [ -z "${HF_TOKEN:-}" ]; then
-    print_error "HF_TOKEN environment variable is not set"
-    print_error "Please set it with: export HF_TOKEN=your_token_here"
-    print_error "You can get a token from: https://huggingface.co/settings/tokens"
-    exit 1
-fi
-
 # Start vLLM server
 print_status "Starting vLLM server on port $VLLM_PORT..."
 VLLM_LOG_FILE="vllm_server.log"
 # Use the virtual environment's vllm explicitly
-HF_TOKEN="$HF_TOKEN" .venv/bin/python -m vllm.entrypoints.openai.api_server --model "$MODEL" --port $VLLM_PORT --disable-log-requests --enforce-eager > "$VLLM_LOG_FILE" 2>&1 &
+.venv/bin/python -m vllm.entrypoints.openai.api_server --model "$MODEL" --port $VLLM_PORT --disable-log-requests --enforce-eager > "$VLLM_LOG_FILE" 2>&1 &
 VLLM_PID=$!
 print_status "vLLM server started with PID: $VLLM_PID"
 print_status "vLLM logs: $VLLM_LOG_FILE"

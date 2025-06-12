@@ -106,8 +106,6 @@ jobs:
     if: github.event.pull_request.draft == false
     permissions:
       contents: read
-    env:
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -122,15 +120,6 @@ jobs:
       - name: Make test script executable
         run: |
           chmod +x tests/e2e/test-local-deployment.sh
-
-      - name: Debug Environment Variables
-        run: |
-          echo "Checking HF_TOKEN availability..."
-          if [ -n "${HF_TOKEN:-}" ]; then
-            echo "✅ HF_TOKEN is set (length: ${#HF_TOKEN})"
-          else
-            echo "❌ HF_TOKEN is not set or empty"
-          fi
 
       - name: Run Local Deployment Test
         run: |
