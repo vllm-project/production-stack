@@ -162,7 +162,8 @@ jobs:
           echo "🧪 Running sticky routing test"
           cd ${{ github.workspace }}
           # Set the model to match what's deployed in the helm values
-          ./tests/e2e/test-sticky-routing.sh --model "facebook/opt-125m" --num-rounds 3 --verbose
+          # Enable debug mode to preserve temp files for artifact collection
+          ./tests/e2e/test-sticky-routing.sh --model "facebook/opt-125m" --num-rounds 3 --verbose --debug
         timeout-minutes: 10
 
       - name: Archive sticky routing test results
@@ -171,7 +172,7 @@ jobs:
         with:
           name: sticky-routing-test-results-pr-${{ github.event.pull_request.number || 'main' }}
           path: |
-            /tmp/sticky-routing-*
+            /tmp/sticky-routing-results-*
 
       - name: Get router and pod logs for debugging
         if: always()

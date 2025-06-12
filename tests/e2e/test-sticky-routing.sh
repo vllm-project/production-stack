@@ -272,7 +272,14 @@ if [ -z "$BASE_URL" ]; then
         fi
         if [ "$DEBUG" = true ]; then
             print_status "Debug mode: Preserving temp directory: $TEMP_DIR"
+            print_status "Debug mode: Results also saved to: $RESULTS_DIR"
+            # Copy temp files to results directory for CI
+            cp -r "$TEMP_DIR"/* "$RESULTS_DIR"/ 2>/dev/null || true
         else
+            rm -rf "$TEMP_DIR"
+            # Still preserve some key files for CI even in non-debug mode
+            cp "$TEMP_DIR"/router_logs.txt "$RESULTS_DIR"/ 2>/dev/null || true
+            cp "$TEMP_DIR"/session_mappings.txt "$RESULTS_DIR"/ 2>/dev/null || true
             rm -rf "$TEMP_DIR"
         fi
     }
@@ -296,7 +303,30 @@ fi
 
 # Create temporary directory for test files
 TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
+
+# Also create a persistent results directory for CI artifacts
+RESULTS_DIR="/tmp/sticky-routing-results-$(date +%s)"
+mkdir -p "$RESULTS_DIR"
+
+cleanup() {
+    if [ -n "$PORT_FORWARD_PID" ]; then
+        print_status "Cleaning up port forwarding (PID: $PORT_FORWARD_PID)"
+        kill "$PORT_FORWARD_PID" 2>/dev/null
+    fi
+    if [ "$DEBUG" = true ]; then
+        print_status "Debug mode: Preserving temp directory: $TEMP_DIR"
+        print_status "Debug mode: Results also saved to: $RESULTS_DIR"
+        # Copy temp files to results directory for CI
+        cp -r "$TEMP_DIR"/* "$RESULTS_DIR"/ 2>/dev/null || true
+    else
+        rm -rf "$TEMP_DIR"
+        # Still preserve some key files for CI even in non-debug mode
+        cp "$TEMP_DIR"/router_logs.txt "$RESULTS_DIR"/ 2>/dev/null || true
+        cp "$TEMP_DIR"/session_mappings.txt "$RESULTS_DIR"/ 2>/dev/null || true
+        rm -rf "$TEMP_DIR"
+    fi
+}
+trap cleanup EXIT
 
 print_status "Starting sticky routing test with 2 users, $NUM_ROUNDS rounds per user"
 
