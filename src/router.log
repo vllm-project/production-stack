@@ -1,0 +1,33 @@
+[32;20m[2025-06-10 06:16:52,393] INFO:[0m Scraping metrics from 1 serving engine(s) [3m(engine_stats.py:136:vllm_router.stats.engine_stats)[0m
+[32;20m[2025-06-10 06:16:52,394] INFO:[0m Initializing round-robin routing logic [3m(routing_logic.py:422:vllm_router.routers.routing_logic)[0m
+Semantic cache model specified but SemanticCache feature gate is not enabled. Enable the feature gate with --feature-gates=SemanticCache=true
+INFO:     Started server process [3842945]
+INFO:     Waiting for application startup.
+[32;20m[2025-06-10 06:16:52,445] INFO:[0m httpx AsyncClient instantiated. Id 127847108016656 [3m(httpx_client.py:31:vllm_router.httpx_client)[0m
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+INFO:     127.0.0.1:45806 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45846 - "GET /v1/models HTTP/1.1" 200 OK
+[32;20m[2025-06-10 06:16:58,323] INFO:[0m Request for model meta-llama/Llama-3.2-1B-Instruct was rewritten [3m(request.py:207:vllm_router.services.request_service.request)[0m
+[1m[2025-06-10 06:16:58,323] DEBUG:[0m Routing request fc469bec-b78e-4e99-acf5-cc23d104b89b for model: meta-llama/Llama-3.2-1B-Instruct [3m(request.py:244:vllm_router.services.request_service.request)[0m
+[32;20m[2025-06-10 06:16:58,323] INFO:[0m Routing request fc469bec-b78e-4e99-acf5-cc23d104b89b to http://localhost:8000 at 1749536218.3237457, process time = 0.0004 [3m(request.py:263:vllm_router.services.request_service.request)[0m
+INFO:     127.0.0.1:45848 - "POST /v1/completions HTTP/1.1" 200 OK
+[1m[2025-06-10 06:16:58,817] DEBUG:[0m Received chat completion request, checking semantic cache [3m(main_router.py:59:vllm_router.routers.main_router)[0m
+[1m[2025-06-10 06:16:58,817] DEBUG:[0m No cache hit, forwarding request to backend [3m(main_router.py:66:vllm_router.routers.main_router)[0m
+[32;20m[2025-06-10 06:16:58,818] INFO:[0m Request for model meta-llama/Llama-3.2-1B-Instruct was rewritten [3m(request.py:207:vllm_router.services.request_service.request)[0m
+[1m[2025-06-10 06:16:58,818] DEBUG:[0m Routing request a0759aee-f0cc-4e71-bcec-37150c3c6c03 for model: meta-llama/Llama-3.2-1B-Instruct [3m(request.py:244:vllm_router.services.request_service.request)[0m
+[32;20m[2025-06-10 06:16:58,818] INFO:[0m Routing request a0759aee-f0cc-4e71-bcec-37150c3c6c03 to http://localhost:8000 at 1749536218.818366, process time = 0.0004 [3m(request.py:263:vllm_router.services.request_service.request)[0m
+INFO:     127.0.0.1:45874 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+[32;20m[2025-06-10 06:16:59,316] INFO:[0m Request for model meta-llama/Llama-3.2-1B-Instruct was rewritten [3m(request.py:207:vllm_router.services.request_service.request)[0m
+[1m[2025-06-10 06:16:59,317] DEBUG:[0m Routing request 3bb63a4b-efb2-48ba-86c3-37107fc34350 for model: meta-llama/Llama-3.2-1B-Instruct [3m(request.py:244:vllm_router.services.request_service.request)[0m
+[32;20m[2025-06-10 06:16:59,317] INFO:[0m Routing request 3bb63a4b-efb2-48ba-86c3-37107fc34350 to http://localhost:8000 at 1749536219.3171995, process time = 0.0003 [3m(request.py:263:vllm_router.services.request_service.request)[0m
+INFO:     127.0.0.1:45882 - "POST /v1/completions HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+[32;20m[2025-06-10 06:16:59,662] INFO:[0m httpx async_client.is_closed(): False - Now close it. Id (will be unchanged): 127847108016656 [3m(httpx_client.py:35:vllm_router.httpx_client)[0m
+[32;20m[2025-06-10 06:16:59,663] INFO:[0m httpx async_client.is_closed(): True. Id (will be unchanged): 127847108016656 [3m(httpx_client.py:39:vllm_router.httpx_client)[0m
+[32;20m[2025-06-10 06:16:59,663] INFO:[0m httpx AsyncClient closed [3m(httpx_client.py:43:vllm_router.httpx_client)[0m
+INFO:     Closing engine stats scraper
+INFO:     Closing service discovery module
+INFO:     Application shutdown complete.
+INFO:     Finished server process [3842945]

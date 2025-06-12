@@ -18,7 +18,7 @@ fi
 python3 -m vllm_router.app --port "$1" \
     --service-discovery static \
     --static-backends "http://localhost:8000" \
-    --static-models "facebook/opt-125m" \
+    --static-models "meta-llama/Llama-3.2-1B-Instruct" \
     --static-model-types "chat" \
     --log-stats \
     --log-stats-interval 10 \
