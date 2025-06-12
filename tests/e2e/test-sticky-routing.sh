@@ -248,6 +248,36 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Create temporary directory for test files
+TEMP_DIR=$(mktemp -d)
+
+# Also create a persistent results directory for CI artifacts
+RESULTS_DIR="/tmp/sticky-routing-results-$(date +%s)"
+mkdir -p "$RESULTS_DIR"
+
+# Initialize PORT_FORWARD_PID to empty so cleanup can always reference it
+PORT_FORWARD_PID=""
+
+cleanup() {
+    if [ -n "$PORT_FORWARD_PID" ]; then
+        print_status "Cleaning up port forwarding (PID: $PORT_FORWARD_PID)"
+        kill "$PORT_FORWARD_PID" 2>/dev/null
+    fi
+    if [ "${DEBUG:-false}" = true ]; then
+        print_status "Debug mode: Preserving temp directory: $TEMP_DIR"
+        print_status "Debug mode: Results also saved to: $RESULTS_DIR"
+        # Copy temp files to results directory for CI
+        cp -r "$TEMP_DIR"/* "$RESULTS_DIR"/ 2>/dev/null || true
+    else
+        rm -rf "$TEMP_DIR"
+        # Still preserve some key files for CI even in non-debug mode
+        cp "$TEMP_DIR"/router_logs.txt "$RESULTS_DIR"/ 2>/dev/null || true
+        cp "$TEMP_DIR"/session_mappings.txt "$RESULTS_DIR"/ 2>/dev/null || true
+        rm -rf "$TEMP_DIR"
+    fi
+}
+trap cleanup EXIT
+
 # If BASE_URL is not provided, set up port forwarding
 if [ -z "$BASE_URL" ]; then
     # Check if vllm-router-service exists
@@ -264,27 +294,6 @@ if [ -z "$BASE_URL" ]; then
     kubectl port-forward svc/vllm-router-service ${LOCAL_PORT}:80 >/dev/null 2>&1 &
     PORT_FORWARD_PID=$!
 
-    # Add cleanup for port forwarding
-    cleanup() {
-        if [ -n "$PORT_FORWARD_PID" ]; then
-            print_status "Cleaning up port forwarding (PID: $PORT_FORWARD_PID)"
-            kill "$PORT_FORWARD_PID" 2>/dev/null
-        fi
-        if [ "$DEBUG" = true ]; then
-            print_status "Debug mode: Preserving temp directory: $TEMP_DIR"
-            print_status "Debug mode: Results also saved to: $RESULTS_DIR"
-            # Copy temp files to results directory for CI
-            cp -r "$TEMP_DIR"/* "$RESULTS_DIR"/ 2>/dev/null || true
-        else
-            rm -rf "$TEMP_DIR"
-            # Still preserve some key files for CI even in non-debug mode
-            cp "$TEMP_DIR"/router_logs.txt "$RESULTS_DIR"/ 2>/dev/null || true
-            cp "$TEMP_DIR"/session_mappings.txt "$RESULTS_DIR"/ 2>/dev/null || true
-            rm -rf "$TEMP_DIR"
-        fi
-    }
-    trap cleanup EXIT
-
     # Wait a moment for port forwarding to establish
     sleep 3
 
@@ -300,33 +309,6 @@ if [ -z "$BASE_URL" ]; then
     print_error "Default BASE_URL will be constructed from minikube IP and vllm-router-service NodePort if not specified"
     exit 1
 fi
-
-# Create temporary directory for test files
-TEMP_DIR=$(mktemp -d)
-
-# Also create a persistent results directory for CI artifacts
-RESULTS_DIR="/tmp/sticky-routing-results-$(date +%s)"
-mkdir -p "$RESULTS_DIR"
-
-cleanup() {
-    if [ -n "$PORT_FORWARD_PID" ]; then
-        print_status "Cleaning up port forwarding (PID: $PORT_FORWARD_PID)"
-        kill "$PORT_FORWARD_PID" 2>/dev/null
-    fi
-    if [ "$DEBUG" = true ]; then
-        print_status "Debug mode: Preserving temp directory: $TEMP_DIR"
-        print_status "Debug mode: Results also saved to: $RESULTS_DIR"
-        # Copy temp files to results directory for CI
-        cp -r "$TEMP_DIR"/* "$RESULTS_DIR"/ 2>/dev/null || true
-    else
-        rm -rf "$TEMP_DIR"
-        # Still preserve some key files for CI even in non-debug mode
-        cp "$TEMP_DIR"/router_logs.txt "$RESULTS_DIR"/ 2>/dev/null || true
-        cp "$TEMP_DIR"/session_mappings.txt "$RESULTS_DIR"/ 2>/dev/null || true
-        rm -rf "$TEMP_DIR"
-    fi
-}
-trap cleanup EXIT
 
 print_status "Starting sticky routing test with 2 users, $NUM_ROUNDS rounds per user"
 
