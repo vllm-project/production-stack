@@ -107,6 +107,21 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install Rust target
+        run: rustup target add x86_64-unknown-linux-gnu
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          ignore-nothing-to-cache: true
+
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
