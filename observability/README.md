@@ -42,6 +42,16 @@ Open the webpage at `http://<IP of your node>:3000` to access the Grafana web pa
 
 Import the dashboard using the `vllm-dashboard.json` in this folder.
 
+## Import LMCache Dashboard
+
+If you use LMCache image in production stack, you can try the LMCache dashboard. It contains six fields showing the benefits of cpu offloading.
+
+```bash
+kubectl apply -f lmcache-dashboard-cm.yaml
+kubectl -n monitoring rollout restart deployment kube-prom-stack-grafana
+kubectl --namespace monitoring port-forward svc/kube-prom-stack-grafana 3000:80 --address 0.0.0.0
+```
+
 ## Use Prometheus Adapter to export vLLM metrics
 
 The vLLM router can export metrics to Prometheus using the [Prometheus Adapter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter).
