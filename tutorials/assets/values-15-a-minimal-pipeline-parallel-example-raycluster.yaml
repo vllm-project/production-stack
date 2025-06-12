@@ -1,24 +1,25 @@
 servingEngineSpec:
   runtimeClassName: ""
-  raySpec:
-    headNode:
-      requestCPU: 2
-      requestMemory: "20Gi"
-      requestGPU: 2
   modelSpec:
-  - name: "distilgpt2"
+  - name: "distilgpt2-raycluster"
     repository: "vllm/vllm-openai"
     tag: "latest"
     modelURL: "distilbert/distilgpt2"
 
     replicaCount: 1
 
-    requestCPU: 2
+    requestCPU: 1
     requestMemory: "20Gi"
-    requestGPU: 2
+    requestGPU: 1
 
     vllmConfig:
-      tensorParallelSize: 2
+      tensorParallelSize: 1
       pipelineParallelSize: 2
 
     shmSize: "20Gi"
+
+    raySpec:
+      headNode:
+        requestCPU: 1
+        requestMemory: "20Gi"
+        requestGPU: 1

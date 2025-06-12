@@ -11,98 +11,14 @@ This tutorial explains how to run the disaggregated prefill system, which splits
 Prerequisites
 -------------------------
 
-* Docker installed with NVIDIA runtime support
+* A Kubernetes cluster with GPU support and NVLink enabled
 * NVIDIA GPUs available (at least 2 GPUs recommended)
-* Python 3.12 installed
-* Hugging Face token with access to Llama models
-* vLLM and its dependencies installed
+* ``kubectl`` configured to talk to your cluster
+* Helm installed and initialized locally
+* Completion of the following setup tutorials:
 
-Local Deployment
----------------------------
-
-Step 1: Start the Prefill Server
-++++++++++++++++++++++++++++++++++
-
-The prefill server handles the initial processing of the input sequence. This server runs on GPU 0 and uses port 8100.
-
-.. code-block:: bash
-
-    bash examples/disaggregated_prefill/start_prefill.sh
-
-This script starts a Docker container with the following key configurations:
-
-* Uses GPU 0 (``CUDA_VISIBLE_DEVICES=0``)
-* Runs on port 8100
-* Acts as a NIXL sender
-* Uses the Llama-3.1-8B-Instruct model
-* Configured as a KV producer and a Nixl sender
-
-Step 2: Start the Decode Server
-++++++++++++++++++++++++++++++++++
-
-The decode server handles the generation of new tokens. This server runs on GPU 1 and uses port 8200.
-
-.. code-block:: bash
-
-    bash examples/disaggregated_prefill/start_decode.sh
-
-This script starts a Docker container with the following key configurations:
-
-* Uses GPU 1 (``CUDA_VISIBLE_DEVICES=1``)
-* Runs on port 8200
-* Acts as a NIXL receiver
-* Uses the Llama-3.1-8B-Instruct model
-* Configured as a KV consumer and a nixl receiver
-
-Step 3: Start the Router
-++++++++++++++++++++++++++++++++++
-
-The router coordinates between the prefill and decode servers, handling request routing.
-
-.. code-block:: bash
-
-    python3 -m vllm_router.app --port 8005 \
-        --service-discovery static \
-        --static-backends "http://localhost:8100,http://localhost:8200" \
-        --static-models "meta-llama/Llama-3.1-8B-Instruct,meta-llama/Llama-3.1-70B-Instruct" \
-        --static-model-labels "llama-prefill,llama-decode" \
-        --log-stats \
-        --log-stats-interval 10 \
-        --engine-stats-interval 10 \
-        --request-stats-window 10 \
-        --routing-logic disaggregated_prefill \
-        --prefill-model-labels "llama-prefill" \
-        --decode-model-labels "llama-decode"
-
-Key router configurations:
-
-* Runs on port 8005
-* Uses static service discovery
-* Implements disaggregated prefill routing logic
-* Logs statistics every 10 seconds
-* Routes requests based on model labels
-
-Step 4: Submit Requests
-++++++++++++++++++++++++++++++++++
-
-Once all servers are running, you can submit requests to the router at ``localhost:8005``. Here's an example curl request:
-
-.. code-block:: bash
-
-    curl http://localhost:8005/v1/completions \
-        -H "Content-Type: application/json" \
-        -d '{
-            "model": "meta-llama/Llama-3.1-8B-Instruct",
-            "prompt": "Your prompt here",
-            "max_tokens": 100
-        }'
-
-You should see logs from LMCache like the following on the decoder instance's side:
-
-.. code-block:: console
-
-    [2025-05-26 20:12:21,913] LMCache DEBUG: Scheduled to load 5 tokens for request cmpl-058cf35e022a479f849a60daefbade9e-0 (vllm_v1_adapter.py:299:lmcache.integration.vllm.vllm_v1_adapter)
-    [2025-05-26 20:12:21,915] LMCache DEBUG: Retrieved 6 out of 6 out of total 6 tokens (cache_engine.py:330:lmcache.experimental.cache_engine)
+  * `00-install-kubernetes-env.md <https://github.com/vllm-project/production-stack/blob/main/tutorials/00-a-install-multinode-kubernetes-env.md>`__
+  * `01-minimal-helm-installation.md <https://github.com/vllm-project/production-stack/blob/main/tutorials/01-b-minimal-helm-installation.md>`__
 
 Kubernetes Deployment
 -------------------------------
@@ -117,6 +33,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
 .. code-block:: yaml
 
     # Unified configuration for disaggregated prefill setup
+    # Unified configuration for disaggregated prefill setup
     servingEngineSpec:
       enableEngine: true
       runtimeClassName: ""
@@ -125,24 +42,25 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
         # Prefill node configuration
         - name: "llama-prefill"
           repository: "lmcache/vllm-openai"
-          tag: "2025-05-17-v1"
+          tag: "2025-05-27-v1"
           modelURL: "meta-llama/Llama-3.1-8B-Instruct"
           replicaCount: 1
           requestCPU: 8
           requestMemory: "30Gi"
-          requestGPU: 1
+          # requestGPU: 1
           pvcStorage: "50Gi"
           vllmConfig:
-            enableChunkedPrefill: false
-            enablePrefixCaching: false
+            enablePrefixCaching: true
             maxModelLen: 32000
             v1: 1
+            gpuMemoryUtilization: 0.6
           lmcacheConfig:
+            cudaVisibleDevices: "0"
             enabled: true
             kvRole: "kv_producer"
             enableNixl: true
             nixlRole: "sender"
-            nixlPeerHost: "pd-llama-decode-engine-service"
+            nixlPeerHost: "vllm-llama-decode-engine-service"
             nixlPeerPort: "55555"
             nixlBufferSize: "1073741824"  # 1GB
             nixlBufferDevice: "cuda"
@@ -155,21 +73,21 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
         # Decode node configuration
         - name: "llama-decode"
           repository: "lmcache/vllm-openai"
-          tag: "2025-05-17-v1"
-          modelURL: "meta-llama/Llama-3.2-1B-Instruct"
+          tag: "2025-05-27-v1"
+          modelURL: "meta-llama/Llama-3.1-8B-Instruct"
           replicaCount: 1
           requestCPU: 8
           requestMemory: "30Gi"
-          requestGPU: 1
+          # requestGPU: 1
           pvcStorage: "50Gi"
           vllmConfig:
-            enableChunkedPrefill: false
-            enablePrefixCaching: false
+            enablePrefixCaching: true
             maxModelLen: 32000
             v1: 1
           lmcacheConfig:
+            cudaVisibleDevices: "1"
             enabled: true
-            kvRole: "kv_consumer"
+            kvRole: "kv_consumer"  # Set decode node as consumer
             enableNixl: true
             nixlRole: "receiver"
             nixlPeerHost: "0.0.0.0"
@@ -207,6 +125,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
         - "llama-prefill"
         - "--decode-model-labels"
         - "llama-decode"
+
 
 Step 2: Deploy Using Helm
 ++++++++++++++++++++++++++++++++++
@@ -271,5 +190,5 @@ You should see logs from LMCache like the following on the decoder instance's si
 
 .. code-block:: console
 
-    [2025-05-26 20:12:21,913] LMCache DEBUG: Scheduled to load 5 tokens for request cmpl-058cf35e022a479f849a60daefbade9e-0 (vllm_v1_adapter.py:299:lmcache.integration.vllm.vllm_v1_adapter)
+    [2025-05-26 20:12:21,913] LMCache DEBUG: Scheduled to load 6 tokens for request cmpl-058cf35e022a479f849a60daefbade9e-0 (vllm_v1_adapter.py:299:lmcache.integration.vllm.vllm_v1_adapter)
     [2025-05-26 20:12:21,915] LMCache DEBUG: Retrieved 6 out of 6 out of total 6 tokens (cache_engine.py:330:lmcache.experimental.cache_engine)

@@ -1,5 +1,6 @@
-{{- if and .Values.servingEngineSpec.enableEngine (not (hasKey .Values.servingEngineSpec "raySpec")) -}}
+{{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+{{- if not (hasKey $modelSpec "raySpec") }}
 {{- $kv_role := "kv_both" }}
 {{- $kv_rank := 0 }}
 {{- $kv_parallel_size := 1 }}
@@ -61,8 +62,10 @@ spec:
       securityContext:
         {{- toYaml .Values.servingEngineSpec.securityContext | nindent 8 }}
       {{- end }}
+      {{- if and (hasKey $modelSpec "lmcacheConfig") (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
       hostIPC: true
       hostPID: true
+      {{- end }}
       hostname: "{{ $.Release.Name }}-{{ $modelSpec.name }}-{{ $.Chart.Name }}"
       subdomain: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
       containers:
@@ -180,6 +183,11 @@ spec:
           - name: LMCACHE_LOG_LEVEL
             value: "DEBUG"
           {{- if hasKey . "v1" }}
+          {{- if eq ($modelSpec.vllmConfig.v1 | toString) "1" }}
+          {{- $dir := default "/tmp" $modelSpec.vllmConfig.prometheusMultiprocDir }}
+          - name: PROMETHEUS_MULTIPROC_DIR
+            value: {{ $dir | quote }}
+          {{- end }}
           - name: VLLM_USE_V1
             value: {{ $modelSpec.vllmConfig.v1 | quote }}
           {{- else }}
@@ -292,16 +300,16 @@ spec:
             value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.enableController | quote }}
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "instanceId" }}
-          - name: LMCACHE_INSTANCE_ID
+          - name: LMCACHE_LMCACHE_INSTANCE_ID
             value: {{ $modelSpec.lmcacheConfig.instanceId | quote }}
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "controllerPort" }}
           - name: LMCACHE_CONTROLLER_URL
-            value: "{{ .Release.Name }}-{{$modelSpec.name}}-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
+            value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
           - name: LMCACHE_WORKER_PORT
-            value: "{{ .Release.Name }}-service:{{ $modelSpec.lmcacheConfig.workerPort }}"
+            value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
           {{-   end }}
           {{- end }}
           {{- if .Values.servingEngineSpec.configs }}
@@ -409,5 +417,6 @@ data:
 {{- end }}
 {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}
