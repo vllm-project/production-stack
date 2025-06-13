@@ -136,11 +136,11 @@ spec:
                 value: "{{ .Release.Name }}-service:{{ $modelSpec.lmcacheConfig.workerPort }}"
               {{-   end }}
               {{- end }}
-            {{- if .Values.servingEngineSpec.configs }}
-            envFrom:
-              - configMapRef:
-                  name: "{{ .Release.Name }}-configs"
-            {{- end }}
+              {{- if .Values.servingEngineSpec.configs }}
+              envFrom:
+                - configMapRef:
+                    name: "{{ .Release.Name }}-configs"
+              {{- end }}
             ports:
               - name: {{ include "chart.container-port-name" . }}
                 containerPort: {{ include "chart.container-port" . }}
@@ -366,11 +366,11 @@ spec:
                   value: "{{ .Release.Name }}-service:{{ $modelSpec.lmcacheConfig.workerPort }}"
                 {{-   end }}
                 {{- end }}
-              {{- if .Values.servingEngineSpec.configs }}
-              envFrom:
-                - configMapRef:
-                    name: "{{ .Release.Name }}-configs"
-              {{- end }}
+                {{- if .Values.servingEngineSpec.configs }}
+                envFrom:
+                  - configMapRef:
+                      name: "{{ .Release.Name }}-configs"
+                {{- end }}
               readinessProbe:
                 exec:
                   command: ["/bin/bash", "-c", "echo TBD"]
