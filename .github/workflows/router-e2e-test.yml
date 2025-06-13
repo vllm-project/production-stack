@@ -100,3 +100,106 @@ jobs:
           path: |
             ~/.kube/config
             src/tests/perftest/logs
+
+  sticky-routing-e2e-test:
+    runs-on: self-hosted
+    needs: e2e-test
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r benchmarks/multi-round-qa/requirements.txt
+          pip install -e .
+
+      - name: Setup minikube environment
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          echo "🔧 Setting up minikube environment"
+          sudo sysctl fs.protected_regular=0
+          # Verify minikube is running
+          minikube status
+          # Ensure kubectl is configured for minikube
+          kubectl config use-context minikube
+
+      - name: Build and deploy router image
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          echo "🔨 Building router docker image"
+          cd ${{ github.workspace }}
+          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
+          sudo docker push localhost:5000/git-act-router
+          minikube image load localhost:5000/git-act-router
+
+      - name: Deploy two-pods setup via helm charts
+        run: |
+          echo "🚀 Deploying two-pods setup with helm"
+          cd ${{ github.workspace }}
+          helm install vllm ./helm -f .github/values-06-session-routing.yaml
+
+      - name: Wait for pods to be ready
+        run: |
+          echo "⏳ Making wait-for-pods script executable and running it"
+          chmod +x .github/wait-for-pods.sh
+          ./.github/wait-for-pods.sh --pod-prefix vllm --timeout 300 --verbose
+
+      - name: Make test script executable
+        run: |
+          chmod +x tests/e2e/test-sticky-routing.sh
+
+      - name: Run sticky routing e2e test
+        run: |
+          echo "🧪 Running sticky routing test"
+          cd ${{ github.workspace }}
+          # Set the model to match what's deployed in the helm values
+          # Enable debug mode to preserve temp files for artifact collection
+          ./tests/e2e/test-sticky-routing.sh --model "facebook/opt-125m" --num-rounds 3 --verbose --debug
+        timeout-minutes: 10
+
+      - name: Archive sticky routing test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sticky-routing-test-results-pr-${{ github.event.pull_request.number || 'main' }}
+          path: |
+            /tmp/sticky-routing-results-*
+
+      - name: Get router and pod logs for debugging
+        if: always()
+        run: |
+          echo "📋 Collecting logs for debugging"
+          mkdir -p debug-logs
+          # Get router logs
+          kubectl logs -l app.kubernetes.io/component=router --tail=100 > debug-logs/router.log || true
+          # Get serving engine logs
+          kubectl logs -l app.kubernetes.io/component=serving-engine --tail=100 > debug-logs/serving-engines.log || true
+          # Get pod status
+          kubectl get pods -o wide > debug-logs/pod-status.txt || true
+          # Get services
+          kubectl get svc > debug-logs/services.txt || true
+
+      - name: Upload debug logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debug-logs-pr-${{ github.event.pull_request.number || 'main' }}
+          path: debug-logs/
+
+      - name: Helm uninstall and cleanup
+        run: |
+          echo "🧹 Cleaning up resources"
+          helm uninstall vllm || true
+          sudo docker image prune -f || true
+        if: always()
+
+      - run: echo "🍏 Sticky routing e2e test job status is ${{ job.status }}."

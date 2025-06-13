@@ -32,6 +32,10 @@ spec:
         image: "{{ .Values.routerSpec.repository | default "lmcache/lmstack-router" }}:{{ .Values.routerSpec.tag | default "latest" }}"
         imagePullPolicy: "{{ .Values.routerSpec.imagePullPolicy | default "Always" }}"
         env:
+          {{- if .Values.routerSpec.hf_token }}
+          - name: HF_TOKEN
+            value: "{{ .Values.routerSpec.hf_token }}"
+          {{- end }}
           - name: LMCACHE_LOG_LEVEL
             value: "DEBUG"
           {{- if .Values.servingEngineSpec.enableEngine -}}
