@@ -25,6 +25,7 @@ RUN git clone https://github.com/kubernetes-sigs/gateway-api-inference-extension
     git apply scheduler.patch && \
     cd ../../../.. && \
     cp /src/roundrobin_picker.go  gateway-api-inference-extension/pkg/epp/scheduling/plugins/picker/roundrobin_picker.go && \
+    cp /src/prefix_aware_picker.go  gateway-api-inference-extension/pkg/epp/scheduling/plugins/picker/prefix_aware_picker.go && \
     mkdir -p /src/pkg/ && \
     cp -r gateway-api-inference-extension/pkg/epp/ /src/pkg/epp && \
     cp gateway-api-inference-extension/go.mod /src && \
