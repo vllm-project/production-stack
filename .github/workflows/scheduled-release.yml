@@ -1,0 +1,227 @@
+name: Release vLLM Production Stack
+
+on:
+  # Run every Monday at 16:00 UTC
+  schedule:
+    - cron: '0 16 * * 1'
+
+  # Allow manual triggering for testing and off-cycle releases
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type (patch, minor, major)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: 'Dry run (no actual release)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.bump-version.outputs.new_version }}
+      current_version: ${{ steps.bump-version.outputs.current_version }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install semver pyyaml uv
+
+      - name: Determine Version Bump Type
+        id: bump-type
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "bump_type=${{ github.event.inputs.release_type }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "bump_type=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump Version
+        id: bump-version
+        run: |
+          # Get current version from Chart.yaml
+          CURRENT_VERSION=$(grep -oP 'version: \K[0-9]+\.[0-9]+\.[0-9]+' helm/Chart.yaml)
+
+          # Calculate new version based on bump type
+          BUMP_TYPE="${{ steps.bump-type.outputs.bump_type }}"
+
+          # Use semver to calculate new version
+          NEW_VERSION=$(python -c "import semver; v = semver.VersionInfo.parse('${CURRENT_VERSION}'); print(getattr(v, 'bump_${BUMP_TYPE}')())")
+
+          {
+            echo "current_version=${CURRENT_VERSION}"
+            echo "new_version=${NEW_VERSION}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Current version: ${CURRENT_VERSION}"
+          echo "New version: ${NEW_VERSION}"
+
+          # Exit early if this is a dry run
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "DRY RUN: Would bump version from ${CURRENT_VERSION} to ${NEW_VERSION}"
+            exit 0
+          fi
+
+          # Update version in Chart.yaml only
+          sed -i "s/version: ${CURRENT_VERSION}/version: ${NEW_VERSION}/" helm/Chart.yaml
+
+          # Commit the version bump
+          git add helm/Chart.yaml
+          git commit -m "Bump Helm chart version to ${NEW_VERSION}"
+          git push
+
+      - name: Create Release Tag
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          NEW_VERSION="${{ steps.bump-version.outputs.new_version }}"
+          git tag -a "vllm-stack-${NEW_VERSION}" -m "Release vllm-stack-${NEW_VERSION}"
+          git push origin "vllm-stack-${NEW_VERSION}"
+
+  release-helm:
+    needs: prepare-release
+    if: ${{ github.event.inputs.dry_run != 'true' }}
+    permissions:
+      contents: write
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.7.0
+        with:
+          skip_existing: false
+          packages_with_index: true
+          charts_dir: "."
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Get PR List and Update Release
+        run: |
+          # Get the tags of the previous and the current releases
+          PREVIOUS_TAG="vllm-stack-${{ needs.prepare-release.outputs.current_version }}"
+          NEW_TAG="vllm-stack-${{ needs.prepare-release.outputs.new_version }}"
+
+          # Get the timestamp of the previous tag, fallback to epoch if tag doesn't exist
+          if git rev-parse "$PREVIOUS_TAG" >/dev/null 2>&1; then
+            PREVIOUS_TAG_DATE=$(git log -1 --format="%aI" "$PREVIOUS_TAG")
+          else
+            PREVIOUS_TAG_DATE="1970-01-01T00:00:00Z"
+          fi
+
+          # Get list of merged PRs between the previous release and current HEAD
+          PR_LIST=$(gh pr list --state merged --base main --json number,title,author,mergedAt --jq ".[] | select(.mergedAt >= \"$PREVIOUS_TAG_DATE\") | .title + \" by @\" + .author.login + \" #\" + (.number | tostring)")
+
+          # Format PR list with bullet points
+          CHANGE_LIST=$(echo "$PR_LIST" | while IFS= read -r line; do echo "* $line"; done)
+
+          # Debug: Check what we found
+          echo "Previous tag: $PREVIOUS_TAG"
+          echo "New tag: $NEW_TAG"
+          echo "Change list:"
+          echo "$CHANGE_LIST"
+
+          # Create release notes file
+          {
+            echo "The stack deployment of vLLM"
+            echo ""
+            echo "## What's Changed"
+            echo ""
+            echo "$CHANGE_LIST"
+          } > release_notes.md
+
+          # Debug: Show the release notes content
+          echo "Release notes content:"
+          cat release_notes.md
+
+          # Update the release created by chart-releaser with our commit list
+          gh release edit "$NEW_TAG" --notes-file release_notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-docker:
+    needs: prepare-release
+    if: ${{ github.event.inputs.dry_run != 'true' }}
+    permissions:
+      contents: write
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to GitHub Container Registry (GHCR)
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: lmcache
+          password: ${{ secrets.LMCACHE_DOCKER_SECRET }}
+
+      - name: Extract and sanitize version
+        id: version
+        run: |
+          pip install uv
+          raw_version=$(uv run python -c 'from vllm_router.version import __version__; print(__version__)')
+          sanitized_version=${raw_version//+/-}
+          echo "version=$sanitized_version" >> "$GITHUB_ENV"
+          echo "Sanitized version: $sanitized_version"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/router:latest
+            ghcr.io/${{ github.repository }}/router:${{ env.version }}
+            ghcr.io/${{ github.repository }}/router:${{ github.sha }}
+            lmcache/lmstack-router:latest
+            lmcache/lmstack-router:${{ env.version }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache,mode=max
