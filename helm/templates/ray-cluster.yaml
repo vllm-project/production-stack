@@ -250,7 +250,7 @@ spec:
             requiredDuringSchedulingIgnoredDuringExecution:
               nodeSelectorTerms:
               {{- with $modelSpec.nodeSelectorTerms }}
-              {{- toYaml . | nindent 12 }}
+              {{- toYaml . | nindent 14 }}
               {{- end }}
         {{- end }}
   workerGroupSpecs:
