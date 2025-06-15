@@ -266,6 +266,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--auth-token-server-url",
+        type=str,
+        default=None,
+        help="The URL of the authentication token server.",
+    )
+
+    parser.add_argument(
         "--dynamic-config-json",
         type=str,
         default=None,

@@ -56,6 +56,7 @@ from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
 from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
+from src.vllm_router.middleware.auth import AuthenticationMiddleware
 from vllm_router.routers.routing_logic import (
     get_routing_logic,
     initialize_routing_logic,
@@ -260,6 +261,16 @@ def initialize_all(app: FastAPI, args):
     app.state.request_stats_monitor = get_request_stats_monitor()
     app.state.router = get_routing_logic()
     app.state.request_rewriter = get_request_rewriter()
+
+    # Initialize authentication middleware
+    if args.auth_token_server_url:
+        app.add_middleware(
+            AuthenticationMiddleware,
+            auth_token_server_url=args.auth_token_server_url
+        )
+        logger.info(f"Authentication middleware enabled with server URL: {args.auth_token_server_url}")
+    else:
+        logger.info("Authentication middleware disabled as no --auth-token-server-url was provided.")
 
 
 app = FastAPI(lifespan=lifespan)
