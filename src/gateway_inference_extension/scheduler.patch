@@ -16,6 +16,7 @@ index b484cde..c7688a8 100644
  		scorers:             map[plugins.Scorer]int{},
 -		picker:              &picker.RandomPicker{},
 +		picker:              &picker.RoundRobinPicker{},
++       picker:              &picker.PrefixAwarePicker{},
  		postSchedulePlugins: []plugins.PostSchedule{},
  	}
 
