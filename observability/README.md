@@ -44,7 +44,7 @@ Import the dashboard using the `vllm-dashboard.json` in this folder.
 
 ## Import LMCache Dashboard
 
-If you use LMCache image in production stack, you can try the LMCache dashboard. It contains six fields showing the benefits of cpu offloading.
+If you use LMCache image in production stack, you can try the LMCache dashboard. It contains the following six fields showing the benefits of cpu offloading: Average time to first token (sec), Cache hit rate (%) in last 1 minute, LMCache retrieve speed (K Tokens / sec), Local CPU cache usage (GB), Number of requested tokens in total, and Number of hit tokens in total.
 
 ```bash
 kubectl apply -f lmcache-dashboard-cm.yaml
