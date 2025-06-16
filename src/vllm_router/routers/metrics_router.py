@@ -14,7 +14,6 @@
 
 import time
 
-import GPUtil
 import psutil
 from fastapi import APIRouter, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
@@ -34,17 +33,12 @@ from vllm_router.services.metrics_service import (
     num_requests_running,
     num_requests_swapped,
 )
-from vllm_router.stats.engine_stats import EngineStats, get_engine_stats_scraper
+from vllm_router.stats.engine_stats import get_engine_stats_scraper
 from vllm_router.stats.request_stats import get_request_stats_monitor
 
 metrics_router = APIRouter()
 
 # Define Gauges for system resource usage
-router_gpu_usage_percent = Gauge(
-    "router_gpu_usage_percent",
-    "GPU usage percent",
-    ["gpu_index"],
-)
 router_cpu_usage_percent = Gauge(
     "router_cpu_usage_percent",
     "CPU usage percent",
@@ -57,14 +51,6 @@ router_disk_usage_percent = Gauge(
     "router_disk_usage_percent",
     "Disk usage percent",
 )
-
-
-def get_gpu_utils_via_gputil():
-    """
-    Use GPUtil to fetch GPU load.
-    Returns a list of (gpu_id, load_percent) tuples.
-    """
-    return [(gpu.id, gpu.load * 100) for gpu in GPUtil.getGPUs()]
 
 
 # --- Prometheus Metrics Endpoint ---
@@ -86,10 +72,6 @@ async def metrics():
         Response: A HTTP response containing the latest Prometheus metrics in
         the appropriate content type.
     """
-
-    # Collect GPU utilization for each GPU via GPUtil
-    for gpu_id, load_pct in get_gpu_utils_via_gputil():
-        router_gpu_usage_percent.labels(gpu_index=str(gpu_id)).set(load_pct)
 
     # Collect CPU utilization (short interval)
     cpu_percent = psutil.cpu_percent(interval=0.1)
