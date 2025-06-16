@@ -26,6 +26,9 @@ from vllm_router.services.metrics_service import (
     num_prefill_requests,
     num_requests_running,
     num_requests_swapped,
+    gpu_prefix_cache_hit_rate,
+    gpu_prefix_cache_hits_total,
+    gpu_prefix_cache_queries_total,
 )
 
 logger = init_logger(__name__)
@@ -71,6 +74,13 @@ def log_stats(app: FastAPI, interval: int = 10):
                     f" Engine Stats: Running Requests: {es.num_running_requests}, "
                     f"Queued Requests: {es.num_queuing_requests}, "
                     f"GPU Cache Hit Rate: {es.gpu_prefix_cache_hit_rate:.2f}\n"
+                )
+                gpu_prefix_cache_hit_rate.labels(server=url).set(es.gpu_prefix_cache_hit_rate)
+                gpu_prefix_cache_hits_total.labels(server=url).set(
+                    es.gpu_prefix_cache_hits_total
+                )
+                gpu_prefix_cache_queries_total.labels(server=url).set(
+                    es.gpu_prefix_cache_queries_total
                 )
             else:
                 logstr += " Engine Stats: No stats available\n"
