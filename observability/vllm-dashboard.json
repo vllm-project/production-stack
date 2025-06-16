@@ -820,11 +820,15 @@
       "pluginVersion": "12.0.0+security-01",
       "targets": [
         {
+          "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "vllm:gpu_prefix_cache_hit_rate",
+          "expr": "vllm:gpu_prefix_cache_hits_total{endpoint=\"service-port\"} / vllm:gpu_prefix_cache_queries_total",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "legendFormat": "{{instance}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "title": "GPU KV Cache Hit Rate",
@@ -989,14 +993,18 @@
       "pluginVersion": "12.0.0+security-01",
       "targets": [
         {
+          "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "node_gpu_usage_query",
+          "expr": "vllm:gpu_cache_usage_perc",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "legendFormat": "GPU Usage",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
-      "title": "GPU Usage",
+      "title": "GPU Cache Usage (%)",
       "type": "timeseries"
     },
     {
@@ -1081,14 +1089,18 @@
       "pluginVersion": "12.0.0+security-01",
       "targets": [
         {
+          "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "node_cpu_usage_query",
+          "expr": "router_cpu_usage_percent",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "legendFormat": "CPU Usage",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
-      "title": "CPU Usage",
+      "title": "CPU Usage (%)",
       "type": "timeseries"
     },
     {
@@ -1173,14 +1185,18 @@
       "pluginVersion": "12.0.0+security-01",
       "targets": [
         {
+          "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "node_memory_usage_query",
+          "expr": "router_memory_usage_percent",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "legendFormat": "Memory Usage",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
-      "title": "Memory Usage",
+      "title": "Memory Usage (%)",
       "type": "timeseries"
     },
     {
@@ -1265,14 +1281,18 @@
       "pluginVersion": "12.0.0+security-01",
       "targets": [
         {
+          "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "node_disk_usage_query",
+          "expr": "router_disk_usage_percent",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "legendFormat": "Disk Usage",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
-      "title": "Disk Usage",
+      "title": "Disk Usage (%)",
       "type": "timeseries"
     }
   ],
@@ -1291,5 +1311,5 @@
   "timezone": "browser",
   "title": "vLLM Dashboard",
   "uid": "750918234",
-  "version": 4
+  "version": 8
 }
