@@ -15,6 +15,10 @@ kind: Deployment
 metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-deployment-vllm"
   namespace: {{ .Release.Namespace }}
+  {{- if hasKey $modelSpec "annotations" }}
+  annotations:
+    {{- toYaml $modelSpec.annotations | nindent 4 }}
+  {{- end }}
   labels:
     model: {{ $modelSpec.name }}
     helm-release-name: {{ .Release.Name }}
@@ -30,6 +34,10 @@ spec:
   progressDeadlineSeconds: 1200
   template:
     metadata:
+      {{- if hasKey $modelSpec "podAnnotations" }}
+      annotations:
+        {{- toYaml $modelSpec.podAnnotations | nindent 8 }}
+      {{- end }}
       labels:
         model: {{ $modelSpec.name }}
         helm-release-name: {{ .Release.Name }}
@@ -61,6 +69,9 @@ spec:
       {{- if .Values.servingEngineSpec.securityContext }}
       securityContext:
         {{- toYaml .Values.servingEngineSpec.securityContext | nindent 8 }}
+      {{- end }}
+      {{- if hasKey $modelSpec "serviceAccountName" }}
+      serviceAccountName: {{ $modelSpec.serviceAccountName }}
       {{- end }}
       {{- if and (hasKey $modelSpec "lmcacheConfig") (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
       hostIPC: true
