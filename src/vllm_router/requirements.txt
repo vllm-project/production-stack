@@ -1,10 +1,10 @@
 aiofiles==24.1.0
 fastapi==0.115.8
+GPUtil
 httpx==0.28.1
 kubernetes==32.0.0
 numpy==1.26.4
 prometheus_client==0.21.1
-psutil
 pynvml
 python-multipart==0.0.20
 sentry-sdk[fastapi,httpx]==2.27.0

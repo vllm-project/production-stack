@@ -14,8 +14,8 @@
 
 import time
 
+import GPUtil
 import psutil
-import pynvml
 from fastapi import APIRouter, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 
@@ -39,10 +39,6 @@ from vllm_router.stats.request_stats import get_request_stats_monitor
 
 metrics_router = APIRouter()
 
-# Initialize NVIDIA Management Library (NVML) and get GPU count
-pynvml.nvmlInit()
-_gpu_count = pynvml.nvmlDeviceGetCount()
-
 # Define Gauges for system resource usage
 router_gpu_usage_percent = Gauge(
     "router_gpu_usage_percent",
@@ -61,6 +57,14 @@ router_disk_usage_percent = Gauge(
     "router_disk_usage_percent",
     "Disk usage percent",
 )
+
+
+def get_gpu_utils_via_gputil():
+    """
+    Use GPUtil to fetch GPU load.
+    Returns a list of (gpu_id, load_percent) tuples.
+    """
+    return [(gpu.id, gpu.load * 100) for gpu in GPUtil.getGPUs()]
 
 
 # --- Prometheus Metrics Endpoint ---
@@ -83,29 +87,26 @@ async def metrics():
         the appropriate content type.
     """
 
-    # 1. Collect GPU utilization for each GPU
-    for i in range(_gpu_count):
-        handle = pynvml.nvmlDeviceGetHandleByIndex(i)
-        util = pynvml.nvmlDeviceGetUtilizationRates(handle)
-        router_gpu_usage_percent.labels(gpu_index=str(i)).set(util.gpu)
+    # Collect GPU utilization for each GPU via GPUtil
+    for gpu_id, load_pct in get_gpu_utils_via_gputil():
+        router_gpu_usage_percent.labels(gpu_index=str(gpu_id)).set(load_pct)
 
-    # 2. Collect CPU utilization (short interval)
+    # Collect CPU utilization (short interval)
     cpu_percent = psutil.cpu_percent(interval=0.1)
     router_cpu_usage_percent.set(cpu_percent)
 
-    # 3. Collect memory utilization
+    # Collect memory utilization
     memory_percent = psutil.virtual_memory().percent
     router_memory_usage_percent.set(memory_percent)
 
-    # 4. Collect disk utilization on root filesystem
+    # Collect disk utilization on root filesystem
     disk_percent = psutil.disk_usage("/").percent
     router_disk_usage_percent.set(disk_percent)
 
-    # 5. Existing vLLM router request statistics
+    # Existing vLLM router request statistics
     stats = get_request_stats_monitor().get_request_stats(time.time())
     for server, stat in stats.items():
         current_qps.labels(server=server).set(stat.qps)
-        # Assuming stat contains the following attributes:
         avg_decoding_length.labels(server=server).set(stat.avg_decoding_length)
         num_prefill_requests.labels(server=server).set(stat.in_prefill_requests)
         num_decoding_requests.labels(server=server).set(stat.in_decoding_requests)
@@ -116,7 +117,7 @@ async def metrics():
         avg_itl.labels(server=server).set(stat.avg_itl)
         num_requests_swapped.labels(server=server).set(stat.num_swapped_requests)
 
-    # 6. Engine statistics (GPU prefix cache metrics)
+    # Engine statistics (GPU prefix cache metrics)
     engine_stats = get_engine_stats_scraper().get_engine_stats()
     for server, engine_stat in engine_stats.items():
         gpu_prefix_cache_hit_rate.labels(server=server).set(
@@ -129,12 +130,12 @@ async def metrics():
             engine_stat.gpu_prefix_cache_queries_total
         )
 
-    # 7. Service discovery health status
+    # Service discovery health status
     endpoints = get_service_discovery().get_endpoint_info()
     for ep in endpoints:
         healthy_pods_total.labels(server=ep.url).set(
             1 if getattr(ep, "healthy", True) else 0
         )
 
-    # 8. Return all metrics in Prometheus format
+    # Return all metrics in Prometheus format
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

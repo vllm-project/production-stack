@@ -24,7 +24,7 @@ dependencies = [
     "uvicorn==0.34.0",
     "xxhash==3.5.0",
     "psutil",
-    "pynvml",
+    "GPUtil",
 ]
 
 [project.scripts]
