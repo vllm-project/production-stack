@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import time
+
 import psutil
 import pynvml
-
 from fastapi import APIRouter, Response
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from prometheus_client import Gauge
+from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.metrics_service import (
@@ -26,17 +25,17 @@ from vllm_router.services.metrics_service import (
     avg_itl,
     avg_latency,
     current_qps,
+    gpu_prefix_cache_hit_rate,
+    gpu_prefix_cache_hits_total,
+    gpu_prefix_cache_queries_total,
     healthy_pods_total,
     num_decoding_requests,
     num_prefill_requests,
     num_requests_running,
     num_requests_swapped,
-    gpu_prefix_cache_hit_rate,
-    gpu_prefix_cache_hits_total,
-    gpu_prefix_cache_queries_total
 )
+from vllm_router.stats.engine_stats import EngineStats, get_engine_stats_scraper
 from vllm_router.stats.request_stats import get_request_stats_monitor
-from vllm_router.stats.engine_stats import get_engine_stats_scraper, EngineStats
 
 metrics_router = APIRouter()
 
@@ -120,9 +119,15 @@ async def metrics():
     # 6. Engine statistics (GPU prefix cache metrics)
     engine_stats = get_engine_stats_scraper().get_engine_stats()
     for server, engine_stat in engine_stats.items():
-        gpu_prefix_cache_hit_rate.labels(server=server).set(engine_stat.gpu_prefix_cache_hit_rate)
-        gpu_prefix_cache_hits_total.labels(server=server).set(engine_stat.gpu_prefix_cache_hits_total)
-        gpu_prefix_cache_queries_total.labels(server=server).set(engine_stat.gpu_prefix_cache_queries_total)
+        gpu_prefix_cache_hit_rate.labels(server=server).set(
+            engine_stat.gpu_prefix_cache_hit_rate
+        )
+        gpu_prefix_cache_hits_total.labels(server=server).set(
+            engine_stat.gpu_prefix_cache_hits_total
+        )
+        gpu_prefix_cache_queries_total.labels(server=server).set(
+            engine_stat.gpu_prefix_cache_queries_total
+        )
 
     # 7. Service discovery health status
     endpoints = get_service_discovery().get_endpoint_info()
