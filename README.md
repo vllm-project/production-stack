@@ -131,6 +131,16 @@ We welcome and value any contributions and collaborations. Please check out [CON
 
 This project is licensed under Apache License 2.0. See the `LICENSE` file for details.
 
+## Sponsors
+
+We are grateful to our sponsors who support our development and benchmarking efforts:
+
+<p align="center">
+  <a href="https://gmicloud.ai">
+    <img src="https://cdn.prod.website-files.com/6683d8c52e4e62685a8d90cf/67a0a0064683945b0cf77f25_GMI%20Cloud%20Logo_Black.svg" alt="GMI Cloud Logo" width="200"/>
+  </a>
+</p>
+
 ---
 
 For any issues or questions, feel free to open an issue or contact us ([@ApostaC](https://github.com/ApostaC), [@YuhanLiu11](https://github.com/YuhanLiu11), [@Shaoting-Feng](https://github.com/Shaoting-Feng)).
