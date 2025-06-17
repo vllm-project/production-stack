@@ -53,12 +53,13 @@ spec:
             - name: "caserver-cport"
               containerPort: {{ .Values.cacheserverSpec.containerPort }}
           imagePullPolicy: IfNotPresent
-        # TODO(Jiayi): add health check for lmcache server
-        # livenessProbe:
-        #   initialDelaySeconds: 30
-        #   periodSeconds: 5
-        #   failureThreshold: 3
-        #   httpGet:
-        #     path: /health
-        #     port: {{ .Values.cacheserverSpec.containerPort }}
+        livenessProbe:
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 3
+          exec:
+            command:
+            - python3
+            - /workspace/LMCache/examples/kubernetes/health_probe.py
+            - {{ .Values.cacheserverSpec.containerPort }}
 {{- end -}}
