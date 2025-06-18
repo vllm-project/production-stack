@@ -27,7 +27,6 @@ spec:
     enableLoRA: true
     dtype: "bfloat16"
     maxModelLen: 4096
-    maxNumSeqs: 1024                 # duplicated for clarity
 
   # --- LoRA & cache off-loading ----------------------------------------
   lmCacheConfig:
