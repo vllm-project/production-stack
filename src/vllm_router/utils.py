@@ -14,6 +14,19 @@ from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
 
+# prepare a WAV byte to prevent repeatedly generating it
+# Generate a 0.1 second silent audio file
+_SILENT_WAV_BYTES = None
+with io.BytesIO() as wav_buffer:
+    with wave.open(wav_buffer, "wb") as wf:
+        wf.setnchannels(1)  # mono audio channel, standard configuration
+        wf.setsampwidth(2)  # 16 bit audio, common bit depth for wav file
+        wf.setframerate(16000)  # 16 kHz sample rate
+        wf.writeframes(b"\x00\x00" * 1600)  # 0.1 second of silence
+
+    # retrieves the generated wav bytes, return
+    _SILENT_WAV_BYTES = wav_buffer.getvalue()
+
 
 class SingletonMeta(type):
     _instances = {}
@@ -80,19 +93,10 @@ class ModelType(enum.Enum):
                 return {"encoding_format": "float", "text_1": "Test", "test_2": "Test2"}
             case ModelType.transcription:
                 # Generate a 0.1 second silent audio file
-                with io.BytesIO() as wav_buffer:
-                    with wave.open(wav_buffer, "wb") as wf:
-                        wf.setnchannels(1)  # mono audio channel, standard configuration
-                        wf.setsampwidth(2)  # 16 bit audio, common bit depth for wav file
-                        wf.setframerate(16000)  # 16 kHz sample rate
-                        wf.writeframes(b"\x00\x00" * 1600)  # 0.1 second of silence
-
-                    # retrieves the generated wav bytes, return
-                    wav_bytes = wav_buffer.getvalue()
-
-                return {
-                    "file": ("empty.wav", wav_bytes, "audio/wav"),
-                }
+                if _SILENT_WAV_BYTES is not None:
+                    return {
+                        "file": ("empty.wav", _SILENT_WAV_BYTES, "audio/wav"),
+                    }
 
 
     @staticmethod
