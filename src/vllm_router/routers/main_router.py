@@ -210,7 +210,8 @@ async def get_engine_instances():
 
 @main_router.get("/health")
 async def health() -> Response:
-    """Endpoint to check the health status of various components.
+    """
+    Endpoint to check the health status of various components.
 
     This function verifies the health of the service discovery module and
     the engine stats scraper. If either component is down, it returns a
@@ -247,7 +248,7 @@ async def health() -> Response:
 
 @main_router.post("/v1/audio/transcriptions")
 async def audio_transcriptions(
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
     model: str = Form(...),
     prompt: str | None = Form(None),
     response_format: str | None = Form("json"),
@@ -276,7 +277,6 @@ async def audio_transcriptions(
     # logger.debug("=========files=========")
 
     data = {
-        "model": model,
         "language": language,
     }
 
@@ -300,19 +300,11 @@ async def audio_transcriptions(
     logger.debug(endpoints)
     logger.debug("==== Total endpoints ====")
 
-    # TODO: right now is skipping label check in code for local testing
-    endpoints = [
-        ep
-        for ep in endpoints
-        if model in ep.model_names  # that actually serve your model
+    # filter the endpoints url by model name for transcriptions
+    transcription_endpoints = [
+        ep for ep in endpoints
+        if model == ep.model_name and ep.model_label == "transcription"
     ]
-
-    logger.debug("==== Discovered endpoints after filtering ====")
-    logger.debug(endpoints)
-    logger.debug("==== Discovered endpoints after filtering ====")
-
-    # filter the endpoints url for transcriptions
-    transcription_endpoints = [ep for ep in endpoints if model in ep.model_names]
 
     logger.debug("====List of transcription endpoints====")
     logger.debug(transcription_endpoints)

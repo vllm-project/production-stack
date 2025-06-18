@@ -7,6 +7,8 @@ import resource
 import requests
 from fastapi.requests import Request
 from starlette.datastructures import MutableHeaders
+import io
+import wave
 
 from vllm_router.log import init_logger
 
@@ -77,9 +79,21 @@ class ModelType(enum.Enum):
             case ModelType.score:
                 return {"encoding_format": "float", "text_1": "Test", "test_2": "Test2"}
             case ModelType.transcription:
+                # Generate a 0.1 second silent audio file
+                with io.BytesIO() as wav_buffer:
+                    with wave.open(wav_buffer, "wb") as wf:
+                        wf.setnchannels(1)  # mono audio channel, standard configuration
+                        wf.setsampwidth(2)  # 16 bit audio, common bit depth for wav file
+                        wf.setframerate(16000)  # 16 kHz sample rate
+                        wf.writeframes(b"\x00\x00" * 1600)  # 0.1 second of silence
+
+                    # retrieves the generated wav bytes, return
+                    wav_bytes = wav_buffer.getvalue()
+
                 return {
-                    "file": "",
+                    "file": ("empty.wav", wav_bytes, "audio/wav"),
                 }
+
 
     @staticmethod
     def get_all_fields():
