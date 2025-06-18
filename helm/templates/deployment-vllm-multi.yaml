@@ -87,7 +87,16 @@ spec:
               add:
                 - SYS_PTRACE
           command:
-          {{- if or (eq $modelSpec.tag "2025-05-27-v1") (eq $modelSpec.tag "2025-05-17-v1") (and (eq $modelSpec.tag "latest") (eq $modelSpec.repository "lmcache/vllm-openai")) }}
+          {{- if or
+            (eq $modelSpec.tag "2025-05-27-v1")
+            (eq $modelSpec.tag "2025-05-17-v1")
+            (eq $modelSpec.tag "latest-nightly")
+            (hasPrefix "nightly-" $modelSpec.tag)
+            (and
+              (eq $modelSpec.tag "latest")
+              (eq $modelSpec.repository "lmcache/vllm-openai")
+            )
+          }}
           - "/opt/venv/bin/vllm"
           {{- else }}
           - "vllm"
