@@ -92,7 +92,7 @@ spec:
                 {{- end }}
               {{- end }}
               {{- with $modelSpec.env }}
-              {{- toYaml . | nindent 10 }}
+              {{- toYaml . | nindent 14 }}
               {{- end }}
               {{- if $modelSpec.lmcacheConfig }}
               {{-   if $modelSpec.lmcacheConfig.enabled }}
@@ -223,7 +223,7 @@ spec:
           {{- end }}
           {{- end}}
           {{- if hasKey $modelSpec "extraVolumes" }}
-          {{- toYaml $modelSpec.extraVolumes | nindent 8 }}
+          {{- toYaml $modelSpec.extraVolumes | nindent 10 }}
           {{- end}}
         {{- end}}
         {{- if $modelSpec.imagePullSecret }}
@@ -233,7 +233,7 @@ spec:
         {{- if .Values.servingEngineSpec.tolerations }}
         {{-   with .Values.servingEngineSpec.tolerations }}
         tolerations:
-          {{-   toYaml . | nindent 8 }}
+          {{-   toYaml . | nindent 10 }}
         {{-   end }}
         {{- end }}
         {{- if .Values.servingEngineSpec.runtimeClassName }}
@@ -250,7 +250,7 @@ spec:
             requiredDuringSchedulingIgnoredDuringExecution:
               nodeSelectorTerms:
               {{- with $modelSpec.nodeSelectorTerms }}
-              {{- toYaml . | nindent 12 }}
+              {{- toYaml . | nindent 14 }}
               {{- end }}
         {{- end }}
   workerGroupSpecs:
@@ -264,7 +264,7 @@ spec:
             helm-release-name: {{ .Release.Name }}
         {{- if .Values.servingEngineSpec.securityContext }}
         securityContext:
-          {{- toYaml .Values.servingEngineSpec.securityContext | nindent 8 }}
+          {{- toYaml .Values.servingEngineSpec.securityContext | nindent 10 }}
         {{- end }}
         spec:
           containers:
@@ -322,7 +322,7 @@ spec:
                   {{- end }}
                 {{- end }}
                 {{- with $modelSpec.env }}
-                {{- toYaml . | nindent 10 }}
+                {{- toYaml . | nindent 16 }}
                 {{- end }}
                 {{- if $modelSpec.lmcacheConfig }}
                 {{-   if $modelSpec.lmcacheConfig.enabled }}
@@ -431,7 +431,7 @@ spec:
             {{- end }}
             {{- end}}
             {{- if hasKey $modelSpec "extraVolumes" }}
-            {{- toYaml $modelSpec.extraVolumes | nindent 8 }}
+            {{- toYaml $modelSpec.extraVolumes | nindent 12 }}
             {{- end}}
           {{- end}}
           {{- if $modelSpec.imagePullSecret }}
@@ -441,7 +441,7 @@ spec:
           {{- if .Values.servingEngineSpec.tolerations }}
           {{-   with .Values.servingEngineSpec.tolerations }}
           tolerations:
-            {{-   toYaml . | nindent 8 }}
+            {{-   toYaml . | nindent 12 }}
           {{-   end }}
           {{- end }}
 
@@ -459,7 +459,7 @@ spec:
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
                 {{- with $modelSpec.nodeSelectorTerms }}
-                {{- toYaml . | nindent 12 }}
+                {{- toYaml . | nindent 16 }}
                 {{- end }}
           {{- end }}
 
