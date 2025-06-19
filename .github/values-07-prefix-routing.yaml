@@ -26,8 +26,7 @@ routerSpec:
   repository: "localhost:5000/git-act-router"
   imagePullPolicy: "IfNotPresent"
   enableRouter: true
-  routingLogic: "session"
-  sessionKey: "x-user-id"
+  routingLogic: "prefixaware"
   extraArgs:
     - "--log-level"
     - "info"
