@@ -26,6 +26,7 @@ with io.BytesIO() as wav_buffer:
 
     # retrieves the generated wav bytes, return
     _SILENT_WAV_BYTES = wav_buffer.getvalue()
+    logger.debug("======A default silent WAV file has been stored in memory within py application process====")
 
 
 class SingletonMeta(type):
@@ -94,6 +95,7 @@ class ModelType(enum.Enum):
             case ModelType.transcription:
                 # Generate a 0.1 second silent audio file
                 if _SILENT_WAV_BYTES is not None:
+                    logger.debug("=====Slient WAV Bytes is being used=====")
                     return {
                         "file": ("empty.wav", _SILENT_WAV_BYTES, "audio/wav"),
                     }
