@@ -83,7 +83,7 @@
                 "type": "string"
               },
               "requestGPU": {
-                "type": "integer"
+                "type": "number"
               },
               "requestGPUType": {
                 "type": "string"
@@ -229,11 +229,24 @@
                     },
                     "value": {
                       "type": "string"
+                    },
+                    "valueFrom": {
+                      "type": "object"
                     }
                   },
-                  "required": [
-                    "name",
-                    "value"
+                  "anyOf": [
+                    {
+                      "required": [
+                        "name",
+                        "value"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "name",
+                        "valueFrom"
+                      ]
+                    }
                   ]
                 }
               },
@@ -282,8 +295,7 @@
               "replicaCount",
               "requestCPU",
               "requestMemory",
-              "requestGPU",
-              "pvcStorage"
+              "requestGPU"
             ]
           }
         },
