@@ -12,9 +12,8 @@ import time
 import uuid
 from typing import Final
 
-from fastapi import FastAPI, Request, Response
-from starlette.responses import StreamingResponse
-
+from fastapi import FastAPI, Request
+from fastapi.responses import Response, StreamingResponse
 from vllm.entrypoints.openai.protocol import (
     ChatCompletionRequest,
     ChatCompletionResponseStreamChoice,
@@ -22,7 +21,6 @@ from vllm.entrypoints.openai.protocol import (
     DeltaMessage,
     UsageInfo,
 )
-
 
 app = FastAPI()
 GLOBAL_ARGS = None
