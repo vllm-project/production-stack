@@ -38,14 +38,14 @@ Installation
 
    - **Namespace Creation**: Creates a namespace called ``production-stack-system`` where the operator will run
    - **Custom Resource Definitions (CRDs)**: Defines 4 new custom resources that can be managed by this operator:
-     
+
      - ``CacheServer``: For managing cache servers
      - ``LoraAdapter``: For managing LoRA adapters (used for model fine-tuning)
      - ``VLLMRouter``: For managing vLLM routing
      - ``VLLMRuntime``: For managing vLLM runtime instances
 
    - **RBAC (Role-Based Access Control)**: Creates various roles and role bindings to control access to these resources with permissions for:
-     
+
      - Admin roles (full access)
      - Editor roles (create/update/delete)
      - Viewer roles (read-only)
@@ -358,4 +358,4 @@ Uninstall
 
    You should see no results from these commands, indicating successful cleanup.
 
-Happy deploying! 🚀 
+Happy deploying! 🚀
