@@ -9,6 +9,5 @@ Test text
     :maxdepth: 1
     :caption: User Manual
 
-    router_crd.rst
     json.rst
     cmd.rst

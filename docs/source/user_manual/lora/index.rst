@@ -9,5 +9,4 @@ Test text
     :maxdepth: 1
     :caption: User Manual
 
-    lora_crd.rst
     manual.rst
