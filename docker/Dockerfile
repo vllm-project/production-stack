@@ -19,6 +19,7 @@ ARG INSTALL_OPTIONAL_DEP=semantic_cache,lmcache
 ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
 
 # Install dependencies (use cache, and delete after install, to speed up the build)
+ENV NO_CUDA_EXT=1
 RUN pip install --upgrade --no-cache-dir pip setuptools_scm && \
     pip install --no-cache-dir .[$INSTALL_OPTIONAL_DEP]
 
