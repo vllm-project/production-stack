@@ -29,7 +29,7 @@ def response_consumer(response_stream, start_time):
     response_len = len(final_words.split(" "))
     throughput = response_len / (end_time - start_time)
     print(
-        f"Process {os.getpid()} got a response of: {response_len} words in {end_time-start_time:.2f} seconds (throughput: {throughput:.2f} w/s, ttft: {token_time - start_time:.4f}) at {end_time}"
+        f"Process {os.getpid()} got a response of: {response_len} words in {end_time - start_time:.2f} seconds (throughput: {throughput:.2f} w/s, ttft: {token_time - start_time:.4f}) at {end_time}"
     )
 
 
