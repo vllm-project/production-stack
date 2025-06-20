@@ -95,11 +95,23 @@ prometheus:
   additionalServiceMonitors:
     - name: "vllm-monitor"
       selector:
-        matchLabels:
-          app.kubernetes.io/managed-by: Helm
-          environment: test
-          release: test
+        matchExpressions:
+          - key: app.kubernetes.io/managed-by
+            operator: In
+            values:
+              - Helm
+          - key: environment
+            operator: In
+            values:
+              - test
+              - router
+          - key: release
+            operator: In
+            values:
+              - test
+              - router
       namespaceSelector:
         any: true
       endpoints:
         - port: "service-port"
+        - port: "router-sport"

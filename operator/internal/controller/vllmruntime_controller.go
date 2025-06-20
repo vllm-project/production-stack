@@ -125,7 +125,7 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Update the deployment if needed
-	if r.deploymentNeedsUpdate(found, vllmRuntime) {
+	if r.deploymentNeedsUpdate(ctx, found, vllmRuntime) {
 		log.Info("Updating Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
 		// Create new deployment spec
 		newDep := r.deploymentForVLLMRuntime(vllmRuntime)
@@ -154,14 +154,44 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 		"app": vllmRuntime.Name,
 	}
 
+	// Define probes
+	readinessProbe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path:   "/health",
+				Port:   intstr.FromInt(int(vllmRuntime.Spec.VLLMConfig.Port)),
+				Scheme: corev1.URISchemeHTTP,
+			},
+		},
+		InitialDelaySeconds: 30,
+		PeriodSeconds:       20,
+		TimeoutSeconds:      5,
+		SuccessThreshold:    1,
+		FailureThreshold:    10,
+	}
+
+	livenessProbe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path:   "/health",
+				Port:   intstr.FromInt(int(vllmRuntime.Spec.VLLMConfig.Port)),
+				Scheme: corev1.URISchemeHTTP,
+			},
+		},
+		InitialDelaySeconds: 240,
+		PeriodSeconds:       10,
+		TimeoutSeconds:      3,
+		SuccessThreshold:    1,
+		FailureThreshold:    3,
+	}
+
 	// Build command line arguments
 	args := []string{
-		"--model",
 		vllmRuntime.Spec.Model.ModelURL,
 		"--host",
 		"0.0.0.0",
 		"--port",
-		fmt.Sprintf("%d", vllmRuntime.Spec.Port),
+		fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.Port),
 	}
 
 	if vllmRuntime.Spec.Model.EnableLoRA {
@@ -176,13 +206,13 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 		args = append(args, "--tool-call-parser", vllmRuntime.Spec.Model.ToolCallParser)
 	}
 
-	if vllmRuntime.Spec.EnableChunkedPrefill {
+	if vllmRuntime.Spec.VLLMConfig.EnableChunkedPrefill {
 		args = append(args, "--enable-chunked-prefill")
 	} else {
 		args = append(args, "--no-enable-chunked-prefill")
 	}
 
-	if vllmRuntime.Spec.EnablePrefixCaching {
+	if vllmRuntime.Spec.VLLMConfig.EnablePrefixCaching {
 		args = append(args, "--enable-prefix-caching")
 	} else {
 		args = append(args, "--no-enable-prefix-caching")
@@ -196,29 +226,29 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 		args = append(args, "--dtype", vllmRuntime.Spec.Model.DType)
 	}
 
-	if vllmRuntime.Spec.TensorParallelSize > 0 {
-		args = append(args, "--tensor-parallel-size", fmt.Sprintf("%d", vllmRuntime.Spec.TensorParallelSize))
+	if vllmRuntime.Spec.VLLMConfig.TensorParallelSize > 0 {
+		args = append(args, "--tensor-parallel-size", fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.TensorParallelSize))
 	}
 
 	if vllmRuntime.Spec.Model.MaxNumSeqs > 0 {
 		args = append(args, "--max-num-seqs", fmt.Sprintf("%d", vllmRuntime.Spec.Model.MaxNumSeqs))
 	}
 
-	if vllmRuntime.Spec.GpuMemoryUtilization != "" {
-		args = append(args, "--gpu_memory_utilization", vllmRuntime.Spec.GpuMemoryUtilization)
+	if vllmRuntime.Spec.VLLMConfig.GpuMemoryUtilization != "" {
+		args = append(args, "--gpu_memory_utilization", vllmRuntime.Spec.VLLMConfig.GpuMemoryUtilization)
 	}
 
-	if vllmRuntime.Spec.MaxLoras > 0 {
-		args = append(args, "--max_loras", fmt.Sprintf("%d", vllmRuntime.Spec.MaxLoras))
+	if vllmRuntime.Spec.VLLMConfig.MaxLoras > 0 {
+		args = append(args, "--max_loras", fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.MaxLoras))
 	}
 
-	if vllmRuntime.Spec.ExtraArgs != nil {
-		args = append(args, vllmRuntime.Spec.ExtraArgs...)
+	if vllmRuntime.Spec.VLLMConfig.ExtraArgs != nil {
+		args = append(args, vllmRuntime.Spec.VLLMConfig.ExtraArgs...)
 	}
 
 	// Build environment variables
 	env := []corev1.EnvVar{}
-	if vllmRuntime.Spec.V1 {
+	if vllmRuntime.Spec.VLLMConfig.V1 {
 		env = append(env, corev1.EnvVar{
 			Name:  "VLLM_USE_V1",
 			Value: "1",
@@ -249,7 +279,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 
 		// Add KV transfer config based on V1 flag
 		var lmcache_config string
-		if vllmRuntime.Spec.V1 {
+		if vllmRuntime.Spec.VLLMConfig.V1 {
 			lmcache_config = `{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}`
 		} else {
 			lmcache_config = `{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}`
@@ -297,8 +327,8 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 	}
 
 	// Add user-defined environment variables
-	if vllmRuntime.Spec.Env != nil {
-		for _, e := range vllmRuntime.Spec.Env {
+	if vllmRuntime.Spec.VLLMConfig.Env != nil {
+		for _, e := range vllmRuntime.Spec.VLLMConfig.Env {
 			env = append(env, corev1.EnvVar{
 				Name:  e.Name,
 				Value: e.Value,
@@ -312,47 +342,47 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 		Limits:   corev1.ResourceList{},
 	}
 
-	if vllmRuntime.Spec.Resources.CPU != "" {
-		resources.Requests[corev1.ResourceCPU] = resource.MustParse(vllmRuntime.Spec.Resources.CPU)
-		resources.Limits[corev1.ResourceCPU] = resource.MustParse(vllmRuntime.Spec.Resources.CPU)
+	if vllmRuntime.Spec.DeploymentConfig.Resources.CPU != "" {
+		resources.Requests[corev1.ResourceCPU] = resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.CPU)
+		resources.Limits[corev1.ResourceCPU] = resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.CPU)
 	}
 
-	if vllmRuntime.Spec.Resources.Memory != "" {
-		resources.Requests[corev1.ResourceMemory] = resource.MustParse(vllmRuntime.Spec.Resources.Memory)
-		resources.Limits[corev1.ResourceMemory] = resource.MustParse(vllmRuntime.Spec.Resources.Memory)
+	if vllmRuntime.Spec.DeploymentConfig.Resources.Memory != "" {
+		resources.Requests[corev1.ResourceMemory] = resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.Memory)
+		resources.Limits[corev1.ResourceMemory] = resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.Memory)
 	}
 
-	if vllmRuntime.Spec.Resources.GPU != "" {
+	if vllmRuntime.Spec.DeploymentConfig.Resources.GPU != "" {
 		// Parse GPU resource as a decimal value
-		gpuResource := resource.MustParse(vllmRuntime.Spec.Resources.GPU)
+		gpuResource := resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.GPU)
 		resources.Requests["nvidia.com/gpu"] = gpuResource
 		resources.Limits["nvidia.com/gpu"] = gpuResource
 	}
 
 	// Get the image from Image spec or use default
-	image := vllmRuntime.Spec.Image.Registry + "/" + vllmRuntime.Spec.Image.Name
+	image := vllmRuntime.Spec.DeploymentConfig.Image.Registry + "/" + vllmRuntime.Spec.DeploymentConfig.Image.Name
 
 	// Get the image pull policy
 	imagePullPolicy := corev1.PullIfNotPresent
-	if vllmRuntime.Spec.Image.PullPolicy != "" {
-		imagePullPolicy = corev1.PullPolicy(vllmRuntime.Spec.Image.PullPolicy)
+	if vllmRuntime.Spec.DeploymentConfig.Image.PullPolicy != "" {
+		imagePullPolicy = corev1.PullPolicy(vllmRuntime.Spec.DeploymentConfig.Image.PullPolicy)
 	}
 
 	// Build image pull secrets
 	var imagePullSecrets []corev1.LocalObjectReference
-	if vllmRuntime.Spec.Image.PullSecretName != "" {
+	if vllmRuntime.Spec.DeploymentConfig.Image.PullSecretName != "" {
 		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{
-			Name: vllmRuntime.Spec.Image.PullSecretName,
+			Name: vllmRuntime.Spec.DeploymentConfig.Image.PullSecretName,
 		})
 	}
 
-	if vllmRuntime.Spec.HFTokenSecret.Name != "" {
+	if vllmRuntime.Spec.Model.HFTokenSecret.Name != "" {
 		env = append(env, corev1.EnvVar{
 			Name: "HF_TOKEN",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: vllmRuntime.Spec.HFTokenSecret,
-					Key:                  vllmRuntime.Spec.HFTokenName,
+					LocalObjectReference: vllmRuntime.Spec.Model.HFTokenSecret,
+					Key:                  vllmRuntime.Spec.Model.HFTokenName,
 				},
 			},
 		})
@@ -364,9 +394,9 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 			Namespace: vllmRuntime.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &vllmRuntime.Spec.Replicas,
+			Replicas: &vllmRuntime.Spec.DeploymentConfig.Replicas,
 			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.DeploymentStrategyType(vllmRuntime.Spec.DeployStrategy),
+				Type: appsv1.DeploymentStrategyType(vllmRuntime.Spec.DeploymentConfig.DeployStrategy),
 			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
@@ -382,44 +412,18 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 							Name:            "vllm",
 							Image:           image,
 							ImagePullPolicy: imagePullPolicy,
-							Command:         []string{"python3", "-m", "vllm.entrypoints.openai.api_server"},
+							Command:         []string{"/opt/venv/bin/vllm", "serve"},
 							Args:            args,
 							Env:             env,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",
-									ContainerPort: vllmRuntime.Spec.Port,
+									ContainerPort: vllmRuntime.Spec.VLLMConfig.Port,
 								},
 							},
-							Resources: resources,
-							ReadinessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path:   "/health",
-										Port:   intstr.FromInt32(vllmRuntime.Spec.Port),
-										Scheme: corev1.URISchemeHTTP,
-									},
-								},
-								InitialDelaySeconds: 30,
-								PeriodSeconds:       20,
-								TimeoutSeconds:      5,
-								SuccessThreshold:    1,
-								FailureThreshold:    10,
-							},
-							LivenessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path:   "/health",
-										Port:   intstr.FromInt32(vllmRuntime.Spec.Port),
-										Scheme: corev1.URISchemeHTTP,
-									},
-								},
-								InitialDelaySeconds: 240,
-								PeriodSeconds:       10,
-								TimeoutSeconds:      3,
-								SuccessThreshold:    1,
-								FailureThreshold:    3,
-							},
+							Resources:      resources,
+							ReadinessProbe: readinessProbe,
+							LivenessProbe:  livenessProbe,
 						},
 					},
 				},
@@ -433,7 +437,9 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 }
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
-func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr *productionstackv1alpha1.VLLMRuntime) bool {
+func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(ctx context.Context, dep *appsv1.Deployment, vr *productionstackv1alpha1.VLLMRuntime) bool {
+
+	log := log.FromContext(ctx)
 	// Generate the expected deployment
 	expectedDep := r.deploymentForVLLMRuntime(vr)
 
@@ -442,21 +448,24 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr
 	actualModelURL := ""
 	// For vllm serve, the model URL is the first argument after the command
 	if len(dep.Spec.Template.Spec.Containers[0].Args) > 0 {
-		actualModelURL = dep.Spec.Template.Spec.Containers[0].Args[1]
+		actualModelURL = dep.Spec.Template.Spec.Containers[0].Args[0]
 	}
 	if expectedModelURL != actualModelURL {
+		log.Info("Model URL mismatch", "expected", expectedModelURL, "actual", actualModelURL)
 		return true
 	}
 
 	// Compare port
-	expectedPort := vr.Spec.Port
+	expectedPort := vr.Spec.VLLMConfig.Port
 	actualPort := dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort
 	if expectedPort != actualPort {
+		log.Info("Port mismatch", "expected", expectedPort, "actual", actualPort)
 		return true
 	}
 
 	// Compare image
 	if expectedDep.Spec.Template.Spec.Containers[0].Image != dep.Spec.Template.Spec.Containers[0].Image {
+		log.Info("Image mismatch", "expected", expectedDep.Spec.Template.Spec.Containers[0].Image, "actual", dep.Spec.Template.Spec.Containers[0].Image)
 		return true
 	}
 
@@ -464,6 +473,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr
 	expectedResources := expectedDep.Spec.Template.Spec.Containers[0].Resources
 	actualResources := dep.Spec.Template.Spec.Containers[0].Resources
 	if !reflect.DeepEqual(expectedResources, actualResources) {
+		log.Info("Resources mismatch", "expected", expectedResources, "actual", actualResources)
 		return true
 	}
 
@@ -499,6 +509,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, vr
 		expectedLMCacheConfig.DiskOffloadingBufferSize != actualDiskOffloadingBufferSize ||
 		expectedLMCacheConfig.RemoteURL != actualRemoteURL ||
 		expectedLMCacheConfig.RemoteSerde != actualRemoteSerde {
+		log.Info("LM Cache configuration mismatch", "expected", expectedLMCacheConfig, "actual", actualLMCacheConfig)
 		return true
 	}
 
@@ -551,7 +562,7 @@ func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *productionsta
 				{
 					Name:       "http",
 					Port:       80,
-					TargetPort: intstr.FromInt32(vllmRuntime.Spec.Port),
+					TargetPort: intstr.FromInt32(vllmRuntime.Spec.VLLMConfig.Port),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},
@@ -566,7 +577,7 @@ func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *productionsta
 // serviceNeedsUpdate checks if the service needs to be updated
 func (r *VLLMRuntimeReconciler) serviceNeedsUpdate(svc *corev1.Service, vr *productionstackv1alpha1.VLLMRuntime) bool {
 	// Compare target port
-	expectedTargetPort := int(vr.Spec.Port)
+	expectedTargetPort := int(vr.Spec.VLLMConfig.Port)
 	actualTargetPort := svc.Spec.Ports[0].TargetPort.IntValue()
 	if expectedTargetPort != actualTargetPort {
 		return true

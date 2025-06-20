@@ -22,6 +22,9 @@ from vllm_router.services.metrics_service import (
     avg_itl,
     avg_latency,
     current_qps,
+    gpu_prefix_cache_hit_rate,
+    gpu_prefix_cache_hits_total,
+    gpu_prefix_cache_queries_total,
     num_decoding_requests,
     num_prefill_requests,
     num_requests_running,
@@ -60,18 +63,26 @@ def log_stats(app: FastAPI, interval: int = 10):
                 logstr += "Models:\n"
                 for model_id, model_info in endpoint.model_info.items():
                     logstr += f"  - {model_id}"
-                    if model_info.get("parent"):
-                        logstr += f" (adapter for {model_info['parent']})"
+                    if model_info.parent:
+                        logstr += f" (adapter for {model_info.parent})"
                     logstr += "\n"
             else:
                 logstr += "Models: No model information available\n"
-
             if url in engine_stats:
                 es = engine_stats[url]
                 logstr += (
                     f" Engine Stats: Running Requests: {es.num_running_requests}, "
                     f"Queued Requests: {es.num_queuing_requests}, "
                     f"GPU Cache Hit Rate: {es.gpu_prefix_cache_hit_rate:.2f}\n"
+                )
+                gpu_prefix_cache_hit_rate.labels(server=url).set(
+                    es.gpu_prefix_cache_hit_rate
+                )
+                gpu_prefix_cache_hits_total.labels(server=url).set(
+                    es.gpu_prefix_cache_hits_total
+                )
+                gpu_prefix_cache_queries_total.labels(server=url).set(
+                    es.gpu_prefix_cache_queries_total
                 )
             else:
                 logstr += " Engine Stats: No stats available\n"
