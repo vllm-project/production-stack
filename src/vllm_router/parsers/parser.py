@@ -320,6 +320,13 @@ def parse_args():
         help="The model labels of decode backends, separated by commas. E.g., model1,model2",
     )
 
+    parser.add_argument(
+        "--kv-aware-threshold",
+        type=int,
+        default=2000,
+        help="The threshold for kv-aware routing.",
+    )
+
     args = parser.parse_args()
     args = load_initial_config_from_config_json_if_required(parser, args)
 

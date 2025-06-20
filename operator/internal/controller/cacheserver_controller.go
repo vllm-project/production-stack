@@ -235,12 +235,14 @@ func (r *CacheServerReconciler) updateStatus(ctx context.Context, cs *production
 		latestCS.Status.LastUpdated = metav1.Now()
 
 		// Update status based on deployment status
-		if dep.Status.AvailableReplicas > 0 {
+		if dep.Status.AvailableReplicas == *dep.Spec.Replicas && dep.Status.UnavailableReplicas == 0 {
 			latestCS.Status.Status = "Ready"
-		} else if dep.Status.UpdatedReplicas > 0 {
+		} else if dep.Status.UpdatedReplicas > 0 && dep.Status.AvailableReplicas != *dep.Spec.Replicas && dep.Status.UnavailableReplicas > 0 {
 			latestCS.Status.Status = "Updating"
-		} else {
+		} else if dep.Status.UnavailableReplicas > 0 {
 			latestCS.Status.Status = "NotReady"
+		} else {
+			latestCS.Status.Status = "Unknown"
 		}
 
 		return r.Status().Update(ctx, latestCS)
@@ -265,7 +267,7 @@ func (r *CacheServerReconciler) serviceForCacheServer(cacheServer *productionsta
 				{
 					Name:       "http",
 					Port:       80,
-					TargetPort: intstr.FromInt(int(cacheServer.Spec.Port)),
+					TargetPort: intstr.FromInt32(cacheServer.Spec.Port),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},

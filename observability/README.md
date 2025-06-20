@@ -38,9 +38,19 @@ Forward the Prometheus dashboard
 kubectl --namespace monitoring port-forward prometheus-kube-prom-stack-kube-prome-prometheus-0 9090:9090
 ```
 
-Open the webpage at `http://<IP of your node>:3000` to access the Grafana web page. The default user name is `admin` and the password can be configured in `values.yaml` (default is `prom-operator`).
+Open the webpage at `http://<IP of your node>:3000` to access the Grafana web page. The default user name is `admin` and the password can be configured in `kube-prom-stack.yaml` field `adminPassword` (default is `prom-operator`).
 
 Import the dashboard using the `vllm-dashboard.json` in this folder.
+
+## Import LMCache Dashboard
+
+If you use LMCache image in production stack, you can try the LMCache dashboard. It contains the following six fields showing the benefits of cpu offloading: Average time to first token (sec), Cache hit rate (%) in last 1 minute, LMCache retrieve speed (K Tokens / sec), Local CPU cache usage (GB), Number of requested tokens in total, and Number of hit tokens in total.
+
+```bash
+kubectl apply -f lmcache-dashboard-cm.yaml
+kubectl -n monitoring rollout restart deployment kube-prom-stack-grafana
+kubectl --namespace monitoring port-forward svc/kube-prom-stack-grafana 3000:80 --address 0.0.0.0
+```
 
 ## Use Prometheus Adapter to export vLLM metrics
 

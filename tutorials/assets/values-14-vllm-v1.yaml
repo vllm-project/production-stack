@@ -16,8 +16,7 @@ servingEngineSpec:
       - ReadWriteOnce
 
     vllmConfig:
-      enableChunkedPrefill: false
-      enablePrefixCaching: false
+      enablePrefixCaching: true
       maxModelLen: 4096
       dtype: "bfloat16"
       v1: 1

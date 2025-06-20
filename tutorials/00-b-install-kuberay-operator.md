@@ -60,10 +60,10 @@ Before you begin, ensure the following:
 ### Step 2: Verify the KubeRay Configuration
 
 1. **Check the Operator Pod Status:**
-   - Ensure that the KubeRay operator pod is running in the default namespace:
+   - Ensure that the KubeRay operator pod is running:
 
      ```bash
-     kubectl get pods
+     kubectl get pods -A | grep kuberay-operator
      ```
 
 2. **Expected Output:**

@@ -16,6 +16,7 @@ servingEngineSpec:
       enableChunkedPrefill: false
       enablePrefixCaching: false
       maxModelLen: 16384
+      v1: 1
 
     lmcacheConfig:
       enabled: true

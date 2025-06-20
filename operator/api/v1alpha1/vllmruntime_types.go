@@ -24,11 +24,41 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// DeploymentConfig defines the deployment configuration
+type DeploymentConfig struct {
+	// Replicas
+	// +kubebuilder:default=1
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// Deploy strategy
+	// +kubebuilder:validation:Enum=RollingUpdate;Recreate
+	// +kubebuilder:default=RollingUpdate
+	DeployStrategy string `json:"deploymentStrategy,omitempty"`
+
+	// Resource requirements
+	Resources ResourceRequirements `json:"resources"`
+
+	// Image configuration
+	Image ImageSpec `json:"image"`
+}
+
 // VLLMRuntimeSpec defines the desired state of VLLMRuntime
 type VLLMRuntimeSpec struct {
 	// Model configuration
 	Model ModelSpec `json:"model"`
 
+	// vLLM server configuration
+	VLLMConfig VLLMConfig `json:"vllmConfig"`
+
+	// LM Cache configuration
+	LMCacheConfig LMCacheConfig `json:"lmCacheConfig,omitempty"`
+
+	// Deployment configuration
+	DeploymentConfig DeploymentConfig `json:"deploymentConfig"`
+}
+
+// VLLMConfig defines the vLLM server configuration
+type VLLMConfig struct {
 	// Enable chunked prefill
 	EnableChunkedPrefill bool `json:"enableChunkedPrefill,omitempty"`
 
@@ -44,9 +74,6 @@ type VLLMRuntimeSpec struct {
 	// Maximum number of LoRAs
 	MaxLoras int32 `json:"maxLoras,omitempty"`
 
-	// LM Cache configuration
-	LMCacheConfig LMCacheConfig `json:"lmCacheConfig,omitempty"`
-
 	// Extra arguments for vllm serve
 	ExtraArgs []string `json:"extraArgs,omitempty"`
 
@@ -59,33 +86,18 @@ type VLLMRuntimeSpec struct {
 
 	// Environment variables
 	Env []EnvVar `json:"env,omitempty"`
-
-	// Resource requirements
-	Resources ResourceRequirements `json:"resources"`
-
-	// Image configuration
-	Image ImageSpec `json:"image"`
-
-	// HuggingFace token secret
-	HFTokenSecret corev1.LocalObjectReference `json:"hfTokenSecret,omitempty"`
-	// +kubebuilder:default=token
-	// +kubebuilder:validation:RequiredWhen=HFTokenSecret.Name!=""
-	HFTokenName string `json:"hfTokenName,omitempty"`
-
-	// Replicas
-	// +kubebuilder:default=1
-	Replicas int32 `json:"replicas,omitempty"`
-
-	// Deploy strategy
-	// +kubebuilder:validation:Enum=RollingUpdate;Recreate
-	// +kubebuilder:default=RollingUpdate
-	DeployStrategy string `json:"deploymentStrategy,omitempty"`
 }
 
 // ModelSpec defines the model configuration
 type ModelSpec struct {
 	// Model URL
 	ModelURL string `json:"modelURL"`
+
+	// HuggingFace token secret
+	HFTokenSecret corev1.LocalObjectReference `json:"hfTokenSecret,omitempty"`
+	// +kubebuilder:default=token
+	// +kubebuilder:validation:RequiredWhen=HFTokenSecret.Name!=""
+	HFTokenName string `json:"hfTokenName,omitempty"`
 
 	// Enable LoRA
 	EnableLoRA bool `json:"enableLoRA,omitempty"`
