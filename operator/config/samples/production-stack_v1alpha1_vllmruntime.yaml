@@ -55,7 +55,7 @@ spec:
     # Image configuration
     image:
       registry: "docker.io"
-      name: "lmcache/vllm-openai:2025-04-18"
+      name: "lmcache/vllm-openai:2025-05-27-v1"
       pullPolicy: "IfNotPresent"
       pullSecretName: ""
 
