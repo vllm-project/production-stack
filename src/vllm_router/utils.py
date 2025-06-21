@@ -4,8 +4,8 @@ import json
 import re
 import resource
 
-import requests
 from fastapi.requests import Request
+import requests
 from starlette.datastructures import MutableHeaders
 import io
 import wave
@@ -184,14 +184,40 @@ def update_content_length(request: Request, request_body: str):
 
 def is_model_healthy(url: str, model: str, model_type: str) -> bool:
     model_details = ModelType[model_type]
+    
     try:
-        response = requests.post(
-            f"{url}{model_details.value}",
-            headers={"Content-Type": "application/json"},
-            json={"model": model} | model_details.get_test_payload(model_type),
-            timeout=30,
-        )
-    except Exception as e:
-        logger.error(e)
+        if model_type == "transcription":
+
+            # for transcription, the backend expects multipart/form-data with a file
+            # we will use pre-generated silent wav bytes
+            files = {
+                "file": ("empty.wav", _SILENT_WAV_BYTES, "audio/wav")
+            }
+            data = {"model":model}
+            response = requests.post(
+                f"{url}{model_details.value}",
+                files=files,  # multipart/form-data
+                data=data
+            )
+        else:
+            # for other model types (chat, completion, etc.)
+            response = requests.post(
+                f"{url}{model_details.value}",
+                headers={"Content-Type": "application/json"},
+                json={"model":model} | model_details.get_test_payload(model_type)
+            )
+
+        response.raise_for_status()
+
+        if model_type == "transcription":
+            return True
+        else:
+            response.json()  # verify it's valid json for other model types
+
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"{model_type} model {model} at {url} not healthy: {e}")
         return False
-    return response.status_code == 200
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to decode JSON from {model_type} model {model} at {url}: {e}")
+        return False
