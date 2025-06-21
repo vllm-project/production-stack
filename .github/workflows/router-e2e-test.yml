@@ -209,7 +209,13 @@ jobs:
     needs: e2e-test
     if: github.event.pull_request.draft == false
     env:
-      LOG_DIR: /tmp/debug-logs-${{ github.event.pull_request.number || 'main' }}
+      LOG_DIR: /tmp/static-discovery-${{ github.event.pull_request.number || 'main' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        strategy: [roundrobin, kvaware]
+
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -231,9 +237,9 @@ jobs:
       - name: Start 2 vLLM serve backends
         run: |
           echo "🚀 Starting vLLM serve backend"
-          mkdir -p "$LOG_DIR"
-          CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 > "$LOG_DIR/backend1.log" 2>&1 &
-          CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 > "$LOG_DIR/backend2.log" 2>&1 &
+          mkdir -p "$LOG_DIR/${{ matrix.strategy }}"
+          CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/${{ matrix.strategy }}/backend1.log" 2>&1 &
+          CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/${{ matrix.strategy }}/backend2.log" 2>&1 &
           sleep 3
 
       - name: Wait for backends to be ready
@@ -258,7 +264,7 @@ jobs:
             --log-stats-interval 10 \
             --engine-stats-interval 10 \
             --request-stats-window 10 \
-            --routing-logic roundrobin > "$LOG_DIR/router.log" 2>&1 &
+            --routing-logic ${{ matrix.strategy }} > "$LOG_DIR/${{ matrix.strategy }}/router.log" 2>&1 &
           ROUTER_PID=$!
           echo "Router started with PID: $ROUTER_PID"
           # Check if router is running
@@ -271,17 +277,21 @@ jobs:
       - name: Run static discovery E2E test
         run: |
           echo "🧪 Running static discovery test"
-          python3 tests/e2e/test-static-discovery.py --num-requests 20 --verbose --log-file-path "$LOG_DIR/router.log" --router-url http://localhost:30080
+          python3 tests/e2e/test-static-discovery.py --num-requests 20 \
+            --verbose \
+            --log-file-path "$LOG_DIR/${{ matrix.strategy }}/router.log" \
+            --router-url http://localhost:30080 \
+            --routing-logic ${{ matrix.strategy }} \
+            --result-dir "$LOG_DIR/${{ matrix.strategy }}"
         timeout-minutes: 5
 
       - name: Archive static discovery test results and logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: static-discovery-test-results-pr-${{ github.event.pull_request.number || 'main' }}
+          name: static-discovery-${{ matrix.strategy }}-test-results-pr-${{ github.event.pull_request.number || 'main' }}
           path: |
-            /tmp/static-discovery-results-*
-            $LOG_DIR/
+            $LOG_DIR/${{ matrix.strategy }}/
 
       - name: Cleanup processes
         if: always()
@@ -289,5 +299,6 @@ jobs:
           echo "🧹 Cleaning up processes"
           pkill -f "vllm serve"
           pkill -f "python3 -m src.vllm_router.app"
+          rm -rf "$LOG_DIR"
 
       - run: echo "🍏 Static discovery e2e test job status is ${{ job.status }}."
