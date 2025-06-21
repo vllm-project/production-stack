@@ -78,7 +78,7 @@ def test_route_request_with_dynamic_endpoints():
     request = Request(headers={"session_id": "abc123"})
 
     router = SessionRouter(session_key="session_id")
-    url1 = router.route_request(endpoints, None, request_stats, request)
+    router.route_request(endpoints, None, request_stats, request)
 
     # Add a new endpoint
     endpoints.append(EndpointInfo(url="http://engine3.com"))

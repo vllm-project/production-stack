@@ -10,34 +10,15 @@ import argparse
 import asyncio
 import time
 import uuid
-from typing import AsyncGenerator, AsyncIterator, Callable, Dict, Final, List, Optional
+from typing import Final
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response, StreamingResponse
-from vllm.entrypoints.chat_utils import (
-    ChatTemplateContentFormatOption,
-    ConversationMessage,
-)
-from vllm.entrypoints.logger import RequestLogger
+from fastapi import FastAPI, Request
+from fastapi.responses import Response, StreamingResponse
 from vllm.entrypoints.openai.protocol import (
-    ChatCompletionLogProb,
-    ChatCompletionLogProbs,
-    ChatCompletionLogProbsContent,
-    ChatCompletionNamedToolChoiceParam,
     ChatCompletionRequest,
-    ChatCompletionResponse,
-    ChatCompletionResponseChoice,
     ChatCompletionResponseStreamChoice,
     ChatCompletionStreamResponse,
-    ChatMessage,
-    DeltaFunctionCall,
     DeltaMessage,
-    DeltaToolCall,
-    ErrorResponse,
-    FunctionCall,
-    PromptTokenUsageInfo,
-    RequestResponseMetadata,
-    ToolCall,
     UsageInfo,
 )
 

@@ -37,6 +37,11 @@ repos:
     rev: "6.0.0"
     hooks:
       - id: isort
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.0
+    hooks:
+      - id: ruff
+        files: ^src/tests/
   # TODO: Enable this hook when environment issues are resolved
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.10.0
