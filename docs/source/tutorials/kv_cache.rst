@@ -36,9 +36,8 @@ Locate the file ``tutorials/assets/values-05-cpu-offloading.yaml`` with the foll
             requestGPU: 1
             pvcStorage: "50Gi"
             vllmConfig:
-            enableChunkedPrefill: false
-            enablePrefixCaching: false
-            maxModelLen: 16384
+              enablePrefixCaching: true
+              maxModelLen: 16384
 
             lmcacheConfig:
             enabled: true

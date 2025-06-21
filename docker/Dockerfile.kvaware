@@ -1,0 +1,28 @@
+FROM lmcache/vllm-openai:2025-05-27-v1
+
+WORKDIR /app
+
+# hadolint ignore=DL3008
+RUN --mount=type=cache,target=/var/lib/apt --mount=type=cache,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the pyproject.toml and the git metadata first (leverage Docker layer caching)
+COPY pyproject.toml .
+COPY .git/ .git/
+
+# Copy the rest of the application code
+COPY src/ src/
+
+ARG INSTALL_OPTIONAL_DEP=semantic_cache,lmcache
+ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
+
+# hadolint ignore=SC1091
+RUN source /opt/venv/bin/activate && \
+    uv pip install --upgrade --no-cache-dir pip setuptools_scm && \
+    uv pip install --no-cache-dir .
+
+# Set the entrypoint
+ENTRYPOINT ["/opt/venv/bin/vllm-router"]
+CMD []

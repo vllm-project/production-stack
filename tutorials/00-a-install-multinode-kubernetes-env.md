@@ -107,12 +107,9 @@ Before you begin, ensure the following:
    ```
 
 4. **Explanation:**
-   - Downloads, installs and configures v1.32 version of cri-o container runtime for your Kubernetes cluster.
-
-5. **Explanation:**
    This script downloads v1.32 version of [`cri-0`](https://github.com/cri-o/packaging/blob/main/README.md#distributions-using-deb-packages), one of container runtimes for Kubernetes for managing pods on your cluster.
 
-6. Repeat steps 1 to 2 on your other bare-metal server, which will serve as a worker node.
+5. Repeat steps 1 to 2 on your other bare-metal server, which will serve as a worker node.
 
 ### Step 3: Setting up a control plane node
 

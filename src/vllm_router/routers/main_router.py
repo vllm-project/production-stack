@@ -31,7 +31,10 @@ from vllm_router.log import init_logger
 from vllm_router.protocols import ModelCard, ModelList
 from vllm_router.routers.routing_logic import get_routing_logic
 from vllm_router.service_discovery import get_service_discovery
-from vllm_router.services.request_service.request import route_general_request
+from vllm_router.services.request_service.request import (
+    route_general_request,
+    route_sleep_wakeup_request,
+)
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
 from vllm_router.stats.request_stats import RequestStatsMonitor
 from vllm_router.version import __version__
@@ -111,6 +114,21 @@ async def route_score(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/score", background_tasks)
 
 
+@main_router.post("/sleep")
+async def route_sleep(request: Request, background_tasks: BackgroundTasks):
+    return await route_sleep_wakeup_request(request, "/sleep", background_tasks)
+
+
+@main_router.post("/wake_up")
+async def route_wake_up(request: Request, background_tasks: BackgroundTasks):
+    return await route_sleep_wakeup_request(request, "/wake_up", background_tasks)
+
+
+@main_router.get("/is_sleeping")
+async def route_is_sleeping(request: Request, background_tasks: BackgroundTasks):
+    return await route_sleep_wakeup_request(request, "/is_sleeping", background_tasks)
+
+
 @main_router.get("/version")
 async def show_version():
     ver = {"version": __version__}
@@ -120,13 +138,13 @@ async def show_version():
 @main_router.get("/v1/models")
 async def show_models():
     """
-    Returns a list of all models available in the stack.
+    Returns a list of all models available in the stack
 
     Args:
         None
 
     Returns:
-        JSONResponse: A JSON response containing the list of models.
+        JSONResponse: A JSON response containing the list of models and their relationships.
 
     Raises:
         Exception: If there is an error in retrieving the endpoint information.
@@ -134,19 +152,60 @@ async def show_models():
     endpoints = get_service_discovery().get_endpoint_info()
     existing_models = set()
     model_cards = []
+
     for endpoint in endpoints:
-        if endpoint.model_name in existing_models:
+        if not endpoint.model_info:
             continue
-        model_card = ModelCard(
-            id=endpoint.model_name,
-            object="model",
-            created=endpoint.added_timestamp,
-            owned_by="vllm",
-        )
-        model_cards.append(model_card)
-        existing_models.add(endpoint.model_name)
+
+        for model_id, model_info in endpoint.model_info.items():
+            if model_id in existing_models:
+                continue
+
+            model_card = ModelCard(
+                id=model_id,
+                object="model",
+                created=model_info.created,
+                owned_by=model_info.owned_by,
+                parent=model_info.parent,
+            )
+            model_cards.append(model_card)
+            existing_models.add(model_id)
+
     model_list = ModelList(data=model_cards)
     return JSONResponse(content=model_list.model_dump())
+
+
+@main_router.get("/engines")
+async def get_engine_instances():
+    """
+    Returns a list of all models available in the stack.
+
+    Args:
+        None
+
+    Returns:
+        JSONResponse: A JSON response containing the list of models and their relationships.
+
+    Raises:
+        Exception: If there is an error in retrieving the endpoint information.
+    """
+    endpoints = get_service_discovery().get_endpoint_info()
+    existing_engines = set()
+    engines_cards = []
+
+    for endpoint in endpoints:
+        if endpoint.Id in existing_engines:
+            continue
+        engine_card = {
+            "engine_id": endpoint.Id,
+            "serving_models": endpoint.model_names,
+            "created": endpoint.added_timestamp,
+        }
+
+        engines_cards.append(engine_card)
+        existing_engines.add(endpoint.Id)
+
+    return JSONResponse(content=engines_cards)
 
 
 @main_router.get("/health")

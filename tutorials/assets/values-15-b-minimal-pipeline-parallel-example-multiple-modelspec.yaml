@@ -1,0 +1,40 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "distilgpt2-raycluster"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "distilbert/distilgpt2"
+
+    replicaCount: 1
+
+    requestCPU: 1
+    requestMemory: "20Gi"
+    requestGPU: 1
+
+    vllmConfig:
+      tensorParallelSize: 1
+      pipelineParallelSize: 2
+
+    shmSize: "20Gi"
+
+    raySpec:
+      headNode:
+        requestCPU: 1
+        requestMemory: "20Gi"
+        requestGPU: 1
+  - name: "opt125m-deployment"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "facebook/opt-125m"
+
+    replicaCount: 1
+
+    requestCPU: 1
+    requestMemory: "20Gi"
+    requestGPU: 1
+
+    vllmConfig:
+      tensorParallelSize: 1
+
+    shmSize: "20Gi"

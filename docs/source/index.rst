@@ -57,6 +57,16 @@ Documentation
 
 .. toctree::
    :maxdepth: 1
+   :caption: Tutorials
+
+   tutorials/disagg.rst
+   tutorials/kv_cache.rst
+   tutorials/lora_load.rst
+   tutorials/kvaware.rst
+   tutorials/prefixaware.rst
+
+.. toctree::
+   :maxdepth: 1
    :caption: Deployment
 
    deployment/helm
@@ -78,11 +88,7 @@ Documentation
    dev_guide/peripheral/index.rst
    dev_guide/dev_api/index.rst
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Tutorials
 
-   tutorials/index.rst
 
 .. toctree::
    :maxdepth: 1

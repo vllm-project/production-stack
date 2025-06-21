@@ -19,6 +19,10 @@ spec:
       port: 55555
       targetPort: zmq-port
       protocol: TCP
+    - name: ucx-port
+      port: 9999
+      targetPort: ucx-port
+      protocol: TCP
   selector:
     model: "{{ $modelSpec.name }}"
     helm-release-name: "{{ $.Release.Name }}"

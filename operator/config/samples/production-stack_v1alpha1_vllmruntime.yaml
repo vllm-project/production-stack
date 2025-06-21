@@ -6,24 +6,6 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: vllmruntime-sample
 spec:
-
-  # vLLM specific configurations
-  enableChunkedPrefill: false
-  enablePrefixCaching: false
-  tensorParallelSize: 1
-  gpuMemoryUtilization: "0.8"
-  maxLoras: 4
-  extraArgs: ["--disable-log-requests"]
-  v1: true
-
-  # LM Cache configuration
-  lmCacheConfig:
-    enabled: true
-    cpuOffloadingBufferSize: "15"
-    diskOffloadingBufferSize: "0"
-    remoteUrl: "lm://cacheserver-sample.default.svc.cluster.local:80"
-    remoteSerde: "naive"
-
   # Model configuration
   model:
     modelURL: "meta-llama/Llama-3.1-8B"
@@ -33,31 +15,52 @@ spec:
     maxModelLen: 4096
     dtype: "bfloat16"
     maxNumSeqs: 32
+    # HuggingFace token secret (optional)
+    hfTokenSecret:
+      name: "huggingface-token"
+    hfTokenName: "token"
 
-  # Environment variables
-  env:
-    - name: HF_HOME
-      value: "/data"
+  # vLLM server configuration
+  vllmConfig:
+    # vLLM specific configurations
+    enableChunkedPrefill: false
+    enablePrefixCaching: false
+    tensorParallelSize: 1
+    gpuMemoryUtilization: "0.8"
+    maxLoras: 4
+    extraArgs: ["--disable-log-requests"]
+    v1: true
+    port: 8000
+    # Environment variables
+    env:
+      - name: HF_HOME
+        value: "/data"
 
-  # Resource requirements
-  resources:
-    cpu: "10"
-    memory: "32Gi"
-    gpu: "1"
+  # LM Cache configuration
+  lmCacheConfig:
+    enabled: true
+    cpuOffloadingBufferSize: "15"
+    diskOffloadingBufferSize: "0"
+    remoteUrl: "lm://cacheserver-sample.default.svc.cluster.local:80"
+    remoteSerde: "naive"
 
-  # Image configuration
-  image:
-    registry: "docker.io"
-    name: "lmcache/vllm-openai:2025-04-18"
-    pullPolicy: "IfNotPresent"
-    pullSecretName: ""
+  # Deployment configuration
+  deploymentConfig:
+    # Resource requirements
+    resources:
+      cpu: "10"
+      memory: "32Gi"
+      gpu: "1"
 
-  # HuggingFace token secret (optional)
-  hfTokenSecret:
-    name: "huggingface-token"
+    # Image configuration
+    image:
+      registry: "docker.io"
+      name: "lmcache/vllm-openai:2025-04-18"
+      pullPolicy: "IfNotPresent"
+      pullSecretName: ""
 
-  # Number of replicas
-  replicas: 1
+    # Number of replicas
+    replicas: 1
 
-  # Deployment strategy
-  deploymentStrategy: "Recreate"
+    # Deployment strategy
+    deploymentStrategy: "Recreate"

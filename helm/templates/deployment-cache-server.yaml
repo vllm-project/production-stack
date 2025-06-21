@@ -29,7 +29,9 @@ spec:
         - name: "lmcache-server"
           image: "{{ required "Required value 'cacheserverSpec.repository' must be defined !" .Values.cacheserverSpec.repository }}:{{ required "Required value 'cacheserverSpec.tag' must be defined !" .Values.cacheserverSpec.tag }}"
           command:
-          {{- if eq .Values.cacheserverSpec.tag "latest" }}
+          {{- if eq .Values.cacheserverSpec.tag "latest-nightly" }}
+          - "/opt/venv/bin/lmcache_server"
+          {{- else if eq .Values.cacheserverSpec.tag "latest" }}
           - "/opt/venv/bin/lmcache_experimental_server"
           {{- else }}
           - "lmcache_experimental_server"
@@ -53,12 +55,17 @@ spec:
             - name: "caserver-cport"
               containerPort: {{ .Values.cacheserverSpec.containerPort }}
           imagePullPolicy: IfNotPresent
-        # TODO(Jiayi): add health check for lmcache server
-        # livenessProbe:
-        #   initialDelaySeconds: 30
-        #   periodSeconds: 5
-        #   failureThreshold: 3
-        #   httpGet:
-        #     path: /health
-        #     port: {{ .Values.cacheserverSpec.containerPort }}
+          {{- if .Values.cacheserverSpec.livenessProbe }}
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.cacheserverSpec.livenessProbe.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ .Values.cacheserverSpec.livenessProbe.periodSeconds | default 10 }}
+            failureThreshold: {{ .Values.cacheserverSpec.livenessProbe.failureThreshold | default 3 }}
+            timeoutSeconds: {{ .Values.cacheserverSpec.livenessProbe.timeoutSeconds | default 5 }}
+            exec:
+              command:
+              - "/opt/venv/bin/python3"
+              - "/workspace/LMCache/examples/kubernetes/health_probe.py"
+              - "127.0.0.1"
+              - "{{ .Values.cacheserverSpec.containerPort }}"
+          {{- end }}
 {{- end -}}
