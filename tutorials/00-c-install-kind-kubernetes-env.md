@@ -123,11 +123,11 @@ sudo usermod -aG docker $USER && newgrp docker
     Allowing volume mounts...
     Creating cluster "single-node-cluster" ...
     ✓ Ensuring node image (kindest/node:v1.27.3) 🖼
-    ✓ Preparing nodes 📦  
-    ✓ Writing configuration 📜 
-    ✓ Starting control-plane 🕹️ 
-    ✓ Installing CNI 🔌 
-    ✓ Installing StorageClass 💾 
+    ✓ Preparing nodes 📦
+    ✓ Writing configuration 📜
+    ✓ Starting control-plane 🕹️
+    ✓ Installing CNI 🔌
+    ✓ Installing StorageClass 💾
     Set kubectl context to "kind-single-node-cluster"
     You can now use your cluster with:
 
