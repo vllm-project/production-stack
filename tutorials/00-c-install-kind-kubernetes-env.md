@@ -16,7 +16,7 @@ application containers run within such nodes.
 - [Steps](#steps)
   - [Step 1: Installing kind](#step-1-installing-kind)
   - [Step 2: Installing Helm](#step-2-installing-helm)
-  - [Step 3: Installing Minikube with GPU Support](#step-3-installing-minikube-with-gpu-support)
+  - [Step 3: Installing Minikube with GPU Support](#step-3-installing-kind-with-gpu-support)
   - [Step 4: Verifying GPU Configuration](#step-4-verifying-gpu-configuration)
 
 ## Prerequisites
