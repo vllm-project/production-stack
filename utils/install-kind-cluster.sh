@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Note that this makes heavy use of Sam Stoelinga's guide https://www.substratus.ai/blog/kind-with-gpus
 
 echo "Setting NVIDIA container toolkit (nvidia-ctk) to be docker's default runtime..." 
@@ -28,19 +30,3 @@ helm repo update
 helm install --wait --generate-name \
      -n gpu-operator --create-namespace \
      nvidia/gpu-operator --set driver.enabled=false
-
-# echo "Creating test pod..."
-# kubectl apply -f - << EOF
-# apiVersion: v1
-# kind: Pod
-# metadata:
-#   name: cuda-vector-add-test
-# spec:
-#   restartPolicy: OnFailure
-#   containers:
-#   - name: cuda-vector-add-test
-#     image: "nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda11.7.1-ubuntu20.04"
-#     resources:
-#       limits:
-#         nvidia.com/gpu: 1
-# EOF
