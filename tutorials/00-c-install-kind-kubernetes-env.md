@@ -217,9 +217,9 @@ sudo usermod -aG docker $USER && newgrp docker
 
 By following this tutorial, you have successfully set up a Kubernetes environment with GPU support on your server. You are now ready to deploy and test vLLM Production Stack on Kubernetes. For further configuration and workload-specific setups, consult the official documentation for `kubectl`, `helm`, and `kind`. To uninstall the cluster, enter:
 
-    ```bash
-    kind delete cluster --name single-node-cluster
-    ```
+```bash
+kind delete cluster --name single-node-cluster
+```
 
 What's next:
 
