@@ -1,22 +1,46 @@
+{{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+{{- if not (hasKey $modelSpec "raySpec") }}
+{{- $kv_role := "kv_both" }}
+{{- $kv_rank := 0 }}
+{{- $kv_parallel_size := 1 }}
+{{- if $modelSpec.lmcacheConfig }}
+{{- if $modelSpec.lmcacheConfig.kvRole }}
+{{- $kv_role = $modelSpec.lmcacheConfig.kvRole }}
+{{- end }}
+{{- end }}
 {{- with $ -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-deployment-vllm"
   namespace: {{ .Release.Namespace }}
+  {{- if hasKey $modelSpec "annotations" }}
+  annotations:
+    {{- toYaml $modelSpec.annotations | nindent 4 }}
+  {{- end }}
   labels:
+    model: {{ $modelSpec.name }}
+    helm-release-name: {{ .Release.Name }}
   {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
   replicas: {{ $modelSpec.replicaCount }}
   {{- include "chart.engineStrategy" . | nindent 2 }}
   selector:
     matchLabels:
+      model: {{ $modelSpec.name }}
+      helm-release-name: {{ .Release.Name }}
     {{- include "chart.engineLabels" . | nindent 6 }}
   progressDeadlineSeconds: 1200
   template:
     metadata:
+      {{- if hasKey $modelSpec "podAnnotations" }}
+      annotations:
+        {{- toYaml $modelSpec.podAnnotations | nindent 8 }}
+      {{- end }}
       labels:
+        model: {{ $modelSpec.name }}
+        helm-release-name: {{ .Release.Name }}
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
       {{- if hasKey $modelSpec "initContainer" }}
@@ -30,26 +54,60 @@ spec:
           {{- if $container.args }}
           args: {{ toYaml $container.args | nindent 12 }}
           {{- end }}
-          {{- if $container.env }}
-          env: {{ toYaml $container.env | nindent 12 }}
-          {{- end }}
+          env:
+            - name: RELEASE_NAME
+              value: {{ $.Release.Name }}
+            {{- if and (hasKey $.Values "cacheserverSpec") (hasKey $.Values.cacheserverSpec "servicePort") }}
+            - name: LMCACHE_SERVER_SERVICE_PORT
+              value: {{ $.Values.cacheserverSpec.servicePort | quote }}
+            {{- end }}
+            {{- if $container.env }}
+            {{- toYaml $container.env | nindent 12 }}
+            {{- end }}
           {{- if $container.resources }}
           resources: {{ toYaml $container.resources | nindent 12 }}
           {{- end }}
-          {{- if hasKey $container "mountPvcStorage" }}
+          {{- if and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage") }}
           volumeMounts:
-          {{- if and $container.volumeMounts.pvcStorage (hasKey $modelSpec "pvcStorage") }}
             - name: {{ .Release.Name }}-storage
               mountPath: /data
           {{- end }}
-          {{- end }}
       {{- end }}
+      {{- if .Values.servingEngineSpec.securityContext }}
+      securityContext:
+        {{- toYaml .Values.servingEngineSpec.securityContext | nindent 8 }}
+      {{- end }}
+      {{- if hasKey $modelSpec "serviceAccountName" }}
+      serviceAccountName: {{ $modelSpec.serviceAccountName }}
+      {{- end }}
+      {{- if and (hasKey $modelSpec "lmcacheConfig") (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
+      hostIPC: true
+      hostPID: true
+      {{- end }}
+      hostname: "{{ $.Release.Name }}-{{ $modelSpec.name }}-{{ $.Chart.Name }}"
+      subdomain: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
-
+          securityContext:
+            capabilities:
+              add:
+                - SYS_PTRACE
           command:
+          {{- if or
+            (eq $modelSpec.tag "2025-05-27-v1")
+            (eq $modelSpec.tag "2025-05-17-v1")
+            (eq $modelSpec.tag "latest-nightly")
+            (hasPrefix "nightly-" $modelSpec.tag)
+            (and
+              (eq $modelSpec.tag "latest")
+              (eq $modelSpec.repository "lmcache/vllm-openai")
+            )
+          }}
+          - "/opt/venv/bin/vllm"
+          {{- else }}
           - "vllm"
+          {{- end }}
           - "serve"
           - {{ $modelSpec.modelURL | quote }}
           - "--host"
@@ -59,13 +117,25 @@ spec:
           {{- if $modelSpec.enableLoRA }}
           - "--enable-lora"
           {{- end }}
+          {{- if $modelSpec.enableTool }}
+          - "--enable-auto-tool-choice"
+          {{- end }}
+          {{- if $modelSpec.toolCallParser }}
+          - "--tool-call-parser"
+          - {{ $modelSpec.toolCallParser | quote }}
+          {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{-   if hasKey . "enableChunkedPrefill" }}
+          {{-     if .enableChunkedPrefill }}
           - "--enable-chunked-prefill"
-          - {{ .enableChunkedPrefill | quote }}
+          {{-     else }}
+          - "--no-enable-chunked-prefill"
+          {{-     end }}
           {{-   end }}
           {{-   if .enablePrefixCaching }}
           - "--enable-prefix-caching"
+          {{-   else }}
+          - "--no-enable-prefix-caching"
           {{-   end }}
           {{-   if hasKey . "maxModelLen" }}
           - "--max-model-len"
@@ -79,6 +149,18 @@ spec:
           - "--tensor-parallel-size"
           - {{ .tensorParallelSize | quote }}
           {{-   end }}
+          {{-   if hasKey . "maxNumSeqs" }}
+          - "--max-num-seqs"
+          - {{ .maxNumSeqs | quote }}
+          {{-   end }}
+          {{-   if hasKey . "gpuMemoryUtilization" }}
+          - "--gpu_memory_utilization"
+          - {{ .gpuMemoryUtilization | quote }}
+          {{-   end }}
+          {{-   if hasKey . "maxLoras" }}
+          - "--max_loras"
+          - {{ .maxLoras | quote }}
+          {{-   end }}
           {{-   if .extraArgs }}
           {{-     range .extraArgs }}
           - {{ . | quote }}
@@ -87,17 +169,32 @@ spec:
           {{- end }}
           {{- if $modelSpec.lmcacheConfig }}
           {{-   if $modelSpec.lmcacheConfig.enabled }}
+          {{-     if hasKey $modelSpec.lmcacheConfig "enablePD" }}
           - "--kv-transfer-config"
-          - '{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}'
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}","kv_connector_extra_config":{"discard_partial_chunks": false, "lmcache_rpc_port": {{ $modelSpec.lmcacheConfig.nixlRole | quote }}}}'
+          {{-     else if hasKey $modelSpec.vllmConfig "v1" }}
+          {{-       if eq (toString $modelSpec.vllmConfig.v1) "1" }}
+          - "--kv-transfer-config"
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}"}'
+          {{-       else }}
+          - "--kv-transfer-config"
+          - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
+          {{-       end }}
+          {{-     else }}
+          - "--kv-transfer-config"
+          - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
+          {{-     end }}
           {{-   end }}
           {{- end }}
           {{- if $modelSpec.chatTemplate }}
           - "--chat-template"
-          - "/chat_templates/chat-template.jinga"
+          - {{ $modelSpec.chatTemplate | quote }}
           {{- end }}
+          {{- if .Values.servingEngineSpec.containerSecurityContext }}
           securityContext:
-            runAsNonRoot: false
-          imagePullPolicy: IfNotPresent
+            {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
+          {{- end }}
+          imagePullPolicy: Always
           env:
           - name: HF_HOME
             {{- if hasKey $modelSpec "pvcStorage" }}
@@ -105,10 +202,24 @@ spec:
             {{- else }}
             value: /tmp
             {{- end }}
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
           {{- with $modelSpec.vllmConfig}}
+          - name: LMCACHE_LOG_LEVEL
+            value: "DEBUG"
           {{- if hasKey . "v1" }}
+          {{- if eq ($modelSpec.vllmConfig.v1 | toString) "1" }}
+          {{- $dir := default "/tmp" $modelSpec.vllmConfig.prometheusMultiprocDir }}
+          - name: PROMETHEUS_MULTIPROC_DIR
+            value: {{ $dir | quote }}
+          {{- end }}
           - name: VLLM_USE_V1
-            value: {{ default 0 $modelSpec.vllmConfig.v1 | quote }}
+            value: {{ $modelSpec.vllmConfig.v1 | quote }}
+          {{- else }}
+          - name: VLLM_USE_V1
+            value: "0"
           {{- end}}
           {{- end}}
           {{- if $modelSpec.hf_token }}
@@ -150,15 +261,58 @@ spec:
           - name: VLLM_RPC_TIMEOUT
             value: "1000000"
           {{-   end }}
-          {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
+          {{- if hasKey $modelSpec.lmcacheConfig "cudaVisibleDevices" }}
+          - name: CUDA_VISIBLE_DEVICES
+            value: {{ $modelSpec.lmcacheConfig.cudaVisibleDevices | quote }}
+          {{-   end }}
+          {{-   if and (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
+          - name: LMCACHE_LOCAL_CPU
+            value: "False"
+          - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+            value: "0"
+          - name: LMCACHE_REMOTE_SERDE
+            value: "NULL"
+          - name: UCX_TLS
+            value: "cuda_ipc,cuda_copy,tcp"
+          {{-   if hasKey $modelSpec.lmcacheConfig "enableNixl" }}
+          - name: LMCACHE_ENABLE_NIXL
+            value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.enableNixl | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlRole" }}
+          - name: LMCACHE_NIXL_ROLE
+            value: {{ $modelSpec.lmcacheConfig.nixlRole | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlPeerHost" }}
+          - name: LMCACHE_NIXL_RECEIVER_HOST
+            # value:  "0.0.0.0"
+            value: {{ $modelSpec.lmcacheConfig.nixlPeerHost | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlPeerPort" }}
+          - name: LMCACHE_NIXL_RECEIVER_PORT
+            value: {{ $modelSpec.lmcacheConfig.nixlPeerPort | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlBufferSize" }}
+          - name: LMCACHE_NIXL_BUFFER_SIZE
+            value: "{{ $modelSpec.lmcacheConfig.nixlBufferSize }}"
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlBufferDevice" }}
+          - name: LMCACHE_NIXL_BUFFER_DEVICE
+            value: {{ $modelSpec.lmcacheConfig.nixlBufferDevice | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlEnableGc" }}
+          - name: LMCACHE_NIXL_ENABLE_GC
+            value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.nixlEnableGc | quote }}
+          {{-   end }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "cpuOffloadingBufferSize" }}
+          {{-     if gt (int $modelSpec.lmcacheConfig.cpuOffloadingBufferSize) 0 }}
           - name: LMCACHE_LOCAL_CPU
             value: "True"
           - name: LMCACHE_MAX_LOCAL_CPU_SIZE
             value: "{{ $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}"
+          {{-     end}}
           {{-   end }}
-          {{-   if $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}
-          - name: LMCACHE_LOCAL_DISK
-            value: "True"
+          {{-   if hasKey $modelSpec.lmcacheConfig "diskOffloadingBufferSize" }}
           - name: LMCACHE_MAX_LOCAL_DISK_SIZE
             value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
           {{-   end }}
@@ -167,6 +321,22 @@ spec:
             value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
           - name: LMCACHE_REMOTE_SERDE
             value: "{{ .Values.cacheserverSpec.serde }}"
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "enableController" }}
+          - name: LMCACHE_ENABLE_CONTROLLER
+            value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.enableController | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "instanceId" }}
+          - name: LMCACHE_LMCACHE_INSTANCE_ID
+            value: {{ $modelSpec.lmcacheConfig.instanceId | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "controllerPort" }}
+          - name: LMCACHE_CONTROLLER_URL
+            value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
+          - name: LMCACHE_WORKER_PORT
+            value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
           {{-   end }}
           {{- end }}
           {{- if .Values.servingEngineSpec.configs }}
@@ -177,9 +347,13 @@ spec:
           ports:
             - name: {{ include "chart.container-port-name" . }}
               containerPort: {{ include "chart.container-port" . }}
+            - name: zmq-port
+              containerPort: 55555
+            - name: ucx-port
+              containerPort: 9999
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
-          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
+          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
           volumeMounts:
           {{- end }}
           {{- if hasKey $modelSpec "pvcStorage" }}
@@ -193,14 +367,17 @@ spec:
           {{- end}}
           {{- end}}
           {{- if $modelSpec.chatTemplate }}
-          - name: {{ .Release.Name }}-chat-templates
-            mountPath: /chat_templates
-          {{- end}}
+          - name: vllm-templates
+            mountPath: /templates
+          {{- end }}
+          {{- if hasKey $modelSpec "extraVolumeMounts" }}
+          {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
+          {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
-      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
       volumes:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
@@ -217,9 +394,18 @@ spec:
         {{- end}}
         {{- end}}
         {{- if $modelSpec.chatTemplate}}
+        {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
         - name: {{ .Release.Name }}-chat-templates
           configMap:
             name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
+        {{- else }}
+        - name: vllm-templates
+          persistentVolumeClaim:
+            claimName: vllm-templates-pvc
+        {{- end }}
+        {{- end}}
+        {{- if hasKey $modelSpec "extraVolumes" }}
+        {{- toYaml $modelSpec.extraVolumes | nindent 8 }}
         {{- end}}
       {{- if .Values.servingEngineSpec.tolerations }}
       {{-   with .Values.servingEngineSpec.tolerations }}
@@ -231,7 +417,12 @@ spec:
       {{- if .Values.servingEngineSpec.runtimeClassName }}
       runtimeClassName: {{ .Values.servingEngineSpec.runtimeClassName }}
       {{- end }}
-      {{- if $modelSpec.nodeSelectorTerms}}
+      {{- if .Values.servingEngineSpec.schedulerName }}
+      schedulerName: {{ .Values.servingEngineSpec.schedulerName }}
+      {{- end }}
+      {{- if $modelSpec.nodeName }}
+      nodeName: {{ $modelSpec.nodeName }}
+      {{- else if $modelSpec.nodeSelectorTerms}}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -240,7 +431,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
-{{- if $modelSpec.chatTemplate }}
+{{- if and $modelSpec.chatTemplate (hasKey $modelSpec "chatTemplateConfigMap") }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -248,9 +439,11 @@ metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
   namespace: "{{ .Release.Namespace }}"
 data:
-  chat-template.jinga: |-
-    {{ $modelSpec.chatTemplate}}
+  {{ $modelSpec.chatTemplate }}: |-
+    {{ $modelSpec.chatTemplateConfigMap }}
 {{- end }}
 {{- end }}
 ---
+{{- end }}
+{{- end }}
 {{- end }}

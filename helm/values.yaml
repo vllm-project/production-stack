@@ -3,11 +3,12 @@
 
 # -- Serving engine configuratoon
 servingEngineSpec:
+  enableEngine: true
   # -- Customized labels for the serving engine deployment
   labels:
     environment: "test"
     release: "test"
-  # vllmApiKey: (optional) api key for securing the VLMM models. Can be either:
+  # vllmApiKey: (optional) api key for securing the vLLM models. Can be either:
   #   - A string containing the token directly (will be stored in a generated secret)
   #   - An object referencing an existing secret:
   #     secretName: "my-existing-secret"
@@ -15,6 +16,9 @@ servingEngineSpec:
   #
   # modelSpec - configuring multiple serving engines deployments that runs different models
   # Each entry in the modelSpec array should contain the following fields:
+  # - annotations: (Optional, map) The annotations to add to the deployment, e.g., {model: "opt125m"}
+  # - serviceAccountName: (Optional, string) The name of the service account to use for the deployment, e.g., "vllm-service-account"
+  # - podAnnotations: (Optional, map) The annotations to add to the pod, e.g., {model: "opt125m"}
   # - name: (string) The name of the model, e.g., "example-model"
   # - repository: (string) The repository of the model, e.g., "vllm/vllm-openai"
   # - tag: (string) The tag of the model, e.g., "latest"
@@ -34,6 +38,18 @@ servingEngineSpec:
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
   # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
+  # - extraVolumes: (Optional, list) Additional volumes to add to the pod, in Kubernetes volume format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volume-v1-core
+  #   Example for an emptyDir volume:
+  #   extraVolumes:
+  #   - name: tmp-volume
+  #     emptyDir:
+  #       medium: ""
+  #       sizeLimit: 5Gi
+  # - extraVolumeMounts: (Optional, list) Additional volume mounts to add to the container, in Kubernetes volumeMount format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volumemount-v1-core
+  #   Example for mounting the tmp-volume to /tmp:
+  #   extraVolumeMounts:
+  #   - name: tmp-volume
+  #     mountPath: /tmp
   # - initContainer: (optional, list of objects) The configuration for the init container to be run before the main container.
   #   - name: (string) The name of the init container, e.g., "init"
   #   - image: (string) The Docker image for the init container, e.g., "busybox:latest"
@@ -49,6 +65,9 @@ servingEngineSpec:
   #   - maxModelLen: (optional, int) The maximum model length, e.g., 16384
   #   - dtype: (optional, string) The data type, e.g., "bfloat16"
   #   - tensorParallelSize: (optional, int) The degree of tensor parallelism, e.g., 2
+  #   - maxNumSeqs: (optional, int) Maximum number of sequences to be processed in a single iteration., e.g., 32
+  #   - maxLoras: (optional, int) The maximum number of LoRA models to be loaded in a single batch, e.g., 4
+  #   - gpuMemoryUtilization: (optional, float) The fraction of GPU memory to be used for the model executor, which can range from 0 to 1. e.g., 0.95
   #   - extraArgs: (optional, list) Extra command line arguments to pass to vLLM, e.g., ["--disable-log-requests"]
   #
   # - lmcacheConfig: (optional, map) The configuration of the LMCache for KV offloading, supported options are:
@@ -64,13 +83,18 @@ servingEngineSpec:
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
   # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes
-  #
+  # - nodeName: (optional) Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   #
   # Example:
   # vllmApiKey: "vllm_xxxxxxxxxxxxx"
   # modelSpec:
   # - name: "mistral"
+  #   annotations:
+  #     model: "mistral"
+  #   podAnnotations:
+  #     model: "mistral"
+  #   serviceAccountName: "vllm-service-account"
   #   repository: "lmcache/vllm-openai"
   #   tag: "latest"
   #   modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
@@ -99,7 +123,10 @@ servingEngineSpec:
   #     enablePrefixCaching: false
   #     maxModelLen: 16384
   #     dtype: "bfloat16"
-  #     extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+  #     maxNumSeqs: 32
+  #     gpuMemoryUtilization: 0.95
+  #     maxLoras: 4
+  #     extraArgs: ["--disable-log-requests", "--trust-remote-code"]
   #
   #   lmcacheConfig:
   #     enabled: true
@@ -114,6 +141,24 @@ servingEngineSpec:
   #         operator: "In"
   #         values:
   #         - "NVIDIA-RTX-A6000"
+
+  #  extraVolumes:
+  #    - name: dev-fuse
+  #      hostPath:
+  #        path: /dev/fuse
+  #        type: CharDevice
+  #    - name: cache-dir
+  #      hostPath:
+  #        path: /var/cache/vllm
+
+  #    extraVolumeMounts:
+  #    - name: dev-fuse
+  #      mountPath: /dev/fuse
+  #      readOnly: true
+  #    - name: cache-dir
+  #      mountPath: /cache
+  #      readOnly: false
+
   modelSpec: []
 
   # -- Container port
@@ -172,6 +217,42 @@ servingEngineSpec:
   # -- RuntimeClassName configuration, set to "nvidia" if the model requires GPU
   runtimeClassName: "nvidia"
 
+  # -- SchedulerName configuration
+  schedulerName: ""
+
+  # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
+  securityContext: {}
+    # -- Run as a non-root user ID
+    # runAsUser: 1000
+    # -- Run with a non-root group ID
+    # runAsGroup: 1000
+    # -- Run as non-root
+    # runAsNonRoot: true
+    # -- Set the seccomp profile
+    # seccompProfile:
+    #   type: RuntimeDefault
+    # -- Drop all capabilities
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # -- Set the file system group ID for all containers
+    # fsGroup: 1000
+
+  # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
+  containerSecurityContext:
+    # -- Run as non-root
+    runAsNonRoot: false
+    # -- Don't allow privilege escalation
+    # allowPrivilegeEscalation: false
+    # -- Drop all capabilities
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # -- Read-only root filesystem
+    # readOnlyRootFilesystem: true
+
+
+
 routerSpec:
   # -- The docker image of the router. The following values are defaults:
   repository: "lmcache/lmstack-router"
@@ -186,6 +267,9 @@ routerSpec:
 
   # -- Container port
   containerPort: 8000
+
+  # -- Service type
+  serviceType: ClusterIP
 
   # -- Service port
   servicePort: 80
@@ -214,6 +298,10 @@ routerSpec:
 
   # -- deployment strategy
   strategy: {}
+
+  # vllmApiKey: (optional) api key for securing the vLLM models. Must be an object referencing an existing secret
+  #   secretName: "my-existing-secret"
+  #   secretKey: "vllm-api-key"
 
   # -- router resource requests and limits
   resources:
@@ -255,6 +343,16 @@ routerSpec:
     #  - secretName: vllm-router-tls
     #    hosts:
     #      - vllm-router.local
+
+  # The node selector terms to match the nodes
+  # Example:
+  #   nodeSelectorTerms:
+  #     - matchExpressions:
+  #       - key: nvidia.com/gpu.product
+  #         operator: "In"
+  #         values:
+  #         - "NVIDIA-RTX-A6000"
+  nodeSelectorTerms: []
 
   # -- TODO: Readiness probe configuration
   #startupProbe:

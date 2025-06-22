@@ -1,0 +1,28 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+    - name: "opt125m"
+      repository: "rocm/vllm"
+      tag: "instinct_main"
+      modelURL: facebook/opt-125m
+      replicaCount: 1
+
+      requestCPU: 6
+      requestMemory: "16Gi"
+      requestGPU: 1
+
+      requestGPUType: "amd.com/gpu"
+
+      hf_token: <YOUR HF TOKEN>
+
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: "your-node-label"
+              operator: "In"
+              values: ["your-node-label-value"]
+
+  tolerations:
+    - key: "your-node-taint"
+      operator: "Equal"
+      value: "your-node-taint-value"
+      effect: "NoSchedule"

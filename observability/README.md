@@ -29,18 +29,28 @@ After installing, the dashboard can be accessed through the service `service/kub
 Forward the Grafana dashboard port to the local node-port
 
 ```bash
-sudo kubectl --namespace monitoring port-forward svc/kube-prom-stack-grafana 3000:80 --address 0.0.0.0
+kubectl --namespace monitoring port-forward svc/kube-prom-stack-grafana 3000:80 --address 0.0.0.0
 ```
 
 Forward the Prometheus dashboard
 
 ```bash
-sudo kubectl --namespace monitoring port-forward prometheus-kube-prom-stack-kube-prome-prometheus-0 9090:9090
+kubectl --namespace monitoring port-forward prometheus-kube-prom-stack-kube-prome-prometheus-0 9090:9090
 ```
 
-Open the webpage at `http://<IP of your node>:3000` to access the Grafana web page. The default user name is `admin` and the password can be configured in `values.yaml` (default is `prom-operator`).
+Open the webpage at `http://<IP of your node>:3000` to access the Grafana web page. The default user name is `admin` and the password can be configured in `kube-prom-stack.yaml` field `adminPassword` (default is `prom-operator`).
 
 Import the dashboard using the `vllm-dashboard.json` in this folder.
+
+## Import LMCache Dashboard
+
+If you use LMCache image in production stack, you can try the LMCache dashboard. It contains the following six fields showing the benefits of cpu offloading: Average time to first token (sec), Cache hit rate (%) in last 1 minute, LMCache retrieve speed (K Tokens / sec), Local CPU cache usage (GB), Number of requested tokens in total, and Number of hit tokens in total.
+
+```bash
+kubectl apply -f lmcache-dashboard-cm.yaml
+kubectl -n monitoring rollout restart deployment kube-prom-stack-grafana
+kubectl --namespace monitoring port-forward svc/kube-prom-stack-grafana 3000:80 --address 0.0.0.0
+```
 
 ## Use Prometheus Adapter to export vLLM metrics
 
@@ -54,7 +64,7 @@ The exported metrics can be used for different purposes, such as horizontal scal
 To verify the metrics are being exported, you can use the following command:
 
 ```bash
-kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1/namespaces/default/metrics | jq | grep vllm_num_requests_waiting -C 10
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq | grep vllm_num_requests_waiting -C 10
 ```
 
 You should see something like the following:

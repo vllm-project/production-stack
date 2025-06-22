@@ -31,6 +31,7 @@ export VLLM_FEATURE_GATES=FeatureName=true
 | Feature Name | Stage | Default | Description |
 |--------------|-------|---------|-------------|
 | SemanticCache | Alpha | false | Semantic caching of LLM requests and responses |
+| PII | Alpha | false | Detect and block PII in LLM requests |
 
 ## Semantic Cache
 
@@ -66,3 +67,29 @@ Clients can control caching behavior by adding the following fields to their req
 
 - `skip_cache`: Set to `true` to bypass the cache for a specific request
 - `cache_similarity_threshold`: Override the default similarity threshold for a specific request
+
+## PII Detection
+
+The PII detection feature is an experimental feature that detects and blocks PII in LLM requests.
+
+### PII Feature Configuration
+
+To enable the PII detection feature, you need to:
+
+1. Enable the feature gate:
+
+   ```bash
+   --feature-gates=PII=true
+   ```
+
+   This will enable the PII detection feature and use the default analyzer.
+
+2. Configure the PII analyzer:
+
+   ```bash
+   --pii-analyzer=[presidio|regex]
+   ```
+
+   Available analyzers:
+   - `presidio`: Microsoft Presidio-based analyzer (requires additional dependencies)
+   - `regex`: Lightweight regex-based analyzer (no additional dependencies)

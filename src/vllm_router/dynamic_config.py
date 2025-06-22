@@ -1,3 +1,17 @@
+# Copyright 2024-2025 The vLLM Production Stack Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import threading
 import time
@@ -12,7 +26,11 @@ from vllm_router.service_discovery import (
     ServiceDiscoveryType,
     reconfigure_service_discovery,
 )
-from vllm_router.utils import SingletonMeta, parse_static_model_names, parse_static_urls
+from vllm_router.utils import (
+    SingletonMeta,
+    parse_comma_separated_args,
+    parse_static_urls,
+)
 
 logger = init_logger(__name__)
 
@@ -31,6 +49,7 @@ class DynamicRouterConfig:
     # Service discovery configurations
     static_backends: Optional[str] = None
     static_models: Optional[str] = None
+    static_aliases: Optional[str] = None
     k8s_port: Optional[int] = None
     k8s_namespace: Optional[str] = None
     k8s_label_selector: Optional[str] = None
@@ -58,6 +77,7 @@ class DynamicRouterConfig:
             service_discovery=args.service_discovery,
             static_backends=args.static_backends,
             static_models=args.static_models,
+            static_aliases=args.static_aliases,
             k8s_port=args.k8s_port,
             k8s_namespace=args.k8s_namespace,
             k8s_label_selector=args.k8s_label_selector,
@@ -118,7 +138,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
             reconfigure_service_discovery(
                 ServiceDiscoveryType.STATIC,
                 urls=parse_static_urls(config.static_backends),
-                models=parse_static_model_names(config.static_models),
+                models=parse_comma_separated_args(config.static_models),
             )
         elif config.service_discovery == "k8s":
             reconfigure_service_discovery(

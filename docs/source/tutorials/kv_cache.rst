@@ -36,9 +36,8 @@ Locate the file ``tutorials/assets/values-05-cpu-offloading.yaml`` with the foll
             requestGPU: 1
             pvcStorage: "50Gi"
             vllmConfig:
-            enableChunkedPrefill: false
-            enablePrefixCaching: false
-            maxModelLen: 16384
+              enablePrefixCaching: true
+              maxModelLen: 16384
 
             lmcacheConfig:
             enabled: true
@@ -103,7 +102,7 @@ Look for the following log message to confirm LMCache is active:
 
 .. code-block:: bash
 
-    curl -X POST http://localhost:30080/completions \
+    curl -X POST http://localhost:30080/v1/completions \
         -H "Content-Type: application/json" \
         -d '{
             "model": "mistralai/Mistral-7B-Instruct-v0.2",

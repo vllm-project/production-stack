@@ -8,6 +8,21 @@ num_requests_running = Gauge(
 num_requests_waiting = Gauge(
     "vllm:num_requests_waiting", "Number of waiting requests", ["server"]
 )
+gpu_prefix_cache_hit_rate = Gauge(
+    "vllm:gpu_prefix_cache_hit_rate",
+    "GPU Prefix Cache Hit Rate",
+    ["server"],
+)
+gpu_prefix_cache_hits_total = Gauge(
+    "vllm:gpu_prefix_cache_hits_total",
+    "Total GPU Prefix Cache Hits",
+    ["server"],
+)
+gpu_prefix_cache_queries_total = Gauge(
+    "vllm:gpu_prefix_cache_queries_total",
+    "Total GPU Prefix Cache Queries",
+    ["server"],
+)
 current_qps = Gauge("vllm:current_qps", "Current Queries Per Second", ["server"])
 avg_decoding_length = Gauge(
     "vllm:avg_decoding_length", "Average Decoding Length", ["server"]

@@ -3,6 +3,10 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from vllm_router.log import init_logger
+
+logger = init_logger(__name__)
+
 
 class OpenAIBaseModel(BaseModel):
     # OpenAI API does allow extra fields
@@ -44,6 +48,7 @@ class ModelCard(OpenAIBaseModel):
     created: int = Field(default_factory=lambda: int(time.time()))
     owned_by: str = "vllm"
     root: Optional[str] = None
+    parent: Optional[str] = None
 
 
 class ModelList(OpenAIBaseModel):

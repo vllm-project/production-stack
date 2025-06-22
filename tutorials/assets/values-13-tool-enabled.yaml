@@ -1,0 +1,48 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "llama3-8b"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+
+    # Tool calling configuration
+    enableTool: true
+    toolCallParser: "llama3_json"  # Parser to use for tool calls (e.g., "llama3_json" for Llama models)
+    chatTemplate: "/templates/tool_chat_template_llama3.1_json.jinja"  # Full path to template file
+
+    # Mount Hugging Face credentials and vLLM configuration
+    env:
+      - name: HUGGING_FACE_HUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: huggingface-credentials
+            key: HUGGING_FACE_HUB_TOKEN
+      - name: VLLM_TEMPLATE_DIR
+        value: "/templates"
+
+    replicaCount: 1
+
+    # Resource requirements for Llama-3.1-8B-Instruct
+    # resources:
+    #   requests:
+    #     cpu: 8
+    #     memory: "32Gi"
+    #     nvidia.com/gpu: 1
+    #   limits:
+    #     cpu: 8
+    #     memory: "32Gi"
+    #     nvidia.com/gpu: 1
+    requestCPU: 8
+    requestMemory: "32Gi"
+    requestGPU: 1
+
+    # vLLM configuration
+    vllmConfig:
+      maxModelLen: 4096
+      dtype: "bfloat16"
+      tensorParallelSize: 1
+
+# Disable shared storage
+# sharedStorage:
+#   enabled: false

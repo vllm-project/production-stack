@@ -20,7 +20,7 @@ This tutorial guides you through the basic configurations required to deploy a v
 
 ## Step 1: Preparing the Configuration File
 
-1. Locate the example configuration file `tutorials/assets/values-02-basic-config.yaml`.
+1. Locate the example configuration file [`tutorials/assets/values-02-basic-config.yaml`](assets/values-02-basic-config.yaml).
 2. Open the file and update the following fields:
     - Write your actual huggingface token in `hf_token: <YOUR HF TOKEN>` in the yaml file.
 
@@ -98,7 +98,7 @@ REVISION: 1
 1. Check the status of the pods:
 
    ```bash
-   sudo kubectl get pods
+   kubectl get pods
    ```
 
    Expected output:
@@ -117,7 +117,7 @@ REVISION: 1
 2. Verify the service is exposed correctly:
 
    ```bash
-   sudo kubectl get services
+   kubectl get services
    ```
 
    Expected output:

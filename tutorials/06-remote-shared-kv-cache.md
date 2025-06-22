@@ -23,7 +23,7 @@ vLLM Production Stack uses LMCache for remote KV cache sharing. For more details
 
 ## Step 1: Configuring KV Cache Shared Storage
 
-Locate the file `tutorials/assets/values-06-remote-shared-storage.yaml` with the following content:
+Locate the file [`tutorials/assets/values-06-remote-shared-storage.yaml`](assets/values-06-remote-shared-storage.yaml) with the following content:
 
 ```yaml
 servingEngineSpec:
@@ -42,6 +42,7 @@ servingEngineSpec:
       enableChunkedPrefill: false
       enablePrefixCaching: false
       maxModelLen: 16384
+      v1: 1
 
     lmcacheConfig:
       enabled: true
@@ -73,6 +74,8 @@ cacheserverSpec:
 
 > **Note:** Replace `<YOUR HF TOKEN>` with your actual Hugging Face token.
 
+Also, right now ``v1`` has to be set to ``1`` to use LMCache docker image with ``latest`` tag.
+
 The `CacheserverSpec` starts a remote shared KV cache storage.
 
 ## Step 2: Deploying the Helm Chart
@@ -80,7 +83,7 @@ The `CacheserverSpec` starts a remote shared KV cache storage.
 Deploy the Helm chart using the customized values file:
 
 ```bash
-sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-storage.yaml
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-storage.yaml
 ```
 
 ## Step 3: Verifying the Installation
@@ -88,13 +91,13 @@ sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-stor
 1. Check the pod logs to verify LMCache is active:
 
    ```bash
-   sudo kubectl get pods
+   kubectl get pods
    ```
 
    Identify the pod name for the vLLM deployment (e.g., `vllm-mistral-deployment-vllm-xxxx-xxxx`). Then run:
 
    ```bash
-   sudo kubectl logs -f <pod-name>
+   kubectl logs -f <pod-name>
    ```
 
    Look for entries in the log indicating LMCache is enabled and operational. An example output (indicating KV cache is stored) is:
@@ -107,7 +110,7 @@ sudo helm install vllm vllm/vllm-stack -f tutorials/assets/values-06-shared-stor
 2. Forward the router service port to access the stack locally:
 
    ```bash
-   sudo kubectl port-forward svc/vllm-router-service 30080:80
+   kubectl port-forward svc/vllm-router-service 30080:80
    ```
 
 3. Send a request to the stack and observe the logs:

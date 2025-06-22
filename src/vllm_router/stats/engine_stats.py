@@ -1,3 +1,16 @@
+# Copyright 2024-2025 The vLLM Production Stack Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import threading
 import time
 from dataclasses import dataclass
@@ -21,6 +34,8 @@ class EngineStats:
     num_queuing_requests: int = 0
     # GPU prefix cache hit rate (as used in some panels)
     gpu_prefix_cache_hit_rate: float = 0.0
+    gpu_prefix_cache_hits_total: int = 0
+    gpu_prefix_cache_queries_total: int = 0
     # GPU KV usage percentage (new field for dashboard "GPU KV Usage Percentage")
     gpu_cache_usage_perc: float = 0.0
 
@@ -41,6 +56,8 @@ class EngineStats:
         num_running_reqs = 0
         num_queuing_reqs = 0
         gpu_prefix_cache_hit_rate = 0.0
+        gpu_prefix_cache_hits_total = 0
+        gpu_prefix_cache_queries_total = 0
         gpu_cache_usage_perc = 0.0
 
         for family in text_string_to_metric_families(vllm_scrape):
@@ -51,6 +68,10 @@ class EngineStats:
                     num_queuing_reqs = sample.value
                 elif sample.name == "vllm:gpu_prefix_cache_hit_rate":
                     gpu_prefix_cache_hit_rate = sample.value
+                elif sample.name == "vllm:gpu_prefix_cache_hits_total":
+                    gpu_prefix_cache_hits_total = sample.value
+                elif sample.name == "vllm:gpu_prefix_cache_queries_total":
+                    gpu_prefix_cache_queries_total = sample.value
                 elif sample.name == "vllm:gpu_cache_usage_perc":
                     gpu_cache_usage_perc = sample.value
 
@@ -58,6 +79,8 @@ class EngineStats:
             num_running_requests=num_running_reqs,
             num_queuing_requests=num_queuing_reqs,
             gpu_prefix_cache_hit_rate=gpu_prefix_cache_hit_rate,
+            gpu_prefix_cache_hits_total=gpu_prefix_cache_hits_total,
+            gpu_prefix_cache_queries_total=gpu_prefix_cache_queries_total,
             gpu_cache_usage_perc=gpu_cache_usage_perc,
         )
 

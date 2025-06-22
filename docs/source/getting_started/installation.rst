@@ -56,4 +56,4 @@ To uninstall the stack, run:
 
 .. code:: bash
 
-    sudo helm uninstall vllm
+    helm uninstall vllm

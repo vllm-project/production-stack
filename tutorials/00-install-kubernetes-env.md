@@ -35,21 +35,21 @@ Before you begin, ensure the following:
 
 ### Step 1: Installing kubectl
 
-1. Clone the repository and navigate to the `utils/` folder:
+1. Clone the repository and navigate to the [`utils/`](../utils/) folder:
 
    ```bash
    git clone https://github.com/vllm-project/production-stack.git
    cd production-stack/utils
    ```
 
-2. Execute the script `install-kubectl.sh`:
+2. Execute the script [`install-kubectl.sh`](../utils/install-kubectl.sh):
 
    ```bash
    bash install-kubectl.sh
    ```
 
 3. **Explanation:**
-   This script downloads the latest version of `kubectl`, the Kubernetes command-line tool, and places it in your PATH for easy execution.
+   This script downloads the latest version of [`kubectl`](https://kubernetes.io/docs/reference/kubectl), the Kubernetes command-line tool, and places it in your PATH for easy execution.
 
 4. **Expected Output:**
    - Confirmation that `kubectl` was downloaded and installed.
@@ -67,7 +67,7 @@ Before you begin, ensure the following:
 
 ### Step 2: Installing Helm
 
-1. Execute the script `install-helm.sh`:
+1. Execute the script [`install-helm.sh`](../utils/install-helm.sh):
 
    ```bash
    bash install-helm.sh
@@ -92,6 +92,38 @@ Before you begin, ensure the following:
    ```
 
 ### Step 3: Installing Minikube with GPU Support
+
+Before proceeding, ensure Docker runs without requiring sudo. To add your user to the docker group, run:
+
+```bash
+sudo usermod -aG docker $USER && newgrp docker
+```
+
+If Minikube is already installed on your system, we recommend uninstalling the existing version before proceeding. You may use one of the following commands based on your operating system and package manager:
+
+```bash
+# Ubuntu / Debian
+sudo apt remove minikube
+
+# RHEL / CentOS / Fedora
+sudo yum remove minikube
+# or
+sudo dnf remove minikube
+
+# macOS (installed via Homebrew)
+brew uninstall minikube
+
+# Arch Linux
+sudo pacman -Rs minikube
+
+# Windows (via Chocolatey)
+choco uninstall minikube
+
+# Windows (via Scoop)
+scoop uninstall minikube
+```
+
+After removing the previous installation, please execute the script provided below to install the latest version.
 
 1. Execute the script `install-minikube-cluster.sh`:
 
@@ -133,7 +165,7 @@ Before you begin, ensure the following:
    The issue can be observed by one or more gpu-operator pods in `CrashLoopBackOff` status, and be confirmed by checking their logs. For example,
 
    ```console
-   $ sudo kubectl -n gpu-operator logs daemonset/nvidia-device-plugin-daemonset -c nvidia-device-plugin
+   $ kubectl -n gpu-operator logs daemonset/nvidia-device-plugin-daemonset -c nvidia-device-plugin
    IS_HOST_DRIVER=true
    NVIDIA_DRIVER_ROOT=/
    DRIVER_ROOT_CTR_PATH=/host
@@ -155,7 +187,7 @@ Before you begin, ensure the following:
 1. Ensure Minikube is running:
 
    ```bash
-   sudo minikube status
+   minikube status
    ```
 
    Expected output:
@@ -172,7 +204,7 @@ Before you begin, ensure the following:
 2. Verify GPU access within Kubernetes:
 
    ```bash
-   sudo kubectl describe nodes | grep -i gpu
+   kubectl describe nodes | grep -i gpu
    ```
 
    Expected output:
@@ -185,13 +217,13 @@ Before you begin, ensure the following:
 3. Deploy a test GPU workload:
 
    ```bash
-   sudo kubectl run gpu-test --image=nvidia/cuda:12.2.0-runtime-ubuntu22.04 --restart=Never -- nvidia-smi
+   kubectl run gpu-test --image=nvidia/cuda:12.2.0-runtime-ubuntu22.04 --restart=Never -- nvidia-smi
    ```
 
     Wait for kubernetes to download and create the pod and then check logs to confirm GPU usage:
 
    ```bash
-   sudo kubectl logs gpu-test
+   kubectl logs gpu-test
    ```
 
    You should see the nvidia-smi output from the terminal

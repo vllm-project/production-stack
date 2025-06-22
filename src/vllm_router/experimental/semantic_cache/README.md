@@ -14,6 +14,14 @@ The semantic cache uses sentence transformers to generate embeddings for chat me
 - Prometheus metrics for cache performance monitoring
 - Persistent storage of cache entries
 
+## Installation
+
+In the semantic cache directory, run the following command to install the dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
 ## Usage
 
 To enable the semantic cache, use the following command-line arguments when starting the vLLM router:

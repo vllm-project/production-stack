@@ -10,3 +10,7 @@ Router Logic
 .. autoclass:: vllm_router.routers.routing_logic.RoundRobinRouter
     :members:
     :show-inheritance:
+
+.. autoclass:: vllm_router.routers.routing_logic.KvawareRouter
+    :members:
+    :show-inheritance:

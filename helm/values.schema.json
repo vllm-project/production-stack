@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
     "servingEngineSpec": {
@@ -43,6 +43,18 @@
           "items": {
             "type": "object",
             "properties": {
+              "annotations": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "podAnnotations": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
               "name": {
                 "type": "string"
               },
@@ -84,6 +96,9 @@
                 "additionalProperties": {
                   "type": "string"
                 }
+              },
+              "serviceAccountName": {
+                "type": "string"
               },
               "initContainer": {
                 "type": "object",
@@ -222,6 +237,9 @@
                   ]
                 }
               },
+              "nodeName": {
+                "type": "string"
+              },
               "nodeSelectorTerms": {
                 "type": "array",
                 "items": {
@@ -355,6 +373,19 @@
         },
         "runtimeClassName": {
           "type": "string"
+        },
+        "schedulerName": {
+          "type": "string"
+        },
+        "securityContext": {
+          "type": "object",
+          "description": "Pod-level security context configuration",
+          "additionalProperties": true
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level security context configuration",
+          "additionalProperties": true
         }
       }
     },
@@ -387,6 +418,21 @@
         },
         "requestStatsWindow": {
           "type": "integer"
+        },
+        "vllmApiKey": {
+          "type": "object",
+          "properties": {
+            "secretName": {
+              "type": "string"
+            },
+            "secretKey": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "secretName",
+            "secretKey"
+          ]
         },
         "labels": {
           "type": "object",

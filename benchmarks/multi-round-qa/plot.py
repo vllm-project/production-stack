@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-QPS_RANGE = [0.1, 0.5, 0.9, 1.3, 1.7, 2.1, 2.7, 3.1, 4.1]
+QPS_RANGE = [0.1, 0.5, 0.9, 1.3, 1.7, 2.1, 2.5, 2.9, 3.3, 3.7, 4.1]
 stack_results = []
 qpses = []
 for qps in QPS_RANGE:
@@ -64,7 +64,7 @@ for qps in QPS_RANGE:
     data = pd.read_csv(file)["ttft"].tolist()
     native_results.append(sum(data) / len(data))
     qpses += [q]
-plt.plot(qpses, native_results, label="Native K8S")
+plt.plot(qpses, native_results, label="Native K8S", color="orange", marker="v")
 print("Naive k8s TTFT", native_results)
 
 plt.xlim(left=0)
@@ -72,4 +72,5 @@ plt.ylim(top=10)
 plt.xlabel("QPS")
 plt.ylabel("Average Time to First Token (s)")
 plt.title("Average Time to First Token vs QPS")
+plt.legend()
 plt.savefig("figure.png")

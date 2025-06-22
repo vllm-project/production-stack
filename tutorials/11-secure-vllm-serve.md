@@ -25,7 +25,7 @@ how to specify the model details, set up necessary environment variables (like
 ## Step 1: Preparing the Configuration File
 
 1. Locate the example configuration file
-   `tutorials/assets/values-11-secure-vllm.yaml`.
+   [`tutorials/assets/values-11-secure-vllm.yaml`](assets/values-11-secure-vllm.yaml).
 2. Open the file and update the following fields:
    - Write your actual huggingface token in `hf_token: <YOUR HF TOKEN>` in the
      yaml file.
