@@ -54,9 +54,16 @@ spec:
           {{- if $container.args }}
           args: {{ toYaml $container.args | nindent 12 }}
           {{- end }}
-          {{- if $container.env }}
-          env: {{ toYaml $container.env | nindent 12 }}
-          {{- end }}
+          env:
+            - name: RELEASE_NAME
+              value: {{ $.Release.Name }}
+            {{- if and (hasKey $.Values "cacheserverSpec") (hasKey $.Values.cacheserverSpec "servicePort") }}
+            - name: LMCACHE_SERVER_SERVICE_PORT
+              value: {{ $.Values.cacheserverSpec.servicePort | quote }}
+            {{- end }}
+            {{- if $container.env }}
+            {{- toYaml $container.env | nindent 12 }}
+            {{- end }}
           {{- if $container.resources }}
           resources: {{ toYaml $container.resources | nindent 12 }}
           {{- end }}
