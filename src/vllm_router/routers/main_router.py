@@ -302,7 +302,8 @@ async def audio_transcriptions(
 
     # filter the endpoints url by model name for transcriptions
     transcription_endpoints = [
-        ep for ep in endpoints
+        ep
+        for ep in endpoints
         if model == ep.model_name and ep.model_label == "transcription"
     ]
 
@@ -351,7 +352,7 @@ async def audio_transcriptions(
 
     # return the whisper response unmodified
     resp = proxied.json()
-    
+
     logger.debug("Backend response headers: %s", proxied.headers)
     logger.debug("Backend response body (truncated): %r", proxied.content[:200])
 

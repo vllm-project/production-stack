@@ -1,14 +1,14 @@
 import abc
 import enum
+import io
 import json
 import re
 import resource
-
-from fastapi.requests import Request
-import requests
-from starlette.datastructures import MutableHeaders
-import io
 import wave
+
+import requests
+from fastapi.requests import Request
+from starlette.datastructures import MutableHeaders
 
 from vllm_router.log import init_logger
 
@@ -26,7 +26,9 @@ with io.BytesIO() as wav_buffer:
 
     # retrieves the generated wav bytes, return
     _SILENT_WAV_BYTES = wav_buffer.getvalue()
-    logger.debug("======A default silent WAV file has been stored in memory within py application process====")
+    logger.debug(
+        "======A default silent WAV file has been stored in memory within py application process===="
+    )
 
 
 class SingletonMeta(type):
@@ -95,11 +97,10 @@ class ModelType(enum.Enum):
             case ModelType.transcription:
                 # Generate a 0.1 second silent audio file
                 if _SILENT_WAV_BYTES is not None:
-                    logger.debug("=====Slient WAV Bytes is being used=====")
+                    logger.debug("=====Silent WAV Bytes is being used=====")
                     return {
                         "file": ("empty.wav", _SILENT_WAV_BYTES, "audio/wav"),
                     }
-
 
     @staticmethod
     def get_all_fields():
@@ -184,27 +185,25 @@ def update_content_length(request: Request, request_body: str):
 
 def is_model_healthy(url: str, model: str, model_type: str) -> bool:
     model_details = ModelType[model_type]
-    
+
     try:
         if model_type == "transcription":
 
             # for transcription, the backend expects multipart/form-data with a file
             # we will use pre-generated silent wav bytes
-            files = {
-                "file": ("empty.wav", _SILENT_WAV_BYTES, "audio/wav")
-            }
-            data = {"model":model}
+            files = {"file": ("empty.wav", _SILENT_WAV_BYTES, "audio/wav")}
+            data = {"model": model}
             response = requests.post(
                 f"{url}{model_details.value}",
                 files=files,  # multipart/form-data
-                data=data
+                data=data,
             )
         else:
             # for other model types (chat, completion, etc.)
             response = requests.post(
                 f"{url}{model_details.value}",
                 headers={"Content-Type": "application/json"},
-                json={"model":model} | model_details.get_test_payload(model_type)
+                json={"model": model} | model_details.get_test_payload(model_type),
             )
 
         response.raise_for_status()
@@ -219,5 +218,7 @@ def is_model_healthy(url: str, model: str, model_type: str) -> bool:
         return False
 
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to decode JSON from {model_type} model {model} at {url}: {e}")
+        logger.error(
+            f"Failed to decode JSON from {model_type} model {model} at {url}: {e}"
+        )
         return False
