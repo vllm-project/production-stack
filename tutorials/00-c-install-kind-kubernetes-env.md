@@ -16,7 +16,7 @@ application containers run within such nodes.
 - [Steps](#steps)
   - [Step 1: Installing kind](#step-1-installing-kind)
   - [Step 2: Installing Helm](#step-2-installing-helm)
-  - [Step 3: Installing Minikube with GPU Support](#step-3-installing-kind-with-gpu-support)
+  - [Step 3: Installing kind with GPU Support](#step-3-installing-kind-with-gpu-support)
   - [Step 4: Verifying GPU Configuration](#step-4-verifying-gpu-configuration)
 
 ## Prerequisites
@@ -104,7 +104,7 @@ Before proceeding, ensure Docker runs without requiring sudo. To add your user t
 sudo usermod -aG docker $USER && newgrp docker
 ```
 
-1. Execute the script [`utils/install-kind-cluster.sh`](../utils/install-kind-cluster.sh):
+1. Execute the script [`install-kind-cluster.sh`](../utils/install-kind-cluster.sh):
 
    ```bash
    bash install-kind-cluster.sh

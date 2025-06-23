@@ -19,12 +19,21 @@ fi
 # Ensure the target directory exists
 mkdir -p "$KIND_DIR"
 
-# Install kubectl (from tutorial https://kind.sigs.k8s.io/docs/user/quick-start/)
-[ "$(uname -m)" = x86_64 ] && curl -Lo kind https://kind.sigs.k8s.io/dl/v0.29.0/kind-linux-amd64
-# For ARM64
-[ "$(uname -m)" = aarch64 ] && curl -Lo kind https://kind.sigs.k8s.io/dl/v0.29.0/kind-linux-arm64
+# Install kind (from tutorial https://kind.sigs.k8s.io/docs/user/quick-start/)
+case "$(uname -m)" in
+  x86_64)
+    curl -Lo kind "https://kind.sigs.k8s.io/dl/v0.29.0/kind-linux-amd64"
+    ;;
+  aarch64)
+    curl -Lo kind "https://kind.sigs.k8s.io/dl/v0.29.0/kind-linux-arm64"
+    ;;
+  *)
+    echo "Unsupported architecture: $(uname -m)" >&2
+    exit 1
+    ;;
+esac
 chmod +x kind
-sudo mv kind "$KIND_PATH"
+mv kind "$KIND_PATH"
 
 # Add to PATH if not already included
 if ! echo "$PATH" | grep -q "$KIND_DIR"; then

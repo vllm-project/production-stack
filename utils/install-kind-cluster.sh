@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -euo pipefail
 # Note that this makes heavy use of Sam Stoelinga's guide https://www.substratus.ai/blog/kind-with-gpus
 echo "Setting NVIDIA container toolkit (nvidia-ctk) to be docker's default runtime..."
 # This allows Docker containers to access GPU hardware
