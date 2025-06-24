@@ -399,13 +399,25 @@ class PrefixAwareRouter(RoutingInterface):
         """
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
+        if "prompt" in request_json: # v1/completions
+            request_str = request_json["prompt"]
+        elif "messages" in request_json: # v1/chat/completions
+            prompt_parts = []
+            for message in request_json["messages"]:
+                # calling str() on already strings is safe and idempotent
+                role = str(message.get("role", "")).capitalize() # first letter uppercase
+                content = str(message.get("content", ""))
+                prompt_parts.append(f"{role}: {content}\n\n")
+            prompt_parts.append("Assistant:")
+            request_str = "".join(prompt_parts)
+
         _, matched_endpoint = await self.hashtrie.longest_prefix_match(
-            request_json["prompt"], available_endpoints
+            request_str, available_endpoints
         )
 
         selected_endpoint = random.choice(list(matched_endpoint))
 
-        await self.hashtrie.insert(request_json["prompt"], selected_endpoint)
+        await self.hashtrie.insert(request_str, selected_endpoint)
 
         return selected_endpoint
 
