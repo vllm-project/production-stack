@@ -4,6 +4,7 @@ httpx==0.28.1
 kubernetes==32.0.0
 numpy==1.26.4
 prometheus_client==0.21.1
+psutil==7.0.0
 python-multipart==0.0.20
 sentry-sdk[fastapi,httpx]==2.27.0
 uhashring==2.3

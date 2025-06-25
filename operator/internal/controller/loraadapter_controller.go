@@ -332,8 +332,8 @@ func (r *LoraAdapterReconciler) getOptimalPlacement(ctx context.Context, adapter
 
 	// Determine number of pods to use
 	numPods := len(validPods)
-	if adapter.Spec.DeploymentConfig.Replicas != nil {
-		replicas := int(*adapter.Spec.DeploymentConfig.Replicas)
+	if adapter.Spec.LoraAdapterDeploymentConfig.Replicas != nil {
+		replicas := int(*adapter.Spec.LoraAdapterDeploymentConfig.Replicas)
 		if replicas >= 0 {
 			numPods = min(replicas, len(validPods))
 		}
