@@ -188,7 +188,7 @@ spec:
           {{- end }}
           {{- if $modelSpec.chatTemplate }}
           - "--chat-template"
-          - {{ $modelSpec.chatTemplate | quote }}
+          - "/templates/{{ $modelSpec.chatTemplate }}"
           {{- end }}
           {{- if .Values.servingEngineSpec.containerSecurityContext }}
           securityContext:
@@ -367,8 +367,13 @@ spec:
           {{- end}}
           {{- end}}
           {{- if $modelSpec.chatTemplate }}
+          {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
+          - name: {{ .Release.Name }}-{{ $modelSpec.name }}-chat-templates
+            mountPath: /templates
+          {{- else }}
           - name: vllm-templates
             mountPath: /templates
+          {{- end }}
           {{- end }}
           {{- if hasKey $modelSpec "extraVolumeMounts" }}
           {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
@@ -395,7 +400,7 @@ spec:
         {{- end}}
         {{- if $modelSpec.chatTemplate}}
         {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
-        - name: {{ .Release.Name }}-chat-templates
+        - name: {{ .Release.Name }}-{{ $modelSpec.name }}-chat-templates
           configMap:
             name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
         {{- else }}
@@ -440,7 +445,7 @@ metadata:
   namespace: "{{ .Release.Namespace }}"
 data:
   {{ $modelSpec.chatTemplate }}: |-
-    {{ $modelSpec.chatTemplateConfigMap }}
+{{ $modelSpec.chatTemplateConfigMap | nindent 4 }}
 {{- end }}
 {{- end }}
 ---

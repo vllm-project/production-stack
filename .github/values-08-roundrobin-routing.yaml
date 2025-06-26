@@ -30,7 +30,7 @@ routerSpec:
   repository: "localhost:5000/git-act-router"
   imagePullPolicy: "IfNotPresent"
   enableRouter: true
-  routingLogic: "prefixaware"
+  routingLogic: "roundrobin"
   extraArgs:
     - "--log-level"
     - "info"
