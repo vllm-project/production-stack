@@ -12,7 +12,7 @@ servingEngineSpec:
 
     requestCPU: 4
     requestMemory: "16Gi"
-    requestGPU: 0.5
+    requestGPU: 1
 
     pvcStorage: "10Gi"
     pvcAccessMode:
@@ -20,14 +20,17 @@ servingEngineSpec:
 
     vllmConfig:
       maxModelLen: 1024
-      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.4"]
+      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+    chatTemplate: "chat.jinja2"
+    chatTemplateConfigMap: |-
+      {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
+      {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
 
 routerSpec:
   repository: "localhost:5000/git-act-router"
   imagePullPolicy: "IfNotPresent"
   enableRouter: true
-  routingLogic: "session"
-  sessionKey: "x-user-id"
+  routingLogic: "prefixaware"
   extraArgs:
     - "--log-level"
     - "info"
