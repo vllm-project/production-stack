@@ -124,9 +124,9 @@ async def process_request(
                 request.app.state.request_stats_monitor.on_request_response(
                     backend_url, request_id, time.time()
                 )
-                # For non-streaming requests, collect the full response
-                if full_response is not None:
-                    full_response.extend(chunk)
+            # For non-streaming requests, collect the full response
+            if full_response is not None:
+                full_response.extend(chunk)
             yield chunk
 
     request.app.state.request_stats_monitor.on_request_complete(
