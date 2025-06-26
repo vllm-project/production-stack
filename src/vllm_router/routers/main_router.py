@@ -82,6 +82,16 @@ async def route_embeddings(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/embeddings", background_tasks)
 
 
+@main_router.post("/tokenize")
+async def route_tokenize(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/tokenize", background_tasks)
+
+
+@main_router.post("/detokenize")
+async def route_detokenize(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/detokenize", background_tasks)
+
+
 @main_router.post("/v1/rerank")
 async def route_v1_rerank(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/rerank", background_tasks)
