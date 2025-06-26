@@ -108,13 +108,13 @@ async def show_version():
 @main_router.get("/v1/models")
 async def show_models():
     """
-    Returns a list of all models available in the stack.
+    Returns a list of all models available in the stack
 
     Args:
         None
 
     Returns:
-        JSONResponse: A JSON response containing the list of models.
+        JSONResponse: A JSON response containing the list of models and their relationships.
 
     Raises:
         Exception: If there is an error in retrieving the endpoint information.
@@ -122,17 +122,25 @@ async def show_models():
     endpoints = get_service_discovery().get_endpoint_info()
     existing_models = set()
     model_cards = []
+
     for endpoint in endpoints:
-        if endpoint.model_name in existing_models:
+        if not endpoint.model_info:
             continue
-        model_card = ModelCard(
-            id=endpoint.model_name,
-            object="model",
-            created=endpoint.added_timestamp,
-            owned_by="vllm",
-        )
-        model_cards.append(model_card)
-        existing_models.add(endpoint.model_name)
+
+        for model_id, model_info in endpoint.model_info.items():
+            if model_id in existing_models:
+                continue
+
+            model_card = ModelCard(
+                id=model_id,
+                object="model",
+                created=model_info["created"],
+                owned_by=model_info["owned_by"],
+                parent=model_info["parent"],
+            )
+            model_cards.append(model_card)
+            existing_models.add(model_id)
+
     model_list = ModelList(data=model_cards)
     return JSONResponse(content=model_list.model_dump())
 

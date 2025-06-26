@@ -42,6 +42,7 @@ servingEngineSpec:
       enableChunkedPrefill: false
       enablePrefixCaching: false
       maxModelLen: 16384
+      v1: 1
 
     lmcacheConfig:
       enabled: true
@@ -72,6 +73,8 @@ cacheserverSpec:
 ```
 
 > **Note:** Replace `<YOUR HF TOKEN>` with your actual Hugging Face token.
+
+Also, right now ``v1`` has to be set to ``1`` to use LMCache docker image with ``latest`` tag.
 
 The `CacheserverSpec` starts a remote shared KV cache storage.
 

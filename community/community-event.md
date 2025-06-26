@@ -10,4 +10,4 @@ Time: Weekly
 
 Please download and import the following iCalendar (.ics) files to your calendar system:
 
-**6:00--6:30PM PT on Tuesdays**: [Zoom link](https://uchicago.zoom.us/j/6603596916?pwd=Z1E5MDRWUSt2am5XbEt4dTFkNGx6QT09), [Calendar Invite](Production_stack_community_meeting.ics)
+**5:30--6:00PM PT on Tuesdays**: [Zoom link](https://uchicago.zoom.us/j/6603596916?pwd=Z1E5MDRWUSt2am5XbEt4dTFkNGx6QT09), [Calendar Invite](prod_stack_community_meeting.ics)

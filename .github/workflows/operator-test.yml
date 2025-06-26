@@ -1,0 +1,75 @@
+name: Operator CRD and CR Testing
+run-name: ${{ github.actor }} is testing operator CRDs and CRs 🚀
+
+concurrency:
+  group: ${{ github.ref }}-crd
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/operator-test.yml'
+      - 'operator/**'
+      - 'tests/e2e/**'
+  pull_request:
+    paths:
+      - '.github/workflows/operator-test.yml'
+      - 'operator/**'
+      - 'tests/e2e/**'
+  merge_group:
+
+jobs:
+  CRD-Validation:
+    runs-on: self-hosted
+    steps:
+      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+
+      - name: Setup test environment
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          echo "🔧 Setting up test environment"
+          sudo sysctl fs.protected_regular=0
+          # Verify minikube is running
+          minikube status
+          # Ensure kubectl is configured for minikube
+          minikube kubectl -- get nodes
+
+      - name: Test CRDs and CRs
+        run: |
+          cd ${{ github.workspace }}
+          chmod +x tests/e2e/test-crds.sh
+          ./tests/e2e/test-crds.sh
+
+      - name: Cleanup test resources
+        if: always()
+        run: |
+          echo "🧹 Cleaning up test resources"
+          # Delete all CRs
+          kubectl delete vllmruntime --all || true
+          kubectl delete cacheserver --all || true
+          kubectl delete vllmrouter --all || true
+          # Delete all CRDs
+          kubectl delete crd vllmruntimes.production-stack.vllm.ai || true
+          kubectl delete crd cacheservers.production-stack.vllm.ai || true
+          kubectl delete crd vllmrouters.production-stack.vllm.ai || true
+
+      - name: Archive test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: operator-test-results
+          path: |
+            operator-test-results/
+
+      - run: echo "🍏 This job's status is ${{ job.status }}."

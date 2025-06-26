@@ -28,6 +28,7 @@ The router can be configured using command-line arguments. Below are the availab
 - `--static-backends`: The URLs of static serving engines, separated by commas (e.g., `http://localhost:8000,http://localhost:8001`).
 - `--static-models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
 - `--static-aliases`: The aliases of the models running in the static serving engines, separated by commas and associated using colons (e.g., `model_alias1:model,mode_alias2:model`).
+- `--static-backend-health-checks`: Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.
 - `--k8s-port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
 - `--k8s-namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
 - `--k8s-label-selector`: The label selector to filter vLLM pods when using K8s service discovery.
@@ -82,10 +83,24 @@ vllm-router --port 8000 \
     --static-backends "http://localhost:9001,http://localhost:9002,http://localhost:9003" \
     --static-models "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m" \
     --static-aliases "gpt4:meta-llama/Llama-3.1-8B-Instruct" \
+    --static-model-types "chat,chat,chat" \
+    --static-backend-health-checks \
     --engine-stats-interval 10 \
     --log-stats \
     --routing-logic roundrobin
 ```
+
+## Backend health checks
+
+By enabling the `--static-backend-health-checks` flag, **vllm-router** will send a simple request to
+your LLM nodes every minute to verify that they still work.
+If a node is down, it will output a warning and exclude the node from being routed to.
+
+If you enable this flag, its also required that you specify `--static-model-types` as we have to use
+different endpoints for each model type.
+
+> Enabling this flag will put some load on your backend every minute as real requests are send to the nodes
+> to test their functionality.
 
 ## Dynamic Router Config
 

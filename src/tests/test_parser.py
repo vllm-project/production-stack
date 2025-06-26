@@ -77,3 +77,37 @@ def test_load_initial_config_from_config_json_if_required_when_config_file_is_pr
             test_parser, args
         )
         assert args.routing_logic == "roundrobin"
+
+
+def test_validate_args_when_service_discovery_is_set_to_static_and_static_backend_health_checks_is_set_and_static_model_types_is_not_set_raises_value_error() -> (
+    None
+):
+    with pytest.raises(ValueError):
+        parser.validate_args(
+            MagicMock(
+                routing_logic="roundrobin",
+                service_discovery="static",
+                static_backend_health_checks=True,
+                static_model_types=None,
+            )
+        )
+
+
+def test_validate_static_model_types_when_model_types_is_not_defines_raises_value_error() -> (
+    None
+):
+    with pytest.raises(ValueError):
+        parser.validate_static_model_types(None)
+
+
+def test_validate_static_model_types_when_model_types_contains_unsupported_model_type_raises_value_error() -> (
+    None
+):
+    with pytest.raises(ValueError):
+        parser.validate_static_model_types("chat,unsupported")
+
+
+def test_validate_static_model_types_when_model_types_contains_only_supported_model_types_does_not_raise_error() -> (
+    None
+):
+    parser.validate_static_model_types("chat,completion,rerank,score")

@@ -1,8 +1,6 @@
 BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//ical.marudot.com//iCal Event Maker
-X-WR-CALNAME:production_stack_community_meeting
-NAME:production_stack_community_meeting
 CALSCALE:GREGORIAN
 BEGIN:VTIMEZONE
 TZID:America/Chicago
@@ -25,12 +23,13 @@ RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU
 END:STANDARD
 END:VTIMEZONE
 BEGIN:VEVENT
-DTSTAMP:20250421T224858Z
-UID:1745275711483-43629@ical.marudot.com
-DTSTART;TZID=America/Chicago:20250422T200000
+DTSTAMP:20250520T063241Z
+UID:1747722750439-82894@ical.marudot.com
+DTSTART;TZID=America/Chicago:20250520T193000
 RRULE:FREQ=WEEKLY;BYDAY=TU
-DTEND;TZID=America/Chicago:20250422T203000
-SUMMARY:vLLM Production Stack Community Meeting
-DESCRIPTION:Zoom link: https://uchicago.zoom.us/j/6603596916?pwd=Z1E5MDRWUSt2am5XbEt4dTFkNGx6QT09\nMeeting notes: https://docs.google.com/document/d/1SCye2qgpwAFDptj8obBXVbSpBbKjb8fiVjH9HKK3OOw/edit?usp=sharing
+DTEND;TZID=America/Chicago:20250520T200000
+SUMMARY:vLLM Production Stack community meeting
+DESCRIPTION:Zoom link: https://uchicago.zoom.us/j/6603596916?pwd=Z1E5MDRWUSt2am5XbEt4dTFkNGx6QT09\n\nMeeting notes: https://docs.google.com/document/d/1SCye2qgpwAFDptj8obBXVbSpBbKjb8fiVjH9HKK3OOw/edit?tab=t.0#heading=h.k23y27krby7f
+LOCATION:https://uchicago.zoom.us/j/6603596916?pwd=Z1E5MDRWUSt2am5XbEt4dTFkNGx6QT09
 END:VEVENT
 END:VCALENDAR
