@@ -16,6 +16,17 @@
             }
           }
         },
+        "strategy": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "RollingUpdate",
+                "Recreate"
+              ]
+            }
+          }
+        },
         "vllmApiKey": {
           "oneOf": [
             {
