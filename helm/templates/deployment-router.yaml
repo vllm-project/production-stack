@@ -131,4 +131,11 @@ spec:
           httpGet:
             path: /health
             port: {{ .Values.routerSpec.containerPort }}
+        startupProbe:
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: {{ .Values.routerSpec.containerPort }}
 {{- end }}

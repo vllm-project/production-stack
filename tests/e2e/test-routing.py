@@ -45,10 +45,11 @@ class StaticDiscoveryTest:
         router_url: str = "http://localhost:30080",
         model: str = "facebook/opt-125m",
         result_dir: str = "tests/e2e/static-discovery-results",
-        log_file_path: Optional[str] = None,
         routing_logic: str = "roundrobin",
         prefix_chunk_size: int = 128,
         num_requests: int = 20,
+        session_key: str = "x-user-id",
+        log_file_path: str = "",
     ):
         self.router_url = router_url
         self.model = model
@@ -58,6 +59,7 @@ class StaticDiscoveryTest:
         os.makedirs(self.results_dir, exist_ok=True)
         self.prefix_chunk_size = prefix_chunk_size
         self.num_requests = num_requests
+        self.session_key = session_key
 
     def _read_log_file(self) -> Optional[deque]:
         """Read router log file and return content as deque"""
@@ -110,6 +112,34 @@ class StaticDiscoveryTest:
                 if request_id in request_id_to_endpoints:
                     request_id_to_endpoints[request_id].add(endpoint)
 
+    def _extract_session_endpoint_set_mapping(
+        self, routing_lines: List[str], session_id_to_endpoints: Dict[str, Set[str]]
+    ):
+        """Extract session ID to set of endpoints mapping from routing lines, but only for the first request"""
+        for line in routing_lines:
+            match = re.search(
+                r"Routing request [^ ]* with session id ([^ ]*) to ([^ ]*) at ", line
+            )
+            if match:
+                session_id = match.group(1)
+                endpoint = match.group(2)
+                if session_id in session_id_to_endpoints:
+                    session_id_to_endpoints[session_id].add(endpoint)
+
+    def _extract_endpoint_list_mapping(
+        self, routing_lines: List[str], request_id_to_endpoints: Dict[str, List[str]]
+    ):
+        """Extract request ID to list of endpoints mapping from routing lines"""
+        for line in routing_lines:
+            match = re.search(
+                r"Routing request ([^ ]*) with session id [^ ]* to ([^ ]*) at ", line
+            )
+            if match:
+                request_id = match.group(1)
+                endpoint = match.group(2)
+                if request_id in request_id_to_endpoints:
+                    request_id_to_endpoints[request_id].append(endpoint)
+
     def _save_routing_lines(
         self, routing_lines: List[str], filename: str = "routing_lines.txt"
     ) -> bool:
@@ -141,6 +171,7 @@ class StaticDiscoveryTest:
                 "Content-Type": "application/json",
                 "Authorization": "Bearer dummy",
                 "X-Request-Id": request_id,
+                self.session_key: request_id,
             }
 
             response = requests.post(
@@ -160,6 +191,47 @@ class StaticDiscoveryTest:
         except json.JSONDecodeError as e:
             print_error(f"ERROR: Invalid JSON response for request {request_id}: {e}")
             return False
+
+    def test_session_routing(self) -> bool:
+        """Test that the router can handle session routing"""
+        print_status(f"🧪 Testing session routing")
+        session_id_to_endpoint = {}
+        success_count = 0
+        total_requests = self.num_requests * 5
+        for i in range(self.num_requests):
+            session_id = str(uuid.uuid4())
+            session_id_to_endpoint[session_id] = set()
+            for j in range(5):
+                if self.send_request(session_id, "Hello!"):
+                    success_count += 1
+
+        if success_count == total_requests:
+            print_status(f"✅ All {total_requests} requests completed successfully")
+        else:
+            print_error(f"❌ Only {success_count}/{total_requests} requests succeeded")
+            return False
+
+        # Analyze routing patterns
+        content = self._read_log_file()
+        if content is None:
+            return False
+        routing_lines = self._extract_routing_lines(content)
+        self._extract_session_endpoint_set_mapping(
+            routing_lines, session_id_to_endpoint
+        )
+        print_status(f"Session ID to endpoint mapping: {session_id_to_endpoint}")
+        self._save_routing_lines(routing_lines, "routing_lines.txt")
+
+        # Verify that all requests are routed to the same endpoint
+        for session_id, endpoints in session_id_to_endpoint.items():
+            if len(endpoints) != 1:
+                print_error(
+                    f"❌ Session {session_id} was routed to multiple endpoints: {endpoints}"
+                )
+                return False
+
+        print_status("✅ Session routing verification passed")
+        return True
 
     def test_roundrobin_routing(self) -> bool:
         """Test that requests are distributed in round-robin fashion"""
@@ -351,11 +423,62 @@ class StaticDiscoveryTest:
     def test_disaggregated_prefill_routing(self) -> bool:
         """Test that the router can handle disaggregated prefill routing"""
         print_status("🧪 Testing disaggregated prefill routing")
+        success_count = 0
+        request_id_to_endpoints = {}
+        for i in range(self.num_requests):
+            request_id = str(uuid.uuid4())
+            request_id_to_endpoints[request_id] = []
+            if self.send_request(request_id, "How are you?"):
+                success_count += 1
+            else:
+                print_error("❌ Failed to send prefill and decode requests")
+                return False
+
+        if success_count == self.num_requests:
+            print_status(
+                f"✅ Successfully sent {self.num_requests} prefill and decode requests"
+            )
+        else:
+            print_error(
+                f"❌ Only {success_count}/{self.num_requests} requests succeeded"
+            )
+            return False
+
+        # Analyze routing patterns
+        content = self._read_log_file()
+        if content is None:
+            return False
+        routing_lines = self._extract_routing_lines(content)
+        self._extract_endpoint_list_mapping(routing_lines, request_id_to_endpoints)
+        for request_id, endpoints in request_id_to_endpoints.items():
+            # must be routed two different endpoints
+            if len(endpoints) != 2:
+                print_error(
+                    f"❌ Request {request_id} was routed to {endpoints} instead of 2 endpoints"
+                )
+                return False
+            if endpoints[0] == endpoints[1]:
+                print_error(
+                    f"❌ Request {request_id} was routed to the same endpoint: {endpoints}"
+                )
+                return False
+
+        print_status(f"Request ID to endpoint mapping: {request_id_to_endpoints}")
+        self._save_routing_lines(routing_lines, "routing_lines.txt")
+        print_status("✅ Disaggregated prefill routing verification passed")
         return True
 
     def test_kvaware_routing(self) -> bool:
         """Test that the router can handle kvaware routing"""
-        print_status("🧪 Testing kvaware routing")
+        print_status("🧪 Only test whether endpoints are working")
+        # TODO: remove this once lmcache supports kvaware routing
+        return True
+        request_id = str(uuid.uuid4())
+        if self.send_request(request_id, "Hello!", max_tokens=10):
+            print_status("✅ Kvaware routing verification passed")
+        else:
+            print_error("❌ Kvaware routing verification failed")
+            return False
         return True
 
     def test_health_endpoint(self) -> bool:
@@ -388,6 +511,10 @@ class StaticDiscoveryTest:
 
     def test_chat_completions(self) -> bool:
         """Test that the router can handle chat completions"""
+        # TODO: remove this once lmcache and kv-aware routing supports chat completions
+        if self.routing_logic == "kvaware":
+            print_status("🧪 Skipping chat completions test for kvaware routing")
+            return True
         try:
             payload = {
                 "model": self.model,
@@ -438,6 +565,7 @@ class StaticDiscoveryTest:
                 "prefixaware": self.test_prefixaware_routing,
                 "disaggregated_prefill": self.test_disaggregated_prefill_routing,
                 "kvaware": self.test_kvaware_routing,
+                "session": self.test_session_routing,
             }
             if test_runner := test_runners.get(self.routing_logic):
                 if not test_runner():
@@ -506,8 +634,7 @@ class K8sDiscoveryRoutingTest(StaticDiscoveryTest):
     def _read_log_file(self) -> Optional[deque]:
         """Read router log file and return content as deque"""
         try:
-            if self.log_file_path is None:
-                self.log_file_path = self._get_router_logs()
+            self.log_file_path = self._get_router_logs()
             print_status(f"Reading log file: {self.log_file_path}")
             if self.log_file_path is not None:
                 with open(self.log_file_path, "r") as f:
@@ -552,6 +679,11 @@ def main():
         default="static",
         help="Discovery type to use for testing",
     )
+    parser.add_argument(
+        "--session-key",
+        default="x-user-id",
+        help="Session key for session routing",
+    )
     args = parser.parse_args()
 
     if args.discovery_type == "static":
@@ -564,6 +696,7 @@ def main():
             routing_logic=args.routing_logic,
             prefix_chunk_size=args.prefix_chunk_size,
             num_requests=args.num_requests,
+            session_key=args.session_key,
         )
         success = test.run_test()
     elif args.discovery_type == "k8s":

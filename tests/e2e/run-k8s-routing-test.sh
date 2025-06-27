@@ -18,6 +18,7 @@ ROUTER_URL=""
 LOG_FILE_PATH=""
 RESULT_DIR="tests/e2e/k8s-discovery-results"
 DISCOVERY_TYPE="k8s"
+SESSION_KEY="x-user-id"
 
 # Colors for output
 RED='\033[0;31m'
@@ -48,6 +49,7 @@ Test Type Options:
     prefixaware        - Test prefix-aware routing
     kvaware           - Test KV-aware routing
     disaggregated-prefill - Test disaggregated prefill routing
+    session           - Test session routing
     all               - Run all available tests sequentially
 
 Options:
@@ -60,11 +62,13 @@ Options:
     -t, --discovery-type TYPE   Discovery type: static or k8s (default: k8s)
     -v, --verbose               Enable verbose output
     -t, --timeout N             Timeout in minutes (default: 10)
+    --session-key KEY           Session key for session routing (default: x-user-id)
     -h, --help                  Show this help message
 
 Examples:
     $0 roundrobin --model "facebook/opt-125m" --num-requests 30 --verbose
     $0 prefixaware --model "facebook/opt-125m" --chunk-size 256 --debug
+    $0 session --model "facebook/opt-125m" --num-requests 30 --verbose
     $0 all --verbose --discovery-type k8s
     $0 roundrobin --router-url "http://localhost:30080" --discovery-type static
 
@@ -155,6 +159,10 @@ run_test() {
         test_cmd="$test_cmd --verbose"
     fi
 
+    if [ "$test_type" = "session" ]; then
+        test_cmd="$test_cmd --session-key \"$SESSION_KEY\""
+    fi
+
     print_status "Executing: $test_cmd"
     timeout "${TIMEOUT_MINUTES}m" bash -c "$test_cmd"
 }
@@ -227,6 +235,7 @@ run_complete_test() {
     # Setup port forwarding for k8s discovery
     if ! setup_port_forwarding; then
         print_error "Failed to setup port forwarding"
+        cleanup_resources
         return 1
     fi
 
@@ -236,6 +245,7 @@ run_complete_test() {
     else
         print_error "❌ $test_type test failed"
         collect_debug_logs "$test_type"
+        cleanup_resources
         return 1
     fi
 
@@ -255,7 +265,9 @@ run_all_tests() {
     local test_configs=(
         "roundrobin:roundrobin:.github/values-08-roundrobin-routing.yaml"
         "prefixaware:prefixaware:.github/values-07-prefix-routing.yaml"
-        "kvaware:kvaware:.github/values-09-kv-aware-routing.yaml"
+        "kvaware:kvaware:.github/values-09-kvaware-routing.yaml"
+        "session:session:.github/values-06-session-routing.yaml"
+        "disaggregated-prefill:disaggregated_prefill:.github/values-10-disagg-prefill.yaml"
     )
 
     local failed_tests=()
@@ -278,7 +290,7 @@ run_all_tests() {
         fi
 
         # Small delay between tests
-        sleep 5
+        sleep 2
     done
 
     # Report final results
@@ -354,6 +366,10 @@ while [[ $# -gt 0 ]]; do
             TIMEOUT_MINUTES="$2"
             shift 2
             ;;
+        --session-key)
+            SESSION_KEY="$2"
+            shift 2
+            ;;
         *)
             print_error "Unknown option: $1"
             show_usage
@@ -379,16 +395,20 @@ else
             ROUTING_LOGIC="prefixaware"
             ;;
         "kvaware")
-            HELM_VALUES_FILE=".github/values-09-kv-aware-routing.yaml"
+            HELM_VALUES_FILE=".github/values-09-kvaware-routing.yaml"
             ROUTING_LOGIC="kvaware"
             ;;
         "disaggregated-prefill")
-            HELM_VALUES_FILE=".github/values-10-disaggregated-prefill-routing.yaml"
+            HELM_VALUES_FILE=".github/values-10-disagg-prefill.yaml"
             ROUTING_LOGIC="disaggregated_prefill"
+            ;;
+        "session")
+            HELM_VALUES_FILE=".github/values-06-session-routing.yaml"
+            ROUTING_LOGIC="session"
             ;;
         *)
             print_error "Invalid test type: $TEST_TYPE"
-            print_error "Valid options: roundrobin, prefixaware, kvaware, disaggregated-prefill, all"
+            print_error "Valid options: roundrobin, prefixaware, kvaware, session, disaggregated-prefill, all"
             exit 1
             ;;
     esac

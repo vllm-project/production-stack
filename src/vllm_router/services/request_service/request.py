@@ -370,6 +370,9 @@ async def route_disaggregated_prefill_request(
     )
     et = time.time()
     logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
+    logger.info(
+        f"Routing request {request_id} with session id None to {request.app.state.prefill_client.base_url} at {et}, process time = {et - in_router_time:.4f}"
+    )
     request_json["max_tokens"] = orig_max_tokens
 
     async def generate_stream():
@@ -377,6 +380,11 @@ async def route_disaggregated_prefill_request(
             request.app.state.decode_client, endpoint, request_json, request_id
         ):
             yield chunk
+
+    curr_time = time.time()
+    logger.info(
+        f"Routing request {request_id} with session id None to {request.app.state.decode_client.base_url} at {curr_time}, process time = {curr_time - et:.4f}"
+    )
 
     return StreamingResponse(
         generate_stream(),
