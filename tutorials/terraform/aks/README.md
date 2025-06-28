@@ -402,7 +402,7 @@ Import the dashboard using the `vllm-dashboard.json` in this folder.
 ### Use Prometheus Adapter to export vLLM metrics
 
 The vLLM router can export metrics to Prometheus using the [Prometheus Adapter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter).
-When running the `install.sh` script, the Prometheus Adapter will be installed and configured to export the vLLM metrics.
+When running the [`install.sh`](../../../observability/install.sh) script, the Prometheus Adapter will be installed and configured to export the vLLM metrics.
 
 We provide a minimal example of how to use the Prometheus Adapter to export vLLM metrics. See [prom-adapter.yaml](../../../observability/prom-adapter.yaml) for more details.
 

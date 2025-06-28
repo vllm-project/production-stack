@@ -22,3 +22,9 @@ resource "azapi_resource_action" "ssh_public_key_gen" {
 output "key_data" {
   value = azapi_resource_action.ssh_public_key_gen.output.publicKey
 }
+
+output "ssh_private_key" {
+  description = "The private SSH key for accessing cluster nodes. Save this to a file to SSH into the nodes."
+  value       = azapi_resource_action.ssh_public_key_gen.output.privateKey
+  sensitive   = true
+}
