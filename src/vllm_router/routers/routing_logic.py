@@ -32,7 +32,6 @@ try:
     from lmcache.v1.cache_controller.message import (
         LookupMsg,
         QueryInstMsg,
-        QueryInstRetMsg,
     )
 except ImportError:
     pass
