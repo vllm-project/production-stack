@@ -38,7 +38,7 @@ from vllm_router.utils import replace_model_in_request_body, update_content_leng
 try:
     # Semantic cache integration
     from vllm_router.experimental.semantic_cache import (
-        GetSemanticCache,
+        get_semantic_cache,
         enable_semantic_cache,
         initialize_semantic_cache,
         is_semantic_cache_enabled,
