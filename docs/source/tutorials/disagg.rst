@@ -134,7 +134,7 @@ Install the deployment using Helm with the configuration file:
 
 .. code-block:: bash
 
-    helm install pd helm/ -f tutorials/assets/values-16-disagg-prefill.yaml
+    helm install vllm helm/ -f tutorials/assets/values-16-disagg-prefill.yaml
 
 This will deploy:
 
@@ -172,7 +172,7 @@ First do port forwarding to access the service:
 
 .. code-block:: bash
 
-    kubectl port-forward svc/pd-router-service 30080:80
+    kubectl port-forward svc/vllm-router-service 30080:80
 
 And then send a request to the router by:
 

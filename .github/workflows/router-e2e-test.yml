@@ -101,7 +101,7 @@ jobs:
             ~/.kube/config
             src/tests/perftest/logs
 
-  sticky-routing-e2e-test:
+  k8s-discovery-e2e-test:
     runs-on: self-hosted
     needs: e2e-test
     if: github.event.pull_request.draft == false
@@ -141,75 +141,35 @@ jobs:
           sudo docker push localhost:5000/git-act-router
           minikube image load localhost:5000/git-act-router
 
-      - name: Deploy two-pods setup via helm charts
+      - name: Run all k8s discovery routing tests
         run: |
-          echo "🚀 Deploying two-pods setup with helm"
-          cd ${{ github.workspace }}
-          helm install vllm ./helm -f .github/values-06-session-routing.yaml
-
-      - name: Wait for pods to be ready
-        run: |
-          echo "⏳ Making wait-for-pods script executable and running it"
-          chmod +x .github/wait-for-pods.sh
-          ./.github/wait-for-pods.sh --pod-prefix vllm --timeout 300 --verbose
-
-      - name: Make test script executable
-        run: |
-          chmod +x tests/e2e/test-sticky-routing.sh
-
-      - name: Run sticky routing e2e test
-        run: |
-          echo "🧪 Running sticky routing test"
-          cd ${{ github.workspace }}
-          # Set the model to match what's deployed in the helm values
-          # Enable debug mode to preserve temp files for artifact collection
-          ./tests/e2e/test-sticky-routing.sh --model "facebook/opt-125m" --num-rounds 3 --verbose --debug
+          echo "🧪 Running all k8s discovery routing tests"
+          ./tests/e2e/run-k8s-routing-test.sh all \
+            --model "facebook/opt-125m" \
+            --num-requests 25 \
+            --chunk-size 128 \
+            --verbose \
+            --result-dir /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }} \
+            --timeout 10
         timeout-minutes: 10
 
-      - name: Archive sticky routing test results
+      - name: Archive k8s discovery routing test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sticky-routing-test-results-pr-${{ github.event.pull_request.number || 'main' }}
+          name: k8s-discovery-routing-test-results-pr-${{ github.event.pull_request.number || 'main' }}
           path: |
-            /tmp/sticky-routing-results-*
+            /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }}/*
 
-      - name: Get router and pod logs for debugging
-        if: always()
-        run: |
-          echo "📋 Collecting logs for debugging"
-          mkdir -p debug-logs
-          # Get router logs
-          kubectl logs -l app.kubernetes.io/component=router --tail=100 > debug-logs/router.log || true
-          # Get serving engine logs
-          kubectl logs -l app.kubernetes.io/component=serving-engine --tail=100 > debug-logs/serving-engines.log || true
-          # Get pod status
-          kubectl get pods -o wide > debug-logs/pod-status.txt || true
-          # Get services
-          kubectl get svc > debug-logs/services.txt || true
-
-      - name: Upload debug logs
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: debug-logs-pr-${{ github.event.pull_request.number || 'main' }}
-          path: debug-logs/
-
-      - name: Helm uninstall and cleanup
-        run: |
-          echo "🧹 Cleaning up resources"
-          helm uninstall vllm || true
-          sudo docker image prune -f || true
-        if: always()
-
-      - run: echo "🍏 Sticky routing e2e test job status is ${{ job.status }}."
+      - run: echo "🍏 K8s discovery e2e test job status is ${{ job.status }}."
 
   static-discovery-e2e-test:
     runs-on: self-hosted
     needs: e2e-test
     if: github.event.pull_request.draft == false
     env:
-      LOG_DIR: /tmp/debug-logs-${{ github.event.pull_request.number || 'main' }}
+      LOG_DIR: /tmp/static-discovery-e2e-test-${{ github.event.pull_request.number || 'main' }}
+
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -232,46 +192,26 @@ jobs:
         run: |
           echo "🚀 Starting vLLM serve backend"
           mkdir -p "$LOG_DIR"
-          CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 > "$LOG_DIR/backend1.log" 2>&1 &
-          CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 > "$LOG_DIR/backend2.log" 2>&1 &
-          sleep 3
+          CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
+          CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend2.log" 2>&1 &
 
       - name: Wait for backends to be ready
         run: |
           echo "⏳ Waiting for backends to be ready"
-          chmod +x .github/wait-for-backends.sh
-          ./.github/wait-for-backends.sh 180 "http://localhost:8001" "http://localhost:8002"
+          chmod +x tests/e2e/wait-for-backends.sh
+          ./tests/e2e/wait-for-backends.sh 180 "http://localhost:8001" "http://localhost:8002"
 
-      - name: Start Router with static discovery and roundrobin routing
+      - name: Run All Static Discovery Routing Tests
         env:
           PYTHONPATH: ${{ github.workspace }}/src
         run: |
-          echo "🔧 Starting router with static discovery and roundrobin routing"
-          echo "PYTHONPATH=$PYTHONPATH"
-          # Start router in background with log capture
-          python3 -m src.vllm_router.app --port 30080 \
-            --service-discovery static \
-            --static-backends "http://localhost:8001,http://localhost:8002" \
-            --static-models "facebook/opt-125m,facebook/opt-125m" \
-            --static-model-types "chat,chat" \
-            --log-stats \
-            --log-stats-interval 10 \
-            --engine-stats-interval 10 \
-            --request-stats-window 10 \
-            --routing-logic roundrobin > "$LOG_DIR/router.log" 2>&1 &
-          ROUTER_PID=$!
-          echo "Router started with PID: $ROUTER_PID"
-          # Check if router is running
-          timeout 30 bash -c 'until curl -s http://localhost:30080 > /dev/null 2>&1; do sleep 1; done' || {
-            echo "❌ Router failed to start within 30 seconds"
-            exit 1
-          }
-          echo "✅ Router started successfully"
-
-      - name: Run static discovery E2E test
-        run: |
-          echo "🧪 Running static discovery test"
-          python3 tests/e2e/test-static-discovery.py --num-requests 20 --verbose --log-file-path "$LOG_DIR/router.log" --router-url http://localhost:30080
+          echo "🧪 Running all static discovery routing tests sequentially"
+          chmod +x tests/e2e/run-static-discovery-routing-test.sh
+          ./tests/e2e/run-static-discovery-routing-test.sh all \
+            --pythonpath "$PYTHONPATH" \
+            --log-dir "$LOG_DIR" \
+            --num-requests 20 \
+            --verbose
         timeout-minutes: 5
 
       - name: Archive static discovery test results and logs
@@ -280,14 +220,13 @@ jobs:
         with:
           name: static-discovery-test-results-pr-${{ github.event.pull_request.number || 'main' }}
           path: |
-            /tmp/static-discovery-results-*
-            $LOG_DIR/
+            ${{ env.LOG_DIR }}/*
 
       - name: Cleanup processes
         if: always()
         run: |
           echo "🧹 Cleaning up processes"
-          pkill -f "vllm serve"
-          pkill -f "python3 -m src.vllm_router.app"
+          pkill -f "vllm serve" || true
+          pkill -f "python3 -m src.vllm_router.app" || true
 
       - run: echo "🍏 Static discovery e2e test job status is ${{ job.status }}."

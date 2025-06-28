@@ -61,7 +61,6 @@ Documentation
 
    tutorials/disagg.rst
    tutorials/kv_cache.rst
-   tutorials/lora_load.rst
    tutorials/kvaware.rst
    tutorials/prefixaware.rst
 
@@ -70,6 +69,7 @@ Documentation
    :caption: Deployment
 
    deployment/helm
+   deployment/crd
    deployment/cloud-deployment/index.rst
    deployment/ray/ray.rst
 
