@@ -300,6 +300,7 @@ resource "helm_release" "kube_prometheus_stack" {
 Once deployed, you can test your vLLM endpoint with these commands:
 
 ### 1. Get azure kubernetes service kubeconfig
+
 ```bash
 export KUBECONFIG="azurek8s"
 ```
