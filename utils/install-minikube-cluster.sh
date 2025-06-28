@@ -10,9 +10,9 @@ echo "Current PATH: $PATH"
 echo "Operating System: $(uname -a)"
 
 # --- Helper Functions ---
-# Check if minikube is installed.
-minikube_exists() {
-  command -v minikube >/dev/null 2>&1
+# check if a command is available
+check_cmd() {
+  command -v "$1" >/dev/null 2>&1
 }
 
 # Get the script directory to reference local scripts reliably.
@@ -24,7 +24,7 @@ bash "$SCRIPT_DIR/install-kubectl.sh"
 bash "$SCRIPT_DIR/install-helm.sh"
 
 # Install minikube if it isn’t already installed.
-if minikube_exists; then
+if check_cmd minikube; then
   echo "Minikube already installed."
 else
   echo "Minikube not found. Installing minikube..."
@@ -43,9 +43,9 @@ fi
 
 # --- NVIDIA GPU Setup ---
 GPU_AVAILABLE=false
-if command -v "$NVIDIA_SMI_PATH" >/dev/null 2>&1; then
+if check_cmd "$NVIDIA_SMI_PATH"; then
     echo "NVIDIA GPU detected via nvidia-smi at: $(command -v "$NVIDIA_SMI_PATH")"
-    if command -v "$NVIDIA_CTK_PATH" >/dev/null 2>&1; then
+    if check_cmd "$NVIDIA_CTK_PATH"; then
       echo "nvidia-ctk found at: $(command -v "$NVIDIA_CTK_PATH")"
       GPU_AVAILABLE=true
     else
