@@ -20,7 +20,10 @@ from vllm_router.dynamic_config import get_dynamic_config_watcher
 from vllm_router.log import init_logger
 from vllm_router.protocols import ModelCard, ModelList
 from vllm_router.service_discovery import get_service_discovery
-from vllm_router.services.request_service.request import route_general_request
+from vllm_router.services.request_service.request import (
+    route_general_request,
+    route_sleep_wakeup_request,
+)
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
 from vllm_router.version import __version__
 
@@ -97,6 +100,21 @@ async def route_v1_score(request: Request, background_tasks: BackgroundTasks):
 @main_router.post("/score")
 async def route_score(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/score", background_tasks)
+
+
+@main_router.post("/sleep")
+async def route_sleep(request: Request, background_tasks: BackgroundTasks):
+    return await route_sleep_wakeup_request(request, "/sleep", background_tasks)
+
+
+@main_router.post("/wake_up")
+async def route_wake_up(request: Request, background_tasks: BackgroundTasks):
+    return await route_sleep_wakeup_request(request, "/wake_up", background_tasks)
+
+
+@main_router.get("/is_sleeping")
+async def route_is_sleeping(request: Request, background_tasks: BackgroundTasks):
+    return await route_sleep_wakeup_request(request, "/is_sleeping", background_tasks)
 
 
 @main_router.get("/version")

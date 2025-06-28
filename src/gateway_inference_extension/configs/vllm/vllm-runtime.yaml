@@ -27,7 +27,6 @@ spec:
     enableLoRA: true
     dtype: "bfloat16"
     maxModelLen: 4096
-    maxNumSeqs: 1024                 # duplicated for clarity
 
   # --- LoRA & cache off-loading ----------------------------------------
   lmCacheConfig:
@@ -98,3 +97,19 @@ spec:
               mountPath: /dev/shm
             - name: adapters
               mountPath: /adapters
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vllm-llama3-1b-instruct-adapters
+data:
+  configmap.yaml: |
+      vLLMLoRAConfig:
+        name: vllm-llama3-1b-instruct-adapters
+        port: 8000
+        defaultBaseModel: meta-llama/Llama-3.2-1B-Instruct
+        ensureExist:
+          models:
+          - id: legogpt
+            source:  AvaLovelace/LegoGPT

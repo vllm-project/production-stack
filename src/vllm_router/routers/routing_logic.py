@@ -398,14 +398,40 @@ class PrefixAwareRouter(RoutingInterface):
             longest prefix match)
         """
 
+        # Handle chat completions
+        if "messages" in request_json:
+            # Get the last message from the messages array
+            messages = request_json["messages"]
+            if messages:
+                # Concatenate all message content
+                prompt_parts = []
+                for message in messages:
+                    content = message.get("content", "")
+                    if isinstance(content, list):
+                        # Handle multimodal messages
+                        text_content = " ".join(
+                            part.get("text", "")
+                            for part in content
+                            if part.get("type") == "text"
+                        )
+                        prompt_parts.append(text_content)
+                    elif content is not None:
+                        prompt_parts.append(content)
+                prompt = "\n".join(prompt_parts)
+            else:
+                prompt = ""
+        else:
+            # Handle regular completions
+            prompt = request_json["prompt"]
+
         available_endpoints = set(endpoint.url for endpoint in endpoints)
         _, matched_endpoint = await self.hashtrie.longest_prefix_match(
-            request_json["prompt"], available_endpoints
+            prompt, available_endpoints
         )
 
         selected_endpoint = random.choice(list(matched_endpoint))
 
-        await self.hashtrie.insert(request_json["prompt"], selected_endpoint)
+        await self.hashtrie.insert(prompt, selected_endpoint)
 
         return selected_endpoint
 

@@ -392,7 +392,6 @@ class K8sServiceDiscovery(ServiceDiscovery):
             the sleep status of the target engine
         """
         url = f"http://{pod_ip}:{self.port}/is_sleeping"
-        sleep = False
         try:
             headers = None
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
@@ -401,11 +400,67 @@ class K8sServiceDiscovery(ServiceDiscovery):
             response = requests.get(url, headers=headers)
             response.raise_for_status()
             sleep = response.json()["is_sleeping"]
+            return sleep
         except Exception as e:
             logger.warning(
                 f"Failed to get the sleep status for engine at {url} - sleep status is set to `False`: {e}"
             )
-        return sleep
+            return False
+
+    def _check_engine_sleep_mode(self, pod_name) -> Optional[bool]:
+        try:
+            enable_sleep_mode = False
+            pod = self.k8s_api.read_namespaced_pod(
+                name=pod_name, namespace=self.namespace
+            )
+            for container in pod.spec.containers:
+                if container.name == "vllm":
+                    for arg in container.command:
+                        if arg == "--enable-sleep-mode":
+                            enable_sleep_mode = True
+                            break
+            return enable_sleep_mode
+        except client.rest.ApiException as e:
+            logger.error(
+                f"Error checking if sleep-mode is enable for pod {pod_name}: {e}"
+            )
+            return False
+
+    def add_sleep_label(self, pod_name):
+        try:
+            pod = self.k8s_api.read_namespaced_pod(
+                name=pod_name, namespace=self.namespace
+            )
+            # pod.metadata.labels = {"sleeping": "true"}
+            pod.metadata.labels.update({"sleeping": "true"})
+            self.k8s_api.patch_namespaced_pod(
+                name=pod_name, namespace=self.namespace, body=pod
+            )
+            logger.info(f"Sleeping label added to the pod: {pod_name}")
+
+        except client.rest.ApiException as e:
+            logger.error(f"Error adding sleeping label to the pod {pod_name}: {e}")
+
+    def remove_sleep_label(self, pod_name):
+        try:
+            label_key = "sleeping"
+            body = {"metadata": {"labels": {label_key: None}}}
+
+            pod = self.k8s_api.read_namespaced_pod(
+                name=pod_name, namespace=self.namespace
+            )
+            if label_key in pod.metadata.labels:
+                self.k8s_api.patch_namespaced_pod(
+                    name=pod_name, namespace=self.namespace, body=body
+                )
+                logger.info(f"Label `sleeping=true` removed from pod '{pod_name}'")
+            else:
+                logger.info(
+                    f"Label `sleeping=true` not found on pod '{pod_name}' in namespace '{self.namespace}'"
+                )
+
+        except client.rest.ApiException as e:
+            logger.error(f"Error removing sleeping label: {e}")
 
     def _get_model_names(self, pod_ip) -> List[str]:
         """
@@ -529,6 +584,13 @@ class K8sServiceDiscovery(ServiceDiscovery):
         # Get detailed model information
         model_info = self._get_model_info(engine_ip)
 
+        # Check if engine is enable with sleep mode and set engine sleep status
+        enable = self._check_engine_sleep_mode(engine_name)
+        if enable == True:
+            sleep_status = self._get_engine_sleep_status(engine_ip)
+        else:
+            sleep_status = False
+
         with self.available_engines_lock:
             self.available_engines[engine_name] = EndpointInfo(
                 url=f"http://{engine_ip}:{self.port}",
@@ -536,7 +598,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
                 added_timestamp=int(time.time()),
                 Id=str(uuid.uuid5(uuid.NAMESPACE_DNS, engine_name)),
                 model_label=model_label,
-                sleep=self._get_engine_sleep_status(engine_ip),
+                sleep=sleep_status,
                 pod_name=engine_name,
                 namespace=self.namespace,
                 model_info=model_info,
