@@ -395,7 +395,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         try:
             headers = None
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
-                logger.info(f"Using vllm server authentication")
+                logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
             response = requests.get(url, headers=headers)
             response.raise_for_status()
@@ -477,7 +477,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         try:
             headers = None
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
-                logger.info(f"Using vllm server authentication")
+                logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
             response = requests.get(url, headers=headers)
             response.raise_for_status()
@@ -509,7 +509,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         try:
             headers = None
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
-                logger.info(f"Using vllm server authentication")
+                logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
             response = requests.get(url, headers=headers)
             response.raise_for_status()

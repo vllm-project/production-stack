@@ -1,8 +1,6 @@
 """Presidio-based PII analyzer implementation."""
 
 import logging
-import os
-import sys
 from typing import Dict, Optional, Set
 
 # Check for dependencies

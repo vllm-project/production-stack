@@ -428,7 +428,7 @@ async def route_sleep_wakeup_request(
     }
 
     if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
-        logger.info(f"Using vllm server authentication")
+        logger.info("Using vllm server authentication")
         headers["Authorization"] = f"Bearer {VLLM_API_KEY}"
 
     url = server_url + endpoint

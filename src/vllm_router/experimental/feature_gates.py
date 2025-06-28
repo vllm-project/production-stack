@@ -1,6 +1,5 @@
 """Feature gates for experimental features."""
 
-import json
 import logging
 import os
 from enum import Enum

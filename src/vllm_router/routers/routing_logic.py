@@ -16,13 +16,10 @@ import abc
 import asyncio
 import enum
 import math
-import os
 import random
-import socket
 import threading
 from typing import Dict, List
 
-import requests
 from fastapi import Request
 
 try:
