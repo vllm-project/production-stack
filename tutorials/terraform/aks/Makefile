@@ -13,14 +13,12 @@ create-azure-infra:
 	@echo "$(GREEN) create azure infra $(RESET)"
 	@cd azure-infrastructure && terraform init
 	@cd azure-infrastructure && terraform apply -auto-approve
-	@export KUBECONFIG="azurek8s"
 
 create-helm-chart:
 	@echo ""
 	@echo "$(GREEN) create helm chart $(RESET)"
 	@cd production-stack && terraform init
 	@cd production-stack && terraform apply -auto-approve
-	@export KUBECONFIG="azurek8s"
 
 
 destroy-azure-infra:

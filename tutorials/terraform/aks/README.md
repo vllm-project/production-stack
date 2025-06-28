@@ -299,7 +299,12 @@ resource "helm_release" "kube_prometheus_stack" {
 
 Once deployed, you can test your vLLM endpoint with these commands:
 
-### 1. Get the external IP address
+### 1. Get azure kubernetes service kubeconfig
+```bash
+export KUBECONFIG="azurek8s"
+```
+
+### 2. Get the external IP address
 
 ```bash
 kubectl port-forward svc/vllm-router-service 30080:80
@@ -307,7 +312,7 @@ kubectl port-forward svc/vllm-router-service 30080:80
 # This allows you to access the service as if it were running locally
 ```
 
-### 2. Test model availability
+### 3. Test model availability
 
 ```bash
 curl -o- http://localhost:30080/v1/models | jq .
@@ -327,7 +332,7 @@ curl -o- http://localhost:30080/v1/models | jq .
 }
 ```
 
-### 3. Run inference
+### 4. Run inference
 
 ```bash
 curl -X POST http://localhost:30080/v1/completions \
@@ -399,7 +404,7 @@ Import the dashboard using the `vllm-dashboard.json` in this folder.
 The vLLM router can export metrics to Prometheus using the [Prometheus Adapter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter).
 When running the `install.sh` script, the Prometheus Adapter will be installed and configured to export the vLLM metrics.
 
-We provide a minimal example of how to use the Prometheus Adapter to export vLLM metrics. See [prom-adapter.yaml](prom-adapter.yaml) for more details.
+We provide a minimal example of how to use the Prometheus Adapter to export vLLM metrics. See [prom-adapter.yaml](../../../observability/prom-adapter.yaml) for more details.
 
 The exported metrics can be used for different purposes, such as horizontal scaling of the vLLM deployments.
 
@@ -466,152 +471,9 @@ cd production-stack
 terraform destroy    # Remove the vLLM stack first
 # This command removes all Helm releases and Kubernetes resources
 
-cd ../gke-infrastructure
-terraform destroy    # Then remove the GKE infrastructure
-# This command removes the GKE cluster and node pools
-```
-
-## 🔧 Troubleshooting
-
-If you encounter issues, here are some helpful commands:
-
-### 1. Check node status
-
-```bash
-kubectl get nodes
-# This command shows all nodes in your cluster with their status
-# The STATUS column should show "Ready" for properly functioning nodes
-NAME                                                  STATUS   ROLES    AGE     VERSION
-gke-production-stack-production-stack-025c54c6-6h6n   Ready    <none>   6m6s    v1.31.5-gke.1233000
-gke-production-stack-production-stack-ceaca16d-0v7b   Ready    <none>   5m54s   v1.31.5-gke.1233000
-```
-
-### 2. Verify GPU detection
-
-```bash
-kubectl describe no gke-production-stack-production-stack-025c54c6-6h6n | grep gpu
-# This command checks if GPUs are properly detected on a specific node
-# The output should show GPU-related labels, taints, and resource allocations
-                    cloud.google.com/gke-gpu=true
-                    cloud.google.com/gke-gpu-driver-version=latest
-                    nvidia.com/gpu=present
-                    node.gke.io/last-applied-node-taints: nvidia.com/gpu=present:NoSchedule
-Taints:             nvidia.com/gpu=present:NoSchedule
-  nvidia.com/gpu:     1
-  nvidia.com/gpu:     1
-  kube-system                 nvidia-gpu-device-plugin-small-cos-h44rj                          150m (1%)     1 (12%)     80Mi (0%)        80Mi (0%)      10m
-  nvidia.com/gpu     1                 1
-```
-
-### 3. Check pod status
-
-```bash
-☁  azure [feat/terraform-tutorial-azure] ⚡  kubectl get po -A
-NAMESPACE      NAME                                                          READY   STATUS      RESTARTS   AGE
-default        vllm-deployment-router-5dcdd95756-psm4k                       1/1     Running     0          10m
-default        vllm-opt125m-deployment-vllm-69bd77b98d-fph2b                 1/1     Running     0          10m
-gpu-operator   gpu-feature-discovery-lb6qf                                   1/1     Running     0          11m
-gpu-operator   gpu-operator-644fb64985-wtsdx                                 1/1     Running     0          11m
-gpu-operator   gpu-operator-node-feature-discovery-gc-6b54df9879-fkghm       1/1     Running     0          11m
-gpu-operator   gpu-operator-node-feature-discovery-master-56d87c5b58-n482p   1/1     Running     0          11m
-gpu-operator   gpu-operator-node-feature-discovery-worker-484vq              1/1     Running     0          11m
-gpu-operator   gpu-operator-node-feature-discovery-worker-xhs9v              1/1     Running     0          11m
-gpu-operator   nvidia-container-toolkit-daemonset-p65jt                      1/1     Running     0          11m
-gpu-operator   nvidia-cuda-validator-pv9jv                                   0/1     Completed   0          10m
-gpu-operator   nvidia-dcgm-exporter-qxxj4                                    1/1     Running     0          11m
-gpu-operator   nvidia-device-plugin-daemonset-g6gr9                          1/1     Running     0          11m
-gpu-operator   nvidia-operator-validator-wkwrl                               1/1     Running     0          11m
-kube-system    azure-ip-masq-agent-9c7rp                                     1/1     Running     0          12m
-kube-system    azure-ip-masq-agent-9svfm                                     1/1     Running     0          20m
-kube-system    cloud-node-manager-7hs9m                                      1/1     Running     0          20m
-kube-system    cloud-node-manager-gkm9n                                      1/1     Running     0          12m
-kube-system    coredns-789465848c-fl998                                      1/1     Running     0          18m
-kube-system    coredns-789465848c-gpvmm                                      1/1     Running     0          20m
-kube-system    coredns-autoscaler-55bcd876cc-vl2ff                           1/1     Running     0          20m
-kube-system    csi-azuredisk-node-6thrr                                      3/3     Running     0          12m
-kube-system    csi-azuredisk-node-bw5jb                                      3/3     Running     0          20m
-kube-system    csi-azurefile-node-xdn75                                      3/3     Running     0          20m
-kube-system    csi-azurefile-node-zdnpr                                      3/3     Running     0          12m
-kube-system    konnectivity-agent-594bb678f4-6tptv                           1/1     Running     0          20m
-kube-system    konnectivity-agent-594bb678f4-mjj7g                           1/1     Running     0          18m
-kube-system    konnectivity-agent-autoscaler-679b77b4f-pwz7l                 1/1     Running     0          20m
-kube-system    kube-proxy-9zgll                                              1/1     Running     0          12m
-kube-system    kube-proxy-ft45n                                              1/1     Running     0          20m
-kube-system    metrics-server-767d556c98-4d5tt                               2/2     Running     0          18m
-kube-system    metrics-server-767d556c98-z67fk                               2/2     Running     0          18m
-monitoring     alertmanager-kube-prom-stack-kube-prome-alertmanager-0        2/2     Running     0          9m10s
-monitoring     kube-prom-stack-grafana-56867fd8fb-4cvwh                      3/3     Running     0          9m15s
-monitoring     kube-prom-stack-kube-prome-operator-7bbc5cc7b9-9dllt          1/1     Running     0          9m15s
-monitoring     kube-prom-stack-kube-state-metrics-5c89c97bd6-hx897           1/1     Running     0          9m15s
-monitoring     kube-prom-stack-prometheus-node-exporter-6vbgq                1/1     Running     0          9m15s
-monitoring     kube-prom-stack-prometheus-node-exporter-np96c                1/1     Running     0          9m15s
-monitoring     prometheus-adapter-6f8d8d7bdf-47djx                           1/1     Running     0          7m39s
-monitoring     prometheus-kube-prom-stack-kube-prome-prometheus-0            2/2     Running     0          9m10s
-```
-
-### 4. View logs
-
-```bash
-kubectl logs -f vllm-opt125m-deployment-vllm-59b9f7b4f5-b7gpj
-# This command shows the logs of a specific pod and follows (-f) new log entries
-# This is useful for debugging issues with the vLLM deployment
-INFO 03-08 20:42:31 __init__.py:207] Automatically detected platform cuda.
-INFO 03-08 20:42:31 api_server.py:912] vLLM API server version 0.7.3
-INFO 03-08 20:42:31 api_server.py:913] args: Namespace(subparser='serve', mode~~
-```
-
-### 5. Check helm releases
-
-```bash
-helm list
-# Lists all Helm releases in the current namespace
-
-helm install vllm vllm/vllm-stack -f production_stack_specification.yaml
-# Manually installs the vLLM stack using a configuration file
-
-helm uninstall vllm
-# Removes the vLLM stack deployment
-```
-
-### 6. Useful kubectl commands
-
-```bash
-kubectl get po -A
-# Lists all pods across all namespaces
-
-kubectl get no
-# Lists all nodes in the cluster
-
-kubectl api-resources
-# Shows all resource types available in the cluster
-
-kubectl config delete-context $CONTEXT_NAME
-# Removes a specific context from kubectl configuration
-# Replace $CONTEXT_NAME with the actual context name
-
-kubectl config delete-user $NAME
-# Removes a specific user from kubectl configuration
-# Replace $NAME with the actual user name
-
-kubectl config delete-cluster $NAME
-# Removes a specific cluster from kubectl configuration
-# Replace $NAME with the actual cluster name
-```
-
-### 7. Additional debugging
-
-```bash
-# Check GPU utilization on nodes
-kubectl describe nodes | grep nvidia.com/gpu
-
-# Verify vLLM service is properly exposed
-kubectl get svc -n default
-
-# Check for events that might indicate issues
-kubectl get events --sort-by=.metadata.creationTimestamp
-
-# Inspect ConfigMaps for any configuration issues
-kubectl get cm -n default
+cd ../azure-infrastructure
+terraform destroy    # Then remove the Azure infrastructure
+# This command removes the Azure cluster and node pools
 ```
 
 ## ☁️ Cost Management
@@ -625,7 +487,7 @@ kubectl scale deployment vllm-opt125m-deployment-vllm --replicas=0
 # Scale back up when needed
 kubectl scale deployment vllm-opt125m-deployment-vllm --replicas=1
 
-# Set up node auto-provisioning in GKE to automatically scale based on demand
+# Set up node auto-provisioning in Azure to automatically scale based on demand
 # This can be configured in the cluster.tf file
 ```
 

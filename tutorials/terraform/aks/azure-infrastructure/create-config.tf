@@ -6,8 +6,4 @@ data "azurerm_kubernetes_cluster" "credentials_file" {
 resource "local_file" "azure-config" {
   content  = data.azurerm_kubernetes_cluster.credentials_file.kube_config_raw
   filename = var.azure_kube_config
-
-  provisioner "local-exec" {
-    command = "export KUBECONFIG=${var.azure_kube_config}"
-  }
 }
