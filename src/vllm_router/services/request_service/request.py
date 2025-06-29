@@ -202,7 +202,7 @@ async def route_general_request(
         except JSONDecodeError:
             logger.warning("Failed to parse rewritten request body as JSON")
             raise HTTPException(
-                status_code=503, detail="Request body is not JSON parsable."
+                status_code=400, detail="Request body is not JSON parsable."
             )
 
     # TODO (ApostaC): merge two awaits into one
