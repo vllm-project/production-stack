@@ -26,30 +26,6 @@ from vllm_router.dynamic_config import (
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
 from vllm_router.services.callbacks_service.callbacks import initialize_custom_callbacks
-
-try:
-    # Semantic cache integration
-    from vllm_router.experimental.semantic_cache import (
-        get_semantic_cache,
-        enable_semantic_cache,
-        initialize_semantic_cache,
-        is_semantic_cache_enabled,
-    )
-    from vllm_router.experimental.semantic_cache_integration import (
-        add_semantic_cache_args,
-        check_semantic_cache,
-        semantic_cache_hit_ratio,
-        semantic_cache_hits,
-        semantic_cache_latency,
-        semantic_cache_misses,
-        semantic_cache_size,
-        store_in_semantic_cache,
-    )
-
-    semantic_cache_available = True
-except ImportError:
-    semantic_cache_available = False
-
 from vllm_router.httpx_client import HTTPXClientWrapper
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
@@ -85,6 +61,21 @@ from vllm_router.utils import (
     parse_static_urls,
     set_ulimit,
 )
+
+try:
+    # Semantic cache integration
+    from vllm_router.experimental.semantic_cache import (
+        enable_semantic_cache,
+        initialize_semantic_cache,
+        is_semantic_cache_enabled,
+    )
+    from vllm_router.experimental.semantic_cache_integration import (
+        semantic_cache_size,
+    )
+
+    semantic_cache_available = True
+except ImportError:
+    semantic_cache_available = False
 
 logger = logging.getLogger("uvicorn")
 
