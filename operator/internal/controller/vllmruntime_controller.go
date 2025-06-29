@@ -443,6 +443,11 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(ctx context.Context, dep *
 	// Generate the expected deployment
 	expectedDep := r.deploymentForVLLMRuntime(vr)
 
+	// Compare replicas
+	if *dep.Spec.Replicas != vr.Spec.DeploymentConfig.Replicas {
+		return true
+	}
+
 	// Compare model URL
 	expectedModelURL := vr.Spec.Model.ModelURL
 	actualModelURL := ""
