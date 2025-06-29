@@ -9,14 +9,14 @@ import json
 import logging
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from prometheus_client import Gauge
 
 from vllm_router.experimental.semantic_cache import (
-    GetSemanticCache,
+    get_semantic_cache,
     is_semantic_cache_enabled,
 )
 
@@ -90,7 +90,7 @@ async def store_in_semantic_cache(
 
     # If this is a chat completion request and semantic cache is enabled,
     # store the request and response in the cache
-    semantic_cache = GetSemanticCache()
+    semantic_cache = get_semantic_cache()
     if semantic_cache and endpoint == "/v1/chat/completions" and method == "POST":
         logger.info("Processing chat completion for potential caching")
         try:
@@ -198,7 +198,7 @@ async def check_semantic_cache(request: Request) -> Optional[JSONResponse]:
     logger.info("Checking semantic cache for potential cache hit")
 
     # Check if semantic cache is initialized
-    semantic_cache = GetSemanticCache()
+    semantic_cache = get_semantic_cache()
     if semantic_cache:
         # Extract model and messages from the request
         model = body.get("model", "")

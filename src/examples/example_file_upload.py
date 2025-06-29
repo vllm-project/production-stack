@@ -1,7 +1,6 @@
 import argparse
 
 import httpx
-import requests
 
 
 def upload_file(server_url: str, file_path: str):

@@ -19,8 +19,6 @@ This module provides functionality to rewrite requests before they are sent to t
 """
 
 import abc
-import json
-from typing import Any, Dict
 
 from vllm_router.log import init_logger
 from vllm_router.utils import SingletonABCMeta
