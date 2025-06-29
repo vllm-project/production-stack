@@ -211,9 +211,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                         "DynamicConfigWatcher: Config changed, reconfiguring..."
                     )
                     self.reconfigure_all(config)
-                    logger.info(
-                        "DynamicConfigWatcher: Config reconfiguration complete"
-                    )
+                    logger.info("DynamicConfigWatcher: Config reconfiguration complete")
                     self.current_config = config
             except Exception as e:
                 logger.warning(f"DynamicConfigWatcher: Error loading config file: {e}")

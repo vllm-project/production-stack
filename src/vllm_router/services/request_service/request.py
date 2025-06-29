@@ -19,7 +19,7 @@ import time
 import uuid
 
 import httpx
-from fastapi import BackgroundTasks, Request, HTTPException
+from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from requests import JSONDecodeError
 

@@ -2,6 +2,7 @@
 
 import logging
 from typing import Dict, Optional, Set
+
 from ..types import PIIType
 from .base import PIIAnalysisResult, PIIAnalyzer, PIILocation
 

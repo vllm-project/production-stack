@@ -9,8 +9,8 @@ import logging
 
 from vllm_router.experimental.feature_gates import get_feature_gates
 from vllm_router.experimental.semantic_cache.semantic_cache import (
-    get_semantic_cache,
     SemanticCache,
+    get_semantic_cache,
     initialize_semantic_cache,
 )
 
