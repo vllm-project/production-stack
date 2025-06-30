@@ -117,12 +117,13 @@ run_test() {
     print_status "🧪 Running static discovery test for $routing_logic routing"
 
     # Build test command
-    local test_cmd="python3 tests/e2e/test-static-discovery.py"
+    local test_cmd="python3 tests/e2e/test-routing.py"
     test_cmd="$test_cmd --num-requests $NUM_REQUESTS"
     test_cmd="$test_cmd --log-file-path '$log_file'"
     test_cmd="$test_cmd --router-url http://localhost:$ROUTER_PORT"
     test_cmd="$test_cmd --routing-logic $routing_logic"
     test_cmd="$test_cmd --result-dir '$result_dir'"
+    test_cmd="$test_cmd --discovery-type static"
 
     if [ "$VERBOSE" = "true" ]; then
         test_cmd="$test_cmd --verbose"
