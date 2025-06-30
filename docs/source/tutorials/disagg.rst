@@ -64,7 +64,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
           nixlEnableGc: true
           enablePD: true
           cpuOffloadingBufferSize: 0
-        hf_token: "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"
+        hf_token: <hf-token>
         labels:
           model: "llama-prefill"
       # Decode node configuration
@@ -93,7 +93,7 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
           nixlBufferDevice: "cuda"
           nixlEnableGc: true
           enablePD: true
-        hf_token: "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"
+        hf_token: <hf-token>
         labels:
           model: "llama-decode"
     containerSecurityContext:
