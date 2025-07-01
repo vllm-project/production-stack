@@ -352,17 +352,19 @@ async def route_disaggregated_prefill_request(
     in_router_time = time.time()
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
-    request_body = await request.body()
-    request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+    request_json = await request.json()
 
     orig_max_tokens = request_json.get("max_tokens", 0)
     request_json["max_tokens"] = 1
     st = time.time()
-    prefiller_response = await send_request_to_prefiller(
+    await send_request_to_prefiller(
         request.app.state.prefill_client, endpoint, request_json, request_id
     )
     et = time.time()
     logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
+    logger.info(
+        f"Routing request {request_id} with session id None to {request.app.state.prefill_client.base_url} at {et}, process time = {et - in_router_time:.4f}"
+    )
     request_json["max_tokens"] = orig_max_tokens
 
     async def generate_stream():
@@ -370,6 +372,11 @@ async def route_disaggregated_prefill_request(
             request.app.state.decode_client, endpoint, request_json, request_id
         ):
             yield chunk
+
+    curr_time = time.time()
+    logger.info(
+        f"Routing request {request_id} with session id None to {request.app.state.decode_client.base_url} at {curr_time}, process time = {curr_time - et:.4f}"
+    )
 
     return StreamingResponse(
         generate_stream(),
@@ -383,7 +390,6 @@ async def route_sleep_wakeup_request(
     endpoint: str,
     background_tasks: BackgroundTasks,
 ):
-    in_router_time = time.time()
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
 

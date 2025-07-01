@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        hook: [hadolint-docker, helmlint, shellcheck]
+        hook: [hadolint-docker, helmlint, shellcheck, checkov]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -31,4 +31,4 @@ jobs:
     - run: echo "::add-matcher::.github/workflows/matchers/actionlint.json"
     - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
       with:
-        extra_args: --all-files --hook-stage manual ${{ matrix.hook }}
+        extra_args: --all-files -v --hook-stage manual ${{ matrix.hook }}
