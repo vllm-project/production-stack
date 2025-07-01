@@ -356,16 +356,14 @@ async def route_disaggregated_prefill_request(
     endpoint: str,
     background_tasks: BackgroundTasks,
 ):
-    in_router_time = time.time()
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
-    request_body = await request.body()
-    request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+    request_json = await request.json()
 
     orig_max_tokens = request_json.get("max_tokens", 0)
     request_json["max_tokens"] = 1
     st = time.time()
-    prefiller_response = await send_request_to_prefiller(
+    await send_request_to_prefiller(
         request.app.state.prefill_client, endpoint, request_json, request_id
     )
     et = time.time()
@@ -398,7 +396,6 @@ async def route_sleep_wakeup_request(
     endpoint: str,
     background_tasks: BackgroundTasks,
 ):
-    in_router_time = time.time()
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
 
