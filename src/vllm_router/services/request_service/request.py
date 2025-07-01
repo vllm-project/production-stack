@@ -397,6 +397,7 @@ async def route_sleep_wakeup_request(
     endpoint: str,
     background_tasks: BackgroundTasks,
 ):
+    in_router_time = time.time()
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
 
