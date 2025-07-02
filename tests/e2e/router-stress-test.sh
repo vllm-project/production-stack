@@ -22,8 +22,8 @@ set -euo pipefail
 
 # Default values
 ROUTER_PORT=30080
-CONCURRENT=200
-REQUESTS=1000
+CONCURRENT=20000
+REQUESTS=100000
 LOG_DIR="/tmp/router-stress-logs"
 MODEL="facebook/opt-125m"
 BACKEND1_PORT=8000

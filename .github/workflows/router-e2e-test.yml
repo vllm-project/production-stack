@@ -101,139 +101,139 @@ jobs:
             ~/.kube/config
             src/tests/perftest/logs
 
-  # k8s-discovery-e2e-test:
-  #   runs-on: self-hosted
-  #   needs: e2e-test
-  #   if: github.event.pull_request.draft == false
-  #   steps:
-  #     - name: Check out repository code
-  #       uses: actions/checkout@v4
+  k8s-discovery-e2e-test:
+    runs-on: self-hosted
+    needs: e2e-test
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
 
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.12"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-  #     - name: Install Python dependencies
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         pip install -r benchmarks/multi-round-qa/requirements.txt
-  #         pip install -e .
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r benchmarks/multi-round-qa/requirements.txt
+          pip install -e .
 
-  #     - name: Setup minikube environment
-  #       env:
-  #         DOCKER_BUILDKIT: 1
-  #       run: |
-  #         echo "🔧 Setting up minikube environment"
-  #         sudo sysctl fs.protected_regular=0
-  #         # Verify minikube is running
-  #         minikube status
-  #         # Ensure kubectl is configured for minikube
-  #         kubectl config use-context minikube
+      - name: Setup minikube environment
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          echo "🔧 Setting up minikube environment"
+          sudo sysctl fs.protected_regular=0
+          # Verify minikube is running
+          minikube status
+          # Ensure kubectl is configured for minikube
+          kubectl config use-context minikube
 
-  #     - name: Build and deploy router image
-  #       env:
-  #         DOCKER_BUILDKIT: 1
-  #       run: |
-  #         echo "🔨 Building router docker image"
-  #         cd ${{ github.workspace }}
-  #         eval "$(minikube docker-env)"
-  #         docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router -f docker/Dockerfile.kvaware .
+      - name: Build and deploy router image
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          echo "🔨 Building router docker image"
+          cd ${{ github.workspace }}
+          eval "$(minikube docker-env)"
+          docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router -f docker/Dockerfile.kvaware .
 
-  #     - name: Run all k8s discovery routing tests
-  #       run: |
-  #         echo "🧪 Running all k8s discovery routing tests"
-  #         ./tests/e2e/run-k8s-routing-test.sh all \
-  #           --model "facebook/opt-125m" \
-  #           --num-requests 25 \
-  #           --chunk-size 128 \
-  #           --verbose \
-  #           --result-dir /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }} \
-  #           --timeout 10
-  #       timeout-minutes: 10
+      - name: Run all k8s discovery routing tests
+        run: |
+          echo "🧪 Running all k8s discovery routing tests"
+          ./tests/e2e/run-k8s-routing-test.sh all \
+            --model "facebook/opt-125m" \
+            --num-requests 25 \
+            --chunk-size 128 \
+            --verbose \
+            --result-dir /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }} \
+            --timeout 10
+        timeout-minutes: 10
 
-  #     - name: Archive k8s discovery routing test results
-  #       uses: actions/upload-artifact@v4
-  #       if: always()
-  #       with:
-  #         name: k8s-discovery-routing-test-results-pr-${{ github.event.pull_request.number || 'main' }}
-  #         path: |
-  #           /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }}/*
+      - name: Archive k8s discovery routing test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k8s-discovery-routing-test-results-pr-${{ github.event.pull_request.number || 'main' }}
+          path: |
+            /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }}/*
 
-  #     - run: echo "🍏 K8s discovery e2e test job status is ${{ job.status }}."
+      - run: echo "🍏 K8s discovery e2e test job status is ${{ job.status }}."
 
-  # static-discovery-e2e-test:
-  #   runs-on: self-hosted
-  #   needs: e2e-test
-  #   if: github.event.pull_request.draft == false
-  #   env:
-  #     LOG_DIR: /tmp/static-discovery-e2e-test-${{ github.event.pull_request.number || 'main' }}
+  static-discovery-e2e-test:
+    runs-on: self-hosted
+    needs: e2e-test
+    if: github.event.pull_request.draft == false
+    env:
+      LOG_DIR: /tmp/static-discovery-e2e-test-${{ github.event.pull_request.number || 'main' }}
 
-  #   steps:
-  #     - name: Check out repository code
-  #       uses: actions/checkout@v4
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
 
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.12"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-  #     - name: Install Python dependencies
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         pip install -e .
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
 
-  #     - name: Install vLLM and lmcache
-  #       run: |
-  #         pip install vllm
-  #         pip install lmcache
+      - name: Install vLLM and lmcache
+        run: |
+          pip install vllm
+          pip install lmcache
 
-  #     - name: Start 2 vLLM serve backends
-  #       run: |
-  #         echo "🚀 Starting vLLM serve backend"
-  #         mkdir -p "$LOG_DIR"
-  #         CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
-  #         CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend2.log" 2>&1 &
+      - name: Start 2 vLLM serve backends
+        run: |
+          echo "🚀 Starting vLLM serve backend"
+          mkdir -p "$LOG_DIR"
+          CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
+          CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend2.log" 2>&1 &
 
-  #     - name: Wait for backends to be ready
-  #       run: |
-  #         echo "⏳ Waiting for backends to be ready"
-  #         chmod +x tests/e2e/wait-for-backends.sh
-  #         ./tests/e2e/wait-for-backends.sh 180 "http://localhost:8001" "http://localhost:8002"
+      - name: Wait for backends to be ready
+        run: |
+          echo "⏳ Waiting for backends to be ready"
+          chmod +x tests/e2e/wait-for-backends.sh
+          ./tests/e2e/wait-for-backends.sh 180 "http://localhost:8001" "http://localhost:8002"
 
-  #     - name: Run All Static Discovery Routing Tests
-  #       env:
-  #         PYTHONPATH: ${{ github.workspace }}/src
-  #       run: |
-  #         echo "🧪 Running all static discovery routing tests sequentially"
-  #         chmod +x tests/e2e/run-static-discovery-routing-test.sh
-  #         ./tests/e2e/run-static-discovery-routing-test.sh all \
-  #           --pythonpath "$PYTHONPATH" \
-  #           --log-dir "$LOG_DIR" \
-  #           --num-requests 20 \
-  #           --verbose \
-  #           --backends-url "http://localhost:8001,http://localhost:8002"
-  #       timeout-minutes: 5
+      - name: Run All Static Discovery Routing Tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          echo "🧪 Running all static discovery routing tests sequentially"
+          chmod +x tests/e2e/run-static-discovery-routing-test.sh
+          ./tests/e2e/run-static-discovery-routing-test.sh all \
+            --pythonpath "$PYTHONPATH" \
+            --log-dir "$LOG_DIR" \
+            --num-requests 20 \
+            --verbose \
+            --backends-url "http://localhost:8001,http://localhost:8002"
+        timeout-minutes: 5
 
-  #     - name: Archive static discovery test results and logs
-  #       uses: actions/upload-artifact@v4
-  #       if: always()
-  #       with:
-  #         name: static-discovery-test-results-pr-${{ github.event.pull_request.number || 'main' }}
-  #         path: |
-  #           ${{ env.LOG_DIR }}/*
+      - name: Archive static discovery test results and logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: static-discovery-test-results-pr-${{ github.event.pull_request.number || 'main' }}
+          path: |
+            ${{ env.LOG_DIR }}/*
 
-  #     - name: Cleanup processes
-  #       if: always()
-  #       run: |
-  #         echo "🧹 Cleaning up processes"
-  #         pkill -f "vllm serve" || true
-  #         pkill -f "python3 -m src.vllm_router.app" || true
+      - name: Cleanup processes
+        if: always()
+        run: |
+          echo "🧹 Cleaning up processes"
+          pkill -f "vllm serve" || true
+          pkill -f "python3 -m src.vllm_router.app" || true
 
-  #     - run: echo "🍏 Static discovery e2e test job status is ${{ job.status }}."
+      - run: echo "🍏 Static discovery e2e test job status is ${{ job.status }}."
 
   router-stress-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: e2e-test
     if: github.event.pull_request.draft == false
     env:
@@ -266,14 +266,14 @@ jobs:
           echo "🧪 Running router stress test with mock backends"
           chmod +x tests/e2e/router-stress-test.sh
           ./tests/e2e/router-stress-test.sh \
-            --concurrent 100 \
-            --requests 1000 \
+            --concurrent 20000 \
+            --requests 100000 \
             --port 30080 \
             --log-dir "$LOG_DIR" \
             --model "facebook/opt-125m" \
             --backend1-port 8000 \
             --backend2-port 8001
-        timeout-minutes: 2
+        timeout-minutes: 10
 
       - name: Archive router stress test results and logs
         uses: actions/upload-artifact@v4
