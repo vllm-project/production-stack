@@ -157,14 +157,14 @@ def update_content_length(request: Request, request_body: str):
     request._headers = headers
 
 
-def is_model_healthy(url: str, model: str, model_type: str) -> bool:
+def is_model_healthy(url: str, model: str, model_type: str, timeout: int = 30) -> bool:
     model_details = ModelType[model_type]
     try:
         response = requests.post(
             f"{url}{model_details.value}",
             headers={"Content-Type": "application/json"},
             json={"model": model} | model_details.get_test_payload(model_type),
-            timeout=30,
+            timeout=timeout,
         )
     except Exception as e:
         logger.error(e)
