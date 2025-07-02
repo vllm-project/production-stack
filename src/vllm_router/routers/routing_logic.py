@@ -18,6 +18,7 @@ import enum
 import math
 import os
 import random
+import re
 import socket
 import threading
 from typing import Dict, List
@@ -42,7 +43,7 @@ except ImportError:
 from uhashring import HashRing
 
 from vllm_router.log import init_logger
-from vllm_router.service_discovery import EndpointInfo
+from vllm_router.service_discovery import EndpointInfo, LoadBalancingEndpointInfo
 from vllm_router.stats.engine_stats import EngineStats
 from vllm_router.stats.request_stats import RequestStats
 from vllm_router.utils import SingletonABCMeta
@@ -56,6 +57,7 @@ class RoutingLogic(str, enum.Enum):
     KVAWARE = "kvaware"
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
+    LOADBALANCING = "loadbalancing"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -455,6 +457,146 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             return decoder_endpoints[0].url
 
 
+class LoadBalancingRouter(RoutingInterface):
+    def __init__(
+        self,
+        lmcache_controller_port: int,
+        flops_rate=312e12,
+        hbm_rate=1.5e12,
+        model_params=175e9,
+    ):
+        self.kv_manager = controller_manager.LMCacheControllerManager(
+            f"0.0.0.0:{lmcache_controller_port}"
+        )
+        self.flops_rate = flops_rate
+        self.hbm_rate = hbm_rate
+        self.model_params = model_params
+
+        self.req_id = 0
+        self.instance_id_to_ip = {}
+        self.endpoint_stats: Dict[str, LoadBalancingEndpointInfo] = {}
+
+    def start_kv_manager(self):
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+        self.thread.start()
+        asyncio.run_coroutine_threadsafe(self.kv_manager.start_all(), self.loop)
+
+    def infer_model_params(self, endpoint_url):
+        """
+            Infer model parameter count from the model name string or previously stored information.
+            Supports formats like "llama-7b", "mistral-13b", "custom-70B", etc.
+
+        Returns:
+        Number of parameters as a float (e.g., 7e9 for 7B).
+        """
+        model_params = self.endpoint_stats[endpoint_url].model_params
+        if model_params:
+            return model_params
+
+        # model params not found, searching name
+        match = re.search(r"(\d+)([bBmM])", endpoint_url)
+        if match:
+            num = 1
+            if type(match.group(1)) == int or type(match.group(1)) == float:
+                num = int(match.group(1))
+            suffix = match.group(2).lower()
+
+            if suffix == "b":
+                model_params = num * 1e9
+            elif suffix == "m":
+                model_params = num * 1e6
+        else:
+            model_params = 0
+
+        self.endpoint_stats[endpoint_url].model_params = (
+            model_params  # keep information for later
+        )
+        return model_params
+
+    def estimate_ttft(self, effective_prompt_len: int, load: int, model_name) -> float:
+        model_params = self.infer_model_params(model_name)
+        if model_params == 0:  # model_params not inferred from endpoint name
+            model_params = self.model_params
+
+        # based on formula from chen jinghong
+        compute = (2 * self.model_params * effective_prompt_len) / self.flops_rate
+        memory = (2 * self.model_params) / self.hbm_rate
+        return (compute + memory) * (1 + load)  # scale by current endpoint load
+
+    def get_instance_id(self, ret_msg):
+        cached_len = 0
+        instance_id = None
+        if ret_msg.layout_info:
+            # find entry with largest end index
+            instance_id = max(ret_msg.layout_info.items(), key=lambda x: x[1][1])[0]
+            cached_len = ret_msg.layout_info[instance_id][1]
+
+        return instance_id, cached_len
+
+    def register_endpoint(self, endpoint: EndpointInfo):
+        if endpoint.url not in self.endpoint_stats:
+            self.endpoint_stats[endpoint.url] = LoadBalancingEndpointInfo()
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        _engine_stats: Dict[str, EngineStats],
+        _request_stats: Dict[str, RequestStats],
+        _request: Request,
+        request_json: Dict,
+    ) -> str:
+
+        # tokenize the prompt
+        url = endpoints[0].url + "/tokenize"
+        headers = {"Content-Type": "application/json"}
+        data = {"model": endpoints[0].model_names, "prompt": request_json["prompt"]}
+        response = requests.post(url, headers=headers, json=data).json()
+        token_ids = response["tokens"]
+        msg = LookupMsg(tokens=token_ids)
+
+        # instance id of longest prefix is returned?
+        ret_msg = self.kv_manager.handle_orchestration_message(msg)
+        instance_id, cached_len = self.get_instance_id(ret_msg)
+
+        prompt_len = len(
+            token_ids
+        )  # - cached_len #should be unnecessary? if there is not an instance id, then len will be 0
+
+        best_url = None
+        best_ttft = float(math.inf)
+
+        if (
+            instance_id is None or instance_id.best_instance_id is None
+        ):  # no cache hit, proceed w/ ttft calculations
+            for ep in endpoints:
+                load = self.endpoint_stats[ep.url].current_load
+                est_ttft = self.estimate_ttft(prompt_len, load, ep.url)
+                if est_ttft < best_ttft:
+                    best_ttft = est_ttft
+                    best_url = ep.url
+        else:  # cache hit
+            self.req_id += 1
+            if instance_id.best_instance_id not in self.instance_id_to_ip:
+                for ep in endpoints:
+                    query_message = QueryInstMsg(
+                        ip=ep.url.split(f":{ep.url.split(':')[-1]}")[0].split("//")[1]
+                    )
+                    instance_id = await self.query_manager(query_message)
+                    self.instance_id_to_ip[instance_id.instance_id] = ep.url
+            logger.info(
+                f"Routing request to {instance_id.best_instance_id} found by kvaware, load balancing router"
+            )
+            best_url = self.instance_id_to_ip[instance_id.best_instance_id]
+
+        # increment load for selected endpoint
+        self.endpoint_stats[best_url].increment_load()
+        return best_url
+
+    def complete_request(self, endpoint_url):
+        self.endpoint_stats[endpoint_url].decrement_load()
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -482,6 +624,16 @@ def initialize_routing_logic(
         return DisaggregatedPrefillRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
+    elif routing_logic == RoutingLogic.LOADBALANCING:
+        logger.info("Initializing load balancing routing logic")
+        router = LoadBalancingRouter(
+            kwargs.get("lmcache_controller_port"),
+            kwargs.get("flops_rate"),
+            kwargs.get("hbm_rate"),
+            kwargs.get("model_params"),
+        )
+        router.start_kv_manager()
+        return router
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -495,6 +647,7 @@ def reconfigure_routing_logic(
         RoundRobinRouter,
         KvawareRouter,
         DisaggregatedPrefillRouter,
+        LoadBalancingRouter,
     ):
         if cls in SingletonABCMeta._instances:
             del SingletonABCMeta._instances[cls]
@@ -509,6 +662,7 @@ def get_routing_logic() -> RoutingInterface:
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
+        LoadBalancingRouter,
     ):
         if cls in SingletonABCMeta._instances:
             return cls()
