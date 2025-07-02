@@ -137,9 +137,8 @@ jobs:
         run: |
           echo "🔨 Building router docker image"
           cd ${{ github.workspace }}
-          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
-          sudo docker push localhost:5000/git-act-router
-          minikube image load localhost:5000/git-act-router
+          eval "$(minikube docker-env)"
+          docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router -f docker/Dockerfile.kvaware .
 
       - name: Run all k8s discovery routing tests
         run: |
@@ -184,9 +183,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
-      - name: Install vLLM
+      - name: Install vLLM and lmcache
         run: |
           pip install vllm
+          pip install lmcache
 
       - name: Start 2 vLLM serve backends
         run: |
@@ -211,7 +211,8 @@ jobs:
             --pythonpath "$PYTHONPATH" \
             --log-dir "$LOG_DIR" \
             --num-requests 20 \
-            --verbose
+            --verbose \
+            --backends-url "http://localhost:8001,http://localhost:8002"
         timeout-minutes: 5
 
       - name: Archive static discovery test results and logs

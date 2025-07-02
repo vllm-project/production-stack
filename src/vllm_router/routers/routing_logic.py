@@ -282,31 +282,7 @@ class KvawareRouter(RoutingInterface):
         if self.tokenizer is None:
             self.tokenizer = AutoTokenizer.from_pretrained(endpoints[0].model_names[0])
         url = endpoints[0].url + "/tokenize"
-        headers = {"Content-Type": "application/json"}
-
-        # Handle chat completions
-        if "messages" in request_json:
-            # Get the last message from the messages array
-            messages = request_json["messages"]
-            if messages:
-                last_message = messages[-1]
-                prompt = last_message.get("content", "")
-                if isinstance(prompt, list):
-                    # Handle multimodal messages
-                    prompt = " ".join(
-                        part.get("text", "")
-                        for part in prompt
-                        if part.get("type") == "text"
-                    )
-                data = {"model": endpoints[0].model_names[0], "prompt": prompt}
-            else:
-                data = {"model": endpoints[0].model_names[0], "prompt": ""}
-        else:
-            # Handle regular completions
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json["prompt"],
-            }
+        # TODO (Yuhan): Handle chat completions
         token_ids = self.tokenizer.encode(request_json["prompt"])
         msg = LookupMsg(tokens=token_ids)
         instance_id = await self.query_manager(msg)
