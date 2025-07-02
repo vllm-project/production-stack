@@ -1,7 +1,22 @@
 #!/bin/bash
 
-# Simple Router Stress Test
+# Router Stress Test - Pure Router Logic Testing
 # Tests round-robin routing logic under high concurrent loads
+#
+# IMPORTANT NOTES:
+# - This test uses MOCK backends and MOCK responses (no real vLLM servers)
+# - Backend ports are dummy placeholders - no actual services run on them
+# - Model names are dummy placeholders - no real models are loaded
+# - When VLLM_ROUTER_STRESS_TEST_MODE=true, the router returns mock responses
+#   instead of forwarding requests to backends (see src/vllm_router/services/request_service/request.py)
+# - This test validates ONLY the router's routing logic, load balancing, and performance
+#   under high concurrent loads, not actual inference capabilities
+#
+# Purpose: Verify that the router correctly distributes requests using round-robin
+# logic and can handle high concurrency without routing logic failures.
+#
+# TODO: will add tests for prefix-aware and session-based router later
+# TODO: will add performance comparison tests & threshold later
 
 set -euo pipefail
 
