@@ -481,15 +481,15 @@ class DisaggregatedPrefillRouter(RoutingInterface):
 
 
 class TimeTrackingRouter(RoutingInterface):
-    def __init__(self, alpha=1.0, beta=0.5):
+    def __init__(self, alpha=1.0, beta=0.5, num_records = 100):
         self.alpha = alpha  # weight for mean time
         self.beta = beta  # weight for st deviation
-
+        self.num_records = num_records #how many request completion times are stored in EndpointCalculations
         self.endpoint_stats: Dict[str, EndpointCalculations] = {}
 
     def update_endpoint(self, endpoint: EndpointInfo):
         if endpoint.url not in self.endpoint_stats:
-            self.endpoint_stats[endpoint.url] = EndpointCalculations()
+            self.endpoint_stats[endpoint.url] = EndpointCalculations(self.num_records)
         else:
             stats = self.endpoint_stats[endpoint.url]
             endpoint.completion_time = stats.mean()
@@ -498,10 +498,10 @@ class TimeTrackingRouter(RoutingInterface):
     async def route_request(
         self,
         endpoints: List[EndpointInfo],
-        engine_stats: Dict[str, EngineStats],
-        request_stats: Dict[str, RequestStats],
-        request: Request,
-        request_json: Dict,
+        _engine_stats: Dict[str, EngineStats],
+        _request_stats: Dict[str, RequestStats],
+        _request: Request,
+        _request_json: Dict,
     ) -> str:
         best_score = math.inf
         best_endpoint = None
@@ -523,8 +523,8 @@ class TimeTrackingRouter(RoutingInterface):
 
         return best_endpoint.url
 
-    def record_completion(self, endpoint: EndpointInfo, duration: float):
-        self.endpoint_stats[endpoint.url].add_completion_time(duration)
+    def record_completion(self, endpoint_url: str, duration: float):
+        self.endpoint_stats[endpoint_url].add_completion_time(duration)
 
 
 # Instead of managing a global _global_router, we can define the initialization functions as:

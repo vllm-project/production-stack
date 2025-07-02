@@ -183,7 +183,8 @@ class EndpointInfo:
 class EndpointCalculations:
     def __init__(self, maxlen=100):
         # keep track of completion times to perform later calculations
-        self.completion_times = deque(maxlen=maxlen)
+        self.maxlen = maxlen
+        self.completion_times = deque(maxlen=self.maxlen)
 
     def add_completion_time(self, completion_time: float):
         self.completion_times.append(completion_time)
