@@ -11,7 +11,9 @@ CONCURRENT=200
 REQUESTS=1000
 LOG_DIR="/tmp/router-stress-logs"
 MODEL="facebook/opt-125m"
-BACKENDS_URL="http://localhost:8000,http://localhost:8001"
+BACKEND1_PORT=8000
+BACKEND2_PORT=8001
+BACKENDS_URL="http://localhost:$BACKEND1_PORT,http://localhost:$BACKEND2_PORT"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -43,12 +45,15 @@ Options:
     -p, --port PORT         Router port (default: 30080)
     -l, --log-dir DIR       Log directory (default: /tmp/router-stress-logs)
     -m, --model MODEL       Model to use (default: facebook/opt-125m)
+    --backend1-port PORT    First backend port (default: 8000)
+    --backend2-port PORT    Second backend port (default: 8001)
     -h, --help              Show this help
 
 Examples:
     $0                      # Basic test (2000 concurrent, 10000 requests)
     $0 -c 500 -n 20000     # High load test
     $0 -p 8080 -c 100      # Different port, lower load
+    $0 --backend1-port 9000 --backend2-port 9001  # Custom backend ports
 
 Prerequisites:
     - Router must be started with VLLM_ROUTER_STRESS_TEST_MODE=true
@@ -156,13 +161,13 @@ check_roundrobin_correctness() {
     
     # Extract backend routing decisions from logs
     # Look for "Routing request ... to http://localhost:XXXX"
-    local backend1_count=$(grep -c "to http://localhost:8000" "$log_file" || echo "0")
-    local backend2_count=$(grep -c "to http://localhost:8001" "$log_file" || echo "0")
+    local backend1_count=$(grep -c "to http://localhost:$BACKEND1_PORT" "$log_file" || echo "0")
+    local backend2_count=$(grep -c "to http://localhost:$BACKEND2_PORT" "$log_file" || echo "0")
     local total_routed=$((backend1_count + backend2_count))
     
     print_status "Round-robin routing results:"
-    print_status "  Backend localhost:8000: $backend1_count requests"
-    print_status "  Backend localhost:8001: $backend2_count requests"
+    print_status "  Backend localhost:$BACKEND1_PORT: $backend1_count requests"
+    print_status "  Backend localhost:$BACKEND2_PORT: $backend2_count requests"
     print_status "  Total routed: $total_routed requests"
     
     if [ "$total_routed" -eq 0 ]; then
@@ -174,8 +179,8 @@ check_roundrobin_correctness() {
     local backend1_pct=$((backend1_count * 100 / total_routed))
     local backend2_pct=$((backend2_count * 100 / total_routed))
     
-    print_status "  Backend localhost:8000: ${backend1_pct}%"
-    print_status "  Backend localhost:8001: ${backend2_pct}%"
+    print_status "  Backend localhost:$BACKEND1_PORT: ${backend1_pct}%"
+    print_status "  Backend localhost:$BACKEND2_PORT: ${backend2_pct}%"
     
     # Check if distribution is roughly even (within 20% tolerance)
     local diff=$((backend1_pct > backend2_pct ? backend1_pct - backend2_pct : backend2_pct - backend1_pct))
@@ -224,6 +229,14 @@ while [[ $# -gt 0 ]]; do
             MODEL="$2"
             shift 2
             ;;
+        --backend1-port)
+            BACKEND1_PORT="$2"
+            shift 2
+            ;;
+        --backend2-port)
+            BACKEND2_PORT="$2"
+            shift 2
+            ;;
         -h|--help)
             show_usage
             exit 0
@@ -239,6 +252,9 @@ done
 # Set trap for cleanup
 trap cleanup EXIT
 
+# Update backends URL with final port values
+BACKENDS_URL="http://localhost:$BACKEND1_PORT,http://localhost:$BACKEND2_PORT"
+
 # Check prerequisites
 print_status "Checking prerequisites..."
 check_ab
@@ -247,6 +263,7 @@ print_status "Router stress test configuration:"
 print_status "  Concurrent requests: $CONCURRENT"
 print_status "  Total requests: $REQUESTS"
 print_status "  Router port: $ROUTER_PORT"
+print_status "  Backend ports: $BACKEND1_PORT, $BACKEND2_PORT"
 print_status "  Model: $MODEL"
 
 # Run test
