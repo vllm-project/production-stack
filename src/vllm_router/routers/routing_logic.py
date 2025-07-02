@@ -481,10 +481,10 @@ class DisaggregatedPrefillRouter(RoutingInterface):
 
 
 class TimeTrackingRouter(RoutingInterface):
-    def __init__(self, alpha=1.0, beta=0.5, num_records = 100):
+    def __init__(self, alpha=1.0, beta=0.5, num_records=100):
         self.alpha = alpha  # weight for mean time
         self.beta = beta  # weight for st deviation
-        self.num_records = num_records #how many request completion times are stored in EndpointCalculations
+        self.num_records = num_records  # how many request completion times are stored in EndpointCalculations
         self.endpoint_stats: Dict[str, EndpointCalculations] = {}
 
     def update_endpoint(self, endpoint: EndpointInfo):
@@ -556,7 +556,9 @@ def initialize_routing_logic(
         )
     elif routing_logic == RoutingLogic.TIMETRACKING:
         logger.info("Initializing time-tracking routing logic")
-        return TimeTrackingRouter()
+        return TimeTrackingRouter(
+            kwargs.get("alpha"), kwargs.get("beta"), kwargs.get("num_records")
+        )
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 

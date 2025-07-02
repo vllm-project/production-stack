@@ -1,12 +1,12 @@
-from typing import Dict, List
-from unittest.mock import Mock
+from typing import Dict
 
 import pytest
 
 from vllm_router.routers.routing_logic import TimeTrackingRouter
-from vllm_router.service_discovery import EndpointInfo, EndpointCalculations
-from vllm_router.stats.engine_stats import EngineStats
-from vllm_router.stats.request_stats import RequestStats
+from vllm_router.service_discovery import EndpointInfo
+
+# from vllm_router.stats.engine_stats import EngineStats
+# from vllm_router.stats.request_stats import RequestStats
 
 
 class Request:
@@ -21,8 +21,22 @@ class Request:
 async def test_time_tracking_router_prefers_fastest_endpoint():
     router = TimeTrackingRouter(alpha=1.0, beta=0.5)
 
-    endpoint_a = EndpointInfo(url="http://endpoint-a", model_names=[], Id="a", added_timestamp=0, model_label="A", sleep=False)
-    endpoint_b = EndpointInfo(url="http://endpoint-b", model_names=[], Id="b", added_timestamp=0, model_label="B", sleep=False)
+    endpoint_a = EndpointInfo(
+        url="http://endpoint-a",
+        model_names=[],
+        Id="a",
+        added_timestamp=0,
+        model_label="A",
+        sleep=False,
+    )
+    endpoint_b = EndpointInfo(
+        url="http://endpoint-b",
+        model_names=[],
+        Id="b",
+        added_timestamp=0,
+        model_label="B",
+        sleep=False,
+    )
 
     router.update_endpoint(endpoint_a)
     router.update_endpoint(endpoint_b)

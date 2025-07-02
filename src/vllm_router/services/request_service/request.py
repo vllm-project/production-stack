@@ -135,7 +135,9 @@ async def process_request(
         backend_url, request_id, time.time()
     )
     if isinstance(request.app.state.router, TimeTrackingRouter):
-        request.app.state.router.record_completion(backend_url, finish_time - start_time)
+        request.app.state.router.record_completion(
+            backend_url, finish_time - start_time
+        )
     # if debug_request:
     #    logger.debug(f"Finished the request with request id: {debug_request.headers.get('x-request-id', None)} at {time.time()}")
     # Store in semantic cache if applicable
