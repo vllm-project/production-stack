@@ -95,20 +95,24 @@ async def process_request(
     request.app.state.request_stats_monitor.on_new_request(
         backend_url, request_id, start_time
     )
-    
+
     # Check if stress test mode is enabled; used for tests/e2e/stress-test.sh
     if os.getenv("VLLM_ROUTER_STRESS_TEST_MODE", "false").lower() == "true":
         # Mock response for stress testing - skip backend calls
         mock_headers = {"content-type": "application/json", "x-request-id": request_id}
         mock_response = b'{"id":"test","object":"chat.completion","choices":[{"message":{"role":"assistant","content":"Test"},"index":0,"finish_reason":"stop"}]}'
-        
+
         # Yield headers and mock response
         yield mock_headers, 200
-        request.app.state.request_stats_monitor.on_request_response(backend_url, request_id, time.time())
+        request.app.state.request_stats_monitor.on_request_response(
+            backend_url, request_id, time.time()
+        )
         yield mock_response
-        request.app.state.request_stats_monitor.on_request_complete(backend_url, request_id, time.time())
+        request.app.state.request_stats_monitor.on_request_complete(
+            backend_url, request_id, time.time()
+        )
         return
-    
+
     # Check if this is a streaming request
     is_streaming = False
     try:

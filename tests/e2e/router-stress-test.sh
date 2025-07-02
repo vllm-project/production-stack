@@ -94,15 +94,15 @@ cleanup() {
 # Function to start router
 start_router() {
     local log_file="$LOG_DIR/router.log"
-    
+
     print_status "Starting router with round-robin routing (stress test mode)"
-    
+
     # Create log directory
     mkdir -p "$(dirname "$log_file")"
-    
+
     # Set stress test mode
     export VLLM_ROUTER_STRESS_TEST_MODE=true
-    
+
     # Start router with detailed logging
     python3 -m src.vllm_router.app --port "$ROUTER_PORT" \
         --service-discovery static \
@@ -112,10 +112,10 @@ start_router() {
         --routing-logic roundrobin \
         --log-stats \
         --log-stats-interval 5 > "$log_file" 2>&1 &
-    
+
     ROUTER_PID=$!
     print_status "Router started with PID: $ROUTER_PID"
-    
+
     # Wait for router to be ready
     print_status "Waiting for router to be ready..."
     timeout 30 bash -c "until curl -s http://localhost:$ROUTER_PORT/v1/models > /dev/null 2>&1; do sleep 1; done" || {
@@ -131,7 +131,7 @@ start_router() {
 run_stress_test() {
     print_status "Running stress test with Apache Bench"
     print_status "Concurrent: $CONCURRENT, Total: $REQUESTS"
-    
+
     # Create payload file
     local payload_file="/tmp/stress_payload.json"
     cat > "$payload_file" << EOF
@@ -144,7 +144,7 @@ run_stress_test() {
     "temperature": 0.7
 }
 EOF
-    
+
     # Run Apache Bench
     ab -c "$CONCURRENT" \
        -n "$REQUESTS" \
@@ -153,12 +153,12 @@ EOF
        -H "Authorization: Bearer test" \
        -H "x-user-id: stress-test-user" \
        "http://localhost:$ROUTER_PORT/v1/chat/completions"
-    
+
     # Clean up payload file
     rm -f "$payload_file"
-    
+
     print_status "Stress test completed"
-    
+
     # Small delay to ensure all logs are written
     sleep 2
 }
@@ -166,40 +166,40 @@ EOF
 # Function to check round-robin correctness
 check_roundrobin_correctness() {
     local log_file="$LOG_DIR/router.log"
-    
+
     print_status "Checking round-robin routing correctness..."
-    
+
     if [ ! -f "$log_file" ]; then
         print_error "Router log file not found: $log_file"
         return 1
     fi
-    
+
     # Extract backend routing decisions from logs
     # Look for "Routing request ... to http://localhost:XXXX"
     local backend1_count=$(grep -c "to http://localhost:$BACKEND1_PORT" "$log_file" || echo "0")
     local backend2_count=$(grep -c "to http://localhost:$BACKEND2_PORT" "$log_file" || echo "0")
     local total_routed=$((backend1_count + backend2_count))
-    
+
     print_status "Round-robin routing results:"
     print_status "  Backend localhost:$BACKEND1_PORT: $backend1_count requests"
     print_status "  Backend localhost:$BACKEND2_PORT: $backend2_count requests"
     print_status "  Total routed: $total_routed requests"
-    
+
     if [ "$total_routed" -eq 0 ]; then
         print_error "No routing decisions found in logs"
         return 1
     fi
-    
+
     # Calculate percentages
     local backend1_pct=$((backend1_count * 100 / total_routed))
     local backend2_pct=$((backend2_count * 100 / total_routed))
-    
+
     print_status "  Backend localhost:$BACKEND1_PORT: ${backend1_pct}%"
     print_status "  Backend localhost:$BACKEND2_PORT: ${backend2_pct}%"
-    
+
     # Check if distribution is roughly even (within 20% tolerance)
     local diff=$((backend1_pct > backend2_pct ? backend1_pct - backend2_pct : backend2_pct - backend1_pct))
-    
+
     if [ "$diff" -le 20 ]; then
         print_status "✅ Round-robin routing is working correctly (${diff}% difference)"
         return 0
@@ -214,7 +214,7 @@ check_roundrobin_correctness() {
 # Function to show log summary
 show_log_summary() {
     local log_file="$LOG_DIR/router.log"
-    
+
     if [ -f "$log_file" ]; then
         print_status "Log summary (last 20 lines):"
         tail -20 "$log_file" | sed 's/^/  /'
@@ -292,4 +292,4 @@ else
     print_error "Test completed but round-robin routing correctness check failed!"
     show_log_summary
     exit 1
-fi 
+fi
