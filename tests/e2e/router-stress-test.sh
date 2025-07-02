@@ -176,8 +176,12 @@ check_roundrobin_correctness() {
 
     # Extract backend routing decisions from logs
     # Look for "Routing request ... to http://localhost:XXXX"
-    local backend1_count=$(grep -c "to http://localhost:$BACKEND1_PORT" "$log_file" || echo "0")
-    local backend2_count=$(grep -c "to http://localhost:$BACKEND2_PORT" "$log_file" || echo "0")
+    local backend1_count
+    backend1_count=$(grep -c "to http://localhost:$BACKEND1_PORT" "$log_file" || echo "0")
+
+    local backend2_count
+    backend2_count=$(grep -c "to http://localhost:$BACKEND2_PORT" "$log_file" || echo "0")
+
     local total_routed=$((backend1_count + backend2_count))
 
     print_status "Round-robin routing results:"
