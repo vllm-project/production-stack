@@ -55,8 +55,8 @@ Router Stress Test - Tests round-robin routing logic
 Usage: $0 [options]
 
 Options:
-    -c, --concurrent N      Concurrent requests (default: 2000)
-    -n, --requests N        Total requests (default: 10000)
+    -c, --concurrent N      Concurrent requests (default: 20000)
+    -n, --requests N        Total requests (default: 100000)
     -p, --port PORT         Router port (default: 30080)
     -l, --log-dir DIR       Log directory (default: /tmp/router-stress-logs)
     -m, --model MODEL       Model to use (default: facebook/opt-125m)
@@ -65,7 +65,7 @@ Options:
     -h, --help              Show this help
 
 Examples:
-    $0                      # Basic test (2000 concurrent, 10000 requests)
+    $0                      # Basic test (20000 concurrent, 100000 requests)
     $0 -c 500 -n 20000     # High load test
     $0 -p 8080 -c 100      # Different port, lower load
     $0 --backend1-port 9000 --backend2-port 9001  # Custom backend ports
