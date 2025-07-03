@@ -458,6 +458,15 @@ class DisaggregatedPrefillRouter(RoutingInterface):
 
 
 class LoadBalancingRouter(RoutingInterface):
+    """
+    A KV cache-aware router that balances LLM inference requests across endpoints
+    by minimizing estimated Time-To-First-Token (TTFT) and accounting for load.
+
+    - Estimates TTFT using prompt length, model size, FLOPS, HBM bandwidth, and load.
+    - Prefers cache hits when available via a KV cache manager.
+    - Tracks current load per endpoint and infers model size from endpoint name.
+    - Supports manual load decrement via `complete_request(endpoint_url)`.
+    """
     def __init__(
         self,
         lmcache_controller_port: int,
@@ -484,8 +493,8 @@ class LoadBalancingRouter(RoutingInterface):
 
     def infer_model_params(self, endpoint_url):
         """
-            Infer model parameter count from the model name string or previously stored information.
-            Supports formats like "llama-7b", "mistral-13b", "custom-70B", etc.
+        Infer model parameter count from the model name string or previously stored information.
+        Supports formats like "llama-7b", "mistral-13b", "custom-70B", etc.
 
         Returns:
         Number of parameters as a float (e.g., 7e9 for 7B).
@@ -546,6 +555,13 @@ class LoadBalancingRouter(RoutingInterface):
         _request: Request,
         request_json: Dict,
     ) -> str:
+        """
+        Routes a request to the best endpoint based on cache hits or lowest estimated TTFT.
+
+        - Uses KV cache if a matching instance is found.
+        - Otherwise, selects the endpoint with the lowest TTFT.
+        - Increments the selected endpoint's load.
+        """
 
         # tokenize the prompt
         url = endpoints[0].url + "/tokenize"
@@ -559,9 +575,7 @@ class LoadBalancingRouter(RoutingInterface):
         ret_msg = self.kv_manager.handle_orchestration_message(msg)
         instance_id, cached_len = self.get_instance_id(ret_msg)
 
-        prompt_len = len(
-            token_ids
-        )  # - cached_len #should be unnecessary? if there is not an instance id, then len will be 0
+        prompt_len = len(token_ids)
 
         best_url = None
         best_ttft = float(math.inf)
