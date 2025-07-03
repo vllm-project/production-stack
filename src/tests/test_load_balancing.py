@@ -7,6 +7,16 @@ import pytest
 from vllm_router.routers.routing_logic import LoadBalancingRouter
 from vllm_router.service_discovery import EndpointInfo
 
+try:
+    from lmcache.v1.cache_controller import controller_manager
+    from lmcache.v1.cache_controller.message import (
+        LookupMsg,
+        QueryInstMsg,
+        QueryInstRetMsg,
+    )
+except ImportError:
+    pass
+
 
 class MockRequest:
     pass
@@ -15,7 +25,7 @@ class MockRequest:
 @pytest.mark.asyncio
 async def test_load_balancing_router_balances_across_models():
     router = LoadBalancingRouter(lmcache_controller_port=1234)
-
+    router.start_kv_manager()
     # Define endpoints with various model sizes
     endpoints = [
         EndpointInfo("http://endpoint-small", "llama-7b", 0.0, "small", None, None, 0),
@@ -73,6 +83,7 @@ async def test_load_balancing_router_balances_across_models():
 @pytest.mark.asyncio
 async def test_router_balances_many_requests():
     router = LoadBalancingRouter(lmcache_controller_port=1234)
+    router.start_kv_manager()
 
     # Register endpoints with different models
     endpoints = [
@@ -142,6 +153,7 @@ async def test_router_balances_many_requests():
 @pytest.mark.asyncio
 async def test_load_balancing_with_request_completion():
     router = LoadBalancingRouter(lmcache_controller_port=1234)
+    router.start_kv_manager()
 
     # Register endpoints
     endpoints = [

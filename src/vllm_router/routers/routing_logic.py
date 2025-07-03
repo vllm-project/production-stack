@@ -467,6 +467,7 @@ class LoadBalancingRouter(RoutingInterface):
     - Tracks current load per endpoint and infers model size from endpoint name.
     - Supports manual load decrement via `complete_request(endpoint_url)`.
     """
+
     def __init__(
         self,
         lmcache_controller_port: int,
