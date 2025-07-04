@@ -1,12 +1,15 @@
-import pytest
-from unittest.mock import patch, AsyncMock
 import random
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from vllm_router.routers.routing_logic import LoadBalancingRouter
 from vllm_router.service_discovery import EndpointInfo
 
 
 class MockRequest:
     pass
+
 
 @pytest.mark.asyncio
 async def test_simple_load_balancing_routing():
@@ -15,8 +18,12 @@ async def test_simple_load_balancing_routing():
     # Register 3 mock endpoints
     endpoints = [
         EndpointInfo("http://endpoint-small", "llama-7b", 0.0, "small", None, None, 0),
-        EndpointInfo("http://endpoint-medium", "mistral-13b", 0.0, "medium", None, None, 0),
-        EndpointInfo("http://endpoint-large", "custom-70B", 0.0, "large", None, None, 0),
+        EndpointInfo(
+            "http://endpoint-medium", "mistral-13b", 0.0, "medium", None, None, 0
+        ),
+        EndpointInfo(
+            "http://endpoint-large", "custom-70B", 0.0, "large", None, None, 0
+        ),
     ]
     for ep in endpoints:
         router.register_endpoint(ep)
@@ -45,6 +52,7 @@ async def test_simple_load_balancing_routing():
         assert selected_url in [ep.url for ep in endpoints]
         assert router.endpoint_stats[selected_url].current_load == 1
 
+
 @pytest.mark.asyncio
 async def test_balancing_under_load():
     router = LoadBalancingRouter(lmcache_controller_port=1234)
@@ -52,8 +60,12 @@ async def test_balancing_under_load():
     # Register endpoints of different model sizes
     endpoints = [
         EndpointInfo("http://endpoint-small", "llama-7b", 0.0, "small", None, None, 0),
-        EndpointInfo("http://endpoint-medium", "mistral-13b", 0.0, "medium", None, None, 0),
-        EndpointInfo("http://endpoint-large", "custom-70B", 0.0, "large", None, None, 0),
+        EndpointInfo(
+            "http://endpoint-medium", "mistral-13b", 0.0, "medium", None, None, 0
+        ),
+        EndpointInfo(
+            "http://endpoint-large", "custom-70B", 0.0, "large", None, None, 0
+        ),
     ]
     for ep in endpoints:
         router.register_endpoint(ep)
@@ -72,9 +84,9 @@ async def test_balancing_under_load():
         request_stats = {}
 
         prompts = [
-            ("short prompt", 100),     # small
-            ("medium prompt", 300),    # medium
-            ("long prompt", 900),      # large
+            ("short prompt", 100),  # small
+            ("medium prompt", 300),  # medium
+            ("long prompt", 900),  # large
         ]
 
         routing_results = []
