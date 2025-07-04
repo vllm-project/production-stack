@@ -11,10 +11,10 @@ ROUTER_PORT=30080
 LOG_DIR="/tmp/router-logs"
 NUM_REQUESTS=20
 MODEL="facebook/opt-125m"
-BACKEND1="http://localhost:8001"
-BACKEND2="http://localhost:8002"
+BACKENDS_URL="http://localhost:8001,http://localhost:8002"
 PYTHONPATH=""
 VERBOSE=""
+SESSION_KEY="x-user-id"
 
 # Colors for output
 RED='\033[0;31m'
@@ -45,14 +45,13 @@ Routing Logic Options:
     prefixaware         - Test prefix-aware routing
     kvaware            - Test KV-aware routing
     disaggregated_prefill - Test disaggregated prefill routing
-
+    session              - Test session routing
 Options:
     -p, --port PORT         Router port (default: 30080)
     -l, --log-dir DIR       Log directory (default: /tmp/router-logs)
     -n, --num-requests N    Number of requests to test (default: 20)
     -m, --model MODEL       Model to use (default: facebook/opt-125m)
-    -b1, --backend1 URL     First backend URL (default: http://localhost:8001)
-    -b2, --backend2 URL     Second backend URL (default: http://localhost:8002)
+    -b, --backends-url URL  Backends URL (default: http://localhost:8001,http://localhost:8002)
     -v, --verbose           Enable verbose output
     -h, --help              Show this help message
 
@@ -60,7 +59,7 @@ Examples:
     $0 roundrobin
     $0 prefixaware --num-requests 30 --verbose
     $0 kvaware --port 30081 --log-dir ./logs
-
+    $0 session --num-requests 30 --verbose
 EOF
 }
 
@@ -75,6 +74,10 @@ cleanup() {
 start_router() {
     local routing_logic=$1
     local log_file="$LOG_DIR/$routing_logic/router.log"
+    local backends_url1
+    backends_url1=$(echo "$BACKENDS_URL" | cut -d ',' -f 1)
+    local backends_url2
+    backends_url2=$(echo "$BACKENDS_URL" | cut -d ',' -f 2)
 
     print_status "🔧 Starting router with static discovery and $routing_logic routing"
     print_status "PYTHONPATH=$PYTHONPATH"
@@ -85,13 +88,17 @@ start_router() {
     # Start router in background with log capture
     python3 -m src.vllm_router.app --port "$ROUTER_PORT" \
         --service-discovery static \
-        --static-backends "$BACKEND1,$BACKEND2" \
+        --static-backends "$backends_url1,$backends_url2" \
         --static-models "$MODEL,$MODEL" \
         --static-model-types "chat,chat" \
         --log-stats \
         --log-stats-interval 10 \
         --engine-stats-interval 10 \
         --request-stats-window 10 \
+        --prefill-model-labels "prefill" \
+        --decode-model-labels "decode" \
+        --static-model-labels "prefill,decode" \
+        --session-key "$SESSION_KEY" \
         --routing-logic "$routing_logic" > "$log_file" 2>&1 &
 
     ROUTER_PID=$!
@@ -124,6 +131,7 @@ run_test() {
     test_cmd="$test_cmd --routing-logic $routing_logic"
     test_cmd="$test_cmd --result-dir '$result_dir'"
     test_cmd="$test_cmd --discovery-type static"
+    test_cmd="$test_cmd --session-key $SESSION_KEY"
 
     if [ "$VERBOSE" = "true" ]; then
         test_cmd="$test_cmd --verbose"
@@ -217,12 +225,8 @@ while [[ $# -gt 0 ]]; do
             MODEL="$2"
             shift 2
             ;;
-        -b1|--backend1)
-            BACKEND1="$2"
-            shift 2
-            ;;
-        -b2|--backend2)
-            BACKEND2="$2"
+        -b|--backends-url)
+            BACKENDS_URL="$2"
             shift 2
             ;;
         -v|--verbose)
@@ -231,6 +235,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --pythonpath)
             PYTHONPATH="$2"
+            shift 2
+            ;;
+        --session-key)
+            SESSION_KEY="$2"
             shift 2
             ;;
         *)
@@ -242,7 +250,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate routing logic
-valid_logics=("roundrobin" "prefixaware" "all")
+valid_logics=("roundrobin" "prefixaware" "kvaware" "disaggregated_prefill" "session" "all")
 if [[ ! " ${valid_logics[*]} " =~ ${ROUTING_LOGIC} ]]; then
     print_error "Invalid routing logic: $ROUTING_LOGIC"
     print_error "Valid options: ${valid_logics[*]}"
@@ -260,7 +268,7 @@ fi
 # Run tests based on routing logic
 if [ "$ROUTING_LOGIC" = "all" ]; then
     # Run all tests
-    all_logics=("roundrobin" "prefixaware")
+    all_logics=("roundrobin" "prefixaware" "kvaware" "disaggregated_prefill" "session")
     run_multiple_tests "${all_logics[@]}"
 else
     # Run single test

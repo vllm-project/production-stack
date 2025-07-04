@@ -32,99 +32,100 @@ Create a configuration file ``values-16-disagg-prefill.yaml`` with the following
 
 .. code-block:: yaml
 
-    # Unified configuration for disaggregated prefill setup
-    # Unified configuration for disaggregated prefill setup
-    servingEngineSpec:
-      enableEngine: true
-      runtimeClassName: ""
-      containerPort: 8000
-      modelSpec:
-        # Prefill node configuration
-        - name: "llama-prefill"
-          repository: "lmcache/vllm-openai"
-          tag: "2025-05-27-v1"
-          modelURL: "meta-llama/Llama-3.1-8B-Instruct"
-          replicaCount: 1
-          requestCPU: 8
-          requestMemory: "30Gi"
-          # requestGPU: 1
-          pvcStorage: "50Gi"
-          vllmConfig:
-            enablePrefixCaching: true
-            maxModelLen: 32000
-            v1: 1
-            gpuMemoryUtilization: 0.6
-          lmcacheConfig:
-            cudaVisibleDevices: "0"
-            enabled: true
-            kvRole: "kv_producer"
-            enableNixl: true
-            nixlRole: "sender"
-            nixlPeerHost: "vllm-llama-decode-engine-service"
-            nixlPeerPort: "55555"
-            nixlBufferSize: "1073741824"  # 1GB
-            nixlBufferDevice: "cuda"
-            nixlEnableGc: true
-            enablePD: true
-            cpuOffloadingBufferSize: 0
-          hf_token: <your-hf-token>
-          labels:
-            model: "llama-prefill"
-        # Decode node configuration
-        - name: "llama-decode"
-          repository: "lmcache/vllm-openai"
-          tag: "2025-05-27-v1"
-          modelURL: "meta-llama/Llama-3.1-8B-Instruct"
-          replicaCount: 1
-          requestCPU: 8
-          requestMemory: "30Gi"
-          # requestGPU: 1
-          pvcStorage: "50Gi"
-          vllmConfig:
-            enablePrefixCaching: true
-            maxModelLen: 32000
-            v1: 1
-          lmcacheConfig:
-            cudaVisibleDevices: "1"
-            enabled: true
-            kvRole: "kv_consumer"  # Set decode node as consumer
-            enableNixl: true
-            nixlRole: "receiver"
-            nixlPeerHost: "0.0.0.0"
-            nixlPeerPort: "55555"
-            nixlBufferSize: "1073741824"  # 1GB
-            nixlBufferDevice: "cuda"
-            nixlEnableGc: true
-            enablePD: true
-          hf_token: <your-hf-token>
-          labels:
-            model: "llama-decode"
-    routerSpec:
-      enableRouter: true
-      repository: "lmcache/lmstack-router"
-      tag: "pd"
-      replicaCount: 1
-      containerPort: 8000
-      servicePort: 80
-      routingLogic: "disaggregated_prefill"
-      engineScrapeInterval: 15
-      requestStatsWindow: 60
-      enablePD: true
-      resources:
-        requests:
-          cpu: "4"
-          memory: "16G"
-        limits:
-          cpu: "4"
-          memory: "32G"
-      labels:
-        environment: "router"
-        release: "router"
-      extraArgs:
-        - "--prefill-model-labels"
-        - "llama-prefill"
-        - "--decode-model-labels"
-        - "llama-decode"
+  servingEngineSpec:
+    enableEngine: true
+    runtimeClassName: ""
+    containerPort: 8000
+    modelSpec:
+      # Prefill node configuration
+      - name: "llama-prefill"
+        repository: "lmcache/vllm-openai"
+        tag: "2025-05-27-v1"
+        modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+        replicaCount: 1
+        requestCPU: 8
+        requestMemory: "30Gi"
+        # requestGPU: 1
+        pvcStorage: "50Gi"
+        vllmConfig:
+          enablePrefixCaching: true
+          maxModelLen: 32000
+          v1: 1
+        lmcacheConfig:
+          cudaVisibleDevices: "0"
+          enabled: true
+          kvRole: "kv_producer"
+          enableNixl: true
+          nixlRole: "sender"
+          nixlPeerHost: "vllm-llama-decode-engine-service"
+          nixlPeerPort: "55555"
+          nixlBufferSize: "1073741824"  # 1GB
+          nixlBufferDevice: "cuda"
+          nixlEnableGc: true
+          enablePD: true
+          cpuOffloadingBufferSize: 0
+        hf_token: <hf-token>
+        labels:
+          model: "llama-prefill"
+      # Decode node configuration
+      - name: "llama-decode"
+        repository: "lmcache/vllm-openai"
+        tag: "2025-05-27-v1"
+        modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+        replicaCount: 1
+        requestCPU: 8
+        requestMemory: "30Gi"
+        # requestGPU: 1
+        pvcStorage: "50Gi"
+        vllmConfig:
+          enablePrefixCaching: true
+          maxModelLen: 32000
+          v1: 1
+        lmcacheConfig:
+          cudaVisibleDevices: "1"
+          enabled: true
+          kvRole: "kv_consumer"  # Set decode node as consumer
+          enableNixl: true
+          nixlRole: "receiver"
+          nixlPeerHost: "0.0.0.0"
+          nixlPeerPort: "55555"
+          nixlBufferSize: "1073741824"  # 1GB
+          nixlBufferDevice: "cuda"
+          nixlEnableGc: true
+          enablePD: true
+        hf_token: <hf-token>
+        labels:
+          model: "llama-decode"
+    containerSecurityContext:
+      capabilities:
+        add:
+          - SYS_PTRACE
+  routerSpec:
+    enableRouter: true
+    repository: "lmcache/lmstack-router"
+    tag: "pd"
+    replicaCount: 1
+    containerPort: 8000
+    servicePort: 80
+    routingLogic: "disaggregated_prefill"
+    engineScrapeInterval: 15
+    requestStatsWindow: 60
+    enablePD: true
+    resources:
+      requests:
+        cpu: "4"
+        memory: "16G"
+      limits:
+        cpu: "4"
+        memory: "32G"
+    labels:
+      environment: "router"
+      release: "router"
+    extraArgs:
+      - "--prefill-model-labels"
+      - "llama-prefill"
+      - "--decode-model-labels"
+      - "llama-decode"
 
 
 Step 2: Deploy Using Helm

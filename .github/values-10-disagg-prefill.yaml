@@ -1,7 +1,10 @@
+# Unified configuration for disaggregated prefill setup
 servingEngineSpec:
   strategy:
     type: Recreate
+  enableEngine: true
   runtimeClassName: ""
+  containerPort: 8000
   modelSpec:
     # Prefill node configuration
     - name: "opt125m-prefill"
@@ -75,13 +78,30 @@ servingEngineSpec:
         - SYS_PTRACE
 
 routerSpec:
+  enableRouter: true
   repository: "git-act-router"
   imagePullPolicy: "IfNotPresent"
   strategy:
     type: Recreate
-  enableRouter: true
-  routingLogic: "session"
-  sessionKey: "x-user-id"
+  replicaCount: 1
+  containerPort: 8000
+  servicePort: 80
+  routingLogic: "disaggregated_prefill"
+  engineScrapeInterval: 15
+  requestStatsWindow: 60
+  enablePD: true
+  resources:
+    requests:
+      cpu: "4"
+      memory: "16G"
+    limits:
+      cpu: "4"
+      memory: "32G"
+  labels:
+    environment: "router"
+    release: "router"
   extraArgs:
-    - "--log-level"
-    - "info"
+    - "--prefill-model-labels"
+    - "opt125m-prefill"
+    - "--decode-model-labels"
+    - "opt125m-decode"

@@ -3,32 +3,82 @@ servingEngineSpec:
     type: Recreate
   runtimeClassName: ""
   modelSpec:
-  - name: "opt125m"
-    repository: "vllm/vllm-openai"
-    tag: "latest"
-    modelURL: "facebook/opt-125m"
-
-    replicaCount: 2
-
-    requestCPU: 4
-    requestMemory: "16Gi"
-    requestGPU: 1
-
-    pvcStorage: "10Gi"
-    pvcAccessMode:
-      - ReadWriteMany
-
-    vllmConfig:
-      maxModelLen: 1024
-      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
-    chatTemplate: "chat.jinja2"
-    chatTemplateConfigMap: |-
-      {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
-      {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
+    # Prefill node configuration
+    - name: "opt125m-prefill"
+      repository: "lmcache/vllm-openai"
+      tag: "2025-05-27-v1"
+      modelURL: "facebook/opt-125m"
+      replicaCount: 1
+      requestCPU: 8
+      requestMemory: "30Gi"
+      # requestGPU: 1
+      pvcStorage: "50Gi"
+      vllmConfig:
+        enablePrefixCaching: true
+        maxModelLen: 1024
+        v1: 1
+        gpuMemoryUtilization: 0.6
+      lmcacheConfig:
+        cudaVisibleDevices: "0"
+        enabled: true
+        kvRole: "kv_producer"
+        enableNixl: true
+        nixlRole: "sender"
+        nixlPeerHost: "vllm-opt125m-decode-engine-service"
+        nixlPeerPort: "55555"
+        nixlBufferSize: "1073741824"  # 1GB
+        nixlBufferDevice: "cuda"
+        nixlEnableGc: true
+        enablePD: true
+        cpuOffloadingBufferSize: 0
+      labels:
+        model: "opt125m-prefill"
+      chatTemplate: "chat.jinja2"
+      chatTemplateConfigMap: |-
+        {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
+        {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
+    # Decode node configuration
+    - name: "opt125m-decode"
+      repository: "lmcache/vllm-openai"
+      tag: "2025-05-27-v1"
+      modelURL: "facebook/opt-125m"
+      replicaCount: 1
+      requestCPU: 8
+      requestMemory: "30Gi"
+      # requestGPU: 1
+      pvcStorage: "50Gi"
+      vllmConfig:
+        enablePrefixCaching: true
+        maxModelLen: 1024
+        v1: 1
+      lmcacheConfig:
+        cudaVisibleDevices: "1"
+        enabled: true
+        kvRole: "kv_consumer"  # Set decode node as consumer
+        enableNixl: true
+        nixlRole: "receiver"
+        nixlPeerHost: "0.0.0.0"
+        nixlPeerPort: "55555"
+        nixlBufferSize: "1073741824"  # 1GB
+        nixlBufferDevice: "cuda"
+        nixlEnableGc: true
+        enablePD: true
+      labels:
+        model: "opt125m-decode"
+      chatTemplate: "chat.jinja2"
+      chatTemplateConfigMap: |-
+        {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
+        {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
+  containerSecurityContext:
+    capabilities:
+      add:
+        - SYS_PTRACE
 
 routerSpec:
-  repository: "localhost:5000/git-act-router"
+  repository: "git-act-router"
   imagePullPolicy: "IfNotPresent"
+  strategy:
+    type: Recreate
   enableRouter: true
   routingLogic: "prefixaware"
   extraArgs:
