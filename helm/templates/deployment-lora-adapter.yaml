@@ -1,0 +1,55 @@
+{{- if .Values.loraAdapters }}
+{{- range .Values.loraAdapters }}
+---
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: LoraAdapter
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: lora-adapter
+    helm-release-name: {{ $.Release.Name }}
+spec:
+  baseModel: {{ .baseModel | quote }}
+  {{- if and (not .vllmApiKey) ($.Values.servingEngineSpec.vllmApiKey) }}
+  vllmApiKey:
+    secretName: {{ $.Release.Name }}-secrets
+    secretKey: vllmApiKey
+  {{- else if .vllmApiKey }}
+  vllmApiKey:
+    secretName: {{ .vllmApiKey.secretName | quote }}
+    secretKey: {{ .vllmApiKey.secretKey | quote }}
+  {{- end }}
+  adapterSource:
+    type: {{ .adapterSource.type | quote }}
+    adapterName: {{ .adapterSource.adapterName | quote }}
+    {{- if .adapterSource.adapterPath }}
+    adapterPath: {{ .adapterSource.adapterPath | quote }}
+    {{- end }}
+    {{- if .adapterSource.repository }}
+    repository: {{ .adapterSource.repository | quote }}
+    {{- end }}
+    {{- if .adapterSource.pattern }}
+    pattern: {{ .adapterSource.pattern | quote }}
+    {{- end }}
+    {{- if .adapterSource.maxAdapters }}
+    maxAdapters: {{ .adapterSource.maxAdapters }}
+    {{- end }}
+    {{- if .adapterSource.credentials }}
+    {{- if (kindIs "string" .adapterSource.credentials) }}
+    credentialsSecretRef:
+      name: {{ $.Release.Name }}-secrets
+      key: lora_adapter_credentials_{{ .adapterSource.adapterName }}
+    {{- else }}
+    credentialsSecretRef:
+      name: {{ .adapterSource.credentials.secretName | quote }}
+      key: {{ .adapterSource.credentials.secretKey | quote }}
+    {{- end }}
+    {{- end }}
+  loraAdapterDeploymentConfig:
+    algorithm: {{ .loraAdapterDeploymentConfig.algorithm | default "default" | quote }}
+    {{- if .loraAdapterDeploymentConfig.replicas }}
+    replicas: {{ .loraAdapterDeploymentConfig.replicas }}
+    {{- end }}
+{{- end }}
+{{- end }}

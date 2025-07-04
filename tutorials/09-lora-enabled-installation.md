@@ -124,7 +124,7 @@ adapter_id = 'nvidia/llama-3.1-nemoguard-8b-topic-control'  # Example adapter
 sql_lora_path = snapshot_download(
     repo_id=adapter_id,
     local_dir='./llama-3.1-nemoguard-8b-topic-control',
-    token=__import__('os').environ['HUGGING_FACE_HUB_TOKEN']
+    token=__import__('os').environ['HF_TOKEN']
 )
 "
 

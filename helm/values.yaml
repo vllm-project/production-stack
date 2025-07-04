@@ -85,6 +85,7 @@ servingEngineSpec:
   # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes
   # - nodeName: (optional) Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
+  # - enableLoRA: (optional, bool) Whether to enable LoRA, e.g., true
   #
   # Example:
   # vllmApiKey: "vllm_xxxxxxxxxxxxx"
@@ -252,7 +253,6 @@ servingEngineSpec:
     # readOnlyRootFilesystem: true
 
 
-
 routerSpec:
   # -- The docker image of the router. The following values are defaults:
   repository: "lmcache/lmstack-router"
@@ -366,3 +366,109 @@ routerSpec:
   #  httpGet:
   #    # -- Path to access on the HTTP server
   #
+
+# -- LoRA Adapter Configuration
+loraAdapters: []
+
+  # -- LoRA adapter instances to deploy
+  # Each instance should contain:
+  # - name: (string) The name of the LoRA adapter instance
+  # - baseModel: (string) The name of the base model this adapter is for
+  # - vllmApiKey: (optional) API key configuration for vLLM authentication
+  #   - secretRef: Reference to a secret containing the API key
+  #     - secretName: (string) Name of the secret
+  #     - secretKey: (string) Key in the secret containing the API key
+  #   - value: (string) Direct API key value
+  # - adapterSource: (object) Configuration for the adapter source
+  #   - type: (string) Type of adapter source (local, s3, http, huggingface)
+  #   - adapterName: (string) Name of the adapter to apply
+  #   - adapterPath: (optional, string) Path to the LoRA adapter weights
+  #   - repository: (optional, string) Repository to get the LoRA adapter from
+  #   - pattern: (optional, string) Pattern to use for the adapter name
+  #   - maxAdapters: (optional, int) Maximum number of adapters to load
+  #   - credentials: (optional, object) Reference to secret with storage credentials
+  #     - secretName: (string) Name of the secret
+  #     - secretKey: (string) Key in the secret containing the credentials
+  # - loraAdapterDeploymentConfig: (object) Configuration for adapter deployment
+  #   - algorithm: (string) Placement algorithm to use (default, ordered, equalized)
+  #   - replicas: (optional, int) Number of replicas that should load this adapter
+  # - labels: (optional, map) Additional labels for the LoRA adapter
+  #
+  # Example:
+  # loraAdapters:
+  #   - name: "llama3-nemoguard-adapter"
+  #     baseModel: "llama3-8b-instr"
+  #     vllmApiKey:
+  #       secretRef:
+  #         secretName: "vllm-api-key"
+  #         secretKey: "VLLM_API_KEY"
+  #     adapterSource:
+  #       type: "local"
+  #       adapterName: "llama-3.1-nemoguard-8b-topic-control"
+  #       adapterPath: "/data/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+  #     loraAdapterDeploymentConfig:
+  #       algorithm: "default"
+  #       replicas: 1
+  #     labels:
+  #       environment: "production"
+  #       model: "llama3-nemoguard"
+
+# -- lora controller Configuration
+loraController:
+  enableLoraController: false
+  # -- kubernetes cluster domain
+  kubernetesClusterDomain: "cluster.local"
+
+  # -- Number of lora controller replicas
+  replicaCount: 1
+
+  # -- lora controller image configuration
+  image:
+    repository: "lmcache/lmstack-lora-controller"
+    tag: "latest"
+    pullPolicy: "IfNotPresent"
+
+  # -- Image pull secrets
+  imagePullSecrets: []
+
+  # -- Pod annotations
+  podAnnotations: {}
+
+  # -- Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Container security context
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+
+  # -- lora controller resources
+  resources: {}
+
+  # -- Node selector
+  nodeSelector: {}
+
+  # -- Affinity
+  affinity: {}
+
+  # -- Tolerations
+  tolerations: []
+
+  # -- Environment variables
+  env: []
+
+  # -- Extra arguments for the lora controller
+  extraArgs: []
+
+  # -- Metrics configuration
+  metrics:
+    enabled: true
+
+  # -- Webhook configuration
+  webhook:
+    enabled: false

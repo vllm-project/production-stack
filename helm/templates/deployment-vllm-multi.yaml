@@ -372,17 +372,26 @@ spec:
           {{- if hasKey $modelSpec "extraVolumeMounts" }}
           {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
           {{- end }}
+          {{- if hasKey $.Values.servingEngineSpec "sharedPvcStorage" }}
+          - name: {{ .Release.Name }}-shared-pvc-storage
+            mountPath: /data/shared-pvc-storage
+          {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
-      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") (hasKey $.Values.servingEngineSpec "sharedPvcStorage") }}
       volumes:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
+        {{- end }}
+        {{- if hasKey $.Values.servingEngineSpec "sharedPvcStorage" }}
+        - name: {{ .Release.Name }}-shared-pvc-storage
+          persistentVolumeClaim:
+            claimName: "{{ .Release.Name }}-shared-pvc-storage-claim"
         {{- end }}
         {{- with $modelSpec.vllmConfig }}
         {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
