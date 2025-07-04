@@ -474,6 +474,7 @@ class LoadBalancingRouter(RoutingInterface):
         flops_rate=312e12,
         hbm_rate=1.5e12,
         model_params=175e9,
+        kv_aware_threshold: int = 2000,
     ):
         self.kv_manager = controller_manager.LMCacheControllerManager(
             f"0.0.0.0:{lmcache_controller_port}"
@@ -481,10 +482,11 @@ class LoadBalancingRouter(RoutingInterface):
         self.flops_rate = flops_rate
         self.hbm_rate = hbm_rate
         self.model_params = model_params
+        self.threshold = kv_aware_threshold
 
-        self.req_id = 0
         self.instance_id_to_ip = {}
         self.endpoint_stats: Dict[str, LoadBalancingEndpointInfo] = {}
+        self.tokenizer = None
 
     def start_kv_manager(self):
         self.loop = asyncio.new_event_loop()
@@ -507,9 +509,7 @@ class LoadBalancingRouter(RoutingInterface):
         # model params not found, searching name
         match = re.search(r"(\d+)([bBmM])", endpoint_url)
         if match:
-            num = 1
-            if type(match.group(1)) == int or type(match.group(1)) == float:
-                num = int(match.group(1))
+            num = int(match.group(1))
             suffix = match.group(2).lower()
 
             if suffix == "b":
@@ -530,19 +530,16 @@ class LoadBalancingRouter(RoutingInterface):
             model_params = self.model_params
 
         # based on formula from chen jinghong
-        compute = (2 * self.model_params * effective_prompt_len) / self.flops_rate
-        memory = (2 * self.model_params) / self.hbm_rate
+        compute = (2 * model_params * effective_prompt_len) / self.flops_rate
+        memory = (2 * model_params) / self.hbm_rate
         return (compute + memory) * (1 + load)  # scale by current endpoint load
 
-    def get_instance_id(self, ret_msg):
-        cached_len = 0
-        instance_id = None
-        if ret_msg.layout_info:
-            # find entry with largest end index
-            instance_id = max(ret_msg.layout_info.items(), key=lambda x: x[1][1])[0]
-            cached_len = ret_msg.layout_info[instance_id][1]
-
-        return instance_id, cached_len
+    def query_manager(self, msg) -> str:
+        """
+        Get the instance id for the given message
+        """
+        instance_id = self.kv_manager.handle_orchestration_message(msg)
+        return instance_id
 
     def register_endpoint(self, endpoint: EndpointInfo):
         if endpoint.url not in self.endpoint_stats:
@@ -565,50 +562,56 @@ class LoadBalancingRouter(RoutingInterface):
         """
 
         # tokenize the prompt
+        if self.tokenizer is None:
+            self.tokenizer = AutoTokenizer.from_pretrained(endpoints[0].model_names[0])
         url = endpoints[0].url + "/tokenize"
-        headers = {"Content-Type": "application/json"}
-        data = {"model": endpoints[0].model_names, "prompt": request_json["prompt"]}
-        response = requests.post(url, headers=headers, json=data).json()
-        token_ids = response["tokens"]
+        token_ids = self.tokenizer.encode(request_json["prompt"])
         msg = LookupMsg(tokens=token_ids)
 
-        # instance id of longest prefix is returned?
-        ret_msg = self.kv_manager.handle_orchestration_message(msg)
-        instance_id, cached_len = self.get_instance_id(ret_msg)
+        instance_id = await self.query_manager(msg)
 
         prompt_len = len(token_ids)
 
         best_url = None
         best_ttft = float(math.inf)
 
+        matched_tokens = math.inf
+        if len(list(instance_id.layout_info.keys())) > 0:
+            matched_instance_id = list(instance_id.layout_info.keys())[0]
+            matched_tokens = instance_id.layout_info[matched_instance_id][1]
+
         if (
-            instance_id is None or instance_id.best_instance_id is None
-        ):  # no cache hit, proceed w/ ttft calculations
+            instance_id is None
+            or len(instance_id.layout_info) == 0
+            or matched_tokens < max(len(token_ids) - self.threshold, 0)
+        ):  # no cache hit/too small, proceed w/ ttft calculations
             for ep in endpoints:
                 load = self.endpoint_stats[ep.url].current_load
                 est_ttft = self.estimate_ttft(prompt_len, load, ep.url)
                 if est_ttft < best_ttft:
                     best_ttft = est_ttft
                     best_url = ep.url
-        else:  # cache hit
-            self.req_id += 1
-            if instance_id.best_instance_id not in self.instance_id_to_ip:
+        else:  # good cache hit
+            queried_instance_ids = [info for info in instance_id.layout_info]
+            if queried_instance_ids[0] not in self.instance_id_to_ip:
                 for ep in endpoints:
                     query_message = QueryInstMsg(
                         ip=ep.url.split(f":{ep.url.split(':')[-1]}")[0].split("//")[1]
                     )
-                    instance_id = await self.query_manager(query_message)
-                    self.instance_id_to_ip[instance_id.instance_id] = ep.url
+                    ep_instance_id = await self.kv_manager.handle_orchestration_message(
+                        query_message
+                    )
+                    self.instance_id_to_ip[ep_instance_id.instance_id] = ep.url
             logger.info(
                 f"Routing request to {instance_id.best_instance_id} found by kvaware, load balancing router"
             )
-            best_url = self.instance_id_to_ip[instance_id.best_instance_id]
+            best_url = self.instance_id_to_ip[queried_instance_ids[0]]
 
         # increment load for selected endpoint
         self.endpoint_stats[best_url].increment_load()
         return best_url
 
-    def complete_request(self, endpoint_url):
+    def on_completion(self, endpoint_url):
         self.endpoint_stats[endpoint_url].decrement_load()
 
 
