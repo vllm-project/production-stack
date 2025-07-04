@@ -16,13 +16,10 @@ import abc
 import asyncio
 import enum
 import math
-import os
 import random
-import socket
 import threading
 from typing import Dict, List
 
-import requests
 from fastapi import Request
 
 try:
@@ -35,7 +32,6 @@ try:
     from lmcache.v1.cache_controller.message import (
         LookupMsg,
         QueryInstMsg,
-        QueryInstRetMsg,
     )
 except ImportError:
     pass

@@ -1,7 +1,6 @@
 """Types and enums for PII detection."""
 
 from enum import Enum
-from typing import Optional, Set
 
 
 class PIIAction(Enum):
