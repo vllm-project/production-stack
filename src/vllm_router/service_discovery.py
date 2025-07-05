@@ -172,6 +172,18 @@ class EndpointInfo:
         return self.model_info.get(model_id)
 
 
+class LoadBalancingEndpointInfo:
+    current_load: int = 0
+
+    model_params: Optional[int] = None
+
+    def increment_load(self):
+        self.current_load += 1
+
+    def decrement_load(self):
+        self.current_load = max(0, self.current_load - 1)
+
+
 class ServiceDiscovery(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_endpoint_info(self) -> List[EndpointInfo]:
