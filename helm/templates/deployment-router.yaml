@@ -119,8 +119,12 @@ spec:
           {{- end }}
           {{- if .Values.routerSpec.resources.limits }}
           limits:
+            {{- if .Values.routerSpec.resources.limits.cpu }}
             cpu: "{{ .Values.routerSpec.resources.limits.cpu }}"
+            {{- end }}
+            {{- if .Values.routerSpec.resources.limits.memory }}
             memory: "{{ .Values.routerSpec.resources.limits.memory }}"
+            {{- end }}
           {{- end }}
         {{- end }}
         ports:
