@@ -313,11 +313,10 @@ routerSpec:
   # -- router resource requests and limits
   resources:
     requests:
-      cpu: "4"
-      memory: "16G"
+      cpu: 400m
+      memory: 500m
     limits:
-      cpu: "8"
-      memory: "32G"
+      memory: 500m
 
   # -- Customized labels for the router deployment
   labels:
