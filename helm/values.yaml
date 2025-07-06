@@ -265,6 +265,13 @@ routerSpec:
   # -- Number of replicas
   replicaCount: 1
 
+  # -- autoscaling configuration
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+
   # -- Container port
   containerPort: 8000
 
