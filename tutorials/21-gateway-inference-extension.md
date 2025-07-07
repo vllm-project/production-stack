@@ -241,18 +241,16 @@ To uninstall all the resources installed on the cluster, run the following:
 
 ```bash
 # Delete the inference extension
-kubectl delete -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/raw/main/config/manifests/gateway/kgateway/gateway.yaml
-
+kubectl delete -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/raw/main/config/manifests/gateway/kgateway/gateway.yaml --ignore-not-found=true
 # Delete the inference model and pool resources
-kubectl delete -f configs/inferencemodel.yaml
-kubectl delete -f configs/inferencepool-resources.yaml
-
+kubectl delete -f configs/inferencemodel.yaml --ignore-not-found=true
+kubectl delete -f configs/inferencepool-resources.yaml --ignore-not-found=true
 # Delete the VLLM deployment
-kubectl delete -f configs/vllm/gpu-deployment.yaml
-
-kubectl delete -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v0.3.0/manifests.yaml
-
+kubectl delete -f configs/vllm/gpu-deployment.yaml --ignore-not-found=true
+kubectl delete -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v0.3.0/manifests.yaml --ignore-not-found=true
+# Delete helm releases
 helm uninstall kgateway -n kgateway-system
 helm uninstall kgateway-crds -n kgateway-system
-kubectl delete ns kgateway-system
+# Delete the namespace last to ensure all resources are removed
+kubectl delete ns kgateway-system --ignore-not-found=true
 ```
