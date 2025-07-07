@@ -15,6 +15,7 @@ Before starting this tutorial, ensure you have:
 ## Overview
 
 The Gateway Inference Extension provides:
+
 - **Individual Model Inference**: Direct access to specific models
 - **Inference Pools**: Load-balanced access to multiple model instances
 - **Gateway API Integration**: Standard Kubernetes Gateway API for routing
@@ -59,7 +60,7 @@ helm upgrade -i --namespace kgateway-system --version $KGTW_VERSION kgateway oci
 
 ### 2.1 Understanding vLLM Runtime
 
-The vLLM Runtime is a custom resource that manages model deployments. Please check ``configs/vllm/gpu-deployment.yaml`` for an example config. 
+The vLLM Runtime is a custom resource that manages model deployments. Please check ``configs/vllm/gpu-deployment.yaml`` for an example config.
 
 ### 2.2 Apply vLLM Deployment
 
@@ -69,6 +70,7 @@ kubectl apply -f configs/vllm/gpu-deployment.yaml
 ```
 
 **Production Considerations**:
+
 - Adjust resource requests/limits based on your model size and GPU capacity
 - Consider using multiple replicas for high availability
 - Monitor GPU utilization and adjust accordingly
@@ -96,7 +98,7 @@ spec:
 
 ### 3.2 Inference Pool Configuration
 
-For routing to multiple model instances, check ``configs/inferencepool-resources.yaml`` for example. 
+For routing to multiple model instances, check ``configs/inferencepool-resources.yaml`` for example.
 
 ### 3.3 Apply Inference Resources
 
