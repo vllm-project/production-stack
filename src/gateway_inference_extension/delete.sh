@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Delete the inference extension
 kubectl delete -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/raw/main/config/manifests/gateway/kgateway/gateway.yaml
 
