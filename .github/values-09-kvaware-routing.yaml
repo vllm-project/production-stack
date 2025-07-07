@@ -80,8 +80,7 @@ routerSpec:
   strategy:
     type: Recreate
   enableRouter: true
-  routingLogic: "session"
-  sessionKey: "x-user-id"
+  routingLogic: "kvaware"
   extraArgs:
     - "--log-level"
     - "info"

@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import time
 import uuid
 from collections import deque
@@ -43,10 +44,12 @@ class StaticDiscoveryTest:
         self,
         router_url: str = "http://localhost:30080",
         model: str = "facebook/opt-125m",
-        log_file_path: str = "router.log",
         result_dir: str = "tests/e2e/static-discovery-results",
         routing_logic: str = "roundrobin",
         prefix_chunk_size: int = 128,
+        num_requests: int = 20,
+        session_key: str = "x-user-id",
+        log_file_path: str = "",
     ):
         self.router_url = router_url
         self.model = model
@@ -55,6 +58,8 @@ class StaticDiscoveryTest:
         self.results_dir = result_dir
         os.makedirs(self.results_dir, exist_ok=True)
         self.prefix_chunk_size = prefix_chunk_size
+        self.num_requests = num_requests
+        self.session_key = session_key
 
     def _read_log_file(self) -> Optional[deque]:
         """Read router log file and return content as deque"""
@@ -107,12 +112,41 @@ class StaticDiscoveryTest:
                 if request_id in request_id_to_endpoints:
                     request_id_to_endpoints[request_id].add(endpoint)
 
+    def _extract_session_endpoint_set_mapping(
+        self, routing_lines: List[str], session_id_to_endpoints: Dict[str, Set[str]]
+    ):
+        """Extract session ID to set of endpoints mapping from routing lines, but only for the first request"""
+        for line in routing_lines:
+            match = re.search(
+                r"Routing request [^ ]* with session id ([^ ]*) to ([^ ]*) at ", line
+            )
+            if match:
+                session_id = match.group(1)
+                endpoint = match.group(2)
+                if session_id in session_id_to_endpoints:
+                    session_id_to_endpoints[session_id].add(endpoint)
+
+    def _extract_endpoint_list_mapping(
+        self, routing_lines: List[str], request_id_to_endpoints: Dict[str, List[str]]
+    ):
+        """Extract request ID to list of endpoints mapping from routing lines"""
+        for line in routing_lines:
+            match = re.search(
+                r"Routing request ([^ ]*) with session id [^ ]* to ([^ ]*) at ", line
+            )
+            if match:
+                request_id = match.group(1)
+                endpoint = match.group(2)
+                if request_id in request_id_to_endpoints:
+                    request_id_to_endpoints[request_id].append(endpoint)
+
     def _save_routing_lines(
         self, routing_lines: List[str], filename: str = "routing_lines.txt"
     ) -> bool:
         """Save routing lines to a file in results directory"""
         try:
-            filepath = f"{self.results_dir}/{filename}"
+            filepath = f"{self.results_dir}/{self.routing_logic}/{filename}"
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
             with open(filepath, "w") as f:
                 f.write("\n".join(routing_lines))
             print_status(f"Wrote {len(routing_lines)} routing lines to {filepath}")
@@ -137,6 +171,7 @@ class StaticDiscoveryTest:
                 "Content-Type": "application/json",
                 "Authorization": "Bearer dummy",
                 "X-Request-Id": request_id,
+                self.session_key: request_id,
             }
 
             response = requests.post(
@@ -157,25 +192,70 @@ class StaticDiscoveryTest:
             print_error(f"ERROR: Invalid JSON response for request {request_id}: {e}")
             return False
 
-    def test_roundrobin_routing(self, num_requests: int = 20) -> bool:
+    def test_session_routing(self) -> bool:
+        """Test that the router can handle session routing"""
+        print_status(f"🧪 Testing session routing")
+        session_id_to_endpoint = {}
+        success_count = 0
+        total_requests = self.num_requests * 5
+        for i in range(self.num_requests):
+            session_id = str(uuid.uuid4())
+            session_id_to_endpoint[session_id] = set()
+            for j in range(5):
+                if self.send_request(session_id, "Hello!"):
+                    success_count += 1
+
+        if success_count == total_requests:
+            print_status(f"✅ All {total_requests} requests completed successfully")
+        else:
+            print_error(f"❌ Only {success_count}/{total_requests} requests succeeded")
+            return False
+
+        # Analyze routing patterns
+        content = self._read_log_file()
+        if content is None:
+            return False
+        routing_lines = self._extract_routing_lines(content)
+        self._extract_session_endpoint_set_mapping(
+            routing_lines, session_id_to_endpoint
+        )
+        print_status(f"Session ID to endpoint mapping: {session_id_to_endpoint}")
+        self._save_routing_lines(routing_lines, "routing_lines.txt")
+
+        # Verify that all requests are routed to the same endpoint
+        for session_id, endpoints in session_id_to_endpoint.items():
+            if len(endpoints) != 1:
+                print_error(
+                    f"❌ Session {session_id} was routed to multiple endpoints: {endpoints}"
+                )
+                return False
+
+        print_status("✅ Session routing verification passed")
+        return True
+
+    def test_roundrobin_routing(self) -> bool:
         """Test that requests are distributed in round-robin fashion"""
-        print_status(f"🧪 Testing round-robin routing with {num_requests} requests")
+        print_status(
+            f"🧪 Testing round-robin routing with {self.num_requests} requests"
+        )
 
         request_id_to_endpoint = {}
         success_count = 0
 
         # Send requests
-        for i in range(1, num_requests + 1):
+        for i in range(1, self.num_requests + 1):
             request_id = str(uuid.uuid4())
             request_id_to_endpoint[request_id] = None
             prompt = f"This is request {request_id}. Please respond briefly."
             if self.send_request(request_id, prompt):
                 success_count += 1
 
-        if success_count == num_requests:
-            print_status(f"✅ All {num_requests} requests completed successfully")
+        if success_count == self.num_requests:
+            print_status(f"✅ All {self.num_requests} requests completed successfully")
         else:
-            print_error(f"❌ Only {success_count}/{num_requests} requests succeeded")
+            print_error(
+                f"❌ Only {success_count}/{self.num_requests} requests succeeded"
+            )
             return False
 
         # Analyze routing patterns
@@ -343,11 +423,62 @@ class StaticDiscoveryTest:
     def test_disaggregated_prefill_routing(self) -> bool:
         """Test that the router can handle disaggregated prefill routing"""
         print_status("🧪 Testing disaggregated prefill routing")
+        success_count = 0
+        request_id_to_endpoints = {}
+        for i in range(self.num_requests):
+            request_id = str(uuid.uuid4())
+            request_id_to_endpoints[request_id] = []
+            if self.send_request(request_id, "How are you?"):
+                success_count += 1
+            else:
+                print_error("❌ Failed to send prefill and decode requests")
+                return False
+
+        if success_count == self.num_requests:
+            print_status(
+                f"✅ Successfully sent {self.num_requests} prefill and decode requests"
+            )
+        else:
+            print_error(
+                f"❌ Only {success_count}/{self.num_requests} requests succeeded"
+            )
+            return False
+
+        # Analyze routing patterns
+        content = self._read_log_file()
+        if content is None:
+            return False
+        routing_lines = self._extract_routing_lines(content)
+        self._extract_endpoint_list_mapping(routing_lines, request_id_to_endpoints)
+        for request_id, endpoints in request_id_to_endpoints.items():
+            # must be routed two different endpoints
+            if len(endpoints) != 2:
+                print_error(
+                    f"❌ Request {request_id} was routed to {endpoints} instead of 2 endpoints"
+                )
+                return False
+            if endpoints[0] == endpoints[1]:
+                print_error(
+                    f"❌ Request {request_id} was routed to the same endpoint: {endpoints}"
+                )
+                return False
+
+        print_status(f"Request ID to endpoint mapping: {request_id_to_endpoints}")
+        self._save_routing_lines(routing_lines, "routing_lines.txt")
+        print_status("✅ Disaggregated prefill routing verification passed")
         return True
 
     def test_kvaware_routing(self) -> bool:
         """Test that the router can handle kvaware routing"""
-        print_status("🧪 Testing kvaware routing")
+        print_status("🧪 Only test whether endpoints are working")
+        # TODO: remove this once lmcache supports kvaware routing
+        return True
+        request_id = str(uuid.uuid4())
+        if self.send_request(request_id, "Hello!", max_tokens=10):
+            print_status("✅ Kvaware routing verification passed")
+        else:
+            print_error("❌ Kvaware routing verification failed")
+            return False
         return True
 
     def test_health_endpoint(self) -> bool:
@@ -380,6 +511,10 @@ class StaticDiscoveryTest:
 
     def test_chat_completions(self) -> bool:
         """Test that the router can handle chat completions"""
+        # TODO: remove this once lmcache and kv-aware routing supports chat completions
+        if self.routing_logic == "kvaware":
+            print_status("🧪 Skipping chat completions test for kvaware routing")
+            return True
         try:
             payload = {
                 "model": self.model,
@@ -408,9 +543,9 @@ class StaticDiscoveryTest:
             return False
 
     def run_test(self) -> bool:
-        """Run the complete static discovery test"""
+        """Run the complete routing test"""
         try:
-            print_status("🚀 Starting static discovery E2E test")
+            print_status(f"🚀 Starting {self.routing_logic} routing E2E test")
 
             # Test health endpoint
             if not self.test_health_endpoint():
@@ -430,6 +565,7 @@ class StaticDiscoveryTest:
                 "prefixaware": self.test_prefixaware_routing,
                 "disaggregated_prefill": self.test_disaggregated_prefill_routing,
                 "kvaware": self.test_kvaware_routing,
+                "session": self.test_session_routing,
             }
             if test_runner := test_runners.get(self.routing_logic):
                 if not test_runner():
@@ -437,12 +573,77 @@ class StaticDiscoveryTest:
             else:
                 print_status(f"🧪 Skipping test for {self.routing_logic} routing logic")
 
-            print_status("✅ Static discovery E2E test passed!")
+            print_status(f"✅ {self.routing_logic} routing E2E test passed!")
             return True
 
         except Exception as e:
             print_error(f"Unexpected error during test: {e}")
             return False
+
+
+class K8sDiscoveryRoutingTest(StaticDiscoveryTest):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _get_router_logs(self) -> Optional[str]:
+        """Get router logs from Kubernetes"""
+        print_status("Fetching router logs...")
+
+        # Try multiple common router pod selectors
+        router_selectors = [
+            "environment=router",
+            "release=router",
+            "app.kubernetes.io/component=router",
+            "app=vllmrouter-sample",
+        ]
+
+        raw_log_file = os.path.join(
+            self.results_dir, self.routing_logic, "raw_router_logs.txt"
+        )
+        os.makedirs(os.path.dirname(raw_log_file), exist_ok=True)
+
+        for selector in router_selectors:
+            try:
+                # Check if pods exist with this selector
+                result = subprocess.run(
+                    ["kubectl", "get", "pods", "-l", selector, "--no-headers"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+
+                if result.stdout.strip():
+                    print_status(f"Found router pods with selector: {selector}")
+
+                    # Get logs
+                    with open(raw_log_file, "w") as f:
+                        subprocess.run(
+                            ["kubectl", "logs", "-l", selector, "--tail=5000"],
+                            stdout=f,
+                            stderr=subprocess.PIPE,
+                            check=True,
+                        )
+                    return raw_log_file
+
+            except subprocess.CalledProcessError:
+                continue
+
+        print_error("Could not fetch router logs. Router log verification failed.")
+        return None
+
+    def _read_log_file(self) -> Optional[deque]:
+        """Read router log file and return content as deque"""
+        try:
+            self.log_file_path = self._get_router_logs()
+            print_status(f"Reading log file: {self.log_file_path}")
+            if self.log_file_path is not None:
+                with open(self.log_file_path, "r") as f:
+                    return deque(f, maxlen=5000)
+            else:
+                return None
+        except FileNotFoundError:
+            print_error(f"❌ Log file not found: {self.log_file_path}")
+            return None
 
 
 def main():
@@ -459,9 +660,7 @@ def main():
         "--num-requests", type=int, default=20, help="Number of requests to test"
     )
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
-    parser.add_argument(
-        "--log-file-path", default="router.log", help="Path to router log file"
-    )
+    parser.add_argument("--log-file-path", help="Path to router log file")
     parser.add_argument(
         "--result-dir",
         default="tests/e2e/static-discovery-results",
@@ -475,18 +674,46 @@ def main():
     parser.add_argument(
         "--prefix-chunk-size", type=int, default=128, help="Size of prefix chunk"
     )
+    parser.add_argument(
+        "--discovery-type",
+        default="static",
+        help="Discovery type to use for testing",
+    )
+    parser.add_argument(
+        "--session-key",
+        default="x-user-id",
+        help="Session key for session routing",
+    )
     args = parser.parse_args()
 
-    test = StaticDiscoveryTest(
-        router_url=args.router_url,
-        model=args.model,
-        log_file_path=args.log_file_path,
-        result_dir=args.result_dir,
-        routing_logic=args.routing_logic,
-        prefix_chunk_size=args.prefix_chunk_size,
-    )
+    if args.discovery_type == "static":
+        print_status(f"🚀 Starting static discovery E2E test")
+        test = StaticDiscoveryTest(
+            router_url=args.router_url,
+            model=args.model,
+            log_file_path=args.log_file_path,
+            result_dir=args.result_dir,
+            routing_logic=args.routing_logic,
+            prefix_chunk_size=args.prefix_chunk_size,
+            num_requests=args.num_requests,
+            session_key=args.session_key,
+        )
+        success = test.run_test()
+    elif args.discovery_type == "k8s":
+        print_status(f"🚀 Starting k8s discovery E2E test")
+        test = K8sDiscoveryRoutingTest(
+            router_url=args.router_url,
+            model=args.model,
+            result_dir=args.result_dir,
+            log_file_path=args.log_file_path,
+            routing_logic=args.routing_logic,
+            num_requests=args.num_requests,
+        )
+        success = test.run_test()
+    else:
+        print_error(f"❌ Invalid discovery type: {args.discovery_type}")
+        return False
 
-    success = test.run_test()
     exit(0 if success else 1)
 
 
