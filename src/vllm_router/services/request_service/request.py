@@ -19,8 +19,9 @@ import time
 import uuid
 
 import httpx
-from fastapi import BackgroundTasks, Request
+from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from requests import JSONDecodeError
 
 from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import (
@@ -37,20 +38,7 @@ from vllm_router.utils import replace_model_in_request_body, update_content_leng
 
 try:
     # Semantic cache integration
-    from vllm_router.experimental.semantic_cache import (
-        GetSemanticCache,
-        enable_semantic_cache,
-        initialize_semantic_cache,
-        is_semantic_cache_enabled,
-    )
     from vllm_router.experimental.semantic_cache_integration import (
-        add_semantic_cache_args,
-        check_semantic_cache,
-        semantic_cache_hit_ratio,
-        semantic_cache_hits,
-        semantic_cache_latency,
-        semantic_cache_misses,
-        semantic_cache_size,
         store_in_semantic_cache,
     )
 
@@ -62,6 +50,7 @@ except ImportError:
 logger = init_logger(__name__)
 
 
+# TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
     body,
@@ -96,13 +85,14 @@ async def process_request(
         backend_url, request_id, start_time
     )
     # Check if this is a streaming request
-    is_streaming = False
     try:
         request_json = json.loads(body)
         is_streaming = request_json.get("stream", False)
-    except:
+    except JSONDecodeError:
         # If we can't parse the body as JSON, assume it's not streaming
-        pass
+        raise HTTPException(
+            status_code=400, detail="Request body is not JSON parsable."
+        )
 
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
@@ -209,8 +199,11 @@ async def route_general_request(
         # Update request_json if the body was rewritten
         try:
             request_json = json.loads(request_body)
-        except:
+        except JSONDecodeError:
             logger.warning("Failed to parse rewritten request body as JSON")
+            raise HTTPException(
+                status_code=400, detail="Request body is not JSON parsable."
+            )
 
     # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
@@ -225,7 +218,7 @@ async def route_general_request(
     if not request_endpoint:
         endpoints = list(
             filter(
-                lambda x: requested_model in x.model_names and x.sleep == False,
+                lambda x: requested_model in x.model_names and not x.sleep,
                 endpoints,
             )
         )
@@ -238,7 +231,7 @@ async def route_general_request(
             filter(
                 lambda x: requested_model in x.model_names
                 and x.Id == request_endpoint
-                and x.sleep == False,
+                and not x.sleep,
                 endpoints,
             )
         )
@@ -435,7 +428,7 @@ async def route_sleep_wakeup_request(
     }
 
     if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
-        logger.info(f"Using vllm server authentication")
+        logger.info("Using vllm server authentication")
         headers["Authorization"] = f"Bearer {VLLM_API_KEY}"
 
     url = server_url + endpoint
