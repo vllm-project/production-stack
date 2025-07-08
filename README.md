@@ -11,11 +11,11 @@
 
 ## Community Events
 
-We host **weekly** community meetings at **alternating** times to accommodate different time zones.
+We host **weekly** community meetings at the following timeslot:
 
 - Tuesdays at 5:30 PM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1E4rcnwZHV84IEFXAGtJ-TP3o1rslNDei&export=download)
 
-Meetings alternate weekly between the two times. All are welcome to join!
+All are welcome to join!
 
 ## Introduction
 
