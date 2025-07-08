@@ -356,7 +356,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         # Init kubernetes watcher
         try:
             config.load_incluster_config()
-        except:
+        except config.ConfigException:
             config.load_kube_config()
 
         self.k8s_api = client.CoreV1Api()
