@@ -13,7 +13,7 @@
 
 We host **weekly** community meetings at **alternating** times to accommodate different time zones.
 
-- Tuesdays at 6:00 PM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1iKpFrt-grVZSIbIXpnVlZyEvADcxLMj_&export=download)
+- Tuesdays at 5:30 PM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1E4rcnwZHV84IEFXAGtJ-TP3o1rslNDei&export=download)
 
 Meetings alternate weekly between the two times. All are welcome to join!
 
