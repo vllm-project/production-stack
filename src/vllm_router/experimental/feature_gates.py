@@ -1,8 +1,6 @@
 """Feature gates for experimental features."""
 
-import json
 import logging
-import os
 from enum import Enum
 from typing import Dict, Optional, Set
 
@@ -109,33 +107,3 @@ def initialize_feature_gates(config: Optional[str] = None) -> None:
 def get_feature_gates() -> FeatureGates:
     """Get the feature gates singleton."""
     return FeatureGates()
-
-
-def initialize_feature_gates(feature_gates_str: Optional[str] = None):
-    """
-    Initialize the feature gates system.
-
-    Args:
-        feature_gates_str: Optional comma-separated list of feature gates
-    """
-    feature_gates = get_feature_gates()
-
-    # Parse environment variable if it exists
-    env_feature_gates = os.environ.get("VLLM_FEATURE_GATES")
-    if env_feature_gates:
-        feature_gates.configure(
-            dict(map(lambda x: x.split("="), env_feature_gates.split(",")))
-        )
-
-    # Parse command-line argument if provided
-    if feature_gates_str:
-        feature_gates.configure(
-            dict(map(lambda x: x.split("="), feature_gates_str.split(",")))
-        )
-
-    # Log enabled features
-    enabled_features = [name for name in feature_gates._enabled_features]
-    if enabled_features:
-        logger.info(f"Enabled experimental features: {', '.join(enabled_features)}")
-    else:
-        logger.info("No experimental features enabled")
