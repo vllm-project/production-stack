@@ -101,6 +101,7 @@ requests:
   {{- if (gt (int $modelSpec.requestGPU) 0) }}
   {{- $gpuType := default "nvidia.com/gpu" $modelSpec.requestGPUType }}
   {{ $gpuType }}: {{ required "Value 'modelSpec.requestGPU' must be defined !" (index $modelSpec.requestGPU | quote) }}
+  {{- end }}
   {{- if (hasKey $modelSpec "requestGPUMem") }}
   nvidia.com/gpumem: {{ $modelSpec.requestGPUMem | quote }}
   {{- end }}
@@ -121,6 +122,7 @@ limits:
   {{- if (gt (int $modelSpec.requestGPU) 0) }}
   {{- $gpuType := default "nvidia.com/gpu" $modelSpec.requestGPUType }}
   {{ $gpuType }}: {{ required "Value 'modelSpec.requestGPU' must be defined !" (index $modelSpec.requestGPU | quote) }}
+  {{- end }}
   {{- if (hasKey $modelSpec "limitGPUMem") }}
   nvidia.com/gpumem: {{ $modelSpec.limitGPUMem | quote }}
   {{- end }}
