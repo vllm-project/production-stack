@@ -90,6 +90,18 @@ livenessProbe:
 {{-   end }}
 {{- end }}
 
+{{- define "chart.hasLimits" -}}
+{{- $modelSpec := . -}}
+{{- or
+    (hasKey $modelSpec "limitMemory")
+    (hasKey $modelSpec "limitCPU")
+    (gt (int $modelSpec.requestGPU) 0)
+    (hasKey $modelSpec "limitGPUMem")
+    (hasKey $modelSpec "limitGPUMemPercentage")
+    (hasKey $modelSpec "limitGPUCores")
+-}}
+{{- end -}}
+
 {{/*
 Define resources with a variable model spec
 */}}
@@ -111,7 +123,7 @@ requests:
   {{- if (hasKey $modelSpec "requestGPUCores") }}
   nvidia.com/gpucores: {{ $modelSpec.requestGPUCores | quote }}
   {{- end }}
-{{- if or (hasKey $modelSpec "limitMemory") (hasKey $modelSpec "limitCPU") (gt (int $modelSpec.requestGPU) 0) (hasKey $modelSpec "limitGPUMem") (hasKey $modelSpec "limitGPUMemPercentage") (hasKey $modelSpec "limitGPUCores") }}
+{{- if (include "chart.hasLimits" $modelSpec | fromYaml) }}
 limits:
   {{- if (hasKey $modelSpec "limitMemory") }}
   memory: {{ $modelSpec.limitMemory | quote }}
