@@ -3,7 +3,7 @@ servingEngineSpec:
   modelSpec:
   - name: "llama3"
     repository: "lmcache/vllm-openai"
-    tag: "2025-04-18"
+    tag: "latest-nightly"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
 
@@ -19,13 +19,12 @@ servingEngineSpec:
       enablePrefixCaching: true
       maxModelLen: 4096
       dtype: "bfloat16"
-      v1: 1
       extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
 
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "20"
-    hf_token: <your-hf-token>
+    hf_token: <hf-token>
 
 cacheserverSpec:
   # -- Number of replicas
@@ -42,7 +41,7 @@ cacheserverSpec:
 
   # -- Cache server image (reusing the vllm image)
   repository: "lmcache/vllm-openai"
-  tag: "2025-04-18"
+  tag: "latest-nightly"
 
   # TODO (Jiayi): please adjust this once we have evictor
   # -- router resource requests and limits
