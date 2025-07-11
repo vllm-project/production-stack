@@ -63,13 +63,15 @@ class HashTrie:
             endpoint (str): The endpoint to insert.
         """
         node = self.root
-        node.endpoints.add(endpoint)
+        async with node.lock:
+            node.endpoints.add(endpoint)
         for chunk_hash in self._chunk_and_hash(request):
             async with node.lock:
                 if chunk_hash not in node.children:
                     node.children[chunk_hash] = TrieNode()
                 node = node.children[chunk_hash]
-            node.endpoints.add(endpoint)
+            async with node.lock:
+                node.endpoints.add(endpoint)
 
     async def longest_prefix_match(
         self, request: str, available_endpoints: Set[str] = set()
