@@ -4,6 +4,9 @@ kind: Service
 metadata:
   name: "{{ .Release.Name }}-router-service"
   namespace: {{ .Release.Namespace }}
+  {{- if .Values.routerSpec.serviceAnnotations }}
+  annotations: {{- toYaml .Values.routerSpec.serviceAnnotations | nindent 4 }}
+  {{- end }}
   labels:
   {{- include "chart.routerLabels" . | nindent 4 }}
 spec:

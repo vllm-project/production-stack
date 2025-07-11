@@ -100,6 +100,7 @@ servingEngineSpec:
   #   tag: "latest"
   #   modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
   #   replicaCount: 1
+  #   imagePullPolicy: "Always" # or "IfNotPresent"
   #
   #   requestCPU: 10
   #   requestMemory: "64Gi"
@@ -271,6 +272,8 @@ routerSpec:
 
   # -- Service type
   serviceType: ClusterIP
+  # -- Service annotations if you use a LoadBalancer or NodePort service type
+  serviceAnnotations: {}
 
   # -- Service port
   servicePort: 80
