@@ -84,22 +84,20 @@ class HashTrie:
         """
         node = self.root
         match_length = 0
-        chunk_hashes = self._chunk_and_hash(request)
         selected_endpoints = available_endpoints
 
-        for i, chunk_hash in enumerate(chunk_hashes):
+        for chunk_hash in self._chunk_and_hash(request):
             async with node.lock:
-                if chunk_hash in node.children:
-
-                    node = node.children[chunk_hash]
-
-                    # reached longest prefix match in currently-available endpoints.
-                    if not node.endpoints.intersection(selected_endpoints):
-                        break
-
-                    match_length += self.chunk_size
-                    selected_endpoints = node.endpoints.intersection(selected_endpoints)
-                else:
-                    break
+                node = node.children.get(chunk_hash)
+            if not node:
+                break
+            async with node.lock:
+                endpoints = node.endpoints.copy()
+            intersection = endpoints.intersection(selected_endpoints)
+            # reached longest prefix match in currently-available endpoints.
+            if not intersection:
+                break
+            match_length += self.chunk_size
+            selected_endpoints = intersection
 
         return match_length, selected_endpoints
