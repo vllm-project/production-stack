@@ -90,9 +90,7 @@ spec:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
           securityContext:
-            capabilities:
-              add:
-                - SYS_PTRACE
+            {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
           command:
           {{- if or
             (eq $modelSpec.tag "2025-05-27-v1")
@@ -172,27 +170,18 @@ spec:
           {{-     if hasKey $modelSpec.lmcacheConfig "enablePD" }}
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}","kv_connector_extra_config":{"discard_partial_chunks": false, "lmcache_rpc_port": {{ $modelSpec.lmcacheConfig.nixlRole | quote }}}}'
-          {{-     else if hasKey $modelSpec.vllmConfig "v1" }}
-          {{-       if eq (toString $modelSpec.vllmConfig.v1) "1" }}
-          - "--kv-transfer-config"
-          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}"}'
-          {{-       else }}
+          {{-     else if and (hasKey $modelSpec.vllmConfig "v0") (eq (toString $modelSpec.vllmConfig.v0) "1") }}
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
-          {{-       end }}
           {{-     else }}
           - "--kv-transfer-config"
-          - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}"}'
           {{-     end }}
           {{-   end }}
           {{- end }}
           {{- if $modelSpec.chatTemplate }}
           - "--chat-template"
-          - {{ $modelSpec.chatTemplate | quote }}
-          {{- end }}
-          {{- if .Values.servingEngineSpec.containerSecurityContext }}
-          securityContext:
-            {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
+          - "/templates/{{ $modelSpec.chatTemplate }}"
           {{- end }}
           imagePullPolicy: Always
           env:
@@ -209,18 +198,14 @@ spec:
           {{- with $modelSpec.vllmConfig}}
           - name: LMCACHE_LOG_LEVEL
             value: "DEBUG"
-          {{- if hasKey . "v1" }}
-          {{- if eq ($modelSpec.vllmConfig.v1 | toString) "1" }}
+          {{- if and (hasKey . "v0") (eq (toString $modelSpec.vllmConfig.v0) "1") }}
+          - name: VLLM_USE_V1
+            value: "0"
+          {{- else }}
           {{- $dir := default "/tmp" $modelSpec.vllmConfig.prometheusMultiprocDir }}
           - name: PROMETHEUS_MULTIPROC_DIR
             value: {{ $dir | quote }}
           {{- end }}
-          - name: VLLM_USE_V1
-            value: {{ $modelSpec.vllmConfig.v1 | quote }}
-          {{- else }}
-          - name: VLLM_USE_V1
-            value: "0"
-          {{- end}}
           {{- end}}
           {{- if $modelSpec.hf_token }}
           - name: HF_TOKEN
@@ -367,8 +352,13 @@ spec:
           {{- end}}
           {{- end}}
           {{- if $modelSpec.chatTemplate }}
+          {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
+          - name: {{ .Release.Name }}-{{ $modelSpec.name }}-chat-templates
+            mountPath: /templates
+          {{- else }}
           - name: vllm-templates
             mountPath: /templates
+          {{- end }}
           {{- end }}
           {{- if hasKey $modelSpec "extraVolumeMounts" }}
           {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
@@ -395,7 +385,7 @@ spec:
         {{- end}}
         {{- if $modelSpec.chatTemplate}}
         {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
-        - name: {{ .Release.Name }}-chat-templates
+        - name: {{ .Release.Name }}-{{ $modelSpec.name }}-chat-templates
           configMap:
             name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
         {{- else }}
@@ -440,7 +430,7 @@ metadata:
   namespace: "{{ .Release.Namespace }}"
 data:
   {{ $modelSpec.chatTemplate }}: |-
-    {{ $modelSpec.chatTemplateConfigMap }}
+{{ $modelSpec.chatTemplateConfigMap | nindent 4 }}
 {{- end }}
 {{- end }}
 ---

@@ -343,7 +343,7 @@ def initialize_semantic_cache(
     return _semantic_cache_instance
 
 
-def GetSemanticCache() -> Optional[SemanticCache]:
+def get_semantic_cache() -> Optional[SemanticCache]:
     """
     Get the semantic cache singleton instance.
 

@@ -1,0 +1,115 @@
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: VLLMRuntime
+metadata:
+  name: vllm-llama3-1b-instruct        # must match Gateway route back-reference
+  labels:
+    app.kubernetes.io/component: model-server
+    app.kubernetes.io/part-of: inference-gateway-demo
+spec:
+  # --- Core vLLM flags --------------------------------------------------
+  v1: true                           # keep vLLM v1 API surface on
+  tensorParallelSize: 1
+  gpuMemoryUtilization: "0.9"
+  maxLoras: 2
+  extraArgs:
+    - "--max-num-seq"                 # identical to old Deployment
+    - "1024"
+    - "--compilation-config"
+    - "3"
+    - "--max-lora-rank"
+    - "32"
+    - "--max-cpu-loras"
+    - "12"
+
+  # --- Model ------------------------------------------------------------
+  model:
+    modelURL: "meta-llama/Llama-3.2-1B-Instruct"
+    enableLoRA: true
+    dtype: "bfloat16"
+    maxModelLen: 4096
+
+  # --- LoRA & cache off-loading ----------------------------------------
+  lmCacheConfig:
+    enabled: true
+    remoteUrl: "lm://cacheserver-sample.default.svc.cluster.local:80"
+    remoteSerde: "naive"
+    cpuOffloadingBufferSize: "15"
+    diskOffloadingBufferSize: "0"
+
+  # --- Runtime image ----------------------------------------------------
+  image:
+    registry: "docker.io"
+    name: "lmcache/vllm-openai:2025-05-05-v1"
+    pullPolicy: "IfNotPresent"
+
+  # --- Resources --------------------------------------------------------
+  resources:
+    cpu: "8"
+    memory: "24Gi"
+    gpu: "1"
+
+  # --- Secret & env -----------------------------------------------------
+  hfTokenSecret:
+    name: "hf-token"
+  env:
+    - name: VLLM_USE_V1
+      value: "1"
+    - name: PORT
+      value: "8000"
+    - name: VLLM_ALLOW_RUNTIME_LORA_UPDATING
+      value: "true"
+
+  # --- Replication & strategy ------------------------------------------
+  replicas: 2
+  deploymentStrategy: "RollingUpdate"
+
+  # --- Pod-level customisation (for adapter syncer & volumes) ----------
+  podTemplate:
+    spec:
+      enableServiceLinks: false      # avoid VLLM_PORT collision
+      terminationGracePeriodSeconds: 130
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: shm
+          emptyDir:
+            medium: Memory
+        - name: adapters
+          emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: vllm-llama3-1b-instruct-adapters
+      initContainers:
+        - name: lora-adapter-syncer
+          image: us-central1-docker.pkg.dev/k8s-staging-images/gateway-api-inference-extension/lora-syncer:main
+          env:
+            - name: DYNAMIC_LORA_ROLLOUT_CONFIG
+              value: "/config/configmap.yaml"
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+      containers:
+        - name: vllm
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: shm
+              mountPath: /dev/shm
+            - name: adapters
+              mountPath: /adapters
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vllm-llama3-1b-instruct-adapters
+data:
+  configmap.yaml: |
+      vLLMLoRAConfig:
+        name: vllm-llama3-1b-instruct-adapters
+        port: 8000
+        defaultBaseModel: meta-llama/Llama-3.2-1B-Instruct
+        ensureExist:
+          models:
+          - id: legogpt
+            source:  AvaLovelace/LegoGPT

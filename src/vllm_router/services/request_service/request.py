@@ -20,8 +20,10 @@ import uuid
 from typing import Optional
 
 import httpx
-from fastapi import BackgroundTasks, Request, UploadFile
+
+from fastapi import BackgroundTasks, Request, UploadFile, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
+from requests import JSONDecodeError
 
 from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import (
@@ -38,20 +40,7 @@ from vllm_router.utils import replace_model_in_request_body,update_content_lengt
 
 try:
     # Semantic cache integration
-    from vllm_router.experimental.semantic_cache import (
-        GetSemanticCache,
-        enable_semantic_cache,
-        initialize_semantic_cache,
-        is_semantic_cache_enabled,
-    )
     from vllm_router.experimental.semantic_cache_integration import (
-        add_semantic_cache_args,
-        check_semantic_cache,
-        semantic_cache_hit_ratio,
-        semantic_cache_hits,
-        semantic_cache_latency,
-        semantic_cache_misses,
-        semantic_cache_size,
         store_in_semantic_cache,
     )
 
@@ -63,6 +52,7 @@ except ImportError:
 logger = init_logger(__name__)
 
 
+# TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
     body,
@@ -97,13 +87,14 @@ async def process_request(
         backend_url, request_id, start_time
     )
     # Check if this is a streaming request
-    is_streaming = False
     try:
         request_json = json.loads(body)
         is_streaming = request_json.get("stream", False)
-    except:
+    except JSONDecodeError:
         # If we can't parse the body as JSON, assume it's not streaming
-        pass
+        raise HTTPException(
+            status_code=400, detail="Request body is not JSON parsable."
+        )
 
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
@@ -210,8 +201,11 @@ async def route_general_request(
         # Update request_json if the body was rewritten
         try:
             request_json = json.loads(request_body)
-        except:
+        except JSONDecodeError:
             logger.warning("Failed to parse rewritten request body as JSON")
+            raise HTTPException(
+                status_code=400, detail="Request body is not JSON parsable."
+            )
 
     # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
@@ -226,7 +220,7 @@ async def route_general_request(
     if not request_endpoint:
         endpoints = list(
             filter(
-                lambda x: requested_model in x.model_names and x.sleep == False,
+                lambda x: requested_model in x.model_names and not x.sleep,
                 endpoints,
             )
         )
@@ -239,7 +233,7 @@ async def route_general_request(
             filter(
                 lambda x: requested_model in x.model_names
                 and x.Id == request_endpoint
-                and x.sleep == False,
+                and not x.sleep,
                 endpoints,
             )
         )
@@ -356,17 +350,19 @@ async def route_disaggregated_prefill_request(
     in_router_time = time.time()
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
-    request_body = await request.body()
-    request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+    request_json = await request.json()
 
     orig_max_tokens = request_json.get("max_tokens", 0)
     request_json["max_tokens"] = 1
     st = time.time()
-    prefiller_response = await send_request_to_prefiller(
+    await send_request_to_prefiller(
         request.app.state.prefill_client, endpoint, request_json, request_id
     )
     et = time.time()
     logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
+    logger.info(
+        f"Routing request {request_id} with session id None to {request.app.state.prefill_client.base_url} at {et}, process time = {et - in_router_time:.4f}"
+    )
     request_json["max_tokens"] = orig_max_tokens
 
     async def generate_stream():
@@ -374,6 +370,11 @@ async def route_disaggregated_prefill_request(
             request.app.state.decode_client, endpoint, request_json, request_id
         ):
             yield chunk
+
+    curr_time = time.time()
+    logger.info(
+        f"Routing request {request_id} with session id None to {request.app.state.decode_client.base_url} at {curr_time}, process time = {curr_time - et:.4f}"
+    )
 
     return StreamingResponse(
         generate_stream(),

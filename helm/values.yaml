@@ -60,6 +60,7 @@ servingEngineSpec:
   #   - mountPvcStorage: (optional, bool) Whether to mount the model's volume.
   #
   # - vllmConfig: (optional, map) The configuration for the VLLM model, supported options are:
+  #   - v0: (optional, map) Specify to 1 to use vLLM v0, otherwise vLLM v1 is used. e.g., 0
   #   - enablePrefixCaching: (optional, bool) Enable prefix caching, e.g., false
   #   - enableChunkedPrefill: (optional, bool) Enable chunked prefill, e.g., false
   #   - maxModelLen: (optional, int) The maximum model length, e.g., 16384
