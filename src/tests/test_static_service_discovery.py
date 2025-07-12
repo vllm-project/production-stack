@@ -21,6 +21,7 @@ def test_init_when_static_backend_health_checks_calls_start_health_checks(
         None,
         None,
         static_backend_health_checks=True,
+        static_backend_health_checks_timeout=30,
         prefill_model_labels=None,
         decode_model_labels=None,
     )
@@ -43,6 +44,7 @@ def test_init_when_endpoint_health_check_disabled_does_not_call_start_health_che
         None,
         None,
         static_backend_health_checks=False,
+        static_backend_health_checks_timeout=30,
         prefill_model_labels=None,
         decode_model_labels=None,
     )
@@ -61,6 +63,7 @@ def test_get_unhealthy_endpoint_hashes_when_only_healthy_models_exist_does_not_r
         None,
         ["chat"],
         static_backend_health_checks=True,
+        static_backend_health_checks_timeout=30,
         prefill_model_labels=None,
         decode_model_labels=None,
     )
@@ -79,6 +82,7 @@ def test_get_unhealthy_endpoint_hashes_when_unhealthy_model_exist_returns_unheal
         None,
         ["chat"],
         static_backend_health_checks=False,
+        static_backend_health_checks_timeout=30,
         prefill_model_labels=None,
         decode_model_labels=None,
     )
@@ -92,7 +96,9 @@ def test_get_unhealthy_endpoint_hashes_when_healthy_and_unhealthy_models_exist_r
 ) -> None:
     unhealthy_model = "bge-m3"
 
-    def mock_is_model_healthy(url: str, model: str, model_type: str) -> bool:
+    def mock_is_model_healthy(
+        url: str, model: str, model_type: str, timeout: int = 30
+    ) -> bool:
         return model != unhealthy_model
 
     monkeypatch.setattr("vllm_router.utils.is_model_healthy", mock_is_model_healthy)
@@ -104,6 +110,7 @@ def test_get_unhealthy_endpoint_hashes_when_healthy_and_unhealthy_models_exist_r
         None,
         ["chat", "embeddings"],
         static_backend_health_checks=False,
+        static_backend_health_checks_timeout=30,
         prefill_model_labels=None,
         decode_model_labels=None,
     )
@@ -128,6 +135,7 @@ def test_get_endpoint_info_when_model_endpoint_hash_is_in_unhealthy_endpoint_doe
         None,
         ["chat", "chat"],
         static_backend_health_checks=False,
+        static_backend_health_checks_timeout=30,
         prefill_model_labels=None,
         decode_model_labels=None,
     )
