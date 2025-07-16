@@ -267,6 +267,13 @@ routerSpec:
   # -- Number of replicas
   replicaCount: 1
 
+  # -- autoscaling configuration
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+
   # -- Container port
   containerPort: 8000
 
@@ -310,11 +317,10 @@ routerSpec:
   # -- router resource requests and limits
   resources:
     requests:
-      cpu: "4"
-      memory: "16G"
+      cpu: 400m
+      memory: 500Mi
     limits:
-      cpu: "8"
-      memory: "32G"
+      memory: 500Mi
 
   # -- Customized labels for the router deployment
   labels:
