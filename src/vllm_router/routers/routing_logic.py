@@ -135,7 +135,24 @@ class RoundRobinRouter(RoutingInterface):
         self.last_endpoints_hash = None
         self._initialized = True
 
-    def route_request(self, endpoints, engine_stats, request_stats, request):
+    def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+    ) -> str:
+        """
+        Route the request to the appropriate engine URL using a simple
+        round-robin algorithm
+        Args:
+            endpoints (List[EndpointInfo]): The list of engine URLs
+            engine_stats (Dict[str, EngineStats]): The engine stats indicating
+                the 'physical' load of each engine
+            request_stats (Dict[str, RequestStats]): The request stats
+                indicating the request-level performance of each engine
+            request (Request): The incoming request
+        """
         endpoints_id = id(endpoints)
         if endpoints_id != self.last_endpoints_id:
             current_hash = hash(tuple(e.url for e in endpoints))
