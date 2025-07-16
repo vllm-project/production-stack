@@ -130,29 +130,20 @@ class RoundRobinRouter(RoutingInterface):
         if hasattr(self, "_initialized"):
             return
         self.req_id = 0
+        self.sorted_endpoints = []
+        self.last_endpoints_id = None
+        self.last_endpoints_hash = None
         self._initialized = True
 
-    def route_request(
-        self,
-        endpoints: List[EndpointInfo],
-        engine_stats: Dict[str, EngineStats],
-        request_stats: Dict[str, RequestStats],
-        request: Request,
-    ) -> str:
-        """
-        Route the request to the appropriate engine URL using a simple
-        round-robin algorithm
-
-        Args:
-            endpoints (List[EndpointInfo]): The list of engine URLs
-            engine_stats (Dict[str, EngineStats]): The engine stats indicating
-                the 'physical' load of each engine
-            request_stats (Dict[str, RequestStats]): The request stats
-                indicating the request-level performance of each engine
-            request (Request): The incoming request
-        """
-        len_engines = len(endpoints)
-        chosen = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
+    def route_request(self, endpoints, engine_stats, request_stats, request):
+        endpoints_id = id(endpoints)
+        if endpoints_id != self.last_endpoints_id:
+            current_hash = hash(tuple(e.url for e in endpoints))
+            if current_hash != self.last_endpoints_hash:
+                self.sorted_endpoints = sorted(endpoints, key=lambda e: e.url)
+                self.last_endpoints_hash = current_hash
+            self.last_endpoints_id = endpoints_id
+        chosen = self.sorted_endpoints[self.req_id % len(self.sorted_endpoints)]
         self.req_id += 1
         return chosen.url
 
