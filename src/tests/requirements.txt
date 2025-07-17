@@ -3,3 +3,4 @@ httpx
 openai
 uvicorn
 vllm
+lmcache
