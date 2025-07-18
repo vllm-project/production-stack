@@ -54,6 +54,12 @@ class RoutingLogic(str, enum.Enum):
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
 
 
+class LoadBalancingStrategy(str, enum.Enum):
+    ROUND_ROBIN = "round_robin"
+    RANDOM = "random"
+    QPS = "qps"
+
+
 class RoutingInterface(metaclass=SingletonABCMeta):
 
     def _qps_routing(
@@ -412,12 +418,35 @@ class DisaggregatedPrefillRouter(RoutingInterface):
     """
     Route the request to the appropriate engine URL by handling prefill and decode operations sequentially.
     First request goes to prefill endpoint, then second request goes to decode endpoint.
+    Supports load balancing strategies for both prefill and decode endpoints.
     """
 
-    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
+    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str], 
+                 load_balancing_strategy: LoadBalancingStrategy = LoadBalancingStrategy.ROUND_ROBIN):
         self.prefill_model_labels = prefill_model_labels
         self.decode_model_labels = decode_model_labels
         self.request_cache = {}  # Cache to store prefill results
+        self.load_balancing_strategy = load_balancing_strategy
+        self.prefill_req_id = 0
+        self.decode_req_id = 0
+
+    def _select_endpoint_round_robin(self, endpoints: List[EndpointInfo], is_prefill: bool) -> str:
+        """Select endpoint using round-robin strategy."""
+        if is_prefill:
+            chosen = sorted(endpoints, key=lambda e: e.url)[self.prefill_req_id % len(endpoints)]
+            self.prefill_req_id += 1
+        else:
+            chosen = sorted(endpoints, key=lambda e: e.url)[self.decode_req_id % len(endpoints)]
+            self.decode_req_id += 1
+        return chosen.url
+
+    def _select_endpoint_random(self, endpoints: List[EndpointInfo]) -> str:
+        """Select endpoint using random strategy."""
+        return random.choice(endpoints).url
+
+    def _select_endpoint_qps(self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]) -> str:
+        """Select endpoint with lowest QPS."""
+        return self._qps_routing(endpoints, request_stats)
 
     def route_request(
         self,
@@ -430,6 +459,7 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         """
         Route the request to appropriate endpoints for prefill and decode operations.
         First request goes to prefill endpoint, then second request goes to decode endpoint.
+        Uses configurable load balancing strategy.
         """
         # Find prefill and decode endpoints
         is_prefill = request_json.get("max_tokens", 0) == 1
@@ -445,10 +475,23 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         decoder_endpoints = [
             e for e in endpoints if e.model_label in self.decode_model_labels
         ]
-        if is_prefill:
-            return prefiller_endpoints[0].url
+
+        target_endpoints = prefiller_endpoints if is_prefill else decoder_endpoints
+        
+        if not target_endpoints:
+            raise ValueError(f"No {'prefill' if is_prefill else 'decode'} endpoints available")
+
+        # Apply load balancing strategy
+        if self.load_balancing_strategy == LoadBalancingStrategy.ROUND_ROBIN:
+            return self._select_endpoint_round_robin(target_endpoints, is_prefill)
+        elif self.load_balancing_strategy == LoadBalancingStrategy.RANDOM:
+            return self._select_endpoint_random(target_endpoints)
+        elif self.load_balancing_strategy == LoadBalancingStrategy.QPS:
+            return self._select_endpoint_qps(target_endpoints, request_stats)
         else:
-            return decoder_endpoints[0].url
+            # Default to first endpoint if strategy is unknown
+            logger.warning(f"Unknown load balancing strategy: {self.load_balancing_strategy}, using first endpoint")
+            return target_endpoints[0].url
 
 
 # Instead of managing a global _global_router, we can define the initialization functions as:
