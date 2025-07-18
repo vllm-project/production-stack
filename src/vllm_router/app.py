@@ -25,7 +25,7 @@ from vllm_router.dynamic_config import (
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
-from vllm_router.httpx_client import HTTPXClientWrapper
+from vllm_router.httpx_client import AiohttpClientWrapper
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
@@ -259,6 +259,7 @@ app.include_router(files_router)
 app.include_router(batches_router)
 app.include_router(metrics_router)
 app.state.httpx_client_wrapper = HTTPXClientWrapper()
+app.state.aiohttp_client_wrapper = AiohttpClientWrapper()
 app.state.semantic_cache_available = semantic_cache_available
 
 
