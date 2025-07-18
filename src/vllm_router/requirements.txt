@@ -1,6 +1,5 @@
 aiofiles==24.1.0
 fastapi==0.115.8
-httpx==0.28.1
 kubernetes==32.0.0
 numpy==1.26.4
 prometheus_client==0.21.1
