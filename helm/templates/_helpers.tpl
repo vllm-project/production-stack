@@ -90,6 +90,18 @@ livenessProbe:
 {{-   end }}
 {{- end }}
 
+{{- define "chart.hasLimits" -}}
+{{- $modelSpec := . -}}
+{{- or
+    (hasKey $modelSpec "limitMemory")
+    (hasKey $modelSpec "limitCPU")
+    (gt (int $modelSpec.requestGPU) 0)
+    (hasKey $modelSpec "limitGPUMem")
+    (hasKey $modelSpec "limitGPUMemPercentage")
+    (hasKey $modelSpec "limitGPUCores")
+-}}
+{{- end -}}
+
 {{/*
 Define resources with a variable model spec
 */}}
@@ -102,7 +114,16 @@ requests:
   {{- $gpuType := default "nvidia.com/gpu" $modelSpec.requestGPUType }}
   {{ $gpuType }}: {{ required "Value 'modelSpec.requestGPU' must be defined !" (index $modelSpec.requestGPU | quote) }}
   {{- end }}
-{{- if or (hasKey $modelSpec "limitMemory") (hasKey $modelSpec "limitCPU") (gt (int $modelSpec.requestGPU) 0) }}
+  {{- if (hasKey $modelSpec "requestGPUMem") }}
+  nvidia.com/gpumem: {{ $modelSpec.requestGPUMem | quote }}
+  {{- end }}
+  {{- if (hasKey $modelSpec "requestGPUMemPercentage") }}
+  nvidia.com/gpumem-percentage: {{ $modelSpec.requestGPUMemPercentage | quote }}
+  {{- end }}
+  {{- if (hasKey $modelSpec "requestGPUCores") }}
+  nvidia.com/gpucores: {{ $modelSpec.requestGPUCores | quote }}
+  {{- end }}
+{{- if (include "chart.hasLimits" $modelSpec | fromYaml) }}
 limits:
   {{- if (hasKey $modelSpec "limitMemory") }}
   memory: {{ $modelSpec.limitMemory | quote }}
@@ -113,6 +134,15 @@ limits:
   {{- if (gt (int $modelSpec.requestGPU) 0) }}
   {{- $gpuType := default "nvidia.com/gpu" $modelSpec.requestGPUType }}
   {{ $gpuType }}: {{ required "Value 'modelSpec.requestGPU' must be defined !" (index $modelSpec.requestGPU | quote) }}
+  {{- end }}
+  {{- if (hasKey $modelSpec "limitGPUMem") }}
+  nvidia.com/gpumem: {{ $modelSpec.limitGPUMem | quote }}
+  {{- end }}
+  {{- if (hasKey $modelSpec "limitGPUMemPercentage") }}
+  nvidia.com/gpumem-percentage: {{ $modelSpec.limitGPUMemPercentage | quote }}
+  {{- end }}
+  {{- if (hasKey $modelSpec "limitGPUCores") }}
+  nvidia.com/gpucores: {{ $modelSpec.limitGPUCores | quote }}
   {{- end }}
 {{- end }}
 {{- end }}
