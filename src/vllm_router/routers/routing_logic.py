@@ -421,8 +421,12 @@ class DisaggregatedPrefillRouter(RoutingInterface):
     Supports load balancing strategies for both prefill and decode endpoints.
     """
 
-    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str], 
-                 load_balancing_strategy: LoadBalancingStrategy = LoadBalancingStrategy.ROUND_ROBIN):
+    def __init__(
+        self,
+        prefill_model_labels: List[str],
+        decode_model_labels: List[str],
+        load_balancing_strategy: LoadBalancingStrategy = LoadBalancingStrategy.ROUND_ROBIN,
+    ):
         self.prefill_model_labels = prefill_model_labels
         self.decode_model_labels = decode_model_labels
         self.request_cache = {}  # Cache to store prefill results
@@ -430,13 +434,19 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         self.prefill_req_id = 0
         self.decode_req_id = 0
 
-    def _select_endpoint_round_robin(self, endpoints: List[EndpointInfo], is_prefill: bool) -> str:
+    def _select_endpoint_round_robin(
+        self, endpoints: List[EndpointInfo], is_prefill: bool
+    ) -> str:
         """Select endpoint using round-robin strategy."""
         if is_prefill:
-            chosen = sorted(endpoints, key=lambda e: e.url)[self.prefill_req_id % len(endpoints)]
+            chosen = sorted(endpoints, key=lambda e: e.url)[
+                self.prefill_req_id % len(endpoints)
+            ]
             self.prefill_req_id += 1
         else:
-            chosen = sorted(endpoints, key=lambda e: e.url)[self.decode_req_id % len(endpoints)]
+            chosen = sorted(endpoints, key=lambda e: e.url)[
+                self.decode_req_id % len(endpoints)
+            ]
             self.decode_req_id += 1
         return chosen.url
 
@@ -444,7 +454,9 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         """Select endpoint using random strategy."""
         return random.choice(endpoints).url
 
-    def _select_endpoint_qps(self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]) -> str:
+    def _select_endpoint_qps(
+        self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
+    ) -> str:
         """Select endpoint with lowest QPS."""
         return self._qps_routing(endpoints, request_stats)
 
@@ -477,9 +489,11 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         ]
 
         target_endpoints = prefiller_endpoints if is_prefill else decoder_endpoints
-        
+
         if not target_endpoints:
-            raise ValueError(f"No {'prefill' if is_prefill else 'decode'} endpoints available")
+            raise ValueError(
+                f"No {'prefill' if is_prefill else 'decode'} endpoints available"
+            )
 
         # Apply load balancing strategy
         if self.load_balancing_strategy == LoadBalancingStrategy.ROUND_ROBIN:
@@ -490,7 +504,9 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             return self._select_endpoint_qps(target_endpoints, request_stats)
         else:
             # Default to first endpoint if strategy is unknown
-            logger.warning(f"Unknown load balancing strategy: {self.load_balancing_strategy}, using first endpoint")
+            logger.warning(
+                f"Unknown load balancing strategy: {self.load_balancing_strategy}, using first endpoint"
+            )
             return target_endpoints[0].url
 
 
