@@ -82,11 +82,11 @@ logger = logging.getLogger("uvicorn")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.httpx_client_wrapper.start()
+    app.state.aiohttp_client_wrapper.start()
     if hasattr(app.state, "batch_processor"):
         await app.state.batch_processor.initialize()
     yield
-    await app.state.httpx_client_wrapper.stop()
+    await app.state.aiohttp_client_wrapper.stop()
 
     # Close the threaded-components
     logger.info("Closing engine stats scraper")
@@ -258,7 +258,6 @@ app.include_router(main_router)
 app.include_router(files_router)
 app.include_router(batches_router)
 app.include_router(metrics_router)
-app.state.httpx_client_wrapper = HTTPXClientWrapper()
 app.state.aiohttp_client_wrapper = AiohttpClientWrapper()
 app.state.semantic_cache_available = semantic_cache_available
 
