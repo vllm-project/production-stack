@@ -158,7 +158,7 @@ Please refer to Step 3 in the :doc:`../getting_started/quickstart` tutorial for 
 Step 4 (Optional): Multi-GPU Deployment
 ---------------------------------------
 
-So far, you have configured and deployment vLLM serving engine with a single GPU. You may also deploy a serving engine on multiple GPUs with the following example configuration snippet:
+So far, you have configured and deployed a vLLM serving engine with a single GPU. You may also deploy a serving engine on multiple GPUs with the following example configuration snippet:
 
 .. code-block:: yaml
 
