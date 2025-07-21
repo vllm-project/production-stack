@@ -35,7 +35,7 @@ Prerequisites
 1. A Kubernetes environment with GPU support. If not set up, follow the :doc:`prerequisite` guide.
 2. Helm installed. Refer to the `install-helm.sh <https://github.com/vllm-project/production-stack/blob/main/utils/install-helm.sh>`_ script for instructions.
 3. kubectl installed. Refer to the `install-kubectl.sh <https://github.com/vllm-project/production-stack/blob/main/utils/install-kubectl.sh>`_ script for instructions.
-4. the project repository cloned: `vLLM Production Stack repository <https://github.com/vllm-project/production-stack>`_.
+4. The project repository cloned: `vLLM Production Stack repository <https://github.com/vllm-project/production-stack>`_.
 5. Basic familiarity with Kubernetes and Helm.
 
 Steps
