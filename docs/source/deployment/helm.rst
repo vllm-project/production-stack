@@ -1,5 +1,5 @@
 Helm Chart Deployment
-====================
+=====================
 
 This tutorial guides you through the basic configurations required to deploy a vLLM serving engine in a Kubernetes environment with GPU support. You will learn how to specify the model details, set up necessary environment variables (like ``HF_TOKEN``), and launch the vLLM serving engine.
 
@@ -78,7 +78,7 @@ Example Snippet
        hf_token: <YOUR HF TOKEN>
 
 Step 2: Applying the Configuration
----------------------------------
+----------------------------------
 
 Deploy the configuration using Helm:
 
@@ -91,7 +91,7 @@ Expected output:
 
 You should see output indicating the successful deployment of the Helm chart:
 
-.. code-block:: plaintext
+.. code-block:: text
 
    Release "vllm" has been deployed. Happy Helming!
    NAME: vllm
@@ -101,7 +101,7 @@ You should see output indicating the successful deployment of the Helm chart:
    REVISION: 1
 
 Step 3: Verifying the Deployment
--------------------------------
+---------------------------------
 
 1. Check the status of the pods:
 
@@ -113,7 +113,7 @@ Step 3: Verifying the Deployment
 
    You should see the following pods:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       NAME                                             READY   STATUS    RESTARTS   AGE
       pod/vllm-deployment-router-xxxx-xxxx         1/1     Running   0          3m23s
@@ -132,7 +132,7 @@ Step 3: Verifying the Deployment
 
    Ensure there are services for both the serving engine and the router:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       NAME                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
       vllm-engine-service   ClusterIP   10.103.98.170    <none>        80/TCP    4m
@@ -149,7 +149,7 @@ Step 3: Verifying the Deployment
 
    Replace ``<SERVICE_IP>`` with the external IP of the service. If everything is configured correctly, you will get:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       {"status":"healthy"}
 

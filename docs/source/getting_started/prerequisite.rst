@@ -6,7 +6,6 @@ This tutorial guides you through the process of setting up a Kubernetes environm
 Table of Contents
 -----------------
 
-- Introduction_
 - `Table of Contents`_
 - Prerequisites_
 - Steps_
@@ -69,7 +68,7 @@ Step 1: Installing kubectl
 
    Example output:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       Client Version: v1.32.1
 
@@ -98,7 +97,7 @@ Step 2: Installing Helm
 
    Example output:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       version.BuildInfo{Version:"v3.17.0", GitCommit:"301108edc7ac2a8ba79e4ebf5701b0b6ce6a31e4", GitTreeState:"clean", GoVersion:"go1.23.4"}
 
@@ -152,7 +151,7 @@ After removing the previous installation, please execute the script provided bel
 3. **Expected Output:**
    If everything goes smoothly, you should see the example output like following:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       😄  minikube v1.35.0 on Ubuntu 22.04 (kvm/amd64)
       ❗  minikube skips various validations when --force is supplied; this may lead to unexpected behavior
@@ -206,7 +205,7 @@ Step 4: Verifying GPU Configuration
 
    Expected output:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       minikube
       type: Control Plane
@@ -223,7 +222,7 @@ Step 4: Verifying GPU Configuration
 
    Expected output:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
         nvidia.com/gpu: 1
         ... (plus many lines related to gpu information)

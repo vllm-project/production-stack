@@ -1,5 +1,5 @@
 Gateway Inference Extension
-==========================
+===========================
 
 This tutorial guides you through setting up and using the Gateway Inference Extension in a production environment. The extension enables inference capabilities through the gateway, supporting both individual inference models and inference pools.
 
@@ -109,7 +109,7 @@ Create an InferenceModel resource for direct model access:
        weight: 100
 
 3.2 Inference Pool Configuration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For routing to multiple model instances, check ``configs/inferencepool-resources.yaml`` for example.
 

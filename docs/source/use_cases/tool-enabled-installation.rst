@@ -1,5 +1,5 @@
 Tool Enabled Installation
-========================
+=========================
 
 This tutorial guides you through setting up the vLLM Production Stack with tool calling support using the Llama-3.1-8B-Instruct model. This setup enables your model to interact with external tools and functions through a structured interface.
 
@@ -18,7 +18,7 @@ Steps
 -----
 
 1. Set up vLLM Templates and Storage
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 First, run the setup script to download templates and create the necessary Kubernetes resources:
 
@@ -43,7 +43,7 @@ The script uses consistent naming that matches the deployment configuration:
 - PersistentVolumeClaim: ``vllm-templates-pvc``
 
 2. Set up Hugging Face Credentials
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Create a Kubernetes secret with your Hugging Face token:
 
@@ -53,10 +53,10 @@ Create a Kubernetes secret with your Hugging Face token:
      --from-literal=HUGGING_FACE_HUB_TOKEN=your_token_here
 
 3. Deploy vLLM Instance with Tool Calling Support
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 3.1: Use the Example Configuration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 We'll use the example configuration file located at ``tutorials/assets/values-08-tool-enabled.yaml``. This file contains all the necessary settings for enabling tool calling:
 
@@ -135,7 +135,7 @@ You can verify the deployment with:
    kubectl logs -f deployment/vllm-tool-llama3-8b-deployment-vllm
 
 4. Test Tool Calling Setup
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Now that the deployment is running, let's test the tool calling functionality using the example script.
 
@@ -153,7 +153,7 @@ First, we need to set up port forwarding to access the router service:
    kubectl port-forward svc/vllm-tool-router-service 8000:80
 
 4.2: Run the Example Script
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In a new terminal, run the example script to test tool calling:
 

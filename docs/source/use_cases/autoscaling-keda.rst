@@ -1,12 +1,11 @@
 Autoscaling with KEDA
-====================
+=====================
 
 This tutorial shows you how to automatically scale a vLLM deployment using `KEDA <https://keda.sh/>`_ and Prometheus-based metrics. You'll configure KEDA to monitor queue length and dynamically adjust the number of replicas based on load.
 
 Table of Contents
 -----------------
 
-- Introduction_
 - Prerequisites_
 - Steps_
 
@@ -32,7 +31,7 @@ Steps
 -----
 
 1. Install the vLLM Production Stack
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Install the production stack using a single pod by following the instructions in :doc:`../deployment/helm`.
 
@@ -47,7 +46,7 @@ This stack includes Prometheus, Grafana, and necessary exporters.
    bash install.sh
 
 3. Install KEDA
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
@@ -133,7 +132,7 @@ This tells KEDA to:
 - Scale up when the queue exceeds 5 requests
 
 6. Test Autoscaling
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Watch the deployment:
 
@@ -143,7 +142,7 @@ Watch the deployment:
 
 You should initially see:
 
-.. code-block:: plaintext
+.. code-block:: text
 
    NAME                         REFERENCE                                TARGETS     MINPODS   MAXPODS   REPLICAS
    keda-hpa-vllm-scaledobject   Deployment/vllm-llama3-deployment-vllm   0/5 (avg)   1         2         1
@@ -180,6 +179,6 @@ To remove KEDA configuration and observability components:
    bash uninstall.sh
 
 Additional Resources
--------------------
+--------------------
 
 - `KEDA Documentation <https://keda.sh/docs/>`_

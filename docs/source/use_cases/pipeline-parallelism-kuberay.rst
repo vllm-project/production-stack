@@ -10,7 +10,7 @@ Table of Contents
 2. `Step 1: Basic explanation of Ray and Kuberay`_
 3. `Step 2: Preparing the Configuration File`_
 4. `Step 3: Applying the Configuration`_
-5. `Step 4: Verifying the Ray Cluster`_
+5. `Step 4: Verifying the Deployment`_
 
 Prerequisites
 -------------
@@ -42,7 +42,7 @@ Step 2: Preparing the Configuration File
    - Write your actual huggingface token in ``hf_token: <YOUR HF TOKEN>`` in the yaml file.
 
 Explanation of Key Items in ``values-15-a-minimal-pipeline-parallel-example-raycluster.yaml``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **raySpec**: Required when using KubeRay to enable pipeline parallelism.
 - **headNode**: Specifies the resource requirements for the Kuberay head node and must be defined accordingly:
@@ -114,7 +114,7 @@ In the following example, we configure a total of two Ray nodes each equipped wi
        hf_token: <YOUR HF TOKEN>
 
 Step 3: Applying the Configuration
----------------------------------
+----------------------------------
 
 Deploy the configuration using Helm:
 
@@ -127,7 +127,7 @@ Expected output:
 
 You should see output indicating the successful deployment of the Helm chart:
 
-.. code-block:: plaintext
+.. code-block:: text
 
    NAME: vllm
    LAST DEPLOYED: Sun May 11 15:10:34 2025
@@ -137,7 +137,7 @@ You should see output indicating the successful deployment of the Helm chart:
    TEST SUITE: None
 
 Step 4: Verifying the Deployment
--------------------------------
+---------------------------------
 
 1. Check the status of the pods:
 
@@ -150,7 +150,7 @@ Step 4: Verifying the Deployment
 
    You should see the following pods:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       pod/vllm-deployment-router-8666bf6464-v97v8 condition met
       NAME                                          READY   STATUS    RESTARTS   AGE   IP                NODE                       NOMINATED NODE   READINESS GATES
@@ -179,7 +179,7 @@ Step 4: Verifying the Deployment
 
    Ensure there are services for both the serving engine and the router:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       NAME                                  TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)             AGE
       kuberay-operator                      ClusterIP   10.97.0.153      <none>        8080/TCP            13h
@@ -202,7 +202,7 @@ Step 4: Verifying the Deployment
 
    **Note:** Port forwarding must be performed from a separate shell session. If the deployment is configured correctly, you should receive a response similar to the following:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       {
           "object": "list",
@@ -231,7 +231,7 @@ Step 4: Verifying the Deployment
 
    A successful response should resemble the following output:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       {
           "id": "cmpl-92c4ceef0f1c42c9bba10da8306bf86c",
@@ -258,7 +258,7 @@ Step 4: Verifying the Deployment
 
    You can also monitor GPU usage for each Ray head and worker pod:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       kubectl exec -it vllm-distilgpt2-raycluster-head-wvqj5 -- /bin/bash
       root@vllm-distilgpt2-raycluster-head-wvqj5:/vllm-workspace# nvidia-smi

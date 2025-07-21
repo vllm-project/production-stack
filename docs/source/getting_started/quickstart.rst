@@ -8,7 +8,6 @@ Table of Contents
 
 - `Quick Start`_
 
-  - Introduction_
   - `Table of Contents`_
   - Prerequisites_
   - Steps_
@@ -117,7 +116,7 @@ Expected output:
 
 - Pods for the ``vllm`` deployment should transition to ``Ready`` and the ``Running`` state.
 
-.. code-block:: plaintext
+.. code-block:: text
 
    NAME                                               READY   STATUS    RESTARTS   AGE
    vllm-deployment-router-859d8fb668-2x2b7        1/1     Running   0          2m38s

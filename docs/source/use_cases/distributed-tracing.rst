@@ -49,7 +49,7 @@ Step 2: Preparing the OpenTelemetry Collector File
 Step 3: Configuring Model and Monitoring
 ----------------------------------------
 
-1. Feel free to inspect the ``values-12-otel-vllm.yaml`` file. Note that the ``OTEL_EXPORTER_OTLP_ENDPOINT`` specification enables metrics, traces, and logs to be collected. Further configurations can be explored `here <https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/>`_.
+1. Feel free to inspect the ``values-12-otel-vllm.yaml`` file. Note that the ``OTEL_EXPORTER_OTLP_ENDPOINT`` specification enables metrics, traces, and logs to be collected. Further configurations can be explored in the `OpenTelemetry OTLP Exporter documentation <https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/>`_.
 
    Run the following from the ``tutorials/assets`` directory:
 
@@ -70,7 +70,7 @@ Step 3: Configuring Model and Monitoring
 
    You should see pods such as the following:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       NAME                                               READY   STATUS    RESTARTS   AGE
       jaeger-744484b5bc-rdrgn                            1/1     Running   0          13m
@@ -91,7 +91,7 @@ Step 3: Configuring Model and Monitoring
 
    Ensure there are services for the serving engine, router, jaeger-collector, and jaeger-query. Note that the OpenTelemetry deployment does not require its own service:
 
-   .. code-block:: plaintext
+   .. code-block:: text
 
       NAME                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
       jaeger-collector          ClusterIP   10.99.125.245   <none>        4317/TCP,4318/TCP   86m

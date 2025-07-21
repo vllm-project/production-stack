@@ -1,5 +1,5 @@
 Sleep and Wakeup Mode
-====================
+=====================
 
 This tutorial demonstrates how to use vLLM v1 ``sleep`` and ``wake_up mode`` feature with vLLM Production Stack. A sleeping engine does not process any requests and free up resources (e.g., GPU memory). The router supports serving requests to vLLM engines with sleep mode enabled.
 
@@ -114,7 +114,7 @@ Expected output:
 
 The logs of the vLLM pod shows that the engine was put to sleep:
 
-.. code-block:: plaintext
+.. code-block:: text
 
    INFO 06-15 18:08:18 [gpu_worker.py:81] Sleep mode freed 39.26 GiB memory, 1.20 GiB memory is still in use.
    INFO 06-15 18:08:18 [executor_base.py:210] It took 5.749613 seconds to fall asleep.
@@ -168,7 +168,7 @@ Expected output:
 
 The logs of the vLLM pod shows that the engine was waked up:
 
-.. code-block:: plaintext
+.. code-block:: text
 
    INFO 06-15 18:11:37 [api_server.py:719] wake up the engine with tags: None
    INFO 06-15 18:11:37 [executor_base.py:226] It took 0.284914 seconds to wake up tags {'kv_cache', 'weights'}.
