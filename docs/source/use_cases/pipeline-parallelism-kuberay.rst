@@ -121,7 +121,7 @@ Deploy the configuration using Helm:
 .. code-block:: bash
 
    helm repo add vllm https://vllm-project.github.io/production-stack
-   helm install vllm vllm/vllm-stack -f tutorials/assets/values-15-minimal-pipeline-parallel-example.yaml
+   helm install vllm vllm/vllm-stack -f tutorials/assets/values-15-a-minimal-pipeline-parallel-example-raycluster.yaml
 
 Expected output:
 
