@@ -172,7 +172,7 @@ After removing the previous installation, please execute the script provided bel
 
 4. Some troubleshooting tips for installing gpu-operator:
 
-   If gpu-operator fails to start because of the common seen "too many open files" issue for minikube (and `kind <https://kind.sigs.k8s.io/>`_), then a quick fix below may be helpful.
+   If gpu-operator fails to start because of the commonly seen "too many open files" issue for minikube (and `kind <https://kind.sigs.k8s.io/>`_), then a quick fix below may be helpful.
 
    The issue can be observed by one or more gpu-operator pods in ``CrashLoopBackOff`` status, and be confirmed by checking their logs. For example,
 
