@@ -18,7 +18,7 @@ A: Update your ``values.yaml`` file with the new version and upgrade:
 
 .. code-block:: bash
 
-   helm upgrade my-vllm-stack vllm-production-stack/vllm-production-stack -f values.yaml
+   helm upgrade my-vllm-stack vllm/vllm-stack -f values.yaml
 
 
 Q: How do I scale my deployment?
