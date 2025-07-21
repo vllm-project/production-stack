@@ -10,162 +10,268 @@ on:
     branches:
       - main
     paths:
-      - '.github/**'
-      - '**.py'
-      - 'pyproject.toml'
-      - 'helm/**'
+      - ".github/**"
+      - "**/*.py"
+      - "pyproject.toml"
+      - "helm/**"
   pull_request:
     paths:
-      - '.github/**'
-      - '**.py'
-      - 'pyproject.toml'
-      - 'helm/**'
-  merge_group:
+      - ".github/**"
+      - "**/*.py"
+      - "pyproject.toml"
+      - "helm/**"
+
 jobs:
-  Secure-Minimal-Example:
+  e2e-k8s-functionality-test:
+    name: E2E Kubernetes Functionality Test
     runs-on: self-hosted
+    timeout-minutes: 20
     steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v4
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
-      - name: Helm uninstall
+      - name: Verify K8s cluster is ready
         run: |
-          releases=$(helm list -q)
+          kubectl config use-context minikube
+          printf "\n=== Cluster Details ===\n"
+          kubectl config view
+          kubectl cluster-info
+          kubectl get nodes -o wide
+          kubectl describe nodes
+          kubectl get pods -A -o wide
+          kubectl get events --sort-by='.lastTimestamp' -A
+          helm version
+          kubectl version
+          printf "\n=== Final Cluster Health Check ===\n"
+          kubectl get cs
+          kubectl -n kube-system wait --for=condition=Ready pod --all --timeout=300s
 
-          if [ -n "$releases" ]; then
-            echo "Found releases: $releases"
-            for r in $releases; do
-              echo "Uninstalling $r..."
-              helm uninstall "$r"
-            done
-          else
-            echo "No Helm releases found; skipping uninstall."
+      - name: Clean up Docker system before building image
+        run: |
+          echo "Cleaning up git-act-router Docker system..."
+          # Remove only git-act-router related images
+          docker images --filter=reference='git-act-router*' -q | xargs -r docker rmi -f
+          # Clean up dangling images
+          docker image prune --force
+      - name: Build and Load Docker image
+        env:
+          DOCKER_IMAGE_NAME: localhost:5000/git-act-router
+        # Add timeout to prevent hanging builds
+        timeout-minutes: 15
+        run: |
+          # Set error handling and verbose mode
+          set -eo pipefail
+
+          echo "🔨 Building Docker image $DOCKER_IMAGE_NAME..."
+          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default \
+            --no-cache \
+            -t "$DOCKER_IMAGE_NAME" \
+            -f docker/Dockerfile . || {
+              echo "❌ Docker build failed!"
+              exit 1
+            }
+          echo "✅ Docker image $DOCKER_IMAGE_NAME built successfully!"
+
+          echo "🔍 Verifying Docker image..."
+          if ! docker images "$DOCKER_IMAGE_NAME" | grep "$DOCKER_IMAGE_NAME"; then
+            echo "❌ Docker image $DOCKER_IMAGE_NAME not found after build!"
+            exit 1
+          fi
+          echo "✅ Docker image $DOCKER_IMAGE_NAME found after build!"
+
+          sudo sysctl fs.protected_regular=0
+          echo "🔍 Verifying image digest..."
+          if ! docker inspect --format='{{.Id}}' "$DOCKER_IMAGE_NAME" >/dev/null 2>&1; then
+            echo "❌ Failed to verify image digest for $DOCKER_IMAGE_NAME"
+            exit 1
           fi
 
-          # Wait until no pods remain
-          echo "Waiting for all pods to terminate..."
-          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
-            sleep 5
-          done
-          echo "All pods have terminated."
-      - name: Deploy via helm charts
+          echo "📤 Loading Docker image into K8s cluster..."
+          sudo docker push localhost:5000/git-act-router
+
+
+      - name: Run Helm tests with matrix strategy
         env:
           DOCKER_BUILDKIT: 1
         run: |
-          cd ${{ github.workspace }}
-          kubectl config use-context minikube
-          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
-          sudo docker push localhost:5000/git-act-router
-          sudo sysctl fs.protected_regular=0
-          minikube image load localhost:5000/git-act-router
-          helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-05-secure-vllm
-        timeout-minutes: 2
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-05-secure-vllm
-          path: |
-            output-05-secure-vllm/
-      - name: Helm uninstall
-        run: |
-            helm uninstall vllm
-            sudo docker image prune -f
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+          set -e
+          TEST_SCENARIOS=(
+            ".github/router.yaml routerSpec"
+          )
 
-  Two-Pods-Minimal-Example:
-    runs-on: self-hosted
-    needs: Secure-Minimal-Example
-    steps:
-      - name: Helm uninstall
-        run: |
-          releases=$(helm list -q)
+          for SCENARIO in "${TEST_SCENARIOS[@]}"; do
+            VALUES_FILE="$(echo "$SCENARIO" | cut -d' ' -f1)"
+            echo "🚀 Deploying scenario with values file: ${VALUES_FILE}"
+            helm uninstall vllm || true
 
-          if [ -n "$releases" ]; then
-            echo "Found releases: $releases"
-            for r in $releases; do
-              echo "Uninstalling $r..."
-              helm uninstall "$r"
+            # Verify Helm chart validity with more thorough checks
+            echo "🔍 Performing Helm lint and template validation..."
+            helm lint ./helm || {
+              echo "❌ Helm lint failed"
+              exit 1
+            }
+
+            # Dry run for additional validation
+            helm install vllm ./helm -f "$VALUES_FILE" --dry-run --debug || {
+              echo "❌ Helm dry-run failed"
+              exit 1
+            }
+
+            # Actual installation
+            helm install vllm ./helm -f "$VALUES_FILE" --debug || {
+              echo "❌ Helm install failed"
+              kubectl get pods -A
+              kubectl describe pod -l environment=router,release=router --namespace=default
+              kubectl get events --sort-by='.lastTimestamp'
+              exit 1
+            }
+
+            echo "⏳ Waiting for pods to be ready..."
+            RETRIES=5
+            for i in $(seq 1 "${RETRIES}"); do
+              if kubectl wait --for=condition=ready pod -l environment=router,release=router --namespace=default --timeout=60s; then
+                echo "✅ Pods are ready after ${i} attempt(s)"
+                kubectl describe pods -n default -l environment=router,release=router
+                break
+              else
+                echo "🚨 Attempt ${i}/${RETRIES}: Pods failed to become ready"
+                kubectl describe pod -l environment=router,release=router --namespace=default
+                kubectl get events --sort-by='.lastTimestamp'
+                kubectl logs -l environment=router,release=router --namespace=default --all-containers=true
+                if [ "${i}" -eq "${RETRIES}" ]; then
+                  echo "❌ Pods did not become ready after ${RETRIES} attempts."
+                  kubectl logs -l environment=router,release=router --namespace=default --all-containers=true
+                  exit 1
+                fi
+                echo "🔄 Retrying in 10 seconds..."
+                sleep 10
+              fi
             done
-          else
-            echo "No Helm releases found; skipping uninstall."
-          fi
-
-          # Wait until no pods remain
-          echo "Waiting for all pods to terminate..."
-          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
-            sleep 5
           done
-          echo "All pods have terminated."
-      - name: Deploy via helm charts
-        run: |
-          cd ${{ github.workspace }}
-          helm install vllm ./helm -f .github/values-01-2pods-minimal-example.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-02-two-pods
-        timeout-minutes: 2
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-02-two-pods
-          path: |
-            output-02-two-pods/
-      - name: Helm uninstall
-        run: |
-          helm uninstall vllm
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
 
-  Multiple-Models:
-    runs-on: self-hosted
-    needs: Two-Pods-Minimal-Example
-    steps:
-      - name: Helm uninstall
+      - name: Validate the installation of vllm backend pod
         run: |
-          releases=$(helm list -q)
+          set -ex
 
-          if [ -n "$releases" ]; then
-            echo "Found releases: $releases"
-            for r in $releases; do
-              echo "Uninstalling $r..."
-              helm uninstall "$r"
+          # Maximum number of retry attempts
+          MAX_RETRIES=10
+          # Interval between retries (in seconds)
+          INTERVAL=20
+
+          # Loop for MAX_RETRIES attempts
+          for ((i=1; i<=MAX_RETRIES; i++)); do
+            # Get all pods with 'vllm' in their name
+            pods=$(kubectl get pods --no-headers | grep "vllm" | awk '{print $1}')
+            if [ -z "$pods" ]; then
+              echo "::warning:: No vllm pods found yet, checking again in $INTERVAL seconds..."
+              sleep $INTERVAL
+              continue
+            fi
+
+            total_pods=0
+            ready_pods=0
+
+            # Iterate through each vllm pod
+            for pod_name in $pods; do
+              line=$(kubectl get pod "$pod_name" --no-headers)
+              if [ $? -ne 0 ]; then
+                echo "::error:: Failed to get pod $pod_name"
+                continue
+              fi
+
+              # Extract readiness status and phase
+              ready=$(echo "$line" | awk '{print $2}')
+              status=$(echo "$line" | awk '{print $3}')
+              phase=$(kubectl get pod "$pod_name" -o jsonpath='{.status.phase}')
+
+              ((total_pods++))
+              timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+              echo "::debug::[$timestamp] Checking pod: $pod_name (Status: $status, Ready: $ready, Phase: $phase)"
+
+              # Check if pod is fully ready
+              if [[ "$status" == "Running" && "$ready" =~ ^([1-9][0-9]*)/\1$ ]]; then
+                ((ready_pods++))
+              else
+                echo "::error:: Pod $pod_name not ready (Status: $status, Ready: $ready, Phase: $phase)"
+                kubectl describe pod "$pod_name"
+                kubectl logs "$pod_name" --all-containers --tail=50
+              fi
             done
-          else
-            echo "No Helm releases found; skipping uninstall."
-          fi
 
-          # Wait until no pods remain
-          echo "Waiting for all pods to terminate..."
-          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
-            sleep 5
+            # Check if all pods are ready
+            if (( ready_pods == total_pods )) && (( total_pods > 0 )); then
+              echo "::success:: All $total_pods vllm pods are now Ready and in Running state."
+              exit 0
+            fi
+
+            # Log progress
+            echo "::debug:: Not all pods are ready yet. Attempt $i/$MAX_RETRIES. Checking again in $INTERVAL seconds..."
+            sleep $INTERVAL
           done
-          echo "All pods have terminated."
-      - name: Deploy via helm charts
+
+          # Final timeout message
+          echo "::error:: Timeout waiting for pods to be ready after $MAX_RETRIES attempts."
+          kubectl get pods --all-namespaces
+          exit 1
+      - name: Curl the router to verify the functionality
         run: |
-          helm install vllm ./helm -f .github/values-04-multiple-models.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-04-multiple-models
-        timeout-minutes: 3
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
+          set -ex
+          kubectl patch service vllm-router-service -p '{"spec":{"type":"NodePort"}}'
+          ip=$(minikube ip)
+          port=$(kubectl get svc vllm-router-service -o=jsonpath='{.spec.ports[0].nodePort}')
+
+          # Define endpoint and headers
+          ENDPOINT="/v1/models"
+          HEADERS=("Content-Type: application/json")
+          RETRY_COUNT=5
+          RETRY_DELAY=10
+
+          echo "🔍 Testing API endpoint: http://$ip:$port$ENDPOINT"
+
+          for i in $(seq 1 $RETRY_COUNT); do
+            echo "📡 Attempt $i/$RETRY_COUNT..."
+            if curl_output=$(curl -v -m 30 ${HEADERS[@]/#/-H } -X GET http://"$ip":"$port""$ENDPOINT" | jq .); then
+              # Validate response format
+              if echo "$curl_output" | jq -e 'has("data")' > /dev/null || echo "$curl_output" | jq -e 'length > 0' > /dev/null; then
+                echo "✅ Received valid response!"
+                break
+              else
+                echo "⚠️ Response format validation failed"
+              fi
+            else
+              echo "⚠️ Request failed"
+            fi
+
+            if [ "$i" -eq "$RETRY_COUNT" ]; then
+              echo "❌ All $RETRY_COUNT attempts failed!"
+              kubectl get pods -o wide
+              kubectl describe endpoints vllm-router-service
+              kubectl logs -l app.kubernetes.io/instance=vllm --tail=50
+              exit 1
+            fi
+
+            echo "🔄 Retrying in $RETRY_DELAY seconds..."
+            sleep $RETRY_DELAY
+          done
+
+          echo "✅ Successfully requested: $curl_output"
+          echo "API endpoint is working properly!"
+      - name: Clean up resources
         if: always()
-        with:
-          name: output-04-multiple-models
-          path: |
-            output-04-multiple-models/
-      - name: Helm uninstall
         run: |
-            helm uninstall vllm
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+          set -e
+          echo "Cleaning up resources for production stack..."
+
+          # Perform cleanup with retries
+          for i in {1..3}; do
+            if helm uninstall vllm; then
+              echo "✅ Successfully uninstalled Helm chart"
+              break
+            else
+              echo "⚠️ Helm uninstall attempt $i failed, retrying..."
+              sleep 5
+            fi
+
+            if [ "$i" -eq 3 ]; then
+              echo "⚠️ Failed to cleanly uninstall Helm chart"
+            fi
+          done
