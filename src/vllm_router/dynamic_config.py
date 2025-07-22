@@ -152,7 +152,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 f"Invalid service discovery type: {config.service_discovery}"
             )
 
-        logger.info(f"DynamicConfigWatcher: Service discovery reconfiguration complete")
+        logger.info("DynamicConfigWatcher: Service discovery reconfiguration complete")
 
     def reconfigure_routing_logic(self, config: DynamicRouterConfig):
         """
@@ -162,7 +162,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
             config.routing_logic, session_key=config.session_key
         )
         self.app.state.router = routing_logic
-        logger.info(f"DynamicConfigWatcher: Routing logic reconfiguration complete")
+        logger.info("DynamicConfigWatcher: Routing logic reconfiguration complete")
 
     def reconfigure_batch_api(self, config: DynamicRouterConfig):
         """
@@ -208,12 +208,10 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 config = DynamicRouterConfig.from_json(self.config_json)
                 if config != self.current_config:
                     logger.info(
-                        f"DynamicConfigWatcher: Config changed, reconfiguring..."
+                        "DynamicConfigWatcher: Config changed, reconfiguring..."
                     )
                     self.reconfigure_all(config)
-                    logger.info(
-                        f"DynamicConfigWatcher: Config reconfiguration complete"
-                    )
+                    logger.info("DynamicConfigWatcher: Config reconfiguration complete")
                     self.current_config = config
             except Exception as e:
                 logger.warning(f"DynamicConfigWatcher: Error loading config file: {e}")

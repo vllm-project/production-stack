@@ -15,11 +15,8 @@ servingEngineSpec:
       # requestGPU: 1
       pvcStorage: "50Gi"
       vllmConfig:
-        enableChunkedPrefill: false
-        enablePrefixCaching: false
+        enablePrefixCaching: true
         maxModelLen: 32000
-        v1: 1
-        gpuMemoryUtilization: 0.6
       lmcacheConfig:
         cudaVisibleDevices: "0"
         enabled: true
@@ -33,7 +30,7 @@ servingEngineSpec:
         nixlEnableGc: true
         enablePD: true
         cpuOffloadingBufferSize: 0
-      hf_token: <your-hf-token>
+      hf_token: <hf-token>
       labels:
         model: "llama-prefill"
     # Decode node configuration
@@ -47,10 +44,8 @@ servingEngineSpec:
       # requestGPU: 1
       pvcStorage: "50Gi"
       vllmConfig:
-        enableChunkedPrefill: false
-        enablePrefixCaching: false
+        enablePrefixCaching: true
         maxModelLen: 32000
-        v1: 1
       lmcacheConfig:
         cudaVisibleDevices: "1"
         enabled: true
@@ -63,9 +58,13 @@ servingEngineSpec:
         nixlBufferDevice: "cuda"
         nixlEnableGc: true
         enablePD: true
-      hf_token: <your-hf-token>
+      hf_token: <hf-token>
       labels:
         model: "llama-decode"
+  containerSecurityContext:
+    capabilities:
+      add:
+        - SYS_PTRACE
 routerSpec:
   enableRouter: true
   repository: "lmcache/lmstack-router"

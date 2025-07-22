@@ -1,5 +1,6 @@
-{{- if and .Values.servingEngineSpec.enableEngine (not (hasKey .Values.servingEngineSpec "raySpec")) -}}
+{{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+{{- if not (hasKey $modelSpec "raySpec") }}
 {{- $kv_role := "kv_both" }}
 {{- $kv_rank := 0 }}
 {{- $kv_parallel_size := 1 }}
@@ -14,6 +15,10 @@ kind: Deployment
 metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-deployment-vllm"
   namespace: {{ .Release.Namespace }}
+  {{- if hasKey $modelSpec "annotations" }}
+  annotations:
+    {{- toYaml $modelSpec.annotations | nindent 4 }}
+  {{- end }}
   labels:
     model: {{ $modelSpec.name }}
     helm-release-name: {{ .Release.Name }}
@@ -29,11 +34,18 @@ spec:
   progressDeadlineSeconds: 1200
   template:
     metadata:
+      {{- if hasKey $modelSpec "podAnnotations" }}
+      annotations:
+        {{- toYaml $modelSpec.podAnnotations | nindent 8 }}
+      {{- end }}
       labels:
         model: {{ $modelSpec.name }}
         helm-release-name: {{ .Release.Name }}
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
+      {{- if $modelSpec.priorityClassName }}
+      priorityClassName: {{ $modelSpec.priorityClassName | quote }}
+      {{- end }}
       {{- if hasKey $modelSpec "initContainer" }}
       {{- $container := $modelSpec.initContainer }}
       initContainers:
@@ -45,9 +57,16 @@ spec:
           {{- if $container.args }}
           args: {{ toYaml $container.args | nindent 12 }}
           {{- end }}
-          {{- if $container.env }}
-          env: {{ toYaml $container.env | nindent 12 }}
-          {{- end }}
+          env:
+            - name: RELEASE_NAME
+              value: {{ $.Release.Name }}
+            {{- if and (hasKey $.Values "cacheserverSpec") (hasKey $.Values.cacheserverSpec "servicePort") }}
+            - name: LMCACHE_SERVER_SERVICE_PORT
+              value: {{ $.Values.cacheserverSpec.servicePort | quote }}
+            {{- end }}
+            {{- if $container.env }}
+            {{- toYaml $container.env | nindent 12 }}
+            {{- end }}
           {{- if $container.resources }}
           resources: {{ toYaml $container.resources | nindent 12 }}
           {{- end }}
@@ -61,19 +80,31 @@ spec:
       securityContext:
         {{- toYaml .Values.servingEngineSpec.securityContext | nindent 8 }}
       {{- end }}
+      {{- if hasKey $modelSpec "serviceAccountName" }}
+      serviceAccountName: {{ $modelSpec.serviceAccountName }}
+      {{- end }}
+      {{- if and (hasKey $modelSpec "lmcacheConfig") (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
       hostIPC: true
       hostPID: true
+      {{- end }}
       hostname: "{{ $.Release.Name }}-{{ $modelSpec.name }}-{{ $.Chart.Name }}"
       subdomain: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
       containers:
         - name: "vllm"
           image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
           securityContext:
-            capabilities:
-              add:
-                - SYS_PTRACE
+            {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
           command:
-          {{- if or (eq $modelSpec.tag "2025-05-27-v1") (eq $modelSpec.tag "2025-05-17-v1") (and (eq $modelSpec.tag "latest") (eq $modelSpec.repository "lmcache/vllm-openai")) }}
+          {{- if or
+            (eq $modelSpec.tag "2025-05-27-v1")
+            (eq $modelSpec.tag "2025-05-17-v1")
+            (eq $modelSpec.tag "latest-nightly")
+            (hasPrefix "nightly-" $modelSpec.tag)
+            (and
+              (eq $modelSpec.tag "latest")
+              (eq $modelSpec.repository "lmcache/vllm-openai")
+            )
+          }}
           - "/opt/venv/bin/vllm"
           {{- else }}
           - "vllm"
@@ -142,29 +173,20 @@ spec:
           {{-     if hasKey $modelSpec.lmcacheConfig "enablePD" }}
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}","kv_connector_extra_config":{"discard_partial_chunks": false, "lmcache_rpc_port": {{ $modelSpec.lmcacheConfig.nixlRole | quote }}}}'
-          {{-     else if hasKey $modelSpec.vllmConfig "v1" }}
-          {{-       if eq (toString $modelSpec.vllmConfig.v1) "1" }}
-          - "--kv-transfer-config"
-          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}"}'
-          {{-       else }}
+          {{-     else if and (hasKey $modelSpec.vllmConfig "v0") (eq (toString $modelSpec.vllmConfig.v0) "1") }}
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
-          {{-       end }}
           {{-     else }}
           - "--kv-transfer-config"
-          - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}"}'
           {{-     end }}
           {{-   end }}
           {{- end }}
           {{- if $modelSpec.chatTemplate }}
           - "--chat-template"
-          - {{ $modelSpec.chatTemplate | quote }}
+          - "/templates/{{ $modelSpec.chatTemplate }}"
           {{- end }}
-          {{- if .Values.servingEngineSpec.containerSecurityContext }}
-          securityContext:
-            {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
-          {{- end }}
-          imagePullPolicy: Always
+          imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
           env:
           - name: HF_HOME
             {{- if hasKey $modelSpec "pvcStorage" }}
@@ -179,13 +201,14 @@ spec:
           {{- with $modelSpec.vllmConfig}}
           - name: LMCACHE_LOG_LEVEL
             value: "DEBUG"
-          {{- if hasKey . "v1" }}
-          - name: VLLM_USE_V1
-            value: {{ $modelSpec.vllmConfig.v1 | quote }}
-          {{- else }}
+          {{- if and (hasKey . "v0") (eq (toString $modelSpec.vllmConfig.v0) "1") }}
           - name: VLLM_USE_V1
             value: "0"
-          {{- end}}
+          {{- else }}
+          {{- $dir := default "/tmp" $modelSpec.vllmConfig.prometheusMultiprocDir }}
+          - name: PROMETHEUS_MULTIPROC_DIR
+            value: {{ $dir | quote }}
+          {{- end }}
           {{- end}}
           {{- if $modelSpec.hf_token }}
           - name: HF_TOKEN
@@ -332,23 +355,37 @@ spec:
           {{- end}}
           {{- end}}
           {{- if $modelSpec.chatTemplate }}
+          {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
+          - name: {{ .Release.Name }}-{{ $modelSpec.name }}-chat-templates
+            mountPath: /templates
+          {{- else }}
           - name: vllm-templates
             mountPath: /templates
           {{- end }}
+          {{- end }}
           {{- if hasKey $modelSpec "extraVolumeMounts" }}
           {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
+          {{- end }}
+          {{- if hasKey $.Values "sharedPvcStorage" }}
+          - name: {{ .Release.Name }}-shared-pvc-storage
+            mountPath: /data/shared-pvc-storage
           {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
-      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") (hasKey $.Values "sharedPvcStorage") }}
       volumes:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
+        {{- end }}
+        {{- if hasKey $.Values "sharedPvcStorage" }}
+        - name: {{ .Release.Name }}-shared-pvc-storage
+          persistentVolumeClaim:
+            claimName: "{{ .Release.Name }}-shared-pvc-storage-claim"
         {{- end }}
         {{- with $modelSpec.vllmConfig }}
         {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
@@ -360,7 +397,7 @@ spec:
         {{- end}}
         {{- if $modelSpec.chatTemplate}}
         {{- if hasKey $modelSpec "chatTemplateConfigMap" }}
-        - name: {{ .Release.Name }}-chat-templates
+        - name: {{ .Release.Name }}-{{ $modelSpec.name }}-chat-templates
           configMap:
             name: "{{ .Release.Name }}-{{$modelSpec.name}}-chat-templates"
         {{- else }}
@@ -405,9 +442,10 @@ metadata:
   namespace: "{{ .Release.Namespace }}"
 data:
   {{ $modelSpec.chatTemplate }}: |-
-    {{ $modelSpec.chatTemplateConfigMap }}
+{{ $modelSpec.chatTemplateConfigMap | nindent 4 }}
 {{- end }}
 {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}

@@ -1,0 +1,17 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "granite"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "ibm-granite/granite-3.0-3b-a800m-instruct"
+    replicaCount: 1
+    requestCPU: 6
+    requestMemory: "16Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      extraArgs: ["--enable-sleep-mode"]
+    env:
+      - name: VLLM_SERVER_DEV_MODE
+        value: "1"

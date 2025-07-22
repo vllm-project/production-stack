@@ -19,8 +19,9 @@ import time
 import uuid
 
 import httpx
-from fastapi import BackgroundTasks, Request
+from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from requests import JSONDecodeError
 
 from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import (
@@ -37,20 +38,7 @@ from vllm_router.utils import replace_model_in_request_body, update_content_leng
 
 try:
     # Semantic cache integration
-    from vllm_router.experimental.semantic_cache import (
-        GetSemanticCache,
-        enable_semantic_cache,
-        initialize_semantic_cache,
-        is_semantic_cache_enabled,
-    )
     from vllm_router.experimental.semantic_cache_integration import (
-        add_semantic_cache_args,
-        check_semantic_cache,
-        semantic_cache_hit_ratio,
-        semantic_cache_hits,
-        semantic_cache_latency,
-        semantic_cache_misses,
-        semantic_cache_size,
         store_in_semantic_cache,
     )
 
@@ -62,6 +50,7 @@ except ImportError:
 logger = init_logger(__name__)
 
 
+# TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
     body,
@@ -96,13 +85,14 @@ async def process_request(
         backend_url, request_id, start_time
     )
     # Check if this is a streaming request
-    is_streaming = False
     try:
         request_json = json.loads(body)
         is_streaming = request_json.get("stream", False)
-    except:
+    except JSONDecodeError:
         # If we can't parse the body as JSON, assume it's not streaming
-        pass
+        raise HTTPException(
+            status_code=400, detail="Request body is not JSON parsable."
+        )
 
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
@@ -124,9 +114,9 @@ async def process_request(
                 request.app.state.request_stats_monitor.on_request_response(
                     backend_url, request_id, time.time()
                 )
-                # For non-streaming requests, collect the full response
-                if full_response is not None:
-                    full_response.extend(chunk)
+            # For non-streaming requests, collect the full response
+            if full_response is not None:
+                full_response.extend(chunk)
             yield chunk
 
     request.app.state.request_stats_monitor.on_request_complete(
@@ -209,8 +199,11 @@ async def route_general_request(
         # Update request_json if the body was rewritten
         try:
             request_json = json.loads(request_body)
-        except:
+        except JSONDecodeError:
             logger.warning("Failed to parse rewritten request body as JSON")
+            raise HTTPException(
+                status_code=400, detail="Request body is not JSON parsable."
+            )
 
     # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
@@ -223,7 +216,12 @@ async def route_general_request(
         update_content_length(request, request_body)
 
     if not request_endpoint:
-        endpoints = list(filter(lambda x: requested_model in x.model_names, endpoints))
+        endpoints = list(
+            filter(
+                lambda x: requested_model in x.model_names and not x.sleep,
+                endpoints,
+            )
+        )
         engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
         request_stats = request.app.state.request_stats_monitor.get_request_stats(
             time.time()
@@ -231,14 +229,19 @@ async def route_general_request(
     else:
         endpoints = list(
             filter(
-                lambda x: requested_model in x.model_names and x.Id == request_endpoint,
+                lambda x: requested_model in x.model_names
+                and x.Id == request_endpoint
+                and not x.sleep,
                 endpoints,
             )
         )
 
     if not endpoints:
         return JSONResponse(
-            status_code=400, content={"error": f"Model {requested_model} not found."}
+            status_code=400,
+            content={
+                "error": f"Model {requested_model} not found or vLLM engine is sleeping."
+            },
         )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
@@ -260,8 +263,27 @@ async def route_general_request(
         )
 
     curr_time = time.time()
+    # Extract actual session ID from request headers for logging
+    session_key = (
+        getattr(request.app.state.router, "session_key", None)
+        if hasattr(request.app.state.router, "session_key")
+        else None
+    )
+    session_id = (
+        request.headers.get(session_key, None) if session_key is not None else None
+    )
+    session_id_display = session_id if session_id is not None else "None"
+
+    # Debug logging to help troubleshoot session ID extraction
+    logger.debug(
+        f"Debug session extraction - Router type: {type(request.app.state.router).__name__}"
+    )
+    logger.debug(f"Debug session extraction - Session key config: {session_key}")
+    logger.debug(f"Debug session extraction - Request headers: {dict(request.headers)}")
+    logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
+
     logger.info(
-        f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+        f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
     )
     stream_generator = process_request(
         request,
@@ -330,27 +352,163 @@ async def route_disaggregated_prefill_request(
     in_router_time = time.time()
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
-    request_body = await request.body()
-    request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+    request_json = await request.json()
 
     orig_max_tokens = request_json.get("max_tokens", 0)
     request_json["max_tokens"] = 1
     st = time.time()
-    prefiller_response = await send_request_to_prefiller(
-        request.app.state.prefill_client, endpoint, request_json, request_id
-    )
-    et = time.time()
-    logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
-    request_json["max_tokens"] = orig_max_tokens
+    try:
+        await send_request_to_prefiller(
+            request.app.state.prefill_client, endpoint, request_json, request_id
+        )
+        et = time.time()
+        logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
+        logger.info(
+            f"Routing request {request_id} with session id None to {request.app.state.prefill_client.base_url} at {et}, process time = {et - in_router_time:.4f}"
+        )
+        request_json["max_tokens"] = orig_max_tokens
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error in prefiller: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=e.response.status_code,
+            content={
+                "error": {
+                    "message": f"Prefiller error: {e.response.text}",
+                    "type": "prefiller_error",
+                    "code": e.response.status_code,
+                }
+            },
+            headers={"X-Request-Id": request_id},
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in prefiller: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "message": f"Prefiller error: {str(e)}",
+                    "type": "prefiller_error",
+                    "code": 500,
+                }
+            },
+            headers={"X-Request-Id": request_id},
+        )
 
     async def generate_stream():
-        async for chunk in send_request_to_decode(
-            request.app.state.decode_client, endpoint, request_json, request_id
-        ):
-            yield chunk
+        try:
+            async for chunk in send_request_to_decode(
+                request.app.state.decode_client, endpoint, request_json, request_id
+            ):
+                yield chunk
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error in decoder: {e}", exc_info=True)
+            try:
+                error_text = e.response.text
+            except Exception:
+                error_text = f"HTTP {e.response.status_code}"
+            # Yield error as JSON response
+            error_response = {
+                "error": {
+                    "message": f"Decoder error: {error_text}",
+                    "type": "decoder_error",
+                    "code": e.response.status_code,
+                }
+            }
+            yield json.dumps(error_response).encode("utf-8")
+        except Exception as e:
+            logger.error(f"Unexpected error in decoder: {e}", exc_info=True)
+            # Yield error as JSON response
+            error_response = {
+                "error": {
+                    "message": f"Decoder error: {str(e)}",
+                    "type": "decoder_error",
+                    "code": 500,
+                }
+            }
+            yield json.dumps(error_response).encode("utf-8")
+
+    curr_time = time.time()
+    logger.info(
+        f"Routing request {request_id} with session id None to {request.app.state.decode_client.base_url} at {curr_time}, process time = {curr_time - et:.4f}"
+    )
 
     return StreamingResponse(
         generate_stream(),
         media_type="application/json",
         headers={"X-Request-Id": request_id},
     )
+
+
+async def route_sleep_wakeup_request(
+    request: Request,
+    endpoint: str,
+    background_tasks: BackgroundTasks,
+):
+    in_router_time = time.time()
+    # Same as vllm, Get request_id from X-Request-Id header if available
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+
+    if request.query_params:
+        request_endpoint = request.query_params.get("id")
+    else:
+        request_endpoint = None
+
+    if request_endpoint is None:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: missing target Engine Id."},
+            headers={"X-Request-Id": request_id},
+        )
+
+    service_discovery = get_service_discovery()
+    endpoints = service_discovery.get_endpoint_info()
+
+    endpoints = list(filter(lambda x: x.Id == request_endpoint, endpoints))
+    if not endpoints:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Engine with Id {request_endpoint} not found."},
+        )
+    logger.debug(f"Routing request {request_id} to engine with Id: {endpoints[0].Id}")
+
+    server_url = endpoints[0].url
+    curr_time = time.time()
+    logger.info(
+        f"Routing request {request_id} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+    )
+
+    headers = {
+        "X-Request-Id": request_id,
+    }
+
+    if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
+        logger.info("Using vllm server authentication")
+        headers["Authorization"] = f"Bearer {VLLM_API_KEY}"
+
+    url = server_url + endpoint
+
+    async with httpx.AsyncClient() as client:
+        if endpoint == "/is_sleeping":
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        else:
+            request_body = await request.body()
+            if request_body:
+                req_data = json.loads(request_body)
+                response = await client.post(url, json=req_data, headers=headers)
+            else:
+                response = await client.post(url, headers=headers)
+            response.raise_for_status()
+
+            pod_name = endpoints[0].pod_name
+            if endpoint == "/sleep":
+                service_discovery.add_sleep_label(pod_name)
+            elif endpoint == "/wake_up":
+                service_discovery.remove_sleep_label(pod_name)
+
+            return JSONResponse(
+                status_code=response.status_code,
+                content={"status": "success"},
+                headers={"X-Request-Id": request_id},
+            )

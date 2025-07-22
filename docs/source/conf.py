@@ -96,6 +96,8 @@ autodoc_mock_imports = [
     "uhashring",
     "lmcache",
     "httpx",
+    "transformers",
+    "os",
 ]
 
 intersphinx_mapping = {

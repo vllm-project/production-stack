@@ -211,9 +211,17 @@ func (r *CacheServerReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, cs
 	if *dep.Spec.Replicas != cs.Spec.Replicas {
 		return true
 	}
+	// Generate the expected deployment
+	expectedDep := r.deploymentForCacheServer(cs)
+
+	// Compare image
+	if len(dep.Spec.Template.Spec.Containers) > 0 &&
+		expectedDep.Spec.Template.Spec.Containers[0].Image != dep.Spec.Template.Spec.Containers[0].Image {
+		return true
+	}
 
 	// Compare resources
-	expectedResources := r.deploymentForCacheServer(cs).Spec.Template.Spec.Containers[0].Resources
+	expectedResources := expectedDep.Spec.Template.Spec.Containers[0].Resources
 	actualResources := dep.Spec.Template.Spec.Containers[0].Resources
 	if !reflect.DeepEqual(expectedResources, actualResources) {
 		return true

@@ -1,62 +1,121 @@
-{{- if and .Values.loraController .Values.loraController.enabled -}}
+{{- if .Values.loraController.enableLoraController }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: lora-controller
+  name: {{ .Release.Name }}-lora-controller
   namespace: {{ .Release.Namespace }}
   labels:
-    app: lora-controller
-    {{- include "chart.engineLabels" . | nindent 4 }}
+    app.kubernetes.io/component: lora-controller
+    helm-release-name: {{ .Release.Name }}
 spec:
-  replicas: {{ .Values.loraController.replicaCount | default 1 }}
   selector:
     matchLabels:
-      app: lora-controller
-      {{- include "chart.engineLabels" . | nindent 6 }}
+      app.kubernetes.io/component: lora-controller
+      helm-release-name: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: lora-controller
-        {{- include "chart.engineLabels" . | nindent 8 }}
+        app.kubernetes.io/component: lora-controller
+        helm-release-name: {{ .Release.Name }}
       {{- with .Values.loraController.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: lora-controller
       {{- with .Values.loraController.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      containers:
-        - name: controller
-          image: "{{ .Values.loraController.image.repository }}:{{ .Values.loraController.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.loraController.image.pullPolicy }}
-          env:
-            - name: ADAPTER_DOWNLOAD_PATH
-              value: "/models"
-            {{- with .Values.loraController.extraEnv }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
+      serviceAccountName: {{ .Release.Name }}-lora-controller
+      securityContext:
+        {{- toYaml .Values.loraController.podSecurityContext | nindent 8 }}
+      {{- if hasKey $.Values "sharedPvcStorage" }}
+      initContainers:
+        - name: fix-perms
+          image: busybox:1.37
+          command: ["sh", "-c", "chown -R 65532:65532 /data/shared-pvc-storage"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
           volumeMounts:
-            - name: shared-model-storage
-              mountPath: /models
-            {{- with .Values.loraController.extraVolumeMounts }}
+            - name: {{ .Release.Name }}-shared-pvc-storage
+              mountPath: /data/shared-pvc-storage
+      {{- end }}
+      containers:
+        - name: manager
+          image: "{{ .Values.loraController.image.repository }}:{{ .Values.loraController.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.loraController.image.pullPolicy }}
+          args:
+            - --leader-elect
+            - --health-probe-bind-address=:8081
+            {{- if .Values.loraController.metrics.enabled }}
+            - --metrics-bind-address=:8443
+            - --metrics-secure
+            {{- else }}
+            - --metrics-bind-address=0
+            {{- end }}
+            {{- if .Values.loraController.webhook.enabled }}
+            - --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
+            {{- end }}
+            {{- with .Values.loraController.extraArgs }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          env:
+            - name: WATCH_NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: KUBERNETES_CLUSTER_DOMAIN
+              value: {{ quote .Values.loraController.kubernetesClusterDomain }}
+            {{- with .Values.loraController.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: metrics
+              containerPort: 8443
+              protocol: TCP
+            {{- if .Values.loraController.webhook.enabled }}
+            - name: webhook-server
+              containerPort: 9443
+              protocol: TCP
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
           resources:
             {{- toYaml .Values.loraController.resources | nindent 12 }}
-          {{- with .Values.loraController.securityContext }}
           securityContext:
-            {{- toYaml . | nindent 12 }}
+            {{- toYaml .Values.loraController.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+          {{- if .Values.loraController.webhook.enabled }}
+            - name: webhook-server-cert
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+          {{- end }}
+          {{- if hasKey $.Values "sharedPvcStorage" }}
+            - name: {{ .Release.Name }}-shared-pvc-storage
+              mountPath: /data/shared-pvc-storage
           {{- end }}
       volumes:
-        - name: shared-model-storage
+      {{- if .Values.loraController.webhook.enabled }}
+        - name: webhook-server-cert
+          secret:
+            secretName: {{ .Release.Name }}-lora-controller-webhook-server-cert
+      {{- end }}
+      {{- if hasKey $.Values "sharedPvcStorage" }}
+        - name: {{ .Release.Name }}-shared-pvc-storage
           persistentVolumeClaim:
-            claimName: {{ .Release.Name }}-shared-storage-claim
-        {{- with .Values.loraController.extraVolumes }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+            claimName: "{{ .Release.Name }}-shared-pvc-storage-claim"
+      {{- end }}
       {{- with .Values.loraController.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -69,8 +128,5 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.loraController.podSecurityContext }}
-      securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      terminationGracePeriodSeconds: 10
 {{- end }}

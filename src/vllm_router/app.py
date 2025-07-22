@@ -25,31 +25,6 @@ from vllm_router.dynamic_config import (
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
-from vllm_router.services.callbacks_service.callbacks import initialize_custom_callbacks
-
-try:
-    # Semantic cache integration
-    from vllm_router.experimental.semantic_cache import (
-        GetSemanticCache,
-        enable_semantic_cache,
-        initialize_semantic_cache,
-        is_semantic_cache_enabled,
-    )
-    from vllm_router.experimental.semantic_cache_integration import (
-        add_semantic_cache_args,
-        check_semantic_cache,
-        semantic_cache_hit_ratio,
-        semantic_cache_hits,
-        semantic_cache_latency,
-        semantic_cache_misses,
-        semantic_cache_size,
-        store_in_semantic_cache,
-    )
-
-    semantic_cache_available = True
-except ImportError:
-    semantic_cache_available = False
-
 from vllm_router.httpx_client import HTTPXClientWrapper
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
@@ -66,6 +41,7 @@ from vllm_router.service_discovery import (
     initialize_service_discovery,
 )
 from vllm_router.services.batch_service import initialize_batch_processor
+from vllm_router.services.callbacks_service.callbacks import initialize_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
@@ -86,6 +62,21 @@ from vllm_router.utils import (
     set_ulimit,
 )
 
+try:
+    # Semantic cache integration
+    from vllm_router.experimental.semantic_cache import (
+        enable_semantic_cache,
+        initialize_semantic_cache,
+        is_semantic_cache_enabled,
+    )
+    from vllm_router.experimental.semantic_cache_integration import (
+        semantic_cache_size,
+    )
+
+    semantic_cache_available = True
+except ImportError:
+    semantic_cache_available = False
+
 logger = logging.getLogger("uvicorn")
 
 
@@ -103,6 +94,8 @@ async def lifespan(app: FastAPI):
     engine_stats_scraper.close()
 
     logger.info("Closing service discovery module")
+    logger.info("shaoting test")
+    logger.info("shaoting test 2")
     service_discovery = get_service_discovery()
     service_discovery.close()
 
@@ -195,6 +188,7 @@ def initialize_all(app: FastAPI, args):
         lmcache_controller_port=args.lmcache_controller_port,
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
+        kv_aware_threshold=args.kv_aware_threshold,
     )
 
     # Initialize feature gates

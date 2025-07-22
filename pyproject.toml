@@ -13,6 +13,7 @@ classifiers = [
 # Should be the same as src/vllm_router/requirements.txt
 dependencies = [
     "aiofiles==24.1.0",
+    "black>=25.1.0",
     "fastapi==0.115.8",
     "httpx==0.28.1",
     "kubernetes==32.0.0",
@@ -23,6 +24,7 @@ dependencies = [
     "uhashring==2.3",
     "uvicorn==0.34.0",
     "xxhash==3.5.0",
+    "psutil==7.0.0",
 ]
 
 [project.scripts]

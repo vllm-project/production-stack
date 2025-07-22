@@ -3,8 +3,8 @@ kind: Kustomization
 
 ## Append samples of your project ##
 resources:
-- production-stack_v1alpha1_vllmruntime.yaml
-- production-stack_v1alpha1_vllmrouter.yaml
-- production-stack_v1alpha1_cacheserver.yaml
-- production-stack_v1alpha1_loraadapter.yaml
+  - production-stack_v1alpha1_vllmruntime.yaml
+  - production-stack_v1alpha1_vllmrouter.yaml
+  - production-stack_v1alpha1_cacheserver.yaml
+  - production-stack_v1alpha1_loraadapter.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

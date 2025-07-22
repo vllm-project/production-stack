@@ -32,9 +32,9 @@ type LoraAdapterSpec struct {
 	// +kubebuilder:validation:Required
 	BaseModel string `json:"baseModel"`
 	// DeploymentConfig defines how the adapter should be deployed
-	DeploymentConfig DeploymentConfig `json:"deploymentConfig,omitempty"`
+	LoraAdapterDeploymentConfig LoraAdapterDeploymentConfig `json:"loraAdapterDeploymentConfig,omitempty"`
 	// VLLMApiKey defines the configuration for vLLM API key authentication
-	VLLMApiKey *VLLMApiKeyConfig `json:"vllmApiKey,omitempty"`
+	VLLMApiKey *VLLMApiKeySecretRef `json:"vllmApiKey,omitempty"`
 }
 
 type AdapterSource struct {
@@ -59,11 +59,15 @@ type AdapterSource struct {
 
 // +mapType=atomic
 type SecretRef struct {
-	// Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?
-	Name string `json:"name,omitempty"`
+	// Name of the secret
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+	// Key in the secret containing the value
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
 }
 
-type DeploymentConfig struct {
+type LoraAdapterDeploymentConfig struct {
 	// Algorithm specifies which placement algorithm to use.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=default;ordered;equalized
@@ -72,16 +76,6 @@ type DeploymentConfig struct {
 	// Replicas is the number of replicas that should load this adapter.
 	// +kubebuilder:validation:Minimum=0
 	Replicas *int32 `json:"replicas,omitempty"`
-}
-
-// VLLMApiKeyConfig defines how to obtain the vLLM API key
-type VLLMApiKeyConfig struct {
-	// Direct API key value
-	// +optional
-	Value string `json:"value,omitempty"`
-	// Reference to a secret containing the API key
-	// +optional
-	SecretRef *VLLMApiKeySecretRef `json:"secretRef,omitempty"`
 }
 
 // VLLMApiKeySecretRef defines the reference to a secret containing the API key
@@ -122,7 +116,6 @@ type Condition struct {
 	// Reason is a brief reason for the condition's current status.
 	// +kubebuilder:validation:MaxLength=1024
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Pattern=`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`
 	// +kubebuilder:validation:Required
 	Reason string `json:"reason"`
 	// Status is the status of the condition.

@@ -3,7 +3,7 @@ servingEngineSpec:
   modelSpec:
   - name: "mistral"
     repository: "lmcache/vllm-openai"
-    tag: "latest"
+    tag: "latest-nightly"
     modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
     replicaCount: 2
     requestCPU: 10
@@ -11,10 +11,8 @@ servingEngineSpec:
     requestGPU: 1
     pvcStorage: "50Gi"
     vllmConfig:
-      enableChunkedPrefill: false
-      enablePrefixCaching: false
+      enablePrefixCaching: true
       maxModelLen: 16384
-      v1: 1
 
     lmcacheConfig:
       enabled: true
@@ -22,7 +20,24 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
+
     hf_token: <YOUR HF TOKEN>
+
+    initContainer:
+      name: "wait-for-cache-server"
+      image: lmcache/vllm-openai:latest-nightly
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          timeout 60 bash -c '
+          while true; do
+            /opt/venv/bin/python3 /workspace/LMCache/examples/kubernetes/health_probe.py $(RELEASE_NAME)-cache-server-service $(LMCACHE_SERVER_SERVICE_PORT) && exit 0
+            echo "Waiting for LMCache server..."
+            sleep 2
+          done'
+
+
+
 
 cacheserverSpec:
   # -- Number of replicas
@@ -39,7 +54,7 @@ cacheserverSpec:
 
   # -- Cache server image (reusing the vllm image)
   repository: "lmcache/vllm-openai"
-  tag: "latest"
+  tag: "latest-nightly"
 
   # TODO (Jiayi): please adjust this once we have evictor
   # -- router resource requests and limits
@@ -50,6 +65,13 @@ cacheserverSpec:
     limits:
       cpu: "4"
       memory: "10G"
+
+  # -- (Optional) Liveness probe for the cache server, available in vllm-openai:latest-nightly
+  # livenessProbe:
+  #   initialDelaySeconds: 30
+  #   periodSeconds: 10
+  #   failureThreshold: 3
+  #   timeoutSeconds: 5
 
   # -- Customized labels for the cache server deployment
   labels:

@@ -11,11 +11,11 @@
 
 ## Community Events
 
-We host **weekly** community meetings at **alternating** times to accommodate different time zones.
+We host **weekly** community meetings at the following timeslot:
 
-- Tuesdays at 6:00 PM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1iKpFrt-grVZSIbIXpnVlZyEvADcxLMj_&export=download)
+- Tuesdays at 5:30 PM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1E4rcnwZHV84IEFXAGtJ-TP3o1rslNDei&export=download)
 
-Meetings alternate weekly between the two times. All are welcome to join!
+All are welcome to join!
 
 ## Introduction
 
@@ -130,6 +130,16 @@ We welcome and value any contributions and collaborations. Please check out [CON
 ## License
 
 This project is licensed under Apache License 2.0. See the `LICENSE` file for details.
+
+## Sponsors
+
+We are grateful to our sponsors who support our development and benchmarking efforts:
+
+<p align="center">
+  <a href="https://gmicloud.ai">
+    <img src="https://cdn.prod.website-files.com/6683d8c52e4e62685a8d90cf/67a0a0064683945b0cf77f25_GMI%20Cloud%20Logo_Black.svg" alt="GMI Cloud Logo" width="200"/>
+  </a>
+</p>
 
 ---
 
