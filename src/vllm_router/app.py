@@ -94,10 +94,6 @@ async def lifespan(app: FastAPI):
     engine_stats_scraper.close()
 
     logger.info("Closing service discovery module")
-    logger.info("shaoting test")
-    logger.info("shaoting test 2")
-    logger.info("shaoting test 3")
-    logger.info("shaoting test 4")
     service_discovery = get_service_discovery()
     service_discovery.close()
 
