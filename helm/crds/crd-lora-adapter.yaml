@@ -1,10 +1,12 @@
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  name: loraadapters.production-stack.vllm.ai
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: loraadapters.production-stack.vllm.ai
+  labels:
+    app.kubernetes.io/name: lora-adapter-crd
+    app.kubernetes.io/component: lora-adapter-crd
 spec:
   group: production-stack.vllm.ai
   names:
@@ -74,8 +76,7 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   maxAdapters:
-                    description: MaxAdapters is the maximum number of adapters to
-                      load.
+                    description: MaxAdapters is the maximum number of adapters to load.
                     format: int32
                     type: integer
                   pattern:
@@ -98,16 +99,15 @@ spec:
                 - type
                 type: object
               baseModel:
-                description: BaseModel is the name of the base model this adapter
-                  is for.
+                description: BaseModel is the name of the base model this adapter is
+                  for.
                 type: string
               loraAdapterDeploymentConfig:
                 description: DeploymentConfig defines how the adapter should be deployed
                 properties:
                   algorithm:
                     default: default
-                    description: Algorithm specifies which placement algorithm to
-                      use.
+                    description: Algorithm specifies which placement algorithm to use.
                     enum:
                     - default
                     - ordered
@@ -123,8 +123,7 @@ spec:
                 - algorithm
                 type: object
               vllmApiKey:
-                description: VLLMApiKey defines the configuration for vLLM API key
-                  authentication
+                description: VLLMApiKey defines the configuration for vLLM API key authentication
                 properties:
                   secretKey:
                     description: Key in the secret containing the API key
@@ -141,6 +140,7 @@ spec:
             - baseModel
             type: object
           status:
+            type: object
             description: LoraAdapterStatus defines the observed state of LoraAdapter.
             properties:
               conditions:
@@ -156,8 +156,8 @@ spec:
                       format: date-time
                       type: string
                     message:
-                      description: Message is a human-readable message indicating
-                        details about why the current state is set.
+                      description: Message is a human-readable message indicating details
+                        about why the current state is set.
                       maxLength: 32768
                       type: string
                     reason:
@@ -187,8 +187,8 @@ spec:
                   type: object
                 type: array
               loadedAdapters:
-                description: LoadedAdapters tracks the loading status of adapters
-                  and their pod assignments.
+                description: LoadedAdapters tracks the loading status of adapters and
+                  their pod assignments.
                 items:
                   description: LoadedAdapter represents an adapter that has been loaded
                     into a pod
@@ -204,8 +204,8 @@ spec:
                       description: Path is the path where the adapter is loaded
                       type: string
                     podAssignments:
-                      description: PodAssignments represents the pods this adapter
-                        has been assigned to
+                      description: PodAssignments represents the pods this adapter has
+                        been assigned to
                       properties:
                         namespace:
                           description: Namespace is the namespace of the pod
@@ -240,9 +240,14 @@ spec:
               phase:
                 description: Phase represents the current phase of the adapter deployment.
                 type: string
-            type: object
         type: object
     served: true
     storage: true
     subresources:
       status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

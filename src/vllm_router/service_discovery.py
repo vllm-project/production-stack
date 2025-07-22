@@ -395,7 +395,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         try:
             headers = None
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
-                logger.info(f"Using vllm server authentication")
+                logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
             response = requests.get(url, headers=headers)
             response.raise_for_status()
@@ -477,7 +477,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         try:
             headers = None
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
-                logger.info(f"Using vllm server authentication")
+                logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
             response = requests.get(url, headers=headers)
             response.raise_for_status()
@@ -509,7 +509,7 @@ class K8sServiceDiscovery(ServiceDiscovery):
         try:
             headers = None
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
-                logger.info(f"Using vllm server authentication")
+                logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
             response = requests.get(url, headers=headers)
             response.raise_for_status()
@@ -584,9 +584,8 @@ class K8sServiceDiscovery(ServiceDiscovery):
         # Get detailed model information
         model_info = self._get_model_info(engine_ip)
 
-        # Check if engine is enable with sleep mode and set engine sleep status
-        enable = self._check_engine_sleep_mode(engine_name)
-        if enable == True:
+        # Check if engine is enabled with sleep mode and set engine sleep status
+        if self._check_engine_sleep_mode(engine_name):
             sleep_status = self._get_engine_sleep_status(engine_ip)
         else:
             sleep_status = False

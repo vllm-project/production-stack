@@ -17,7 +17,6 @@ servingEngineSpec:
       vllmConfig:
         enablePrefixCaching: true
         maxModelLen: 32000
-        v1: 1
       lmcacheConfig:
         cudaVisibleDevices: "0"
         enabled: true
@@ -47,7 +46,6 @@ servingEngineSpec:
       vllmConfig:
         enablePrefixCaching: true
         maxModelLen: 32000
-        v1: 1
       lmcacheConfig:
         cudaVisibleDevices: "1"
         enabled: true
