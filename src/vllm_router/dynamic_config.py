@@ -139,6 +139,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 ServiceDiscoveryType.STATIC,
                 urls=parse_static_urls(config.static_backends),
                 models=parse_comma_separated_args(config.static_models),
+                app=self.app
             )
         elif config.service_discovery == "k8s":
             reconfigure_service_discovery(
