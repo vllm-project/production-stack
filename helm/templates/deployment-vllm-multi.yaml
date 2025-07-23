@@ -70,10 +70,15 @@ spec:
           {{- if $container.resources }}
           resources: {{ toYaml $container.resources | nindent 12 }}
           {{- end }}
-          {{- if and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage") }}
+          {{- if or (and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage")) (hasKey $container "extraVolumeMounts") }}
           volumeMounts:
+          {{- end }}
+          {{- if and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage") }}
             - name: {{ .Release.Name }}-storage
               mountPath: /data
+          {{- end }}
+          {{- if hasKey $container "extraVolumeMounts" }}
+          {{- toYaml $container.extraVolumeMounts | nindent 12 }}
           {{- end }}
       {{- end }}
       {{- if .Values.servingEngineSpec.securityContext }}

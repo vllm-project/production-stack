@@ -59,6 +59,7 @@ servingEngineSpec:
   #   - env: (optional, list) List of environment variables to set in the container, each being a map with:
   #   - resources: (optional, map) The resource requests and limits for the container:
   #   - mountPvcStorage: (optional, bool) Whether to mount the model's volume.
+  #   - extraVolumeMounts: (Optional, list) Additional volume mounts to add to the init container, in Kubernetes volumeMount format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volumemount-v1-core
   #
   # - vllmConfig: (optional, map) The configuration for the VLLM model, supported options are:
   #   - v0: (optional, map) Specify to 1 to use vLLM v0, otherwise vLLM v1 is used. e.g., 0
