@@ -112,8 +112,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          check-latest: true
+          python-version: "3.10"
 
       - name: Install Python dependencies
         run: |
@@ -177,8 +176,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          check-latest: true
+          python-version: "3.10"
 
       - name: Install Python dependencies
         run: |
