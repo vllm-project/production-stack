@@ -43,6 +43,9 @@ spec:
         helm-release-name: {{ .Release.Name }}
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
+      {{- if $modelSpec.priorityClassName }}
+      priorityClassName: {{ $modelSpec.priorityClassName | quote }}
+      {{- end }}
       {{- if hasKey $modelSpec "initContainer" }}
       {{- $container := $modelSpec.initContainer }}
       initContainers:
