@@ -188,6 +188,8 @@ jobs:
 
       - name: Start 2 vLLM serve backends
         run: |
+          source /usr/local/bin/conda-init
+          conda activate llmstack
           echo "🚀 Starting vLLM serve backend"
           mkdir -p "$LOG_DIR"
           CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
