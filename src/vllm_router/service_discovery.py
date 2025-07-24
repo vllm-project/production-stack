@@ -380,6 +380,20 @@ class K8sServiceDiscovery(ServiceDiscovery):
         ready_count = sum(1 for status in container_statuses if status.ready)
         return ready_count == len(container_statuses)
 
+    @staticmethod
+    def _is_pod_terminating(pod):
+        """
+        Check if the pod is in terminating state by checking
+        deletion timestamp and pod phase.
+        """
+        # Check if pod has deletion timestamp
+        if pod.metadata.deletion_timestamp is not None:
+            return True
+        # Check if pod phase is failed or succeeded
+        if pod.status.phase in ["Failed", "Succeeded"]:
+            return True
+        return False
+
     def _get_engine_sleep_status(self, pod_ip) -> Optional[bool]:
         """
         Get the engine sleeping status by querying the engine's
@@ -554,13 +568,29 @@ class K8sServiceDiscovery(ServiceDiscovery):
                     event_type = event["type"]
                     pod_name = pod.metadata.name
                     pod_ip = pod.status.pod_ip
-                    is_pod_ready = self._check_pod_ready(pod.status.container_statuses)
+
+                    # Check if pod is terminating
+                    is_pod_terminating = self._is_pod_terminating(pod)
+                    is_container_ready = self._check_pod_ready(
+                        pod.status.container_statuses
+                    )
+
+                    # Pod is ready if container is ready and pod is not terminating
+                    is_pod_ready = is_container_ready and not is_pod_terminating
+
                     if is_pod_ready:
                         model_names = self._get_model_names(pod_ip)
                         model_label = self._get_model_label(pod)
                     else:
                         model_names = []
                         model_label = None
+
+                    # Record pod status for debugging
+                    if is_container_ready and is_pod_terminating:
+                        logger.info(
+                            f"Pod {pod_name} has ready containers but is terminating - marking as unavailable"
+                        )
+
                     self._on_engine_update(
                         pod_name,
                         pod_ip,
