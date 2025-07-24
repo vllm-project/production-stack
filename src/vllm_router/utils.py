@@ -217,7 +217,6 @@ def is_model_healthy(url: str, model: str, model_type: str) -> bool:
             return True  # validation passed
 
     except requests.exceptions.RequestException as e:
-        logger.warning(f"{model_type} model {model} at {url} not healthy: {e}")
         return False
 
     except json.JSONDecodeError as e:
