@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import dataclasses
 import json
 import threading
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Literal, Optional
 
 from fastapi import FastAPI
 
 from vllm_router.log import init_logger
+from vllm_router.parsers.yaml_utils import (
+    read_and_process_yaml_config_file,
+)
 from vllm_router.routers.routing_logic import reconfigure_routing_logic
 from vllm_router.service_discovery import (
     ServiceDiscoveryType,
@@ -92,6 +96,11 @@ class DynamicRouterConfig:
         )
 
     @staticmethod
+    def from_yaml(yaml_path: str) -> "DynamicRouterConfig":
+        config = read_and_process_yaml_config_file(yaml_path)
+        return DynamicRouterConfig(**config)
+
+    @staticmethod
     def from_json(json_path: str) -> "DynamicRouterConfig":
         with open(json_path, "r") as f:
             config = json.load(f)
@@ -103,12 +112,13 @@ class DynamicRouterConfig:
 
 class DynamicConfigWatcher(metaclass=SingletonMeta):
     """
-    Watches a config json file for changes and updates the DynamicRouterConfig accordingly.
+    Watches a config file for changes and updates the DynamicRouterConfig accordingly.
     """
 
     def __init__(
         self,
-        config_json: str,
+        config_path: str,
+        config_file_type: Literal["YAML", "JSON"],
         watch_interval: int,
         init_config: DynamicRouterConfig,
         app: FastAPI,
@@ -117,11 +127,13 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         Initializes the ConfigMapWatcher with the given ConfigMap name and namespace.
 
         Args:
-            config_json: the path to the json file containing the dynamic configuration
+            config_path: the path to the config file containing the dynamic configuration
+            config_file_type: the config file type containing the dynamic configuration (YAML or JSON)
             watch_interval: the interval in seconds at which to watch the for changes
             app: the fastapi app to reconfigure
         """
-        self.config_json = config_json
+        self.config_path = config_path
+        self.config_file_type = config_file_type
         self.watch_interval = watch_interval
         self.current_config = init_config
         self.app = app
@@ -228,7 +240,12 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         """
         while self.running:
             try:
-                config = DynamicRouterConfig.from_json(self.config_json)
+                if self.config_file_type == "YAML":
+                    config = DynamicRouterConfig.from_yaml(self.config_path)
+                elif self.config_file_type == "JSON":
+                    config = DynamicRouterConfig.from_json(self.config_path)
+                else:
+                    raise ValueError("Unsupported config file type.")
                 if config != self.current_config:
                     logger.info(
                         "DynamicConfigWatcher: Config changed, reconfiguring..."
@@ -251,15 +268,18 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
 
 
 def initialize_dynamic_config_watcher(
-    config_json: str,
+    config_path: str,
+    config_file_type: Literal["YAML", "JSON"],
     watch_interval: int,
     init_config: DynamicRouterConfig,
     app: FastAPI,
 ):
     """
-    Initializes the DynamicConfigWatcher with the given config json and watch interval.
+    Initializes the DynamicConfigWatcher with the given config path, file type and watch interval.
     """
-    return DynamicConfigWatcher(config_json, watch_interval, init_config, app)
+    return DynamicConfigWatcher(
+        config_path, config_file_type, watch_interval, init_config, app
+    )
 
 
 def get_dynamic_config_watcher() -> DynamicConfigWatcher:
