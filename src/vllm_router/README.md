@@ -49,7 +49,8 @@ The router can be configured using command-line arguments. Below are the availab
 
 ### Dynamic Config Options
 
-- `--dynamic-config-json`: The path to the json file containing the dynamic configuration.
+- `--dynamic-config-yaml`: The path to the YAML file containing the dynamic configuration.
+- `--dynamic-config-json`: The path to the JSON file containing the dynamic configuration.
 
 ### Sentry Options
 
@@ -106,8 +107,9 @@ different endpoints for each model type.
 
 ## Dynamic Router Config
 
-The router can be configured dynamically using a json file when passing the `--dynamic-config-json` option.
-The router will watch the json file for changes and update the configuration accordingly (every 10 seconds).
+The router can be configured dynamically using a config file when passing the `--dynamic-config-yaml` or
+`--dynamic-config-json` options. Please note that these are two mutually exclusive options.
+The router will watch the config file for changes and update the configuration accordingly (every 10 seconds).
 
 Currently, the dynamic config supports the following fields:
 
@@ -125,7 +127,22 @@ Currently, the dynamic config supports the following fields:
 - (When using `k8s` service discovery) `k8s_label_selector`: The label selector to filter vLLM pods when using K8s service discovery.
 - `session_key`: The key (in the header) to identify a session when using session-based routing.
 
-Here is an example dynamic config file:
+Here is an example of a dynamic YAML config file:
+
+```yaml
+service_discovery: static
+routing_logic: roundrobin
+static_models:
+    facebook/opt-125m:
+        static_backends:
+            - http://localhost:9001
+            - http://localhost:9003
+    meta-llama/Llama-3.1-8B-Instruct:
+        static_backends:
+            - http://localhost:9002
+```
+
+Here is an example of a dynamic JSON config file:
 
 ```json
 {
