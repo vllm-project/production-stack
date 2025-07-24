@@ -66,6 +66,9 @@ class DynamicRouterConfig:
     # Routing logic configurations
     session_key: Optional[str] = None
 
+    # Logging Options
+    callbacks: Optional[str] = None
+
     # Batch API configurations
     # TODO (ApostaC): Support dynamic reconfiguration of batch API
     # enable_batch_api: bool
@@ -93,6 +96,8 @@ class DynamicRouterConfig:
             # Routing logic configurations
             routing_logic=args.routing_logic,
             session_key=args.session_key,
+            # Logging Options
+            callbacks=args.callbacks,
         )
 
     @staticmethod

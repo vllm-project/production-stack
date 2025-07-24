@@ -48,6 +48,7 @@ def test_load_initial_config_from_config_file_if_required_when_yaml_config_file_
                 {
                     "routing_logic": "roundrobin",
                     "service_discovery": "static",
+                    "callbacks": "module.custom.callback_handler",
                     "static_models": {
                         "bge-m3": {
                             "static_backends": [
@@ -75,6 +76,7 @@ def test_load_initial_config_from_config_file_if_required_when_yaml_config_file_
         )
         assert args.routing_logic == "roundrobin"
         assert args.service_discovery == "static"
+        assert args.callbacks == "module.custom.callback_handler"
         assert (
             args.static_backends
             == "https://endpoint1.example.com/bge-m3,https://endpoint2.example.com/bge-m3,https://endpoint3.example.com/bge-reranker-v2-m3"
