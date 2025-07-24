@@ -18,7 +18,7 @@ import os
 import time
 import uuid
 
-import httpx
+import aiohttp
 from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from requests import JSONDecodeError
@@ -97,12 +97,12 @@ async def process_request(
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
 
-    async with request.app.state.httpx_client_wrapper().stream(
+    async with request.app.state.aiohttp_client_wrapper().request(
         method=request.method,
         url=backend_url + endpoint,
         headers=dict(request.headers),
-        content=body,
-        timeout=None,
+        data=body,
+        timeout=aiohttp.ClientTimeout(total=None),
     ) as backend_response:
         # Yield headers and status code first.
         yield backend_response.headers, backend_response.status_code
@@ -305,7 +305,7 @@ async def route_general_request(
 
 
 async def send_request_to_prefiller(
-    client: httpx.AsyncClient, endpoint: str, req_data: dict, request_id: str
+    client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
 ):
     """
     Send a request to a prefiller service.
@@ -320,13 +320,13 @@ async def send_request_to_prefiller(
         "X-Request-Id": request_id,
     }
 
-    response = await client.post(endpoint, json=req_data, headers=headers)
-    response.raise_for_status()
-    return response
+    async with client.post(endpoint, json=req_data, headers=headers) as response:
+        response.raise_for_status()
+        return response
 
 
 async def send_request_to_decode(
-    client: httpx.AsyncClient, endpoint: str, req_data: dict, request_id: str
+    client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
 ):
     """
     Asynchronously stream the response from a service using a persistent client.
@@ -336,11 +336,9 @@ async def send_request_to_decode(
         "X-Request-Id": request_id,
     }
 
-    async with client.stream(
-        "POST", endpoint, json=req_data, headers=headers
-    ) as response:
+    async with client.post(endpoint, json=req_data, headers=headers) as response:
         response.raise_for_status()
-        async for chunk in response.aiter_bytes():
+        async for chunk in response.content.iter_chunked(8192):
             yield chunk
 
 
@@ -367,15 +365,15 @@ async def route_disaggregated_prefill_request(
             f"Routing request {request_id} with session id None to {request.app.state.prefill_client.base_url} at {et}, process time = {et - in_router_time:.4f}"
         )
         request_json["max_tokens"] = orig_max_tokens
-    except httpx.HTTPStatusError as e:
+    except aiohttp.ClientResponseError as e:
         logger.error(f"HTTP error in prefiller: {e}", exc_info=True)
         return JSONResponse(
-            status_code=e.response.status_code,
+            status_code=e.status,
             content={
                 "error": {
-                    "message": f"Prefiller error: {e.response.text}",
+                    "message": f"Prefiller error: {e.message}",
                     "type": "prefiller_error",
-                    "code": e.response.status_code,
+                    "code": e.status,
                 }
             },
             headers={"X-Request-Id": request_id},
@@ -400,18 +398,18 @@ async def route_disaggregated_prefill_request(
                 request.app.state.decode_client, endpoint, request_json, request_id
             ):
                 yield chunk
-        except httpx.HTTPStatusError as e:
+        except aiohttp.ClientResponseError as e:
             logger.error(f"HTTP error in decoder: {e}", exc_info=True)
             try:
-                error_text = e.response.text
+                error_text = e.message
             except Exception:
-                error_text = f"HTTP {e.response.status_code}"
+                error_text = f"HTTP {e.status}"
             # Yield error as JSON response
             error_response = {
                 "error": {
                     "message": f"Decoder error: {error_text}",
                     "type": "decoder_error",
-                    "code": e.response.status_code,
+                    "code": e.status,
                 }
             }
             yield json.dumps(error_response).encode("utf-8")
@@ -487,19 +485,20 @@ async def route_sleep_wakeup_request(
 
     url = server_url + endpoint
 
-    async with httpx.AsyncClient() as client:
+    async with aiohttp.ClientSession() as client:
         if endpoint == "/is_sleeping":
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-            return response.json()
+            async with client.get(url, headers=headers) as response:
+                response.raise_for_status()
+                return await response.json()
         else:
             request_body = await request.body()
             if request_body:
                 req_data = json.loads(request_body)
-                response = await client.post(url, json=req_data, headers=headers)
+                async with client.post(url, json=req_data, headers=headers) as response:
+                    response.raise_for_status()
             else:
-                response = await client.post(url, headers=headers)
-            response.raise_for_status()
+                async with client.post(url, headers=headers) as response:
+                    response.raise_for_status()
 
             pod_name = endpoints[0].pod_name
             if endpoint == "/sleep":
@@ -508,7 +507,7 @@ async def route_sleep_wakeup_request(
                 service_discovery.remove_sleep_label(pod_name)
 
             return JSONResponse(
-                status_code=response.status_code,
+                status_code=response.status,
                 content={"status": "success"},
                 headers={"X-Request-Id": request_id},
             )
