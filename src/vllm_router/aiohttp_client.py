@@ -34,9 +34,9 @@ class AiohttpClientWrapper:
         logger.info(
             f"aiohttp async_client.closed: {self.async_client.closed} - Now close it. Id (will be unchanged): {id(self.async_client)}"
         )
-        await self.async_client.aclose()
+        await self.async_client.close()
         logger.info(
-            f"aiohttp async_client.is_closed(): {self.async_client.is_closed}. Id (will be unchanged): {id(self.async_client)}"
+            f"aiohttp async_client.closed: {self.async_client.closed}. Id (will be unchanged): {id(self.async_client)}"
         )
         self.async_client = None
         logger.info("aiohttp ClientSession closed")
