@@ -19,13 +19,13 @@ import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
 
+from vllm_router.aiohttp_client import AiohttpClientWrapper
 from vllm_router.dynamic_config import (
     DynamicRouterConfig,
     get_dynamic_config_watcher,
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
-from vllm_router.aiohttp_client import AiohttpClientWrapper
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router

@@ -33,6 +33,7 @@ def parse_args():
 
 if __name__ == "__main__":
     import asyncio
+
     args = parse_args()
     endpoint = args.url
     file_to_upload = args.path

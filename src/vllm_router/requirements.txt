@@ -1,4 +1,5 @@
 aiofiles==24.1.0
+aiohttp==3.9.5
 fastapi==0.115.8
 kubernetes==32.0.0
 numpy==1.26.4
@@ -9,4 +10,3 @@ sentry-sdk[fastapi]==2.27.0
 uhashring==2.3
 uvicorn==0.34.0
 xxhash==3.5.0
-aiohttp==3.9.5
