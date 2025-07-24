@@ -22,7 +22,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-import httpx
+import aiohttp
 import requests
 from kubernetes import client, config, watch
 
@@ -311,14 +311,14 @@ class StaticServiceDiscovery(ServiceDiscovery):
         ):
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
-                    self.app.state.prefill_client = httpx.AsyncClient(
+                    self.app.state.prefill_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
-                        timeout=None,
+                        timeout=aiohttp.ClientTimeout(total=None),
                     )
                 elif endpoint_info.model_label in self.decode_model_labels:
-                    self.app.state.decode_client = httpx.AsyncClient(
+                    self.app.state.decode_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
-                        timeout=None,
+                        timeout=aiohttp.ClientTimeout(total=None),
                     )
         return endpoint_infos
 
@@ -607,14 +607,14 @@ class K8sServiceDiscovery(ServiceDiscovery):
                 and self.decode_model_labels is not None
             ):
                 if model_label in self.prefill_model_labels:
-                    self.app.state.prefill_client = httpx.AsyncClient(
+                    self.app.state.prefill_client = aiohttp.ClientSession(
                         base_url=f"http://{engine_ip}:{self.port}",
-                        timeout=None,
+                        timeout=aiohttp.ClientTimeout(total=None),
                     )
                 elif model_label in self.decode_model_labels:
-                    self.app.state.decode_client = httpx.AsyncClient(
+                    self.app.state.decode_client = aiohttp.ClientSession(
                         base_url=f"http://{engine_ip}:{self.port}",
-                        timeout=None,
+                        timeout=aiohttp.ClientTimeout(total=None),
                     )
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
