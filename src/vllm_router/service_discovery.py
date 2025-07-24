@@ -206,12 +206,12 @@ class StaticServiceDiscovery(ServiceDiscovery):
         app,
         urls: List[str],
         models: List[str],
-        aliases: List[str] | None,
-        model_labels: List[str] | None,
-        model_types: List[str] | None,
-        static_backend_health_checks: bool,
-        prefill_model_labels: List[str] | None,
-        decode_model_labels: List[str] | None,
+        aliases: List[str] | None = None,
+        model_labels: List[str] | None = None,
+        model_types: List[str] | None = None,
+        static_backend_health_checks: bool = False,
+        prefill_model_labels: List[str] | None = None,
+        decode_model_labels: List[str] | None = None,
     ):
         self.app = app
         assert len(urls) == len(models), "URLs and models should have the same length"
