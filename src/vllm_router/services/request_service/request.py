@@ -17,6 +17,7 @@ import json
 import os
 import time
 import uuid
+import asyncio
 
 import httpx
 from fastapi import BackgroundTasks, HTTPException, Request
@@ -35,6 +36,7 @@ from vllm_router.services.request_service.rewriter import (
     is_request_rewriter_initialized,
 )
 from vllm_router.utils import replace_model_in_request_body, update_content_length
+from vllm_router.services.queue_service.queue import queue_manager
 
 try:
     # Semantic cache integration
@@ -59,6 +61,7 @@ async def process_request(
     endpoint,
     background_tasks: BackgroundTasks,
     debug_request=None,
+    condition: asyncio.Condition = None
 ):
     """
     Process a request by sending it to the chosen backend.
@@ -122,7 +125,9 @@ async def process_request(
     request.app.state.request_stats_monitor.on_request_complete(
         backend_url, request_id, time.time()
     )
-
+    if condition: #lets scheduler know that an endpoint-specific request has completed, can perhaps dispatch new
+        async with condition:
+            condition.notify()
     # if debug_request:
     #    logger.debug(f"Finished the request with request id: {debug_request.headers.get('x-request-id', None)} at {time.time()}")
     # Store in semantic cache if applicable
@@ -282,26 +287,48 @@ async def route_general_request(
     logger.debug(f"Debug session extraction - Request headers: {dict(request.headers)}")
     logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
 
-    logger.info(
-        f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
-    )
-    stream_generator = process_request(
-        request,
-        request_body,
-        server_url,
-        request_id,
-        endpoint,
-        background_tasks,
-    )
-    headers, status_code = await anext(stream_generator)
-    headers_dict = {key: value for key, value in headers.items()}
-    headers_dict["X-Request-Id"] = request_id
-    return StreamingResponse(
-        stream_generator,
-        status_code=status_code,
-        headers=headers_dict,
-        media_type="text/event-stream",
-    )
+    # enqueue if endpoint load is too high
+    if not queue_manager._endpoint_is_free(server_url):
+        queue_manager.register_endpoint(server_url) #if queue does not already exist
+
+        await queue_manager.enqueue(
+            server_url,
+            {
+                "request": request,
+                "request_id": request_id,
+                "body": request_body,
+                "endpoint": endpoint,
+                "background_tasks": background_tasks
+            },
+            priority=queue_manager.calculate_request_priority(request)
+        )
+        
+        return JSONResponse(
+            status_code=202,
+            content={"status": "queued", "endpoint": server_url}
+        )
+    else:
+        logger.info(
+            f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+        )
+        stream_generator = process_request(
+            request,
+            request_body,
+            server_url,
+            request_id,
+            endpoint,
+            background_tasks,
+            condition=queue_manager.conditions[server_url]
+        )
+        headers, status_code = await anext(stream_generator)
+        headers_dict = {key: value for key, value in headers.items()}
+        headers_dict["X-Request-Id"] = request_id
+        return StreamingResponse(
+            stream_generator,
+            status_code=status_code,
+            headers=headers_dict,
+            media_type="text/event-stream",
+        )
 
 
 async def send_request_to_prefiller(
