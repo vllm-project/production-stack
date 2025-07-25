@@ -90,9 +90,7 @@ async def process_request(
         is_streaming = request_json.get("stream", False)
     except JSONDecodeError:
         # If we can't parse the body as JSON, assume it's not streaming
-        raise HTTPException(
-            status_code=400, detail="Request body is not JSON parsable."
-        )
+        raise HTTPException(status=400, detail="Request body is not JSON parsable.")
 
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
@@ -105,9 +103,9 @@ async def process_request(
         timeout=aiohttp.ClientTimeout(total=None),
     ) as backend_response:
         # Yield headers and status code first.
-        yield backend_response.headers, backend_response.status_code
+        yield backend_response.headers, backend_response.status
         # Stream response content.
-        async for chunk in backend_response.aiter_bytes():
+        async for chunk in backend_response.content.iter_any():
             total_len += len(chunk)
             if not first_token:
                 first_token = True
@@ -293,12 +291,12 @@ async def route_general_request(
         endpoint,
         background_tasks,
     )
-    headers, status_code = await anext(stream_generator)
+    headers, status = await anext(stream_generator)
     headers_dict = {key: value for key, value in headers.items()}
     headers_dict["X-Request-Id"] = request_id
     return StreamingResponse(
         stream_generator,
-        status_code=status_code,
+        status_code=status,
         headers=headers_dict,
         media_type="text/event-stream",
     )
