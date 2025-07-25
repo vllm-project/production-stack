@@ -12,17 +12,12 @@ package picker
 
 import (
 	"math/rand"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/cespare/xxhash/v2"
 
 	"sigs.k8s.io/gateway-api-inference-extension/pkg/epp/scheduling/plugins"
 	"sigs.k8s.io/gateway-api-inference-extension/pkg/epp/scheduling/types"
 )
-
-const chunkSize = 128
 
 var _ plugins.Picker = &PrefixMatchPicker{}
 
@@ -57,40 +52,7 @@ func (p *PrefixMatchPicker) Pick(
 		return &types.Result{}
 	}
 
-	var prompt string
-
-	if msgs, ok := ctx.RequestBody["messages"]; ok {
-		if arr, ok := msgs.([]any); ok {
-			var parts []string
-			for _, m := range arr {
-				mm, ok := m.(map[string]any)
-				if !ok {
-					continue
-				}
-				switch c := mm["content"].(type) {
-				case string:
-					parts = append(parts, c)
-				case []any:
-					for _, part := range c {
-						mp, ok := part.(map[string]any)
-						if !ok {
-							continue
-						}
-						if mp["type"] == "text" {
-							if txt, ok := mp["text"].(string); ok {
-								parts = append(parts, txt)
-							}
-						}
-					}
-				}
-			}
-			prompt = strings.Join(parts, "\n")
-		}
-	}
-
-	if prompt == "" {
-		prompt, _ = ctx.RequestBody["prompt"].(string)
-	}
+	prompt, _ := ctx.RequestBody["prompt"].(string)
 
 	// 1. Build the set of available endpoints.
 	available := make(map[string]struct{}, len(scoredPods))
@@ -133,34 +95,12 @@ func (p *PrefixMatchPicker) Pick(
 
 type hashTrie struct {
 	mu        sync.RWMutex
-	children  map[uint64]*hashTrie
+	children  map[rune]*hashTrie
 	endpoints map[string]struct{}
 }
 
 func newHashTrie() *hashTrie {
-	return &hashTrie{children: make(map[uint64]*hashTrie)}
-}
-
-func intersection(a, b map[string]struct{}) map[string]struct{} {
-	res := make(map[string]struct{})
-	for k := range a {
-		if _, ok := b[k]; ok {
-			res[k] = struct{}{}
-		}
-	}
-	return res
-}
-
-func chunkAndHash(s string) []uint64 {
-	hashes := make([]uint64, 0, (len(s)+chunkSize-1)/chunkSize)
-	for i := 0; i < len(s); i += chunkSize {
-		end := i + chunkSize
-		if end > len(s) {
-			end = len(s)
-		}
-		hashes = append(hashes, xxhash.Sum64([]byte(s[i:end])))
-	}
-	return hashes
+	return &hashTrie{children: make(map[rune]*hashTrie)}
 }
 
 func (t *hashTrie) insert(key, endpoint string) {
@@ -168,23 +108,18 @@ func (t *hashTrie) insert(key, endpoint string) {
 	defer t.mu.Unlock()
 
 	node := t
+	for _, r := range key {
+		child, ok := node.children[r]
+		if !ok {
+			child = newHashTrie()
+			node.children[r] = child
+		}
+		node = child
+	}
 	if node.endpoints == nil {
 		node.endpoints = make(map[string]struct{})
 	}
 	node.endpoints[endpoint] = struct{}{}
-
-	for _, h := range chunkAndHash(key) {
-		child, ok := node.children[h]
-		if !ok {
-			child = newHashTrie()
-			node.children[h] = child
-		}
-		node = child
-		if node.endpoints == nil {
-			node.endpoints = make(map[string]struct{})
-		}
-		node.endpoints[endpoint] = struct{}{}
-	}
 }
 
 func (t *hashTrie) longestPrefixMatch(
@@ -194,20 +129,24 @@ func (t *hashTrie) longestPrefixMatch(
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
+	var lastMatch map[string]struct{}
 	node := t
-	matched := intersection(node.endpoints, available)
-
-	for _, h := range chunkAndHash(key) {
-		child, ok := node.children[h]
+	for _, r := range key {
+		if node.endpoints != nil {
+			lastMatch = node.endpoints
+		}
+		child, ok := node.children[r]
 		if !ok {
 			break
 		}
 		node = child
-		cand := intersection(node.endpoints, available)
-		if len(cand) == 0 {
-			break
-		}
-		matched = cand
 	}
-	return matched
+	// Filter by `available`.
+	res := make(map[string]struct{})
+	for ep := range lastMatch {
+		if _, ok := available[ep]; ok {
+			res[ep] = struct{}{}
+		}
+	}
+	return res
 }
