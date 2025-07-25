@@ -18,6 +18,9 @@ spec:
       {{- include "chart.routerLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ .Release.Name }}-router-service-account
+      {{- if .Values.routerSpec.priorityClassName }}
+      priorityClassName: {{ .Values.routerSpec.priorityClassName | quote }}
+      {{- end }}
       {{- if .Values.routerSpec.nodeSelectorTerms }}
       affinity:
         nodeAffinity:

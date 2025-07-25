@@ -5,6 +5,7 @@ import json
 import re
 import resource
 import wave
+from typing import Optional
 
 import requests
 from fastapi.requests import Request
@@ -158,7 +159,9 @@ def parse_static_urls(static_backends: str):
     return backend_urls
 
 
-def parse_comma_separated_args(comma_separated_string: str):
+def parse_comma_separated_args(comma_separated_string: Optional[str]):
+    if comma_separated_string is None:
+        return None
     return comma_separated_string.split(",")
 
 
