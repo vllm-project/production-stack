@@ -108,6 +108,12 @@ def parse_args():
         help="The service discovery type.",
     )
     parser.add_argument(
+        "--k8s-service-discovery-type",
+        type=str,
+        choices=["pod-ip", "service-name"],
+        help="The k8s service discovery type implementation only applies if service-discovery is specified as k8s.",
+    )
+    parser.add_argument(
         "--static-backends",
         type=str,
         default=None,
