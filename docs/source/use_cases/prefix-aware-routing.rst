@@ -1,37 +1,47 @@
 Prefix Aware Routing
-======================================
-
-Introduction
---------------------------------
+====================
 
 This tutorial demonstrates how to use prefix aware routing in the vLLM Production Stack. Prefix aware routing ensures that subsequent requests with the same prompt prefix are routed to the same instance, maximizing KV cache utilization and improving performance.
 
+Table of Contents
+-----------------
+
+1. Prerequisites_
+2. `Step 1: Deploy with Prefix Aware Routing`_
+3. `Step 2: Port Forwarding`_
+4. `Step 3: Testing Prefix Aware Routing`_
+5. `Step 4: Clean Up`_
+
 Prerequisites
---------------------------------
+-------------
 
-* Installation of minimal example shown in :ref:`examples`
-* Kubernetes environment with GPU support
+- Completion of the following tutorials:
 
+  - :doc:`../getting_started/prerequisite`
+  - :doc:`../getting_started/quickstart`
 
-Deploy with Prefix Aware Routing
----------------------------------------------
+- A Kubernetes environment with GPU support
+- Basic familiarity with Kubernetes and Helm
+
+Step 1: Deploy with Prefix Aware Routing
+----------------------------------------
 
 We'll use the predefined configuration file ``values-18-prefix-aware.yaml`` which sets up two vLLM instances with prefix aware routing enabled.
 
 1. Deploy the Helm chart with the configuration:
 
-.. code-block:: bash
+   .. code-block:: bash
 
-   helm install vllm helm/ -f tutorials/assets/values-18-prefix-aware.yaml
+      helm install vllm helm/ -f tutorials/assets/values-18-prefix-aware.yaml
 
-2. Wait for the deployment to complete:
+   Wait for the deployment to complete:
 
-.. code-block:: bash
+   .. code-block:: bash
 
-   kubectl get pods -w
+      kubectl get pods -w
 
-Port Forwarding
----------------------------------------------
+Step 2: Port Forwarding
+-----------------------
 
 Forward the router service port to your local machine:
 
@@ -39,10 +49,10 @@ Forward the router service port to your local machine:
 
    kubectl port-forward svc/vllm-router-service 30080:80
 
-Testing Prefix Aware Routing
----------------------------------------------
+Step 3: Testing Prefix Aware Routing
+------------------------------------
 
-1. First, send a request to the router:
+First, send a request to the router:
 
 .. code-block:: bash
 
@@ -54,7 +64,7 @@ Testing Prefix Aware Routing
        "max_tokens": 100
      }'
 
-2. Then, send another request with the same prompt prefix:
+Then, send another request with the same prompt prefix:
 
 .. code-block:: bash
 
@@ -75,8 +85,8 @@ Specifically, you should see some log like the following:
    [2025-06-03 06:16:28,963] LMCache DEBUG: Scheduled to load 5 tokens for request cmpl-306538839e87480ca5604ecc5f75c847-0 (vllm_v1_adapter.py:299:lmcache.integration.vllm.vllm_v1_adapter)
    [2025-06-03 06:16:28,966] LMCache DEBUG: Retrieved 6 out of 6 out of total 6 tokens (cache_engine.py:330:lmcache.experimental.cache_engine)
 
-Clean Up
----------------------------------------------
+Step 4: Clean Up
+-----------------
 
 To clean up the deployment:
 
@@ -85,7 +95,7 @@ To clean up the deployment:
    helm uninstall vllm
 
 Conclusion
----------------------------------------------
+----------
 
 In this tutorial, we've demonstrated how to:
 

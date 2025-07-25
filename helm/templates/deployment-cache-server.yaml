@@ -16,6 +16,9 @@ spec:
       labels:
       {{- include "chart.cacheserverLabels" . | nindent 8 }}
     spec:
+      {{- if .Values.cacheserverSpec.priorityClassName}}
+      priorityClassName: {{ .Values.cacheserverSpec.priorityClassName | quote }}
+      {{- end }}
       {{- if .Values.cacheserverSpec.nodeSelectorTerms}}
       affinity:
         nodeAffinity:
