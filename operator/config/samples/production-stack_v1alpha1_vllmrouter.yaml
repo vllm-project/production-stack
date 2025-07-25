@@ -16,7 +16,7 @@ spec:
   serviceDiscovery: k8s
 
   # Label selector for vLLM runtime pods
-  k8sLabelSelector: "app=vllmruntime-sample"
+  k8sLabelSelector: "model=llama-3.1-8b-instruct"
 
   # Routing strategy (roundrobin or session)
   routingLogic: roundrobin

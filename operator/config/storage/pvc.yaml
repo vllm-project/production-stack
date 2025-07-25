@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: shared-pvc-storage
+  labels:
+    type: local
+    app: production-stack
+    component: shared-pvc-storage
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /data/shared-pvc-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-pvc-storage-claim
+  namespace: default
+  labels:
+    app: production-stack
+    component: shared-pvc-storage
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
