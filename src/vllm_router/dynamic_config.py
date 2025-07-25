@@ -50,6 +50,11 @@ class DynamicRouterConfig:
     static_backends: Optional[str] = None
     static_models: Optional[str] = None
     static_aliases: Optional[str] = None
+    static_model_labels: Optional[str] = None
+    static_model_types: Optional[str] = None
+    static_backend_health_checks: Optional[bool] = False
+    prefill_model_labels: Optional[str] = None
+    decode_model_labels: Optional[str] = None
     k8s_port: Optional[int] = None
     k8s_namespace: Optional[str] = None
     k8s_label_selector: Optional[str] = None
@@ -137,15 +142,33 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         if config.service_discovery == "static":
             reconfigure_service_discovery(
                 ServiceDiscoveryType.STATIC,
+                app=self.app,
                 urls=parse_static_urls(config.static_backends),
                 models=parse_comma_separated_args(config.static_models),
+                aliases=parse_comma_separated_args(config.static_aliases),
+                model_labels=parse_comma_separated_args(config.static_model_labels),
+                model_types=parse_comma_separated_args(config.static_model_types),
+                static_backend_health_checks=config.static_backend_health_checks,
+                prefill_model_labels=parse_comma_separated_args(
+                    config.prefill_model_labels
+                ),
+                decode_model_labels=parse_comma_separated_args(
+                    config.decode_model_labels
+                ),
             )
         elif config.service_discovery == "k8s":
             reconfigure_service_discovery(
                 ServiceDiscoveryType.K8S,
+                app=self.app,
                 namespace=config.k8s_namespace,
                 port=config.k8s_port,
                 label_selector=config.k8s_label_selector,
+                prefill_model_labels=parse_comma_separated_args(
+                    config.prefill_model_labels
+                ),
+                decode_model_labels=parse_comma_separated_args(
+                    config.decode_model_labels
+                ),
             )
         else:
             raise ValueError(
