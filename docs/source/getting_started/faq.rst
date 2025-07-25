@@ -14,7 +14,7 @@ Deployment & Configuration
 Q: How do I update to a new version of vLLM Production Stack?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A: Update your ``values.yaml`` file with the new version and upgrade:
+Update your ``values.yaml`` file with the new version and upgrade:
 
 .. code-block:: bash
 
@@ -24,7 +24,7 @@ A: Update your ``values.yaml`` file with the new version and upgrade:
 Q: How do I scale my deployment?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A: You can scale in several ways:
+You can scale in several ways:
 
 * **Horizontal scaling**: Increase ``replicaCount`` in your values
 * **Vertical scaling**: Allocate more GPUs per replica
@@ -45,7 +45,7 @@ Performance & Optimization
 Q: How can I improve inference performance?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A: Several optimization strategies are available:
+Several optimization strategies are available:
 
 * **KV Cache optimization**: See :doc:`../use_cases/kv-cache-aware-routing`
 * **Prefix caching**: See :doc:`../use_cases/prefix-aware-routing`
@@ -55,7 +55,7 @@ A: Several optimization strategies are available:
 Q: What is KV cache and why does it matter?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A: KV (Key-Value) cache stores computed attention keys and values from previous tokens, enabling faster generation of subsequent tokens. Proper KV cache management significantly improves performance for:
+KV (Key-Value) cache stores computed attention keys and values from previous tokens, enabling faster generation of subsequent tokens. Proper KV cache management significantly improves performance for:
 
 * Long conversations
 * Similar prompts
@@ -64,7 +64,7 @@ A: KV (Key-Value) cache stores computed attention keys and values from previous 
 Q: How do I monitor performance?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A: Use the built-in monitoring features:
+Use the built-in monitoring features:
 
 * **Prometheus metrics**: Built-in metrics collection
 * **Distributed tracing**: See :doc:`../use_cases/distributed-tracing`
@@ -76,7 +76,7 @@ Troubleshooting
 Q: Pods are stuck in Pending state
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A: Check:
+Check:
 
 .. code-block:: bash
 
@@ -101,9 +101,9 @@ A:
 Q: How can I contribute?
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-A: See :doc:`../developer_guide/contributing` for contribution guidelines.
+See :doc:`../developer_guide/contributing` for contribution guidelines.
 
 Q: Is there a roadmap?
 ~~~~~~~~~~~~~~~~~~~~~~
 
-A: Check the GitHub repository for the latest roadmap and feature plans.
+Check the GitHub repository for the latest roadmap and feature plans.
