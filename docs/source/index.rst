@@ -59,9 +59,7 @@ Documentation
    :maxdepth: 2
    :caption: Deployment
 
-   deployment/helm
-   deployment/crd
-   deployment/gateway-inference-extension
+   deployment/index
 
 .. toctree::
    :maxdepth: 2
