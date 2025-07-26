@@ -336,7 +336,7 @@ async def send_request_to_decode(
 
     async with client.post(endpoint, json=req_data, headers=headers) as response:
         response.raise_for_status()
-        async for chunk in response.content.iter_chunked(8192):
+        async for chunk in response.content.iter_any():
             yield chunk
 
 
