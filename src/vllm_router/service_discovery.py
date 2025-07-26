@@ -384,15 +384,9 @@ class K8sServiceDiscovery(ServiceDiscovery):
     def _is_pod_terminating(pod):
         """
         Check if the pod is in terminating state by checking
-        deletion timestamp and pod phase.
+        deletion timestamp.
         """
-        # Check if pod has deletion timestamp
-        if pod.metadata.deletion_timestamp is not None:
-            return True
-        # Check if pod phase is failed or succeeded
-        if pod.status.phase in ["Failed", "Succeeded"]:
-            return True
-        return False
+        return pod.metadata.deletion_timestamp is not None
 
     def _get_engine_sleep_status(self, pod_ip) -> Optional[bool]:
         """
