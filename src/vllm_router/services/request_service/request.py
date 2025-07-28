@@ -36,7 +36,7 @@ from vllm_router.services.request_service.rewriter import (
     is_request_rewriter_initialized,
 )
 from vllm_router.utils import replace_model_in_request_body, update_content_length
-from vllm_router.services.queue_service.queue import queue_manager
+from vllm_router.services.queue_service.queue import get_queue_manager
 
 try:
     # Semantic cache integration
@@ -161,6 +161,9 @@ async def route_general_request(
     Returns:
         StreamingResponse: A response object that streams data from the backend server to the client.
     """
+    #if queue enabled?
+    queue_manager = get_queue_manager()
+    
     if isinstance(request.app.state.router, DisaggregatedPrefillRouter):
         response = await route_disaggregated_prefill_request(
             request, endpoint, background_tasks

@@ -3,14 +3,15 @@
 import asyncio
 import time
 from typing import Dict, Any, Tuple
-from vllm_router.stats.engine_stats import EngineStatsScraper
+from vllm_router.stats.engine_stats import get_engine_stats_scraper
+_global_queue_manager = None
 
 class EndpointQueueManager:
     def __init__(self, max_queue_wait_time = 10):
         self.endpoint_queues: Dict[str, asyncio.PriorityQueue] = {}
         self.conditions: Dict[str, asyncio.Condition] = {}
 
-        self.scraper = EngineStatsScraper(scrape_interval=5)
+        self.scraper = get_engine_stats_scraper()
         self.max_queue_wait_time = max_queue_wait_time
         #kept for shutdown
         self.endpoint_tasks: Dict[str, asyncio.Task] = {}
@@ -93,9 +94,9 @@ class EndpointQueueManager:
     
         except Exception as e:
             print(f"[Queue Dispatch Error] {e}")
-        finally:
+        """finally:
             async with self.conditions[endpoint_url]:
-                self.conditions[endpoint_url].notify()
+                self.conditions[endpoint_url].notify()"""
 
 
     async def _reroute_or_dispatch_stale_request(self, request: dict, original_endpoint: str):
@@ -133,7 +134,7 @@ class EndpointQueueManager:
         return 0
     
 
-    async def shutdown(self):
+    async def close(self):
         print("Shutting down scheduler...")
 
         self._shutdown_event.set()
@@ -146,4 +147,13 @@ class EndpointQueueManager:
 
         print("Scheduler shutdown complete.")
 
-queue_manager = EndpointQueueManager(max_queue_wait_time = 10)
+
+
+def initialize_queue_manager(max_queue_wait_time=10):
+    global _global_queue_manager
+    _global_queue_manager = EndpointQueueManager(max_queue_wait_time=max_queue_wait_time)
+
+def get_queue_manager() -> "EndpointQueueManager":
+    if _global_queue_manager is None:
+        raise ValueError("Queue manager not initialized")
+    return _global_queue_manager
