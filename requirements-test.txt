@@ -1,5 +1,5 @@
 faiss-cpu>=1.7.4
-huggingface-hub==0.30.0
+huggingface-hub==0.33.0
 pytest
 pytest-asyncio
 sentence-transformers>=2.2.2
