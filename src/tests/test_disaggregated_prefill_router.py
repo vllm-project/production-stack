@@ -1,3 +1,4 @@
+import time
 from typing import Dict
 
 import pytest
@@ -6,12 +7,8 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillRouter,
     LoadBalancingStrategy,
 )
-
-
-class EndpointInfo:
-    def __init__(self, url: str, model_label: str):
-        self.url = url
-        self.model_label = model_label
+from vllm_router.service_discovery import EndpointInfo
+from vllm_router.utils import SingletonABCMeta
 
 
 class RequestStats:
@@ -27,15 +24,63 @@ class Request:
 class TestDisaggregatedPrefillRouter:
     def setup_method(self):
         """Setup test fixtures before each test method."""
+        # Clear singleton instances to ensure clean state between tests
+        if DisaggregatedPrefillRouter in SingletonABCMeta._instances:
+            del SingletonABCMeta._instances[DisaggregatedPrefillRouter]
+
+        current_time = time.time()
+
         self.prefill_endpoints = [
-            EndpointInfo("http://prefill1.com", "prefill-model"),
-            EndpointInfo("http://prefill2.com", "prefill-model"),
-            EndpointInfo("http://prefill3.com", "prefill-model"),
+            EndpointInfo(
+                url="http://prefill1.com",
+                model_names=["prefill-model"],
+                Id="prefill1",
+                added_timestamp=current_time,
+                model_label="prefill-model",
+                sleep=False,
+            ),
+            EndpointInfo(
+                url="http://prefill2.com",
+                model_names=["prefill-model"],
+                Id="prefill2",
+                added_timestamp=current_time,
+                model_label="prefill-model",
+                sleep=False,
+            ),
+            EndpointInfo(
+                url="http://prefill3.com",
+                model_names=["prefill-model"],
+                Id="prefill3",
+                added_timestamp=current_time,
+                model_label="prefill-model",
+                sleep=False,
+            ),
         ]
         self.decode_endpoints = [
-            EndpointInfo("http://decode1.com", "decode-model"),
-            EndpointInfo("http://decode2.com", "decode-model"),
-            EndpointInfo("http://decode3.com", "decode-model"),
+            EndpointInfo(
+                url="http://decode1.com",
+                model_names=["decode-model"],
+                Id="decode1",
+                added_timestamp=current_time,
+                model_label="decode-model",
+                sleep=False,
+            ),
+            EndpointInfo(
+                url="http://decode2.com",
+                model_names=["decode-model"],
+                Id="decode2",
+                added_timestamp=current_time,
+                model_label="decode-model",
+                sleep=False,
+            ),
+            EndpointInfo(
+                url="http://decode3.com",
+                model_names=["decode-model"],
+                Id="decode3",
+                added_timestamp=current_time,
+                model_label="decode-model",
+                sleep=False,
+            ),
         ]
         self.all_endpoints = self.prefill_endpoints + self.decode_endpoints
 
@@ -410,12 +455,51 @@ class TestDisaggregatedPrefillRouter:
             load_balancing_strategy=LoadBalancingStrategy.ROUND_ROBIN,
         )
 
+        import time
+
+        current_time = time.time()
+
         mixed_endpoints = [
-            EndpointInfo("http://prefill1.com", "prefill-model-1"),
-            EndpointInfo("http://prefill2.com", "prefill-model-2"),
-            EndpointInfo("http://decode1.com", "decode-model-1"),
-            EndpointInfo("http://decode2.com", "decode-model-2"),
-            EndpointInfo("http://other.com", "other-model"),  # Should be ignored
+            EndpointInfo(
+                url="http://prefill1.com",
+                model_names=["prefill-model-1"],
+                Id="prefill1",
+                added_timestamp=current_time,
+                model_label="prefill-model-1",
+                sleep=False,
+            ),
+            EndpointInfo(
+                url="http://prefill2.com",
+                model_names=["prefill-model-2"],
+                Id="prefill2",
+                added_timestamp=current_time,
+                model_label="prefill-model-2",
+                sleep=False,
+            ),
+            EndpointInfo(
+                url="http://decode1.com",
+                model_names=["decode-model-1"],
+                Id="decode1",
+                added_timestamp=current_time,
+                model_label="decode-model-1",
+                sleep=False,
+            ),
+            EndpointInfo(
+                url="http://decode2.com",
+                model_names=["decode-model-2"],
+                Id="decode2",
+                added_timestamp=current_time,
+                model_label="decode-model-2",
+                sleep=False,
+            ),
+            EndpointInfo(
+                url="http://other.com",
+                model_names=["other-model"],
+                Id="other",
+                added_timestamp=current_time,
+                model_label="other-model",
+                sleep=False,
+            ),  # Should be ignored
         ]
 
         prefill_request_json = {"max_tokens": 1}
