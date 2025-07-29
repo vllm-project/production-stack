@@ -294,6 +294,8 @@ async def route_general_request(
     if not queue_manager._endpoint_is_free(server_url):
         queue_manager.register_endpoint(server_url) #if queue does not already exist
 
+        response_future = asyncio.get_event_loop().create_future()
+
         await queue_manager.enqueue(
             server_url,
             {
@@ -303,13 +305,11 @@ async def route_general_request(
                 "endpoint": endpoint,
                 "background_tasks": background_tasks
             },
-            priority=queue_manager.calculate_request_priority(request)
+            priority=queue_manager.calculate_request_priority(request),
+            result_future=response_future
         )
         
-        return JSONResponse(
-            status_code=202,
-            content={"status": "queued", "endpoint": server_url}
-        )
+        return await response_future
     else:
         logger.info(
             f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"

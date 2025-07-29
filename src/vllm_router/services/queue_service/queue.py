@@ -2,22 +2,29 @@
 
 import asyncio
 import time
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Optional
+from fastapi.responses import StreamingResponse
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
 _global_queue_manager = None
 
 class EndpointQueueManager:
-    def __init__(self, max_queue_wait_time = 10):
+    def __init__(self, max_queue_wait_time, max_running_requests, max_gpu_perc, scraper=None):
         self.endpoint_queues: Dict[str, asyncio.PriorityQueue] = {}
         self.conditions: Dict[str, asyncio.Condition] = {}
 
-        self.scraper = get_engine_stats_scraper()
+        self.scraper = scraper or get_engine_stats_scraper()
+        if self.scraper is None:
+            raise RuntimeError("Engine stats scraper not initialized.")
+        #user configurable
+        self.max_running_requests = max_running_requests
+        self.max_gpu_perc = max_gpu_perc
         self.max_queue_wait_time = max_queue_wait_time
+
         #kept for shutdown
         self.endpoint_tasks: Dict[str, asyncio.Task] = {}
         self._shutdown_event = asyncio.Event()
 
-    def register_endpoint(self, endpoint_url: str):
+    async def register_endpoint(self, endpoint_url: str):
         if endpoint_url in self.endpoint_queues:
             return #already registered
         
@@ -27,17 +34,24 @@ class EndpointQueueManager:
         self.endpoint_tasks[endpoint_url] = task
 
     async def enqueue(
-        self, endpoint_url: str, request: Dict[str, Any], priority: int = 0
+        self, endpoint_url: str, request: Dict[str, Any], 
+        priority: int = 0,
+        result_future: Optional[asyncio.Future] = None
     ):
         if self._shutdown_event.is_set():
             raise RuntimeError("Scheduler is shutting down, can't enqueue new requests.")
 
-        await self.endpoint_queues[endpoint_url].put((priority, time.time(). request))
+        if result_future:
+            request["_result_future"] = result_future
+
+        await self.endpoint_queues[endpoint_url].put((priority, time.time(), request))
         async with self.conditions[endpoint_url]:
             self.conditions[endpoint_url].notify() #request available in the queue
 
     async def _scheduler_loop(self, endpoint_url: str):
-        queue = self.queues[endpoint_url]
+        print(f"Scheduler started for {endpoint_url}")
+
+        queue = self.endpoint_queues[endpoint_url]
         condition = self.conditions[endpoint_url]
 
         try:
@@ -60,45 +74,52 @@ class EndpointQueueManager:
                 else:
                     await queue.put((priority - 1, enqueue_time, request)) #requeue w higher prio
                     async with condition:
-                        await condition.wait()  # only wake up when notified
+                        await asyncio.wait_for(condition.wait(), timeout=1.0)  # 1 second timeout
         
         except asyncio.CancelledError:
             print(f"Scheduler loop for {endpoint_url} cancelled.")
         except Exception as e:
             print(f"Error in scheduler loop ({endpoint_url}): {e}")
 
-    def _endpoint_is_free(self, endpoint_url: str) -> bool: #TODO: what stats?
+    def _endpoint_is_free(self, endpoint_url: str) -> bool: #TODO: what stats could be relevant
         """queue waits for endpoint load to decrease before dequeing waiting request"""
 
         stats = self.scraper.get_engine_stats().get(endpoint_url)
-        return stats and stats.num_running_requests < 4 and stats.gpu_cache_usage_perc < 90 #TODO: configurable?
+        return (stats 
+                and stats.num_running_requests < self.max_running_requests 
+                and stats.gpu_cache_usage_perc < self.max_gpu_perc)
 
-    async def _dispatch_and_signal(self, endpoint_url: str, req: Dict[str, Any]):
+    async def _dispatch_and_signal(self, endpoint_url: str, request: Dict[str, Any]):
         from vllm_router.services.request_service.request import process_request
 
+        result_future = request.get("_result_future")
         try:
-            
-            stream_generator = process_request(
-                req["request"], req["body"], endpoint_url,
-                req["request_id"], req["endpoint"], req["background_tasks"]
-            )
+            stream_generator = process_request(request["request"], request["body"], endpoint_url,
+                                                request["request_id"], request["endpoint"], 
+                                                request["background_tasks"], self.conditions[endpoint_url])
             headers, status_code = await anext(stream_generator)
-            headers_dict = {key: value for key, value in headers.items()}
-            headers_dict["X-Request-Id"] = request_id
-            return StreamingResponse( #TODO
+            headers_dict = dict(headers)
+            headers_dict["X-Request-Id"] = request["request_id"]
+
+            response = StreamingResponse(
                 stream_generator,
                 status_code=status_code,
                 headers=headers_dict,
-                media_type="text/event-stream",
+                media_type="text/event-stream"
             )
-    
+
+            # If this request came from the queue, fulfill the future
+
+            if result_future and not result_future.done():
+                result_future.set_result(response)
+
         except Exception as e:
-            print(f"[Queue Dispatch Error] {e}")
-        """finally:
-            async with self.conditions[endpoint_url]:
-                self.conditions[endpoint_url].notify()"""
+            if result_future and not result_future.done():
+                result_future.set_exception(e)
+            else:
+                print(f"[Queue Dispatch Error] {e}")
 
-
+        return
     async def _reroute_or_dispatch_stale_request(self, request: dict, original_endpoint: str):
         request_id = request.get("request_id")
         session_id = request.get("session_id")
@@ -149,9 +170,13 @@ class EndpointQueueManager:
 
 
 
-def initialize_queue_manager(max_queue_wait_time=10):
+def initialize_queue_manager(max_queue_wait_time=10, max_running_requests = 10, max_gpu_perc = 95,
+                             scraper=None):
     global _global_queue_manager
-    _global_queue_manager = EndpointQueueManager(max_queue_wait_time=max_queue_wait_time)
+    _global_queue_manager = EndpointQueueManager(max_queue_wait_time=max_queue_wait_time,
+                                                 max_running_requests=max_running_requests,
+                                                 max_gpu_perc=max_gpu_perc,
+                                                 scraper=scraper)
 
 def get_queue_manager() -> "EndpointQueueManager":
     if _global_queue_manager is None:

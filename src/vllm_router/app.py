@@ -170,8 +170,10 @@ def initialize_all(app: FastAPI, args):
     # Initialize singletons via custom functions.
     initialize_engine_stats_scraper(args.engine_stats_interval)
     initialize_request_stats_monitor(args.request_stats_window)
-    # queue
-    initialize_queue_manager(args.max_wait_time)
+    # Initialize queue
+    initialize_queue_manager(args.max_wait_time,
+                             args.max_running_requests,
+                             args.max_gpu_perc)
 
     if args.enable_batch_api:
         logger.info("Initializing batch API")
