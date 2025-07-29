@@ -39,7 +39,7 @@ class TestDisaggregatedPrefillRouter:
             EndpointInfo("http://decode3.com", "decode-model"),
         ]
         self.all_endpoints = self.prefill_endpoints + self.decode_endpoints
-        
+
         self.request_stats = {
             "http://prefill1.com": RequestStats(qps=10.0),
             "http://prefill2.com": RequestStats(qps=5.0),
@@ -48,7 +48,7 @@ class TestDisaggregatedPrefillRouter:
             "http://decode2.com": RequestStats(qps=3.0),
             "http://decode3.com": RequestStats(qps=12.0),
         }
-        
+
         self.mock_request = Request(headers={})
         self.mock_engine_stats = {}
 
@@ -59,10 +59,10 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model"],
             load_balancing_strategy=LoadBalancingStrategy.ROUND_ROBIN,
         )
-        
+
         # Test multiple prefill requests (max_tokens=1)
         prefill_request_json = {"max_tokens": 1}
-        
+
         results = []
         for _ in range(6):  # Test twice the number of endpoints
             result = router.route_request(
@@ -73,11 +73,11 @@ class TestDisaggregatedPrefillRouter:
                 prefill_request_json,
             )
             results.append(result)
-        
+
         # Verify round-robin behavior
         expected_sequence = [
             "http://prefill1.com",
-            "http://prefill2.com", 
+            "http://prefill2.com",
             "http://prefill3.com",
             "http://prefill1.com",
             "http://prefill2.com",
@@ -92,10 +92,10 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model"],
             load_balancing_strategy=LoadBalancingStrategy.ROUND_ROBIN,
         )
-        
+
         # Test multiple decode requests (max_tokens != 1)
         decode_request_json = {"max_tokens": 100}
-        
+
         results = []
         for _ in range(6):  # Test twice the number of endpoints
             result = router.route_request(
@@ -106,7 +106,7 @@ class TestDisaggregatedPrefillRouter:
                 decode_request_json,
             )
             results.append(result)
-        
+
         # Verify round-robin behavior
         expected_sequence = [
             "http://decode1.com",
@@ -125,10 +125,10 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model"],
             load_balancing_strategy=LoadBalancingStrategy.RANDOM,
         )
-        
+
         prefill_request_json = {"max_tokens": 1}
         decode_request_json = {"max_tokens": 100}
-        
+
         # Test prefill routing - should return one of the prefill endpoints
         prefill_results = set()
         for _ in range(20):  # Run multiple times to test randomness
@@ -140,11 +140,15 @@ class TestDisaggregatedPrefillRouter:
                 prefill_request_json,
             )
             prefill_results.add(result)
-        
+
         # Should only return prefill endpoints
-        expected_prefill_urls = {"http://prefill1.com", "http://prefill2.com", "http://prefill3.com"}
+        expected_prefill_urls = {
+            "http://prefill1.com",
+            "http://prefill2.com",
+            "http://prefill3.com",
+        }
         assert prefill_results.issubset(expected_prefill_urls)
-        
+
         # Test decode routing - should return one of the decode endpoints
         decode_results = set()
         for _ in range(20):  # Run multiple times to test randomness
@@ -156,9 +160,13 @@ class TestDisaggregatedPrefillRouter:
                 decode_request_json,
             )
             decode_results.add(result)
-        
+
         # Should only return decode endpoints
-        expected_decode_urls = {"http://decode1.com", "http://decode2.com", "http://decode3.com"}
+        expected_decode_urls = {
+            "http://decode1.com",
+            "http://decode2.com",
+            "http://decode3.com",
+        }
         assert decode_results.issubset(expected_decode_urls)
 
     def test_qps_load_balancing(self):
@@ -168,10 +176,10 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model"],
             load_balancing_strategy=LoadBalancingStrategy.QPS,
         )
-        
+
         prefill_request_json = {"max_tokens": 1}
         decode_request_json = {"max_tokens": 100}
-        
+
         # Test prefill routing - should select endpoint with lowest QPS
         result = router.route_request(
             self.all_endpoints,
@@ -182,7 +190,7 @@ class TestDisaggregatedPrefillRouter:
         )
         # http://prefill2.com has QPS=5.0, which is lowest among prefill endpoints
         assert result == "http://prefill2.com"
-        
+
         # Test decode routing - should select endpoint with lowest QPS
         result = router.route_request(
             self.all_endpoints,
@@ -201,13 +209,13 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model"],
             load_balancing_strategy=LoadBalancingStrategy.QPS,
         )
-        
+
         # Remove stats for one endpoint to simulate new endpoint
         incomplete_stats = self.request_stats.copy()
         del incomplete_stats["http://prefill1.com"]
-        
+
         prefill_request_json = {"max_tokens": 1}
-        
+
         result = router.route_request(
             self.all_endpoints,
             self.mock_engine_stats,
@@ -225,7 +233,7 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model"],
             load_balancing_strategy=LoadBalancingStrategy.ROUND_ROBIN,
         )
-        
+
         # Test prefill detection (max_tokens=1)
         prefill_request_json = {"max_tokens": 1}
         result = router.route_request(
@@ -235,8 +243,12 @@ class TestDisaggregatedPrefillRouter:
             self.mock_request,
             prefill_request_json,
         )
-        assert result in ["http://prefill1.com", "http://prefill2.com", "http://prefill3.com"]
-        
+        assert result in [
+            "http://prefill1.com",
+            "http://prefill2.com",
+            "http://prefill3.com",
+        ]
+
         # Test decode detection (max_tokens != 1)
         decode_request_json = {"max_tokens": 100}
         result = router.route_request(
@@ -246,8 +258,12 @@ class TestDisaggregatedPrefillRouter:
             self.mock_request,
             decode_request_json,
         )
-        assert result in ["http://decode1.com", "http://decode2.com", "http://decode3.com"]
-        
+        assert result in [
+            "http://decode1.com",
+            "http://decode2.com",
+            "http://decode3.com",
+        ]
+
         # Test decode detection (max_tokens=0)
         decode_request_json_zero = {"max_tokens": 0}
         result = router.route_request(
@@ -257,7 +273,11 @@ class TestDisaggregatedPrefillRouter:
             self.mock_request,
             decode_request_json_zero,
         )
-        assert result in ["http://decode1.com", "http://decode2.com", "http://decode3.com"]
+        assert result in [
+            "http://decode1.com",
+            "http://decode2.com",
+            "http://decode3.com",
+        ]
 
     def test_no_prefill_endpoints_available(self):
         """Test error handling when no prefill endpoints are available."""
@@ -266,10 +286,10 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model"],
             load_balancing_strategy=LoadBalancingStrategy.ROUND_ROBIN,
         )
-        
+
         # Only provide decode endpoints
         prefill_request_json = {"max_tokens": 1}
-        
+
         with pytest.raises(ValueError, match="No prefill endpoints available"):
             router.route_request(
                 self.decode_endpoints,  # Only decode endpoints
@@ -286,10 +306,10 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model"],
             load_balancing_strategy=LoadBalancingStrategy.ROUND_ROBIN,
         )
-        
+
         # Only provide prefill endpoints
         decode_request_json = {"max_tokens": 100}
-        
+
         with pytest.raises(ValueError, match="No decode endpoints available"):
             router.route_request(
                 self.prefill_endpoints,  # Only prefill endpoints
@@ -309,9 +329,9 @@ class TestDisaggregatedPrefillRouter:
         )
         # Manually set invalid strategy
         router.load_balancing_strategy = "invalid_strategy"
-        
+
         prefill_request_json = {"max_tokens": 1}
-        
+
         result = router.route_request(
             self.all_endpoints,
             self.mock_engine_stats,
@@ -329,10 +349,10 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model"],
             load_balancing_strategy=LoadBalancingStrategy.ROUND_ROBIN,
         )
-        
+
         prefill_request_json = {"max_tokens": 1}
         decode_request_json = {"max_tokens": 100}
-        
+
         # Make some prefill requests
         prefill_results = []
         for _ in range(2):
@@ -344,7 +364,7 @@ class TestDisaggregatedPrefillRouter:
                 prefill_request_json,
             )
             prefill_results.append(result)
-        
+
         # Make some decode requests
         decode_results = []
         for _ in range(2):
@@ -356,7 +376,7 @@ class TestDisaggregatedPrefillRouter:
                 decode_request_json,
             )
             decode_results.append(result)
-        
+
         # Continue with more prefill requests
         for _ in range(2):
             result = router.route_request(
@@ -367,7 +387,7 @@ class TestDisaggregatedPrefillRouter:
                 prefill_request_json,
             )
             prefill_results.append(result)
-        
+
         # Verify independent round-robin sequences
         expected_prefill = [
             "http://prefill1.com",  # req 0
@@ -376,10 +396,10 @@ class TestDisaggregatedPrefillRouter:
             "http://prefill1.com",  # req 3
         ]
         expected_decode = [
-            "http://decode1.com",   # req 0
-            "http://decode2.com",   # req 1
+            "http://decode1.com",  # req 0
+            "http://decode2.com",  # req 1
         ]
-        
+
         assert prefill_results == expected_prefill
         assert decode_results == expected_decode
 
@@ -390,7 +410,7 @@ class TestDisaggregatedPrefillRouter:
             decode_model_labels=["decode-model-1", "decode-model-2"],
             load_balancing_strategy=LoadBalancingStrategy.ROUND_ROBIN,
         )
-        
+
         mixed_endpoints = [
             EndpointInfo("http://prefill1.com", "prefill-model-1"),
             EndpointInfo("http://prefill2.com", "prefill-model-2"),
@@ -398,10 +418,10 @@ class TestDisaggregatedPrefillRouter:
             EndpointInfo("http://decode2.com", "decode-model-2"),
             EndpointInfo("http://other.com", "other-model"),  # Should be ignored
         ]
-        
+
         prefill_request_json = {"max_tokens": 1}
         decode_request_json = {"max_tokens": 100}
-        
+
         # Test prefill routing - should use both prefill model endpoints
         prefill_results = []
         for _ in range(4):
@@ -413,7 +433,7 @@ class TestDisaggregatedPrefillRouter:
                 prefill_request_json,
             )
             prefill_results.append(result)
-        
+
         expected_prefill = [
             "http://prefill1.com",
             "http://prefill2.com",
@@ -421,7 +441,7 @@ class TestDisaggregatedPrefillRouter:
             "http://prefill2.com",
         ]
         assert prefill_results == expected_prefill
-        
+
         # Test decode routing - should use both decode model endpoints
         decode_results = []
         for _ in range(4):
@@ -433,7 +453,7 @@ class TestDisaggregatedPrefillRouter:
                 decode_request_json,
             )
             decode_results.append(result)
-        
+
         expected_decode = [
             "http://decode1.com",
             "http://decode2.com",
