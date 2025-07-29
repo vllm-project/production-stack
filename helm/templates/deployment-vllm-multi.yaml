@@ -377,7 +377,10 @@ spec:
       {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") (hasKey $.Values "sharedPvcStorage") }}
       volumes:
       {{- end}}
-        {{- if hasKey $modelSpec "pvcStorage" }}
+        {{- if eq (toString $modelSpec.pvcStorage) "emptyDir" }}
+        - name: {{ .Release.Name }}-storage
+          emptyDir: {}
+        {{- else if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
