@@ -66,10 +66,9 @@ class ModelType(enum.Enum):
                     ],
                     "temperature": 0.0,
                     "max_tokens": 3,
-                    "max_completion_tokens": 3,
                 }
             case ModelType.completion:
-                return {"prompt": "Hello"}
+                return {"prompt": "Hello", "max_tokens": 3}
             case ModelType.embeddings:
                 return {"input": "Hello"}
             case ModelType.rerank:
