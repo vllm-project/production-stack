@@ -455,8 +455,6 @@ class TestDisaggregatedPrefillRouter:
             load_balancing_strategy=LoadBalancingStrategy.ROUND_ROBIN,
         )
 
-        import time
-
         current_time = time.time()
 
         mixed_endpoints = [
