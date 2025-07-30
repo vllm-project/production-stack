@@ -2,8 +2,7 @@
 {{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- with $ -}}
-{{- if and (hasKey $modelSpec "pvcStorage") (not (empty $modelSpec.pvcStorage)) }}
-{{- if ne (toString $modelSpec.pvcStorage) "emptyDir" }}
+{{- if and (hasKey $modelSpec "pvcStorage") (not (empty $modelSpec.pvcStorage)) (kindIs "string" $modelSpec.pvcStorage) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -27,7 +26,6 @@ spec:
     matchLabels:
       {{- toYaml $modelSpec.pvcMatchLabels | nindent 8 }}
   {{- end }}
-{{- end }}
 {{- end }}
 {{- end }}
 ---
