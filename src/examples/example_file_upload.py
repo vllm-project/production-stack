@@ -11,7 +11,7 @@ async def upload_file(server_url: str, file_path: str):
             data = {"purpose": "unknown"}
 
             async with aiohttp.ClientSession() as client:
-                async with client.post(server_url, data=data) as response:
+                async with client.post(server_url, files=files, data=data) as response:
                     if response.status == 200:
                         result = await response.json()
                         print("File uploaded successfully:", result)
