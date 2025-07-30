@@ -200,7 +200,7 @@ def is_model_healthy(url: str, model: str, model_type: str) -> bool:
                 f"{url}{model_details.value}",
                 files=files,  # multipart/form-data
                 data=data,
-                timeout=10
+                timeout=10,
             )
         else:
             # for other model types (chat, completion, etc.)
@@ -208,7 +208,7 @@ def is_model_healthy(url: str, model: str, model_type: str) -> bool:
                 f"{url}{model_details.value}",
                 headers={"Content-Type": "application/json"},
                 json={"model": model} | model_details.get_test_payload(model_type),
-                timeout=10
+                timeout=10,
             )
 
         response.raise_for_status()

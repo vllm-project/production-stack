@@ -26,8 +26,8 @@ from vllm_router.protocols import ModelCard, ModelList
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.request import (
     route_general_request,
-    route_sleep_wakeup_request,
     route_general_transcriptions,
+    route_sleep_wakeup_request,
 )
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
 from vllm_router.version import __version__
@@ -241,4 +241,6 @@ async def route_v1_audio_transcriptions(
     request: Request, background_tasks: BackgroundTasks
 ):
     """Handles audio transcription requests."""
-    return await route_general_transcriptions(request, "/v1/audio/transcriptions", background_tasks)
+    return await route_general_transcriptions(
+        request, "/v1/audio/transcriptions", background_tasks
+    )

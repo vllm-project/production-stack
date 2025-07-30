@@ -20,8 +20,7 @@ import uuid
 from typing import Optional
 
 import httpx
-
-from fastapi import BackgroundTasks, Request, UploadFile, HTTPException
+from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from requests import JSONDecodeError
 
@@ -29,14 +28,14 @@ from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillRouter,
     KvawareRouter,
-    PrefixAwareRouter
+    PrefixAwareRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
     is_request_rewriter_initialized,
 )
-from vllm_router.utils import replace_model_in_request_body,update_content_length
+from vllm_router.utils import replace_model_in_request_body, update_content_length
 
 try:
     # Semantic cache integration
@@ -511,8 +510,9 @@ async def route_sleep_wakeup_request(
                 headers={"X-Request-Id": request_id},
             )
 
+
 async def route_general_transcriptions(
-    request: Request, 
+    request: Request,
     endpoint: str,  # "/v1/audio/transcriptions"
     background_tasks: BackgroundTasks,
 ):
@@ -531,10 +531,15 @@ async def route_general_transcriptions(
         prompt: Optional[str] = form.get("prompt", None)
         response_format: Optional[str] = form.get("response_format", "json")
         temperature_str: Optional[str] = form.get("temperature", None)
-        temperature: Optional[float] = float(temperature_str) if temperature_str is not None else None
+        temperature: Optional[float] = (
+            float(temperature_str) if temperature_str is not None else None
+        )
         language: Optional[str] = form.get("language", "en")
     except KeyError as e:
-        return JSONResponse(status_code=400, content={"error": f"Invalid request: missing '{e.args[0]}' in form data."})
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Invalid request: missing '{e.args[0]}' in form data."},
+        )
 
     logger.debug("==== Enter audio_transcriptions ====")
     logger.debug("Received upload: %s (%s)", file.filename, file.content_type)
@@ -549,11 +554,16 @@ async def route_general_transcriptions(
 
     # --- 2. Service Discovery and Routing ---
     # Access singletons via request.app.state for consistent style
-    service_discovery = get_service_discovery() # This one is often still accessed directly via its get function
-    router = request.app.state.router # Access router from app.state
-    engine_stats_scraper = request.app.state.engine_stats_scraper # Access engine_stats_scraper from app.state
-    request_stats_monitor = request.app.state.request_stats_monitor # Access request_stats_monitor from app.state
-
+    service_discovery = (
+        get_service_discovery()
+    )  # This one is often still accessed directly via its get function
+    router = request.app.state.router  # Access router from app.state
+    engine_stats_scraper = (
+        request.app.state.engine_stats_scraper
+    )  # Access engine_stats_scraper from app.state
+    request_stats_monitor = (
+        request.app.state.request_stats_monitor
+    )  # Access request_stats_monitor from app.state
 
     endpoints = service_discovery.get_endpoint_info()
 
@@ -565,7 +575,9 @@ async def route_general_transcriptions(
     transcription_endpoints = [
         ep
         for ep in endpoints
-        if model == ep.model_name and ep.model_label == "transcription" and not ep.sleep # Added ep.sleep == False
+        if model == ep.model_name
+        and ep.model_label == "transcription"
+        and not ep.sleep  # Added ep.sleep == False
     ]
 
     logger.debug("====List of transcription endpoints====")
@@ -575,7 +587,8 @@ async def route_general_transcriptions(
     if not transcription_endpoints:
         logger.error("No transcription backend available for model %s", model)
         return JSONResponse(
-            status_code=404, content={"error": f"No transcription backend for model {model}"}
+            status_code=404,
+            content={"error": f"No transcription backend for model {model}"},
         )
 
     # grab the current engine and request stats
@@ -596,7 +609,7 @@ async def route_general_transcriptions(
     payload_bytes = await file.read()
     files = {"file": (file.filename, payload_bytes, file.content_type)}
 
-    data = {"model": model,"language": language}
+    data = {"model": model, "language": language}
 
     if prompt:
         data["prompt"] = prompt
@@ -616,19 +629,16 @@ async def route_general_transcriptions(
     try:
         async with request.app.state.httpx_client_wrapper() as client:
             backend_response = await client.post(
-            f"{chosen_url}{endpoint}",
-            data=data,
-            files=files,
-            timeout=300.0
-        )
+                f"{chosen_url}{endpoint}", data=data, files=files, timeout=300.0
+            )
         backend_response.raise_for_status()
 
         # --- 4. Return the response ---
         response_content = backend_response.json()
         headers = {
-                k: v
-                for k, v in backend_response.headers.items()
-                if k.lower() not in ("content-encoding", "transfer-encoding", "connection")
+            k: v
+            for k, v in backend_response.headers.items()
+            if k.lower() not in ("content-encoding", "transfer-encoding", "connection")
         }
 
         headers["X-Request-Id"] = request_id
@@ -639,7 +649,13 @@ async def route_general_transcriptions(
             headers=headers,
         )
     except httpx.HTTPStatusError as e:
-        error_content = e.response.json() if "json" in e.response.headers.get("content-type", "") else e.response.text
+        error_content = (
+            e.response.json()
+            if "json" in e.response.headers.get("content-type", "")
+            else e.response.text
+        )
         return JSONResponse(status_code=e.response.status_code, content=error_content)
     except httpx.RequestError as e:
-        return JSONResponse(status_code=503, content={"error": f"Failed to connect to backend: {e}"})
+        return JSONResponse(
+            status_code=503, content={"error": f"Failed to connect to backend: {e}"}
+        )
