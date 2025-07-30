@@ -88,6 +88,9 @@
               "requestGPUType": {
                 "type": "string"
               },
+              "priorityClassName": {
+                "type": "string"
+              },
               "pvcStorage": {
                 "type": "string"
               },

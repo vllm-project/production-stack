@@ -13,3 +13,39 @@ roleRef:
   name: {{ .Release.Name }}-pod-reader
   apiGroup: rbac.authorization.k8s.io
 {{- end }}
+
+{{- if .Values.loraController.enableLoraController }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-lora-controller
+  labels:
+    app.kubernetes.io/component: lora-controller
+    helm-release-name: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-lora-controller
+subjects:
+- kind: ServiceAccount
+  name: {{ .Release.Name }}-lora-controller
+  namespace: {{ .Release.Namespace }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-leader-election-rolebinding
+  labels:
+    app.kubernetes.io/component: leader-election
+    helm-release-name: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: {{ .Release.Name }}-lora-controller
+  namespace: {{ .Release.Namespace }}
+{{- end }}

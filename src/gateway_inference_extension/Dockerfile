@@ -20,6 +20,9 @@ WORKDIR /src
 COPY * /src
 # Clone repo and apply patch
 RUN git clone https://github.com/kubernetes-sigs/gateway-api-inference-extension.git && \
+    cd gateway-api-inference-extension && \
+    git checkout e8834c311ed599e2a99f85328cf2e0ae143402c3 && \
+    cd .. && \
     cp /src/scheduler.patch gateway-api-inference-extension/pkg/epp/scheduling/ && \
     cd gateway-api-inference-extension/pkg/epp/scheduling/ && \
     git apply scheduler.patch && \
