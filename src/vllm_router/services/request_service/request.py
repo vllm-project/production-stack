@@ -320,7 +320,7 @@ async def send_request_to_prefiller(
 
     async with client.post(endpoint, json=req_data, headers=headers) as response:
         response.raise_for_status()
-        return response
+        return await response.json()
 
 
 async def send_request_to_decode(
@@ -490,13 +490,16 @@ async def route_sleep_wakeup_request(
                 return await response.json()
         else:
             request_body = await request.body()
+            response_status = None
             if request_body:
                 req_data = json.loads(request_body)
                 async with client.post(url, json=req_data, headers=headers) as response:
                     response.raise_for_status()
+                    response_status = response.status
             else:
                 async with client.post(url, headers=headers) as response:
                     response.raise_for_status()
+                    response_status = response.status
 
             pod_name = endpoints[0].pod_name
             if endpoint == "/sleep":
@@ -505,7 +508,7 @@ async def route_sleep_wakeup_request(
                 service_discovery.remove_sleep_label(pod_name)
 
             return JSONResponse(
-                status_code=response.status,
+                status_code=response_status,
                 content={"status": "success"},
                 headers={"X-Request-Id": request_id},
             )
