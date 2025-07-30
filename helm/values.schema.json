@@ -398,6 +398,15 @@
         "replicaCount": {
           "type": "integer"
         },
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minReplicas": {"type": "integer"},
+            "maxReplicas": {"type": "integer"},
+            "targetCPUUtilizationPercentage": {"type": "integer"}
+          }
+        },
         "containerPort": {
           "type": "integer"
         },
