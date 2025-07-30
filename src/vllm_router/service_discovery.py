@@ -100,6 +100,9 @@ class EndpointInfo:
     # Pod name
     pod_name: Optional[str] = None
 
+    # Service name
+    service_name: Optional[str] = None
+
     # Namespace
     namespace: Optional[str] = None
 
@@ -107,7 +110,7 @@ class EndpointInfo:
     model_info: Dict[str, ModelInfo] = None
 
     def __str__(self):
-        return f"EndpointInfo(url={self.url}, model_names={self.model_names}, added_timestamp={self.added_timestamp}, model_label={self.model_label}, pod_name={self.pod_name}, namespace={self.namespace})"
+        return f"EndpointInfo(url={self.url}, model_names={self.model_names}, added_timestamp={self.added_timestamp}, model_label={self.model_label}, service_name={self.service_name},pod_name={self.pod_name}, namespace={self.namespace})"
 
     def get_base_models(self) -> List[str]:
         """
@@ -323,7 +326,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         return endpoint_infos
 
 
-class K8sServiceDiscovery(ServiceDiscovery):
+class K8sPodIPServiceDiscovery(ServiceDiscovery):
     def __init__(
         self,
         app,
@@ -694,6 +697,400 @@ class K8sServiceDiscovery(ServiceDiscovery):
         self.watcher_thread.join()
 
 
+class K8sServiceNameServiceDiscovery(ServiceDiscovery):
+    def __init__(
+        self,
+        app,
+        namespace: str,
+        port: str,
+        label_selector=None,
+        prefill_model_labels: List[str] | None = None,
+        decode_model_labels: List[str] | None = None,
+    ):
+        """
+        Initialize the Kubernetes service discovery module. This module
+        assumes all serving engine services are in the same namespace, listening
+        on the same port, and have the same label selector.
+
+        For the routing logic, this approach cannot perform advanced routing
+        strategies such as kvaware or PD routing. Instead, it relies on
+        Kubernetes'native service-level load-balancing mechanisms, such
+        as round-robin or session affinity-based routing.
+
+        Regarding metrics collection, the monitoring system typically scrapes vLLM
+        metrics directly from individual pods. When metrics collection is performed
+        at the service level, there is no guarantee that the collected metrics
+        correspond to the specific pod that handled a given inference request,
+        especially in multi-replica deployments.
+
+        Therefore, to ensure full functionality of the production stack including
+        accurate routing and metrics, this service discovery mechanismis recommended
+        for deployments where each service maps to a single pod(1:1 service-to-pod ratio).
+
+        It will start a daemon thread to watch the engine services and update
+        the url of the available engines.
+
+        Args:
+            namespace: the namespace of the engine services
+            port: the port of the engines
+            label_selector: the label selector of the engines
+        """
+        self.app = app
+        self.namespace = namespace
+        self.port = port
+        self.available_engines: Dict[str, EndpointInfo] = {}
+        self.available_engines_lock = threading.Lock()
+        self.label_selector = label_selector
+
+        # Init kubernetes watcher
+        try:
+            config.load_incluster_config()
+        except config.ConfigException:
+            config.load_kube_config()
+
+        self.k8s_api = client.CoreV1Api()
+        self.k8s_watcher = watch.Watch()
+
+        # Start watching engines
+        self.running = True
+        self.watcher_thread = threading.Thread(target=self._watch_engines, daemon=True)
+        self.watcher_thread.start()
+        self.prefill_model_labels = prefill_model_labels
+        self.decode_model_labels = decode_model_labels
+
+    def _check_service_ready(self, service_name, namespace):
+        endpoints = self.k8s_api.read_namespaced_endpoints(service_name, namespace)
+        if not endpoints.subsets:
+            return False
+
+        for subset in endpoints.subsets:
+            if subset.addresses:
+                return True
+        return False
+
+    def _get_engine_sleep_status(self, service_name) -> Optional[bool]:
+        """
+        Get the engine sleeping status by querying the engine's
+        '/is_sleeping' endpoint.
+
+        Args:
+            service_name: the name of the service running the engine
+
+        Returns:
+            the sleep status of the target engine
+        """
+        url = f"http://{service_name}:{self.port}/is_sleeping"
+        try:
+            headers = None
+            if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
+                logger.info("Using vllm server authentication")
+                headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            sleep = response.json()["is_sleeping"]
+            return sleep
+        except Exception as e:
+            logger.warning(
+                f"Failed to get the sleep status for engine at {url} - sleep status is set to `False`: {e}"
+            )
+            return False
+
+    def _check_engine_sleep_mode(self, service_name) -> Optional[bool]:
+        try:
+            service = self.k8s_api.read_namespaced_service(service_name, self.namespace)
+            if not service.spec.selector:
+                return False
+
+            selector = ",".join([f"{k}={v}" for k, v in service.spec.selector.items()])
+            pods = self.k8s_api.list_namespaced_pod(
+                namespace=self.namespace, label_selector=selector
+            )
+
+            if not pods.items:
+                logger.warning(
+                    f"No pods found for service {service_name} in namespace {self.namespace}"
+                )
+                return False
+
+            enable_sleep_mode = False
+            for container in pods.items[0].spec.containers:
+                if container.name == "vllm":
+                    for arg in container.command:
+                        if arg == "--enable-sleep-mode":
+                            enable_sleep_mode = True
+                            break
+            return enable_sleep_mode
+        except client.rest.ApiException as e:
+            logger.error(
+                f"Error checking if sleep-mode is enable for service {service_name}: {e}"
+            )
+            return False
+
+    def add_sleep_label(self, service_name):
+        try:
+            body = {"metadata": {"labels": {"sleeping": "true"}}}
+            self.k8s_api.patch_namespaced_service(
+                name=service_name, namespace=self.namespace, body=body
+            )
+            logger.info(f"Sleeping label added to the service: {service_name}")
+
+        except client.rest.ApiException as e:
+            logger.error(
+                f"Error adding sleeping label to the service {service_name}: {e}"
+            )
+
+    def remove_sleep_label(self, service_name):
+        try:
+            label_key = "sleeping"
+            body = {"metadata": {"labels": {label_key: None}}}
+
+            service = self.k8s_api.read_namespaced_service(
+                name=service_name, namespace=self.namespace
+            )
+            if label_key in service.metadata.labels:
+                self.k8s_api.patch_namespaced_service(
+                    name=service_name, namespace=self.namespace, body=body
+                )
+                logger.info(
+                    f"Label `sleeping=true` removed from service '{service_name}'"
+                )
+            else:
+                logger.info(
+                    f"Label `sleeping=true` not found on service '{service_name}' in namespace '{self.namespace}'"
+                )
+
+        except client.rest.ApiException as e:
+            logger.error(f"Error removing sleeping label: {e}")
+
+    def _get_model_names(self, service_name) -> List[str]:
+        """
+        Get the model names of the serving engine service by querying the service's
+        '/v1/models' endpoint.
+
+        Args:
+            service_name: the name of the service
+
+        Returns:
+            List of model names available on the serving engine, including both base models and adapters
+        """
+        url = f"http://{service_name}:{self.port}/v1/models"
+        try:
+            headers = None
+            if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
+                logger.info("Using vllm server authentication")
+                headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            models = response.json()["data"]
+
+            # Collect all model names, including both base models and adapters
+            model_names = []
+            for model in models:
+                model_id = model["id"]
+                model_names.append(model_id)
+
+            logger.info(f"Found models on service {service_name}: {model_names}")
+            return model_names
+        except Exception as e:
+            logger.error(f"Failed to get model names from {url}: {e}")
+            return []
+
+    def _get_model_info(self, service_name) -> Dict[str, ModelInfo]:
+        """
+        Get detailed model information from the serving engine service.
+
+        Args:
+            service_name: the IP name of the service
+
+        Returns:
+            Dictionary mapping model IDs to their ModelInfo objects, including parent-child relationships
+        """
+        url = f"http://{service_name}:{self.port}/v1/models"
+        try:
+            headers = None
+            if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
+                logger.info("Using vllm server authentication")
+                headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            models = response.json()["data"]
+            # Create a dictionary of model information
+            model_info = {}
+            for model in models:
+                model_id = model["id"]
+                model_info[model_id] = ModelInfo.from_dict(model)
+
+            return model_info
+        except Exception as e:
+            logger.error(f"Failed to get model info from {url}: {e}")
+            return {}
+
+    def _get_model_label(self, service) -> Optional[str]:
+        """
+        Get the model label from the service's selector.
+
+        Args:
+            service: The Kubernetes service object
+
+        Returns:
+            The model selector if found, None otherwise
+        """
+        if not service.spec.selector:
+            return None
+        return service.spec.selector.get("model")
+
+    def _watch_engines(self):
+        # TODO (ApostaC): remove the hard-coded timeouts
+
+        while self.running:
+            try:
+                for event in self.k8s_watcher.stream(
+                    self.k8s_api.list_namespaced_service,
+                    namespace=self.namespace,
+                    label_selector=self.label_selector,
+                    timeout_seconds=30,
+                ):
+                    service = event["object"]
+                    event_type = event["type"]
+                    service_name = service.metadata.name
+                    is_service_ready = self._check_service_ready(
+                        service_name, self.namespace
+                    )
+                    if is_service_ready:
+                        model_names = self._get_model_names(service_name)
+                        model_label = self._get_model_label(service)
+                    else:
+                        model_names = []
+                        model_label = None
+                    self._on_engine_update(
+                        service_name,
+                        event_type,
+                        is_service_ready,
+                        model_names,
+                        model_label,
+                    )
+            except Exception as e:
+                logger.error(f"K8s watcher error: {e}")
+                time.sleep(0.5)
+
+    def _add_engine(self, engine_name: str, model_names: List[str], model_label: str):
+        logger.info(
+            f"Discovered new serving engine {engine_name} at "
+            f"running models: {model_names}"
+        )
+
+        # Get detailed model information
+        model_info = self._get_model_info(engine_name)
+
+        # Check if engine is enabled with sleep mode and set engine sleep status
+        if self._check_engine_sleep_mode(engine_name):
+            sleep_status = self._get_engine_sleep_status(engine_name)
+        else:
+            sleep_status = False
+
+        with self.available_engines_lock:
+            self.available_engines[engine_name] = EndpointInfo(
+                url=f"http://{engine_name}:{self.port}",
+                model_names=model_names,
+                added_timestamp=int(time.time()),
+                Id=str(uuid.uuid5(uuid.NAMESPACE_DNS, engine_name)),
+                model_label=model_label,
+                sleep=sleep_status,
+                service_name=engine_name,
+                namespace=self.namespace,
+                model_info=model_info,
+            )
+            if (
+                self.prefill_model_labels is not None
+                and self.decode_model_labels is not None
+            ):
+                if model_label in self.prefill_model_labels:
+                    self.app.state.prefill_client = httpx.AsyncClient(
+                        base_url=f"http://{engine_name}:{self.port}",
+                        timeout=None,
+                    )
+                elif model_label in self.decode_model_labels:
+                    self.app.state.decode_client = httpx.AsyncClient(
+                        base_url=f"http://{engine_name}:{self.port}",
+                        timeout=None,
+                    )
+            # Store model information in the endpoint info
+            self.available_engines[engine_name].model_info = model_info
+
+    def _delete_engine(self, engine_name: str):
+        logger.info(f"Serving engine {engine_name} is deleted")
+        with self.available_engines_lock:
+            del self.available_engines[engine_name]
+
+    def _on_engine_update(
+        self,
+        engine_name: str,
+        event: str,
+        is_service_ready: bool,
+        model_names: List[str],
+        model_label: Optional[str],
+    ) -> None:
+        if event == "ADDED":
+            if not engine_name:
+                return
+
+            if not is_service_ready:
+                return
+
+            if not model_names:
+                return
+
+            self._add_engine(engine_name, model_names, model_label)
+
+        elif event == "DELETED":
+            if engine_name not in self.available_engines:
+                return
+
+            self._delete_engine(engine_name)
+
+        elif event == "MODIFIED":
+            if not engine_name:
+                return
+
+            if is_service_ready and model_names:
+                self._add_engine(engine_name, model_names, model_label)
+                return
+
+            if (
+                not is_service_ready or not model_names
+            ) and engine_name in self.available_engines:
+                self._delete_engine(engine_name)
+                return
+
+    def get_endpoint_info(self) -> List[EndpointInfo]:
+        """
+        Get the URLs of the serving engines that are available for
+        querying.
+
+        Returns:
+            a list of engine URLs
+        """
+        with self.available_engines_lock:
+            return list(self.available_engines.values())
+
+    def get_health(self) -> bool:
+        """
+        Check if the service discovery module is healthy.
+
+        Returns:
+            True if the service discovery module is healthy, False otherwise
+        """
+        return self.watcher_thread.is_alive()
+
+    def close(self):
+        """
+        Close the service discovery module.
+        """
+        self.running = False
+        self.k8s_watcher.stop()
+        self.watcher_thread.join()
+
+
 def _create_service_discovery(
     service_discovery_type: ServiceDiscoveryType, *args, **kwargs
 ) -> ServiceDiscovery:
@@ -712,7 +1109,16 @@ def _create_service_discovery(
     if service_discovery_type == ServiceDiscoveryType.STATIC:
         return StaticServiceDiscovery(*args, **kwargs)
     elif service_discovery_type == ServiceDiscoveryType.K8S:
-        return K8sServiceDiscovery(*args, **kwargs)
+        k8s_discovery_type = kwargs.pop("k8s_service_discovery_type", "pod-ip")
+        if k8s_discovery_type is None or not k8s_discovery_type.strip():
+            normalized_type = "pod-ip"
+        else:
+            normalized_type = k8s_discovery_type.strip().lower()
+
+        if normalized_type == "service-name":
+            return K8sServiceNameServiceDiscovery(*args, **kwargs)
+        else:
+            return K8sPodIPServiceDiscovery(*args, **kwargs)
     else:
         raise ValueError("Invalid service discovery type")
 

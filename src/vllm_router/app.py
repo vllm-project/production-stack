@@ -146,6 +146,7 @@ def initialize_all(app: FastAPI, args):
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
             ServiceDiscoveryType.K8S,
+            k8s_service_discovery_type=args.k8s_service_discovery_type,
             app=app,
             namespace=args.k8s_namespace,
             port=args.k8s_port,
