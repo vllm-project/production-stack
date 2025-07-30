@@ -233,12 +233,20 @@ class StaticServiceDiscovery(ServiceDiscovery):
 
     def get_unhealthy_endpoint_hashes(self) -> list[str]:
         unhealthy_endpoints = []
-        for url, model, model_type in zip(self.urls, self.models, self.model_types):
-            if utils.is_model_healthy(url, model, model_type):
-                logger.debug(f"{model} at {url} is healthy")
-            else:
-                logger.warning(f"{model} at {url} not healthy!")
-                unhealthy_endpoints.append(self.get_model_endpoint_hash(url, model))
+        try:
+            for url, model, model_type in zip(
+                self.urls, self.models, self.model_types, strict=True
+            ):
+                if utils.is_model_healthy(url, model, model_type):
+                    logger.debug(f"{model} at {url} is healthy")
+                else:
+                    logger.warning(f"{model} at {url} not healthy!")
+                    unhealthy_endpoints.append(self.get_model_endpoint_hash(url, model))
+        except ValueError:
+            logger.error(
+                "To perform health check, each model has to define a static_model_type and at least one static_backend. "
+                "Skipping health checks for now."
+            )
         return unhealthy_endpoints
 
     async def check_model_health(self):
