@@ -15,8 +15,8 @@ from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
 
-# prepare a WAV byte to prevent repeatedly generating it
 # Generate a 0.1 second silent audio file
+# This will be used for the /v1/audio/transcriptions endpoint
 _SILENT_WAV_BYTES = None
 with io.BytesIO() as wav_buffer:
     with wave.open(wav_buffer, "wb") as wf:
@@ -96,7 +96,6 @@ class ModelType(enum.Enum):
             case ModelType.score:
                 return {"encoding_format": "float", "text_1": "Test", "test_2": "Test2"}
             case ModelType.transcription:
-                # Generate a 0.1 second silent audio file
                 if _SILENT_WAV_BYTES is not None:
                     logger.debug("=====Silent WAV Bytes is being used=====")
                     return {
