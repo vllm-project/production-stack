@@ -89,6 +89,7 @@ class DynamicRouterConfig:
             service_discovery=args.service_discovery,
             static_backends=args.static_backends,
             static_models=args.static_models,
+            static_model_types=args.static_model_types,
             static_aliases=args.static_aliases,
             k8s_port=args.k8s_port,
             k8s_namespace=args.k8s_namespace,

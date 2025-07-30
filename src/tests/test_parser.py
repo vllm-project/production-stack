@@ -55,11 +55,13 @@ def test_load_initial_config_from_config_file_if_required_when_yaml_config_file_
                                 "https://endpoint1.example.com/bge-m3",
                                 "https://endpoint2.example.com/bge-m3",
                             ],
+                            "static_model_type": "embeddings",
                         },
                         "bge-reranker-v2-m3": {
                             "static_backends": [
                                 "https://endpoint3.example.com/bge-reranker-v2-m3",
                             ],
+                            "static_model_type": "rerank",
                         },
                     },
                     "static_aliases": {"text-embedding-3-small": "bge-m3"},
@@ -82,6 +84,7 @@ def test_load_initial_config_from_config_file_if_required_when_yaml_config_file_
             == "https://endpoint1.example.com/bge-m3,https://endpoint2.example.com/bge-m3,https://endpoint3.example.com/bge-reranker-v2-m3"
         )
         assert args.static_models == "bge-m3,bge-m3,bge-reranker-v2-m3"
+        assert args.static_model_types == "embeddings,embeddings,rerank"
         assert args.static_aliases == "text-embedding-3-small:bge-m3"
 
 
