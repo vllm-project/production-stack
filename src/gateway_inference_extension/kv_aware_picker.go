@@ -44,9 +44,6 @@ func NewKvAwarePicker(addr string, threshold int) *KvAwarePicker {
 
 func (p *KvAwarePicker) Name() string { return "kvaware" }
 
-// Pick selects a pod based on KV cache information when possible.
-// The current implementation falls back to a round robin policy and
-// leaves the LMCache lookup as future work.
 func (p *KvAwarePicker) Pick(ctx *types.SchedulingContext, scoredPods []*types.ScoredPod) *types.Result {
 	if len(scoredPods) == 0 {
 		return &types.Result{}
