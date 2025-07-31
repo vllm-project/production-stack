@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: production-stack-controller-manager
+  name: controller-manager
   namespace: production-stack-system
   labels:
     app.kubernetes.io/name: production-stack
@@ -86,7 +86,12 @@ spec:
             requests:
               cpu: 10m
               memory: 64Mi
-          volumeMounts: []
-      volumes: []
+          volumeMounts:
+            - name: shared-pvc-storage
+              mountPath: /data/shared-pvc-storage
+      volumes:
+        - name: shared-pvc-storage
+          persistentVolumeClaim:
+            claimName: production-stack-shared-pvc-storage-claim
       serviceAccountName: production-stack-controller-manager
       terminationGracePeriodSeconds: 10

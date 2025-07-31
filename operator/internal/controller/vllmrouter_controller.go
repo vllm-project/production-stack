@@ -194,8 +194,9 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // deploymentForVLLMRouter returns a VLLMRouter Deployment object
 func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.VLLMRouter) *appsv1.Deployment {
-	labels := map[string]string{
-		"app": router.Name,
+	labels := map[string]string{"app": router.Name}
+	for k, v := range router.Labels {
+		labels[k] = v
 	}
 
 	// Add user-defined environment variables

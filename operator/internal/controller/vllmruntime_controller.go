@@ -50,6 +50,8 @@ type VLLMRuntimeReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -150,8 +152,9 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 // deploymentForVLLMRuntime returns a VLLMRuntime Deployment object
 func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *productionstackv1alpha1.VLLMRuntime) *appsv1.Deployment {
-	labels := map[string]string{
-		"app": vllmRuntime.Name,
+	labels := map[string]string{"app": vllmRuntime.Name}
+	for k, v := range vllmRuntime.Labels {
+		labels[k] = v
 	}
 
 	// Define probes
@@ -178,11 +181,11 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 				Scheme: corev1.URISchemeHTTP,
 			},
 		},
-		InitialDelaySeconds: 240,
-		PeriodSeconds:       10,
+		InitialDelaySeconds: 300,
+		PeriodSeconds:       20,
 		TimeoutSeconds:      3,
 		SuccessThreshold:    1,
-		FailureThreshold:    3,
+		FailureThreshold:    10,
 	}
 
 	// Build command line arguments
@@ -258,6 +261,15 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 			Name:  "VLLM_USE_V1",
 			Value: "0",
 		})
+	}
+
+	if vllmRuntime.Spec.Model.EnableLoRA {
+		env = append(env,
+			corev1.EnvVar{
+				Name:  "VLLM_ALLOW_RUNTIME_LORA_UPDATING",
+				Value: "True",
+			},
+		)
 	}
 
 	// LM Cache configuration
@@ -424,6 +436,22 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 							Resources:      resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "shared-pvc-storage",
+									MountPath: "/data/shared-pvc-storage",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "shared-pvc-storage",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "production-stack-shared-pvc-storage-claim",
+								},
+							},
 						},
 					},
 				},
