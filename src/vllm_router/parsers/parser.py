@@ -94,7 +94,9 @@ def validate_args(args):
     if not (0.0 <= args.sentry_traces_sample_rate <= 1.0):
         raise ValueError("Sentry traces sample rate must be between 0.0 and 1.0.")
     if not (0.0 <= args.sentry_profile_session_sample_rate <= 1.0):
-        raise ValueError("Sentry profile session sample rate must be between 0.0 and 1.0.")
+        raise ValueError(
+            "Sentry profile session sample rate must be between 0.0 and 1.0."
+        )
 
 
 def parse_args():
