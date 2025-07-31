@@ -363,6 +363,10 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
 func (r *VLLMRouterReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, router *servingv1alpha1.VLLMRouter) bool {
+	// Compare replicas
+	if *dep.Spec.Replicas != router.Spec.Replicas {
+		return true
+	}
 	// Generate the expected deployment
 	expectedDep := r.deploymentForVLLMRouter(router)
 

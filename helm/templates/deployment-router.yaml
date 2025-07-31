@@ -7,7 +7,11 @@ metadata:
   labels:
   {{- include "chart.routerLabels" . | nindent 4 }}
 spec:
+{{- if .Values.routerSpec.autoscaling.enabled }}
+  replicas: {{ .Values.routerSpec.autoscaling.minReplicas }}
+{{- else }}
   replicas: {{ .Values.routerSpec.replicaCount }}
+{{- end }}
   {{- include "chart.routerStrategy" . | nindent 2 }}
   selector:
     matchLabels:
@@ -18,6 +22,9 @@ spec:
       {{- include "chart.routerLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ .Release.Name }}-router-service-account
+      {{- if .Values.routerSpec.priorityClassName }}
+      priorityClassName: {{ .Values.routerSpec.priorityClassName | quote }}
+      {{- end }}
       {{- if .Values.routerSpec.nodeSelectorTerms }}
       affinity:
         nodeAffinity:
@@ -115,8 +122,12 @@ spec:
           {{- end }}
           {{- if .Values.routerSpec.resources.limits }}
           limits:
+            {{- if .Values.routerSpec.resources.limits.cpu }}
             cpu: "{{ .Values.routerSpec.resources.limits.cpu }}"
+            {{- end }}
+            {{- if .Values.routerSpec.resources.limits.memory }}
             memory: "{{ .Values.routerSpec.resources.limits.memory }}"
+            {{- end }}
           {{- end }}
         {{- end }}
         ports:
@@ -126,6 +137,13 @@ spec:
             containerPort: 9000
         livenessProbe:
           initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: {{ .Values.routerSpec.containerPort }}
+        startupProbe:
+          initialDelaySeconds: 5
           periodSeconds: 5
           failureThreshold: 3
           httpGet:

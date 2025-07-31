@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from prometheus_client import Counter, Gauge, Histogram
+from prometheus_client import Counter, Histogram
 
 from vllm_router.log import init_logger
 

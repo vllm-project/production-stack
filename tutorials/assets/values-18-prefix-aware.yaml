@@ -3,7 +3,7 @@ servingEngineSpec:
   modelSpec:
   - name: "llama"
     repository: "lmcache/vllm-openai"
-    tag: "2025-05-17-v1"
+    tag: "2025-05-27-v1"
     modelURL: "meta-llama/Llama-3.2-1B-Instruct"
     replicaCount: 2
     requestCPU: 6
@@ -13,7 +13,6 @@ servingEngineSpec:
     vllmConfig:
       enablePrefixCaching: true
       maxModelLen: 16384
-      v1: 1
 
     lmcacheConfig:
       enabled: true
@@ -22,7 +21,7 @@ servingEngineSpec:
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: <your-huggingface-token>
+    hf_token: <hf-token>
 
 routerSpec:
   repository: "lmcache/lmstack-router"

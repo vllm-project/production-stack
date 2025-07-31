@@ -62,10 +62,15 @@ spec:
                     description: CredentialsSecretRef references a secret containing
                       storage credentials.
                     properties:
-                      name:
-                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          TODO: Add other useful fields. apiVersion, kind, uid?'
+                      key:
+                        description: Key in the secret containing the value
                         type: string
+                      name:
+                        description: Name of the secret
+                        type: string
+                    required:
+                    - key
+                    - name
                     type: object
                     x-kubernetes-map-type: atomic
                   maxAdapters:
@@ -121,22 +126,15 @@ spec:
                 description: VLLMApiKey defines the configuration for vLLM API key
                   authentication
                 properties:
-                  secretRef:
-                    description: Reference to a secret containing the API key
-                    properties:
-                      secretKey:
-                        description: Key in the secret containing the API key
-                        type: string
-                      secretName:
-                        description: Name of the secret
-                        type: string
-                    required:
-                    - secretKey
-                    - secretName
-                    type: object
-                  value:
-                    description: Direct API key value
+                  secretKey:
+                    description: Key in the secret containing the API key
                     type: string
+                  secretName:
+                    description: Name of the secret
+                    type: string
+                required:
+                - secretKey
+                - secretName
                 type: object
             required:
             - adapterSource
@@ -167,7 +165,6 @@ spec:
                         status.
                       maxLength: 1024
                       minLength: 1
-                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                       type: string
                     status:
                       description: Status is the status of the condition.

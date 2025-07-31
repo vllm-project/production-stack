@@ -20,22 +20,8 @@ from vllm_router import utils
 from vllm_router.version import __version__
 
 try:
-    # Semantic cache integration
-    from vllm_router.experimental.semantic_cache import (
-        GetSemanticCache,
-        enable_semantic_cache,
-        initialize_semantic_cache,
-        is_semantic_cache_enabled,
-    )
     from vllm_router.experimental.semantic_cache_integration import (
         add_semantic_cache_args,
-        check_semantic_cache,
-        semantic_cache_hit_ratio,
-        semantic_cache_hits,
-        semantic_cache_latency,
-        semantic_cache_misses,
-        semantic_cache_size,
-        store_in_semantic_cache,
     )
 
     semantic_cache_available = True
@@ -120,6 +106,12 @@ def parse_args():
         type=str,
         choices=["static", "k8s"],
         help="The service discovery type.",
+    )
+    parser.add_argument(
+        "--k8s-service-discovery-type",
+        type=str,
+        choices=["pod-ip", "service-name"],
+        help="The k8s service discovery type implementation only applies if service-discovery is specified as k8s.",
     )
     parser.add_argument(
         "--static-backends",
