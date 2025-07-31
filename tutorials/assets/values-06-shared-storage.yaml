@@ -3,7 +3,7 @@ servingEngineSpec:
   modelSpec:
   - name: "mistral"
     repository: "lmcache/vllm-openai"
-    tag: "latest"
+    tag: "latest-nightly"
     modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
     replicaCount: 2
     requestCPU: 10
@@ -13,7 +13,6 @@ servingEngineSpec:
     vllmConfig:
       enablePrefixCaching: true
       maxModelLen: 16384
-      v1: 1
 
     lmcacheConfig:
       enabled: true

@@ -1,9 +1,10 @@
 """Presidio-based PII analyzer implementation."""
 
 import logging
-import os
-import sys
 from typing import Dict, Optional, Set
+
+from ..types import PIIType
+from .base import PIIAnalysisResult, PIIAnalyzer, PIILocation
 
 # Check for dependencies
 MISSING_DEPS = []
@@ -17,17 +18,6 @@ try:
 except ImportError:
     MISSING_DEPS.append("pydantic>=2.0.0")
 
-try:
-    import numpy
-except ImportError:
-    MISSING_DEPS.append("numpy>=1.22.4,<1.25.0")
-
-try:
-    import en_core_web_sm
-    import spacy
-except ImportError:
-    MISSING_DEPS.append("spacy>=3.0.0,<3.7.0")
-    MISSING_DEPS.append("python -m spacy download en_core_web_sm")
 
 try:
     from presidio_analyzer import AnalyzerEngine
@@ -35,8 +25,6 @@ try:
 except ImportError:
     MISSING_DEPS.append("presidio-analyzer>=2.2.0")
 
-from ..types import PIIType
-from .base import PIIAnalysisResult, PIIAnalyzer, PIILocation
 
 logger = logging.getLogger(__name__)
 

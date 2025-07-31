@@ -166,15 +166,111 @@ var _ = Describe("LoraAdapterReconciler", func() {
 			})
 			Expect(err).ToNot(HaveOccurred())
 
-			By("Checking the LoraAdapter status")
-			Eventually(func() string {
+			By("Checking the LoraAdapter status shows waiting condition")
+			Eventually(func() bool {
 				var updatedAdapter productionstackv1alpha1.LoraAdapter
 				err := k8sClient.Get(ctx, loraAdapterKey, &updatedAdapter)
 				if err != nil {
-					return ""
+					return false
 				}
-				return updatedAdapter.Status.Phase
-			}, timeout, interval).Should(Equal("Pending"))
+				// Check if there's a waiting condition
+				for _, condition := range updatedAdapter.Status.Conditions {
+					if condition.Type == "WaitingForPods" && condition.Status == "True" {
+						return true
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
+
+			By("Verifying no adapters are loaded when no pods are ready")
+			var updatedAdapter productionstackv1alpha1.LoraAdapter
+			err = k8sClient.Get(ctx, loraAdapterKey, &updatedAdapter)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(updatedAdapter.Status.LoadedAdapters)).To(Equal(0))
+		})
+
+		It("Should transition from waiting to loaded when pods become ready", func() {
+			By("Reconciling the LoraAdapter with no pods initially")
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: loraAdapterKey,
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Verifying waiting condition is set")
+			Eventually(func() bool {
+				var updatedAdapter productionstackv1alpha1.LoraAdapter
+				err := k8sClient.Get(ctx, loraAdapterKey, &updatedAdapter)
+				if err != nil {
+					return false
+				}
+				for _, condition := range updatedAdapter.Status.Conditions {
+					if condition.Type == "WaitingForPods" && condition.Status == "True" {
+						return true
+					}
+				}
+				return false
+			}, timeout, interval).Should(BeTrue())
+
+			By("Creating a ready pod")
+			testPod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod-ready",
+					Namespace: namespace,
+					Labels: map[string]string{
+						"model": "llama-3-1-8b", // Match the adapter's base model
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test-container",
+							Image: "test-image",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "container-port",
+									ContainerPort: 8000,
+								},
+							},
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					PodIP: "10.0.0.1",
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, testPod)).Should(Succeed())
+
+			By("Reconciling again after pod becomes ready")
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: loraAdapterKey,
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Verifying waiting condition is cleared")
+			Eventually(func() bool {
+				var updatedAdapter productionstackv1alpha1.LoraAdapter
+				err := k8sClient.Get(ctx, loraAdapterKey, &updatedAdapter)
+				if err != nil {
+					return false
+				}
+				// Check that waiting condition is not present
+				for _, condition := range updatedAdapter.Status.Conditions {
+					if condition.Type == "WaitingForPods" {
+						return false
+					}
+				}
+				return true
+			}, timeout, interval).Should(BeTrue())
+
+			// Clean up the test pod
+			Expect(k8sClient.Delete(ctx, testPod)).Should(Succeed())
 		})
 	})
 })
