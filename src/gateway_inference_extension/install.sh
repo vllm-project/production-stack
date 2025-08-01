@@ -13,7 +13,7 @@ kubectl apply -f https://github.com/kubernetes-sigs/gateway-api-inference-extens
 helm upgrade -i --namespace kgateway-system --version $KGTW_VERSION kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --set inferenceExtension.enabled=true
 
 # Apply VLLM deployment using the VLLMRuntime CRD
-kubectl apply -f configs/vllm/vllm-runtime.yaml
+kubectl apply -f configs/vllm/gpu-deployment.yaml
 
 # Apply inference model and pool resources
 kubectl apply -f configs/inferencemodel.yaml

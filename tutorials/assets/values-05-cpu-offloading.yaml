@@ -13,13 +13,10 @@ servingEngineSpec:
     pvcAccessMode:
       - ReadWriteOnce
     vllmConfig:
-      enableChunkedPrefill: false
-      enablePrefixCaching: false
-      maxModelLen: 16384
-      v1: 1
+      maxModelLen: 32000
 
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "20"
 
-    hf_token: <YOUR HF TOKEN>
+    hf_token: <hf-token>

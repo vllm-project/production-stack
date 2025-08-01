@@ -13,7 +13,6 @@ servingEngineSpec:
     vllmConfig:
       enablePrefixCaching: true
       maxModelLen: 32000
-      v1: 1
 
     lmcacheConfig:
       enabled: true
@@ -39,7 +38,6 @@ servingEngineSpec:
     vllmConfig:
       enablePrefixCaching: true
       maxModelLen: 32000
-      v1: 1
 
     lmcacheConfig:
       enabled: true
@@ -66,7 +64,6 @@ servingEngineSpec:
     vllmConfig:
       enablePrefixCaching: true
       maxModelLen: 32000
-      v1: 1
 
     lmcacheConfig:
       enabled: true
@@ -92,7 +89,6 @@ servingEngineSpec:
     vllmConfig:
       enablePrefixCaching: true
       maxModelLen: 32000
-      v1: 1
 
     lmcacheConfig:
       enabled: true
