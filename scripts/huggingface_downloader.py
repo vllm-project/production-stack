@@ -35,7 +35,10 @@ async def download(request: DownloadRequest):
         logger.info(f"Downloading {model_id} to {target_dir}")
         os.makedirs(target_dir, exist_ok=True)
         snapshot_download(model_id, local_dir=target_dir, token=request.token)
-        return {"message": f"Successfully downloaded {model_id} to {target_dir}"}
+        return {
+            "message": f"Successfully downloaded {model_id} to {target_dir}",
+            "path": target_dir,
+        }
     except Exception as e:
         logger.exception(f"Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

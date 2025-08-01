@@ -81,6 +81,74 @@ spec:
                       memory:
                         type: string
                     type: object
+                  sidecarConfig:
+                    description: Sidecar configuration
+                    properties:
+                      args:
+                        description: Arguments for the sidecar container
+                        items:
+                          type: string
+                        type: array
+                      command:
+                        description: Command to run in the sidecar container
+                        items:
+                          type: string
+                        type: array
+                      enabled:
+                        default: false
+                        description: Enabled enables the sidecar container
+                        type: boolean
+                      env:
+                        description: Environment variables for the sidecar container
+                        items:
+                          description: EnvVar represents an environment variable
+                          properties:
+                            name:
+                              type: string
+                            value:
+                              type: string
+                          required:
+                          - name
+                          - value
+                          type: object
+                        type: array
+                      image:
+                        description: Image configuration for the sidecar
+                        properties:
+                          name:
+                            type: string
+                          pullPolicy:
+                            type: string
+                          pullSecretName:
+                            type: string
+                          registry:
+                            type: string
+                        required:
+                        - name
+                        - registry
+                        type: object
+                      mountPath:
+                        default: /data
+                        description: MountPath is the path where the shared volume
+                          will be mounted in the sidecar
+                        type: string
+                      name:
+                        default: sidecar
+                        description: Name is the name of the sidecar container
+                        type: string
+                      resources:
+                        description: Resource requirements for the sidecar container
+                        properties:
+                          cpu:
+                            type: string
+                          gpu:
+                            type: string
+                          memory:
+                            type: string
+                        type: object
+                    required:
+                    - image
+                    type: object
                 required:
                 - image
                 - resources
@@ -155,6 +223,41 @@ spec:
                     type: string
                 required:
                 - modelURL
+                type: object
+              storageConfig:
+                description: Storage configuration
+                properties:
+                  accessMode:
+                    default: ReadWriteMany
+                    description: AccessMode is the access mode for the persistent
+                      volume claim
+                    enum:
+                    - ReadWriteOnce
+                    - ReadOnlyMany
+                    - ReadWriteMany
+                    type: string
+                  enabled:
+                    default: false
+                    description: Enabled enables persistent storage
+                    type: boolean
+                  mountPath:
+                    default: /data
+                    description: MountPath is the path where the volume will be mounted
+                      in the container
+                    type: string
+                  size:
+                    default: 10Gi
+                    description: Size is the size of the persistent volume claim
+                    type: string
+                  storageClassName:
+                    description: StorageClassName is the name of the storage class
+                      to use
+                    type: string
+                  volumeName:
+                    default: pvc-storage
+                    description: VolumeName is the name of the volume (optional, will
+                      be auto-generated if not specified)
+                    type: string
                 type: object
               vllmConfig:
                 description: vLLM server configuration
