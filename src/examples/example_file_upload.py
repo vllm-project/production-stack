@@ -1,22 +1,23 @@
 import argparse
 
-import httpx
+import aiohttp
 
 
-def upload_file(server_url: str, file_path: str):
+async def upload_file(server_url: str, file_path: str):
     """Uploads a file to the production stack."""
     try:
         with open(file_path, "rb") as file:
             files = {"file": (file_path, file, "application/octet-stream")}
             data = {"purpose": "unknown"}
 
-            with httpx.Client() as client:
-                response = client.post(server_url, files=files, data=data)
-
-                if response.status_code == 200:
-                    print("File uploaded successfully:", response.json())
-                else:
-                    print("Failed to upload file:", response.text)
+            async with aiohttp.ClientSession() as client:
+                async with client.post(server_url, files=files, data=data) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        print("File uploaded successfully:", result)
+                    else:
+                        text = await response.text()
+                        print("Failed to upload file:", text)
     except Exception as e:
         print(f"Error: {e}")
 
@@ -31,7 +32,9 @@ def parse_args():
 
 
 if __name__ == "__main__":
+    import asyncio
+
     args = parse_args()
     endpoint = args.url
     file_to_upload = args.path
-    upload_file(endpoint, file_to_upload)
+    asyncio.run(upload_file(endpoint, file_to_upload))
