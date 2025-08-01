@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -227,9 +226,9 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if hasWaitingAdapters {
 		// If we have adapters waiting for pods, requeue more frequently
 		logger.Info("Some adapters are waiting for pods, requeuing with shorter interval")
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return ctrl.Result{Requeue: true}, nil
 	}
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	return ctrl.Result{Requeue: true}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -343,7 +342,7 @@ func (r *LoraAdapterReconciler) downloadHuggingFaceAdapter(ctx context.Context, 
 	}
 
 	// Download the adapter directly using command line tools
-	adapterPath := filepath.Join("/data/lora-adapters", source.AdapterName)
+	adapterPath := strings.ReplaceAll(source.AdapterName, "/", "-")
 
 	// Get the HuggingFace token from the secret
 	secret := &corev1.Secret{}
@@ -371,13 +370,17 @@ func (r *LoraAdapterReconciler) downloadHuggingFaceAdapter(ctx context.Context, 
 		"local_dir": adapterPath,
 	}
 
-	_, err = r.sendRequest(ctx, "POST", endpoint, payload, adapter)
+	body, err := r.sendRequest(ctx, "POST", endpoint, payload, adapter)
 	if err != nil {
 		return "", fmt.Errorf("failed to download adapter: %w", err)
 	}
 
 	// Update the adapter path in the spec
-	adapter.Spec.AdapterSource.AdapterPath = adapterPath
+	bodyMap := make(map[string]string)
+	if err := json.Unmarshal(body, &bodyMap); err != nil {
+		return "", fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	adapter.Spec.AdapterSource.AdapterPath = bodyMap["path"]
 	if err := r.Update(ctx, adapter); err != nil {
 		return "", fmt.Errorf("failed to update adapter path: %w", err)
 	}
