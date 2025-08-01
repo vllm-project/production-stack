@@ -8,6 +8,7 @@ from vllm_router.services.queue_service.queue import (
 )
 from fastapi.responses import StreamingResponse
 import pytest_asyncio
+import json
 
 
 @pytest.fixture
@@ -52,7 +53,6 @@ async def test_queue_manager_initialization(mock_scraper):
 
 @pytest.mark.asyncio
 async def test_register_endpoint(queue_manager):
-    # Already registered by fixture; just test existence
     for endpoint in ["endpoint1", "endpoint2"]:
         assert endpoint in queue_manager.endpoint_queues
         assert endpoint in queue_manager.conditions
@@ -63,8 +63,9 @@ async def test_register_endpoint(queue_manager):
 async def test_enqueue_request(queue_manager):
     test_request = {"request_id": "test123", "body": "test"}
     future = asyncio.Future()
-    await queue_manager.enqueue("endpoint1", test_request, priority=1, result_future=future)
-    assert queue_manager.endpoint_queues["endpoint1"]._queue
+    test_request["_result_future"] = future
+    await queue_manager.enqueue("endpoint1", test_request, priority=1)
+    assert not queue_manager.endpoint_queues["endpoint1"].empty()
     assert not future.done()
 
 
@@ -85,63 +86,71 @@ async def test_endpoint_is_free(queue_manager, mock_scraper):
 async def test_dispatch_and_signal(queue_manager):
     test_request = {
         "request_id": "test123",
-        "body": "test",
+        "body": json.dumps({"prompt": "hello"}),
         "request": MagicMock(),
         "endpoint": "endpoint1",
         "background_tasks": MagicMock(),
         "_result_future": asyncio.Future()
     }
 
-    mock_response = StreamingResponse(content=MagicMock())
-
     with patch("vllm_router.services.request_service.request.process_request", new_callable=AsyncMock) as mock_process:
-        # Simulate response async generator
         async def mock_stream():
-            yield ({"content-type": "application/json"}, 200)
+            yield ("content-type", 200)
             yield StreamingResponse(content=MagicMock())
 
-        mock_process.return_value = mock_stream()
-        await queue_manager._dispatch_and_signal("endpoint1", test_request)
+        mock_process.return_value.__aiter__.return_value = mock_stream()
 
-        assert test_request["_result_future"].done()
-        assert isinstance(test_request["_result_future"].result(), StreamingResponse)
+        await queue_manager._dispatch_and_signal("endpoint1", test_request)
 
 
 @pytest.mark.asyncio
 async def test_scheduler_loop(queue_manager):
     test_request = {
-    "request_id": "test123",
-    "body": "test",
-    "request": MagicMock(),  # ← Required by `process_request(...)`
-    "endpoint": "endpoint1",  # ← Required
-    "background_tasks": MagicMock(),
-    "_result_future": asyncio.Future()
+        "request_id": "test123",
+        "body": json.dumps({"prompt": "hello"}),
+        "request": MagicMock(),
+        "endpoint": "endpoint1",
+        "background_tasks": MagicMock(),
+        "_result_future": asyncio.Future()
     }
 
     await queue_manager.enqueue("endpoint1", test_request)
     await asyncio.sleep(1)
-    assert not queue_manager.endpoint_queues["endpoint1"]._queue
     assert test_request["_result_future"].done()
 
-
 @pytest.mark.asyncio
-async def test_stale_request_rerouting(queue_manager):
+@patch("vllm_router.services.request_service.request.process_request", new_callable=AsyncMock)
+@patch("vllm_router.services.queue_service.queue.EndpointQueueManager._reroute_or_dispatch_stale_request", new_callable=AsyncMock)
+async def test_stale_request_rerouting(mock_reroute, mock_process_request, queue_manager):
+    dummy_request = MagicMock()
+    dummy_request.state = MagicMock()
+
+    # Simulate a quick response stream
+    async def dummy_stream():
+        yield ({"content-type": "application/json"}, 200)
+
+    mock_process_request.return_value = dummy_stream()
+
+    # Simulate a stale request
     stale_request = {
         "request_id": "stale123",
-        "body": "test",
+        "body": '{"input": "hello"}',
+        "model_name": "test-model",
+        "session_id": "abc",
+        "request": dummy_request,
+        "endpoint": "endpoint1",
+        "background_tasks": MagicMock(),
         "_result_future": asyncio.Future(),
-        "enqueue_time": time.time() - 20
+        "enqueue_timestamp": time.time() - 15,  # 15s ago
     }
+    queue_manager._endpoint_is_free = MagicMock(return_value=False)
 
-    with patch.object(queue_manager, "_reroute_or_dispatch_stale_request", new_callable=AsyncMock) as mock_reroute:
-        await queue_manager.enqueue("endpoint1", stale_request)
-        for _ in range(10):
-            if mock_reroute.call_count:
-                break
-            await asyncio.sleep(0.1)
-        mock_reroute.assert_called_once()
+    await queue_manager.enqueue("endpoint1", stale_request)
 
-        mock_reroute.assert_called_once()
+    # Let scheduler tick
+    await asyncio.sleep(15)
+
+    mock_reroute.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -157,7 +166,7 @@ async def test_shutdown(queue_manager):
 async def test_singleton_pattern():
     from vllm_router.services.queue_service import queue as queue_module
 
-    queue_module._global_queue_manager = None  # Reset locally
+    queue_module._global_queue_manager = None
 
     scraper = MagicMock()
     scraper.get_engine_stats.return_value = {

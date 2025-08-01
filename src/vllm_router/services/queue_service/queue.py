@@ -5,6 +5,7 @@ import time
 from typing import Dict, Any, Optional
 from fastapi.responses import StreamingResponse
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
+from threading import Lock
 _global_queue_manager = None
 
 class EndpointQueueManager:
@@ -19,6 +20,10 @@ class EndpointQueueManager:
         self.max_running_requests = max_running_requests
         self.max_gpu_perc = max_gpu_perc
         self.max_queue_wait_time = max_queue_wait_time
+
+        #stale request round-robin fallback strategy
+        self.req_id = 0
+        self._lock = Lock()
 
         #kept for shutdown
         self.endpoint_tasks: Dict[str, asyncio.Task] = {}
@@ -35,14 +40,11 @@ class EndpointQueueManager:
 
     async def enqueue(
         self, endpoint_url: str, request: Dict[str, Any], 
-        priority: int = 0,
-        result_future: Optional[asyncio.Future] = None
+        priority: int = 0
     ):
         if self._shutdown_event.is_set():
             raise RuntimeError("Scheduler is shutting down, can't enqueue new requests.")
 
-        if result_future:
-            request["_result_future"] = result_future
 
         await self.endpoint_queues[endpoint_url].put((priority, time.time(), request))
         async with self.conditions[endpoint_url]:
@@ -60,26 +62,42 @@ class EndpointQueueManager:
                     await condition.wait_for(lambda: not queue.empty())
 
                 try:
-                    priority, enqueue_time, request = queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    continue
+                    # Peek at the top of the queue without removing
+                    priority, enqueue_time, request = queue._queue[0]
+                except IndexError:
+                    continue  # queue is empty
 
-                wait_duration = time.time() - enqueue_time #stale request logic
-                if wait_duration > self.max_queue_wait_time:
-                    await self._reroute_or_dispatch_stale_request(request, endpoint_url)
-                    continue
 
                 if self._endpoint_is_free(endpoint_url):
-                    asyncio.create_task(self._dispatch_and_signal(endpoint_url, request))
-                else:
-                    await queue.put((priority - 1, enqueue_time, request)) #requeue w higher prio
-                    async with condition:
-                        await asyncio.wait_for(condition.wait(), timeout=1.0)  # 1 second timeout
-        
+                    try:
+                        _, _, request = queue.get_nowait()
+                        print("Routing request")
+                        asyncio.create_task(self._dispatch_and_signal(endpoint_url, request))
+                    except Exception as e:
+                        print(f"[Dispatch error] {e}")
+                    continue
+            
+                wait_duration = time.time() - enqueue_time
+                print(f"Request waited {wait_duration:.2f}s, threshold is {self.max_queue_wait_time}s")
+                if wait_duration > self.max_queue_wait_time:
+                    # Dequeue and reroute
+                    try:
+                        _, _, stale_request = queue.get_nowait()
+                        await self._reroute_or_dispatch_stale_request(stale_request, endpoint_url)
+                    except Exception as e:
+                        print(f"[Stale reroute error] {e}")
+                    continue
+            
+                # Endpoint not free and not stale → yield loop
+                await asyncio.sleep(0.05)
+
         except asyncio.CancelledError:
             print(f"Scheduler loop for {endpoint_url} cancelled.")
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"Error in scheduler loop ({endpoint_url}): {e}")
+
 
     def _endpoint_is_free(self, endpoint_url: str) -> bool: #TODO: what stats could be relevant
         """queue waits for endpoint load to decrease before dequeing waiting request"""
@@ -125,33 +143,41 @@ class EndpointQueueManager:
         session_id = request.get("session_id")
         model = request.get("model_name")
 
-        # TODO: Use KV cache hit estimation in future
-        has_session_affinity = session_id and self._session_matches_endpoint(session_id, original_endpoint)
+        # TODO: Use KV cache hit estimation in future, session aware id
 
-        if not has_session_affinity:
-            new_endpoint = self.find_best_endpoint(model_name=model, exclude=[original_endpoint])
+        if True: #replace with conditionals, move to different ep
+            priority = max(0, self.calculate_request_priority(request) - 1) #priority is boosted
+            new_endpoint = self.find_new_endpoint(exclude=original_endpoint)
             if new_endpoint and new_endpoint != original_endpoint:
                 print(f"[Rerouting] Request {request_id} → {new_endpoint} (was {original_endpoint})")
 
                 if self._endpoint_is_free(new_endpoint):
                     asyncio.create_task(self._dispatch_and_signal(new_endpoint, request))
                 else:
-                    queue = self.endpoint_queues[new_endpoint]
-                    async with self.conditions[new_endpoint]:
-                        await queue.put((self.calculate_request_priority(request), time.time(), request))
-                        self.conditions[new_endpoint].notify()
+                    self.enqueue(new_endpoint, request, priority)
                 return
 
-        # Session matches → keep on original endpoint
+        # keep on original endpoint
         print(f"[Requeue] Request {request_id} stays at {original_endpoint}")
         queue = self.endpoint_queues[original_endpoint]
         async with self.conditions[original_endpoint]:
-            await queue.put((self.calculate_request_priority(request) - 1, time.time(), request))
-            self.conditions[original_endpoint].notify()
+            self.enqueue(original_endpoint, request, priority)
 
 
+    def find_new_endpoint(self, exclude: str) -> str: #TODO: get currently used router and pass in list of endpoints
+        #excluding orig endpoint to preserve routing strategy
+        endpoints = [ep for ep in self.endpoint_queues.keys() if ep!=exclude]
 
-    def calculate_request_priority(self, request) -> int:
+        if not endpoints:
+            return exclude
+
+        with self._lock:
+            chosen = sorted(endpoints, key=lambda e:e)[self.req % len(endpoints)]
+            self.req_id += 1
+        return chosen
+        
+
+    def calculate_request_priority(self, request) -> int: #TODO
         return 0
     
 

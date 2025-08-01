@@ -303,10 +303,10 @@ async def route_general_request(
                 "request_id": request_id,
                 "body": request_body,
                 "endpoint": endpoint,
-                "background_tasks": background_tasks
+                "background_tasks": background_tasks,
+                "result_future":response_future
             },
-            priority=queue_manager.calculate_request_priority(request),
-            result_future=response_future
+            priority=queue_manager.calculate_request_priority(request)
         )
         
         return await response_future
