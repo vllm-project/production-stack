@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: loraadapter-sample
 spec:
-  baseModel: "llama3-8b-instr" # Use the model name with your specified model name in engineSpec
+  baseModel: "Llama-3.1-8B-Instruct" # Use the model name with your specified model label in vllmruntime
   # If you want to use vllm api key, uncomment the following section, you can either use secret or directly set the value
   # Option 1: Secret reference
   # vllmApiKey:
@@ -17,9 +17,12 @@ spec:
   # vllmApiKey:
   #   value: "abc123"
   adapterSource:
-    type: "local" # (local, huggingface, s3) for now we only support local
+    type: "huggingface" # (local, huggingface)
     adapterName: "llama-3.1-nemoguard-8b-topic-control" # This will be the adapter ID
-    adapterPath: "/data/lora-adapters/llama-3.1-nemoguard-8b-topic-control" # This will be the path to the adapter in the persistent volume
+    repository: "nvidia/llama-3.1-nemoguard-8b-topic-control"
+    credentialsSecretRef:
+      name: "huggingface-credentials"
+      key: "hf_token"
   loraAdapterDeploymentConfig:
     algorithm: "default" # for now we only support default algorithm
     replicas: 1 # if not specified, by default algorithm, the lora adapter will be applied to all llama3-8b models, if specified, the lora adapter will only be applied to the specified number of replicas

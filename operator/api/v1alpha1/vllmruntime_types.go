@@ -40,6 +40,9 @@ type DeploymentConfig struct {
 
 	// Image configuration
 	Image ImageSpec `json:"image"`
+
+	// Sidecar configuration
+	SidecarConfig SidecarConfig `json:"sidecarConfig,omitempty"`
 }
 
 // VLLMRuntimeSpec defines the desired state of VLLMRuntime
@@ -52,6 +55,9 @@ type VLLMRuntimeSpec struct {
 
 	// LM Cache configuration
 	LMCacheConfig LMCacheConfig `json:"lmCacheConfig,omitempty"`
+
+	// Storage configuration
+	StorageConfig StorageConfig `json:"storageConfig,omitempty"`
 
 	// Deployment configuration
 	DeploymentConfig DeploymentConfig `json:"deploymentConfig"`
@@ -137,6 +143,63 @@ type LMCacheConfig struct {
 
 	// RemoteSerde is the serialization format for the remote cache
 	RemoteSerde string `json:"remoteSerde,omitempty"`
+}
+
+// StorageConfig defines the storage configuration
+type StorageConfig struct {
+	// Enabled enables persistent storage
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+
+	// StorageClassName is the name of the storage class to use
+	StorageClassName string `json:"storageClassName,omitempty"`
+
+	// Size is the size of the persistent volume claim
+	// +kubebuilder:default="10Gi"
+	Size string `json:"size,omitempty"`
+
+	// AccessMode is the access mode for the persistent volume claim
+	// +kubebuilder:default=ReadWriteMany
+	// +kubebuilder:validation:Enum=ReadWriteOnce;ReadOnlyMany;ReadWriteMany
+	AccessMode string `json:"accessMode,omitempty"`
+
+	// MountPath is the path where the volume will be mounted in the container
+	// +kubebuilder:default="/data"
+	MountPath string `json:"mountPath,omitempty"`
+
+	// VolumeName is the name of the volume (optional, will be auto-generated if not specified)
+	// +kubebuilder:default="pvc-storage"
+	VolumeName string `json:"volumeName,omitempty"`
+}
+
+// SidecarConfig defines the sidecar container configuration
+type SidecarConfig struct {
+	// Enabled enables the sidecar container
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Name is the name of the sidecar container
+	// +kubebuilder:default="sidecar"
+	Name string `json:"name,omitempty"`
+
+	// Image configuration for the sidecar
+	Image ImageSpec `json:"image"`
+
+	// Command to run in the sidecar container
+	Command []string `json:"command,omitempty"`
+
+	// Arguments for the sidecar container
+	Args []string `json:"args,omitempty"`
+
+	// Environment variables for the sidecar container
+	Env []EnvVar `json:"env,omitempty"`
+
+	// Resource requirements for the sidecar container
+	Resources ResourceRequirements `json:"resources,omitempty"`
+
+	// MountPath is the path where the shared volume will be mounted in the sidecar
+	// +kubebuilder:default="/data"
+	MountPath string `json:"mountPath,omitempty"`
 }
 
 // EnvVar represents an environment variable
