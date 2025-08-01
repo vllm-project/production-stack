@@ -50,6 +50,7 @@ type VLLMRuntimeReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -105,6 +106,43 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	// Handle PVC if storage is enabled
+	if vllmRuntime.Spec.StorageConfig.Enabled {
+		// Check if the PVC already exists, if not create a new one
+		foundPVC := &corev1.PersistentVolumeClaim{}
+		err = r.Get(ctx, types.NamespacedName{Name: vllmRuntime.Name, Namespace: vllmRuntime.Namespace}, foundPVC)
+		if err != nil && errors.IsNotFound(err) {
+			// Define a new PVC
+			pvc := r.pvcForVLLMRuntime(vllmRuntime)
+			log.Info("Creating a new PVC", "PVC.Namespace", pvc.Namespace, "PVC.Name", pvc.Name)
+			err = r.Create(ctx, pvc)
+			if err != nil {
+				log.Error(err, "Failed to create new PVC", "PVC.Namespace", pvc.Namespace, "PVC.Name", pvc.Name)
+				return ctrl.Result{}, err
+			}
+			// PVC created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		} else if err != nil {
+			log.Error(err, "Failed to get PVC")
+			return ctrl.Result{}, err
+		}
+
+		// Update the PVC if needed
+		if r.pvcNeedsUpdate(foundPVC, vllmRuntime) {
+			log.Info("Updating PVC", "PVC.Namespace", foundPVC.Namespace, "PVC.Name", foundPVC.Name)
+			// Create new PVC spec
+			newPVC := r.pvcForVLLMRuntime(vllmRuntime)
+
+			err = r.Update(ctx, newPVC)
+			if err != nil {
+				log.Error(err, "Failed to update PVC", "PVC.Namespace", foundPVC.Namespace, "PVC.Name", foundPVC.Name)
+				return ctrl.Result{}, err
+			}
+			// PVC updated successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		}
+	}
+
 	// Check if the deployment already exists, if not create a new one
 	found := &appsv1.Deployment{}
 	err = r.Get(ctx, types.NamespacedName{Name: vllmRuntime.Name, Namespace: vllmRuntime.Namespace}, found)
@@ -150,8 +188,9 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 // deploymentForVLLMRuntime returns a VLLMRuntime Deployment object
 func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *productionstackv1alpha1.VLLMRuntime) *appsv1.Deployment {
-	labels := map[string]string{
-		"app": vllmRuntime.Name,
+	labels := map[string]string{"app": vllmRuntime.Name}
+	for k, v := range vllmRuntime.Labels {
+		labels[k] = v
 	}
 
 	// Define probes
@@ -178,11 +217,11 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 				Scheme: corev1.URISchemeHTTP,
 			},
 		},
-		InitialDelaySeconds: 240,
-		PeriodSeconds:       10,
+		InitialDelaySeconds: 300,
+		PeriodSeconds:       20,
 		TimeoutSeconds:      3,
 		SuccessThreshold:    1,
-		FailureThreshold:    3,
+		FailureThreshold:    10,
 	}
 
 	// Build command line arguments
@@ -258,6 +297,15 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 			Name:  "VLLM_USE_V1",
 			Value: "0",
 		})
+	}
+
+	if vllmRuntime.Spec.Model.EnableLoRA {
+		env = append(env,
+			corev1.EnvVar{
+				Name:  "VLLM_ALLOW_RUNTIME_LORA_UPDATING",
+				Value: "True",
+			},
+		)
 	}
 
 	// LM Cache configuration
@@ -388,6 +436,61 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 		})
 	}
 
+	// Build volumes and volume mounts if storage is enabled
+	var volumes []corev1.Volume
+	var volumeMounts []corev1.VolumeMount
+
+	if vllmRuntime.Spec.StorageConfig.Enabled {
+		volumeName := "pvc-storage"
+		if vllmRuntime.Spec.StorageConfig.VolumeName != "" {
+			volumeName = vllmRuntime.Spec.StorageConfig.VolumeName
+		}
+
+		mountPath := "/data"
+		if vllmRuntime.Spec.StorageConfig.MountPath != "" {
+			mountPath = vllmRuntime.Spec.StorageConfig.MountPath
+		}
+
+		volumes = append(volumes, corev1.Volume{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: vllmRuntime.Name,
+				},
+			},
+		})
+
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      volumeName,
+			MountPath: mountPath,
+		})
+	}
+
+	containers := []corev1.Container{
+		{
+			Name:            "vllm",
+			Image:           image,
+			ImagePullPolicy: imagePullPolicy,
+			Command:         []string{"/opt/venv/bin/vllm", "serve"},
+			Args:            args,
+			Env:             env,
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: vllmRuntime.Spec.VLLMConfig.Port,
+				},
+			},
+			Resources:      resources,
+			VolumeMounts:   volumeMounts,
+			ReadinessProbe: readinessProbe,
+			LivenessProbe:  livenessProbe,
+		},
+	}
+
+	if vllmRuntime.Spec.DeploymentConfig.SidecarConfig.Enabled {
+		containers = append(containers, r.buildSidecarContainer(vllmRuntime))
+	}
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      vllmRuntime.Name,
@@ -407,25 +510,8 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 				},
 				Spec: corev1.PodSpec{
 					ImagePullSecrets: imagePullSecrets,
-					Containers: []corev1.Container{
-						{
-							Name:            "vllm",
-							Image:           image,
-							ImagePullPolicy: imagePullPolicy,
-							Command:         []string{"/opt/venv/bin/vllm", "serve"},
-							Args:            args,
-							Env:             env,
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "http",
-									ContainerPort: vllmRuntime.Spec.VLLMConfig.Port,
-								},
-							},
-							Resources:      resources,
-							ReadinessProbe: readinessProbe,
-							LivenessProbe:  livenessProbe,
-						},
-					},
+					Volumes:          volumes,
+					Containers:       containers,
 				},
 			},
 		},
@@ -434,6 +520,104 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 	// Set the owner reference
 	ctrl.SetControllerReference(vllmRuntime, dep, r.Scheme)
 	return dep
+}
+
+// buildSidecarContainer builds the sidecar container configuration
+func (r *VLLMRuntimeReconciler) buildSidecarContainer(vllmRuntime *productionstackv1alpha1.VLLMRuntime) corev1.Container {
+	sidecarConfig := vllmRuntime.Spec.DeploymentConfig.SidecarConfig
+
+	// Build sidecar volume mounts
+	var sidecarVolumeMounts []corev1.VolumeMount
+
+	mountPath := "/data"
+
+	// Add shared storage volume mount if storage is enabled
+	if vllmRuntime.Spec.StorageConfig.Enabled {
+		volumeName := "pvc-storage"
+		if vllmRuntime.Spec.StorageConfig.VolumeName != "" {
+			volumeName = vllmRuntime.Spec.StorageConfig.VolumeName
+		}
+
+		if sidecarConfig.MountPath != "" {
+			mountPath = sidecarConfig.MountPath
+		}
+
+		sidecarVolumeMounts = append(sidecarVolumeMounts, corev1.VolumeMount{
+			Name:      volumeName,
+			MountPath: mountPath,
+		})
+	}
+
+	// Build sidecar environment variables
+	var sidecarEnv []corev1.EnvVar
+	sidecarEnv = append(sidecarEnv, corev1.EnvVar{
+		Name:  "PORT",
+		Value: "30090",
+	})
+	sidecarEnv = append(sidecarEnv, corev1.EnvVar{
+		Name:  "LORA_DOWNLOAD_BASE_DIR",
+		Value: mountPath + "/lora-adapters",
+	})
+	for _, envVar := range sidecarConfig.Env {
+		sidecarEnv = append(sidecarEnv, corev1.EnvVar{
+			Name:  envVar.Name,
+			Value: envVar.Value,
+		})
+	}
+
+	// Build sidecar resources
+	sidecarResources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{},
+		Limits:   corev1.ResourceList{},
+	}
+
+	if sidecarConfig.Resources.CPU != "" {
+		sidecarResources.Requests[corev1.ResourceCPU] = resource.MustParse(sidecarConfig.Resources.CPU)
+		sidecarResources.Limits[corev1.ResourceCPU] = resource.MustParse(sidecarConfig.Resources.CPU)
+	} else {
+		sidecarResources.Requests[corev1.ResourceCPU] = resource.MustParse("0.5")
+		sidecarResources.Limits[corev1.ResourceCPU] = resource.MustParse("0.5")
+	}
+
+	if sidecarConfig.Resources.Memory != "" {
+		sidecarResources.Requests[corev1.ResourceMemory] = resource.MustParse(sidecarConfig.Resources.Memory)
+		sidecarResources.Limits[corev1.ResourceMemory] = resource.MustParse(sidecarConfig.Resources.Memory)
+	} else {
+		sidecarResources.Requests[corev1.ResourceMemory] = resource.MustParse("128Mi")
+		sidecarResources.Limits[corev1.ResourceMemory] = resource.MustParse("128Mi")
+	}
+
+	if sidecarConfig.Resources.GPU != "" {
+		gpuResource := resource.MustParse(sidecarConfig.Resources.GPU)
+		sidecarResources.Requests["nvidia.com/gpu"] = gpuResource
+		sidecarResources.Limits["nvidia.com/gpu"] = gpuResource
+	} else {
+		sidecarResources.Requests["nvidia.com/gpu"] = resource.MustParse("0")
+		sidecarResources.Limits["nvidia.com/gpu"] = resource.MustParse("0")
+	}
+
+	// Get sidecar image
+	sidecarImage := sidecarConfig.Image.Registry + "/" + sidecarConfig.Image.Name
+
+	// Get sidecar image pull policy
+	sidecarImagePullPolicy := corev1.PullIfNotPresent
+	if sidecarConfig.Image.PullPolicy != "" {
+		sidecarImagePullPolicy = corev1.PullPolicy(sidecarConfig.Image.PullPolicy)
+	}
+
+	// Build sidecar container
+	sidecarContainer := corev1.Container{
+		Name:            sidecarConfig.Name,
+		Image:           sidecarImage,
+		ImagePullPolicy: sidecarImagePullPolicy,
+		Command:         sidecarConfig.Command,
+		Args:            sidecarConfig.Args,
+		Env:             sidecarEnv,
+		Resources:       sidecarResources,
+		VolumeMounts:    sidecarVolumeMounts,
+	}
+
+	return sidecarContainer
 }
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
@@ -551,8 +735,9 @@ func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *production
 
 // serviceForVLLMRuntime returns a VLLMRuntime Service object
 func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *productionstackv1alpha1.VLLMRuntime) *corev1.Service {
-	labels := map[string]string{
-		"app": vllmRuntime.Name,
+	labels := map[string]string{"app": vllmRuntime.Name}
+	for k, v := range vllmRuntime.Labels {
+		labels[k] = v
 	}
 
 	svc := &corev1.Service{
@@ -591,11 +776,78 @@ func (r *VLLMRuntimeReconciler) serviceNeedsUpdate(svc *corev1.Service, vr *prod
 	return false
 }
 
+// pvcForVLLMRuntime returns a VLLMRuntime PVC object
+func (r *VLLMRuntimeReconciler) pvcForVLLMRuntime(vllmRuntime *productionstackv1alpha1.VLLMRuntime) *corev1.PersistentVolumeClaim {
+	labels := map[string]string{"app": vllmRuntime.Name}
+	for k, v := range vllmRuntime.Labels {
+		labels[k] = v
+	}
+
+	// Set default values if not specified
+	accessMode := corev1.ReadWriteOnce
+	if vllmRuntime.Spec.StorageConfig.AccessMode != "" {
+		switch vllmRuntime.Spec.StorageConfig.AccessMode {
+		case "ReadWriteOnce":
+			accessMode = corev1.ReadWriteOnce
+		case "ReadOnlyMany":
+			accessMode = corev1.ReadOnlyMany
+		case "ReadWriteMany":
+			accessMode = corev1.ReadWriteMany
+		}
+	}
+
+	size := "10Gi"
+	if vllmRuntime.Spec.StorageConfig.Size != "" {
+		size = vllmRuntime.Spec.StorageConfig.Size
+	}
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      vllmRuntime.Name,
+			Namespace: vllmRuntime.Namespace,
+			Labels:    labels,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{accessMode},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse(size),
+				},
+			},
+		},
+	}
+
+	// Add storage class if specified
+	if vllmRuntime.Spec.StorageConfig.StorageClassName != "" {
+		pvc.Spec.StorageClassName = &vllmRuntime.Spec.StorageConfig.StorageClassName
+	}
+
+	// Set the owner reference
+	ctrl.SetControllerReference(vllmRuntime, pvc, r.Scheme)
+	return pvc
+}
+
+// pvcNeedsUpdate checks if the PVC needs to be updated
+func (r *VLLMRuntimeReconciler) pvcNeedsUpdate(pvc *corev1.PersistentVolumeClaim, vr *productionstackv1alpha1.VLLMRuntime) bool {
+	// Compare storage size
+	expectedSize := "10Gi"
+	if vr.Spec.StorageConfig.Size != "" {
+		expectedSize = vr.Spec.StorageConfig.Size
+	}
+	actualSize := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+	if expectedSize != actualSize.String() {
+		return true
+	}
+
+	return false
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *VLLMRuntimeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&productionstackv1alpha1.VLLMRuntime{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }
