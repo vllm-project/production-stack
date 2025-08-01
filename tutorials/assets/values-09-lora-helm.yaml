@@ -44,14 +44,9 @@ servingEngineSpec:
       pvcStorage: "10Gi"
       pvcAccessMode:
         - ReadWriteOnce
-
-# Shared storage for LoRA adapters
-sharedPvcStorage:
-  size: "10Gi"
-  storageClass: "standard"
-  accessModes:
-    - ReadWriteMany
-  hostPath: "/data/shared-pvc-storage"
+  sidecar:
+    image: "lmcache/lmstack-sidecar:latest"
+    imagePullPolicy: "Always"
 
 # Enable the lora controller (required for LoRA adapters)
 loraController:
