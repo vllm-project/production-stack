@@ -52,6 +52,7 @@ class ModelType(enum.Enum):
     embeddings = "/v1/embeddings"
     rerank = "/v1/rerank"
     score = "/v1/score"
+    vision = "/v1/chat/completions"
 
     @staticmethod
     def get_test_payload(model_type: str):
@@ -76,6 +77,26 @@ class ModelType(enum.Enum):
                 return {"query": "Hello", "documents": ["Test"]}
             case ModelType.score:
                 return {"encoding_format": "float", "text_1": "Test", "test_2": "Test2"}
+            case ModelType.vision:
+                return {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "This is a test. Just reply with yes",
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": "data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAG0lEQVR4nGLinfJq851wJn69udZSvIAAAAD//yf3BLKCfW8HAAAAAElFTkSuQmCC"
+                                    },
+                                },
+                            ],
+                        }
+                    ]
+                }
 
     @staticmethod
     def get_all_fields():
