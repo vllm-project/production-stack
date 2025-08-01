@@ -91,6 +91,12 @@ def validate_args(args):
         raise ValueError("Engine stats interval must be greater than 0.")
     if args.request_stats_window <= 0:
         raise ValueError("Request stats window must be greater than 0.")
+    if not (0.0 <= args.sentry_traces_sample_rate <= 1.0):
+        raise ValueError("Sentry traces sample rate must be between 0.0 and 1.0.")
+    if not (0.0 <= args.sentry_profile_session_sample_rate <= 1.0):
+        raise ValueError(
+            "Sentry profile session sample rate must be between 0.0 and 1.0."
+        )
 
 
 def parse_args():
@@ -296,6 +302,20 @@ def parse_args():
         "--sentry-dsn",
         type=str,
         help="Enables Sentry Error Reporting to the specified Data Source Name",
+    )
+
+    parser.add_argument(
+        "--sentry-traces-sample-rate",
+        type=float,
+        default=0.1,
+        help="The sample rate for Sentry traces. Default is 0.1 (10%)",
+    )
+
+    parser.add_argument(
+        "--sentry-profile-session-sample-rate",
+        type=float,
+        default=1.0,
+        help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%)",
     )
 
     parser.add_argument(
