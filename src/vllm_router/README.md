@@ -150,3 +150,43 @@ The response will be a JSON object with the current dynamic config.
     "dynamic_config": <current_dynamic_config (JSON object)>
 }
 ```
+
+## Granian Server
+
+This extension provides a Granian server implementation for vLLM Router that supports better parallelism and improved performance.
+
+### Usage
+
+Instead of running the standard FastAPI server with Uvicorn, use the Granian frontend:
+
+```bash
+python -m vllm_router.granian_frontend \
+    --service-discovery static \
+    --static-backends http://localhost:8000 \
+    --static-models llama-2-7b \
+    --routing-logic roundrobin \
+    --port 8001 \
+    --granian-threads 8 \
+    --granian-loop auto \
+    --granian-log-level info
+```
+
+### Configuration Options
+
+In addition to all standard vLLM Router options, the Granian server supports these specific parameters:
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--granian-threads` | Number of runtime threads | 8 |
+| `--granian-loop` | Event loop implementation (`auto`, `asyncio`, or `uvloop`) | `auto` |
+| `--granian-log-level` | Log level for Granian | `info` |
+
+### Performance Tuning
+
+For optimal performance:
+
+1. Adjust `--granian-threads` based on your workload and system resources
+2. For high throughput workloads, consider using `--granian-loop uvloop`
+3. Monitor system performance and adjust parameters accordingly
+
+Note: The server will automatically fall back to uvicorn if there are any issues starting the Granian server.
