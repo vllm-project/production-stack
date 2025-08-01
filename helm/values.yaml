@@ -23,7 +23,10 @@ servingEngineSpec:
   # - name: (string) The name of the model, e.g., "example-model"
   # - repository: (string) The repository of the model, e.g., "vllm/vllm-openai"
   # - tag: (string) The tag of the model, e.g., "latest"
-  # - imagePullSecret: (Optional, string) Name of secret with credentials to private container repository, e.g. "secret"
+  # - imagePullSecret: (Optional, string, list) Name of secret with credentials to private container repository, e.g. "secret"
+  #   - A string containing the docker registry secret name
+  #   - A list of string to the different docker registry secret name
+  #
   # - modelURL: (string) The URL of the model, e.g., "facebook/opt-125m"
   # - chatTemplate: (Optional, string) Chat template (Jinga2) specifying tokenizer configuration, e.g. "{% for message in messages %}\n{% if message['role'] == 'user' %}\n{{ 'Question:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'system' %}\n{{ 'System:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'assistant' %}{{ 'Answer:\n'  + message['content'] + '\n\n' }}{% endif %}\n{% if loop.last and add_generation_prompt %}\n{{ 'Answer:\n' }}{% endif %}{% endfor %}"
   #
@@ -59,6 +62,7 @@ servingEngineSpec:
   #   - env: (optional, list) List of environment variables to set in the container, each being a map with:
   #   - resources: (optional, map) The resource requests and limits for the container:
   #   - mountPvcStorage: (optional, bool) Whether to mount the model's volume.
+  #   - extraVolumeMounts: (optional, list) Only specify the directory that is mounted to this container. For more information, refer to modelSpec.extraVolumeMounts.
   #
   # - vllmConfig: (optional, map) The configuration for the VLLM model, supported options are:
   #   - v0: (optional, map) Specify to 1 to use vLLM v0, otherwise vLLM v1 is used. e.g., 0
@@ -334,6 +338,9 @@ routerSpec:
   labels:
     environment: "router"
     release: "router"
+
+  # -- Pod Annotations the router deployment
+  podAnnotations: {}
 
   ingress:
     # -- Enable ingress controller resource
