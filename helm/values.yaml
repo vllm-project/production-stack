@@ -255,6 +255,10 @@ servingEngineSpec:
     # -- Read-only root filesystem
     # readOnlyRootFilesystem: true
 
+  # -- Sidecar configuration
+  sidecar:
+    image: "lmcache/lmstack-sidecar:latest"
+    imagePullPolicy: "Always"
 
 routerSpec:
   # -- The docker image of the router. The following values are defaults:

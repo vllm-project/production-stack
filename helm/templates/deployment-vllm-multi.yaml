@@ -370,6 +370,19 @@ spec:
           - name: {{ .Release.Name }}-shared-pvc-storage
             mountPath: /data/shared-pvc-storage
           {{- end }}
+        {{- if and $modelSpec.enableLoRA (hasKey $modelSpec "pvcStorage") }}
+        - name: sidecar
+          image: {{ .Values.servingEngineSpec.sidecar.image }}
+          imagePullPolicy: {{ .Values.servingEngineSpec.sidecar.imagePullPolicy | default "Always" }}
+          env:
+            - name: PORT
+              value: "30090"
+            - name: LORA_DOWNLOAD_BASE_DIR
+              value: /data/lora-adapters
+          volumeMounts:
+            - name: {{ .Release.Name }}-storage
+              mountPath: /data
+        {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
