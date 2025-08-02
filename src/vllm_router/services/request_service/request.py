@@ -317,6 +317,10 @@ async def route_general_request(
     logger.info(
         f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
     )
+    condition = None
+    if queue_manager.enable_queue:
+        condition = queue_manager.conditions[server_url]
+
     stream_generator = process_request(
         request,
         request_body,
@@ -324,7 +328,7 @@ async def route_general_request(
         request_id,
         endpoint,
         background_tasks,
-        condition=queue_manager.conditions[server_url],
+        condition=condition,
     )
     headers, status_code = await anext(stream_generator)
     headers_dict = {key: value for key, value in headers.items()}
