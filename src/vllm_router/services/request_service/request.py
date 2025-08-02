@@ -290,7 +290,7 @@ async def route_general_request(
     logger.debug(f"Debug session extraction - Request headers: {dict(request.headers)}")
     logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
 
-    # enqueue if endpoint load is too high
+    # Enqueue if endpoint load is too high
     if not queue_manager._endpoint_is_free(server_url):
         queue_manager.register_endpoint(server_url) #if queue does not already exist
 

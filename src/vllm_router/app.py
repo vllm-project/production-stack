@@ -108,7 +108,7 @@ async def lifespan(app: FastAPI):
         logger.info("Closing dynamic config watcher")
         dyn_cfg_watcher.close()
 
-    # close the queue manager
+    # Close the queue manager
     queue_manager = get_queue_manager()
     if queue_manager is not None:
         logger.info("Closing per endpoint queues and tasks")
@@ -170,6 +170,7 @@ def initialize_all(app: FastAPI, args):
     # Initialize singletons via custom functions.
     initialize_engine_stats_scraper(args.engine_stats_interval)
     initialize_request_stats_monitor(args.request_stats_window)
+    
     # Initialize queue
     initialize_queue_manager(args.max_wait_time,
                              args.max_running_requests,

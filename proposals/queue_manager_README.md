@@ -16,7 +16,8 @@ This module implements an asynchronous queue manager for dispatching of LLM infe
 
 ## Flow Chart
 
-![Logic flow for incoming request.](imgs/flowchart.png)
+![Logic flow for incoming request.](imgs/enqueue_flowchart.png)
+![Logic flow for scheduler loop that runs per endpoint.](imgs/sched_loop_flowchart.png)
 
 ---
 
@@ -59,7 +60,9 @@ await queue_manager.enqueue(
         "request_id": request_id,
         "body": request_body,
         "endpoint": endpoint,
-        "background_tasks": background_tasks
+        "background_tasks": background_tasks,
+        "result_future": response_future
+
     },
     priority=queue_manager.calculate_request_priority(request)
 )
@@ -69,14 +72,7 @@ await queue_manager.enqueue(
 - Adds the request to a `PriorityQueue`.
 - Notifies the condition variable to wake the scheduler.
 
-If queued, returns a `202 Accepted`:
-
-```json
-{
-  "status": "queued",
-  "endpoint": "http://..."
-}
-```
+If queued, awaits future response.
 
 ---
 
@@ -89,8 +85,8 @@ async def _scheduler_loop(self, endpoint_url: str):
 Runs a background task for each endpoint:
 
 - Waits for new requests in the queue.
-- If a request has waited longer than max_queue_wait_time, the scheduler calls `_reroute_or_dispatch_stale_request` to determine next actions.
 - If the endpoint is free, dispatches the request.
+- If a request has waited longer than max_queue_wait_time, the scheduler calls `_reroute_or_dispatch_stale_request` to determine next actions.
 
 
 ---
@@ -115,8 +111,10 @@ await self._reroute_or_dispatch_stale_request(request, original_endpoint)
 ```
 
 - Attempts to reroute the request to a different free endpoint.
-- If session affinity (based on session ID) applies, keeps it on the original endpoint.
+- Currently always reroutes
 - If the new endpoint is also busy, queues the request there.
+
+In future, can choose to keep request at that endpoint if it has session history, or KVCache matches.
 
 ---
 
@@ -141,9 +139,9 @@ queue_manager = EndpointQueueManager(max_queue_wait_time=10)
 
 ## TODOs
 
-- [ ] Implement KV cache-aware session affinity logic
-- [ ] Improve request priority classification
-- [ ] Make queue limits and load thresholds configurable
+- [ ] Implement KV cache-aware, session affinity logic
+- [ ] Implement request priority classification
+- [ ] Replace round-robin stale routing policy
 - [ ] Retry policies and smarter rerouting heuristics
 
 ---
