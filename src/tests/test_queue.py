@@ -1,14 +1,16 @@
-import pytest
 import asyncio
+import json
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
-from vllm_router.services.queue_service.queue import (
-    initialize_queue_manager,
-    get_queue_manager,
-)
-from fastapi.responses import StreamingResponse
+
+import pytest
 import pytest_asyncio
-import json
+from fastapi.responses import StreamingResponse
+
+from vllm_router.services.queue_service.queue import (
+    get_queue_manager,
+    initialize_queue_manager,
+)
 
 
 @pytest.fixture
@@ -27,7 +29,7 @@ async def queue_manager(mock_scraper):
         max_queue_wait_time=10,
         max_running_requests=10,
         max_gpu_perc=95,
-        scraper=mock_scraper
+        scraper=mock_scraper,
     )
     manager = get_queue_manager()
     await manager.register_endpoint("endpoint1")
@@ -42,7 +44,7 @@ async def test_queue_manager_initialization(mock_scraper):
         max_queue_wait_time=10,
         max_running_requests=10,
         max_gpu_perc=95,
-        scraper=mock_scraper
+        scraper=mock_scraper,
     )
     manager = get_queue_manager()
     assert manager.max_queue_wait_time == 10
@@ -90,10 +92,14 @@ async def test_dispatch_and_signal(queue_manager):
         "request": MagicMock(),
         "endpoint": "endpoint1",
         "background_tasks": MagicMock(),
-        "_result_future": asyncio.Future()
+        "_result_future": asyncio.Future(),
     }
 
-    with patch("vllm_router.services.request_service.request.process_request", new_callable=AsyncMock) as mock_process:
+    with patch(
+        "vllm_router.services.request_service.request.process_request",
+        new_callable=AsyncMock,
+    ) as mock_process:
+
         async def mock_stream():
             yield ("content-type", 200)
             yield StreamingResponse(content=MagicMock())
@@ -111,17 +117,26 @@ async def test_scheduler_loop(queue_manager):
         "request": MagicMock(),
         "endpoint": "endpoint1",
         "background_tasks": MagicMock(),
-        "_result_future": asyncio.Future()
+        "_result_future": asyncio.Future(),
     }
 
     await queue_manager.enqueue("endpoint1", test_request)
     await asyncio.sleep(1)
     assert test_request["_result_future"].done()
 
+
 @pytest.mark.asyncio
-@patch("vllm_router.services.request_service.request.process_request", new_callable=AsyncMock)
-@patch("vllm_router.services.queue_service.queue.EndpointQueueManager._reroute_or_dispatch_stale_request", new_callable=AsyncMock)
-async def test_stale_request_rerouting(mock_reroute, mock_process_request, queue_manager):
+@patch(
+    "vllm_router.services.request_service.request.process_request",
+    new_callable=AsyncMock,
+)
+@patch(
+    "vllm_router.services.queue_service.queue.EndpointQueueManager._reroute_or_dispatch_stale_request",
+    new_callable=AsyncMock,
+)
+async def test_stale_request_rerouting(
+    mock_reroute, mock_process_request, queue_manager
+):
     dummy_request = MagicMock()
     dummy_request.state = MagicMock()
 
@@ -177,7 +192,7 @@ async def test_singleton_pattern():
         max_queue_wait_time=10,
         max_running_requests=10,
         max_gpu_perc=95,
-        scraper=scraper
+        scraper=scraper,
     )
     manager1 = queue_module.get_queue_manager()
     manager2 = queue_module.get_queue_manager()

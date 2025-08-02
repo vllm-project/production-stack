@@ -21,7 +21,6 @@ This module implements an asynchronous queue manager for dispatching of LLM infe
 
 ---
 
-
 ## File: `services/queue_manager.py`
 
 ### Class: `EndpointQueueManager`
@@ -88,7 +87,6 @@ Runs a background task for each endpoint:
 - If the endpoint is free, dispatches the request.
 - If a request has waited longer than max_queue_wait_time, the scheduler calls `_reroute_or_dispatch_stale_request` to determine next actions.
 
-
 ---
 
 ### 4. Dispatch Logic
@@ -128,7 +126,6 @@ queue_manager = EndpointQueueManager(max_queue_wait_time=10)
 
 ---
 
-
 ## Dependencies
 
 - `asyncio`
@@ -143,5 +140,6 @@ queue_manager = EndpointQueueManager(max_queue_wait_time=10)
 - [ ] Implement request priority classification
 - [ ] Replace round-robin stale routing policy
 - [ ] Retry policies and smarter rerouting heuristics
+- [ ] Implement knapsack-like selection allowing for a group of requests to be dispatched at once
 
 ---

@@ -317,7 +317,7 @@ def parse_args():
         "--max-wait-time",
         type=int,
         default=10,
-        help="The maximum amount of time a request waits in a queue before it gets rerouted. E.g., 10s" ,
+        help="The maximum amount of time a request waits in a queue before it gets rerouted. E.g., 10s",
     )
 
     parser.add_argument(
