@@ -294,7 +294,7 @@ async def route_general_request(
     logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
 
     # Enqueue if endpoint load is too high
-    if not queue_manager._endpoint_is_free(server_url):
+    if queue_manager.enable_queue and not queue_manager._endpoint_is_free(server_url):
         queue_manager.register_endpoint(server_url)  # if queue does not already exist
 
         response_future = asyncio.get_event_loop().create_future()
@@ -313,28 +313,28 @@ async def route_general_request(
         )
 
         return await response_future
-    else:
-        logger.info(
-            f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
-        )
-        stream_generator = process_request(
-            request,
-            request_body,
-            server_url,
-            request_id,
-            endpoint,
-            background_tasks,
-            condition=queue_manager.conditions[server_url],
-        )
-        headers, status_code = await anext(stream_generator)
-        headers_dict = {key: value for key, value in headers.items()}
-        headers_dict["X-Request-Id"] = request_id
-        return StreamingResponse(
-            stream_generator,
-            status_code=status_code,
-            headers=headers_dict,
-            media_type="text/event-stream",
-        )
+
+    logger.info(
+        f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+    )
+    stream_generator = process_request(
+        request,
+        request_body,
+        server_url,
+        request_id,
+        endpoint,
+        background_tasks,
+        condition=queue_manager.conditions[server_url],
+    )
+    headers, status_code = await anext(stream_generator)
+    headers_dict = {key: value for key, value in headers.items()}
+    headers_dict["X-Request-Id"] = request_id
+    return StreamingResponse(
+        stream_generator,
+        status_code=status_code,
+        headers=headers_dict,
+        media_type="text/event-stream",
+    )
 
 
 async def send_request_to_prefiller(

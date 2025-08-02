@@ -173,7 +173,10 @@ def initialize_all(app: FastAPI, args):
 
     # Initialize queue
     initialize_queue_manager(
-        args.max_wait_time, args.max_running_requests, args.max_gpu_perc
+        args.enable_queue,
+        args.max_wait_time,
+        args.max_running_requests,
+        args.max_gpu_perc,
     )
 
     if args.enable_batch_api:

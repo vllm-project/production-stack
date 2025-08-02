@@ -314,6 +314,12 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--enable_queue",
+        type=bool,
+        default=True,
+        help="Enable router-side queuing.",
+    )
+    parser.add_argument(
         "--max-wait-time",
         type=int,
         default=10,

@@ -14,7 +14,12 @@ _global_queue_manager = None
 
 class EndpointQueueManager:
     def __init__(
-        self, max_queue_wait_time, max_running_requests, max_gpu_perc, scraper=None
+        self,
+        enable_queue,
+        max_queue_wait_time,
+        max_running_requests,
+        max_gpu_perc,
+        scraper=None,
     ):
         """
         Initializes the queue manager responsible for scheduling and dispatching
@@ -26,6 +31,7 @@ class EndpointQueueManager:
             max_gpu_perc (float): Maximum allowed GPU usage percentage per endpoint.
             scraper: Optional engine stats scraper for monitoring backend load.
         """
+        self.enable_queue = enable_queue
         self.endpoint_queues: Dict[str, asyncio.PriorityQueue] = {}
         self.conditions: Dict[str, asyncio.Condition] = {}
 
@@ -300,7 +306,11 @@ class EndpointQueueManager:
 
 
 def initialize_queue_manager(
-    max_queue_wait_time=10, max_running_requests=10, max_gpu_perc=95, scraper=None
+    enable_queue=True,
+    max_queue_wait_time=10,
+    max_running_requests=10,
+    max_gpu_perc=95,
+    scraper=None,
 ):
     """
     Initializes and globally registers the queue manager with the specified configuration.
@@ -314,6 +324,7 @@ def initialize_queue_manager(
 
     global _global_queue_manager
     _global_queue_manager = EndpointQueueManager(
+        enable_queue=enable_queue,
         max_queue_wait_time=max_queue_wait_time,
         max_running_requests=max_running_requests,
         max_gpu_perc=max_gpu_perc,

@@ -11,6 +11,8 @@ This module implements an asynchronous queue manager for dispatching of LLM infe
 - Request rerouting if an endpoint remains overloaded too long
 - Session affinity preservation (stubbed for future KV cache usage)
 - Graceful shutdown of all schedulers
+- Queue can be enabled or disabled. Default is enabled.
+  - Note that queue manager is still instantiated, just not used.
 
 ---
 
