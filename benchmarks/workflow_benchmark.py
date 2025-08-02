@@ -87,11 +87,18 @@ class WorkflowBenchmark:
                 result = await response.json()
                 latency = time.time() - start_time
                 
+                # Safely count tokens
+                tokens = 0
+                if result.get("choices") and len(result["choices"]) > 0:
+                    text = result["choices"][0].get("text", "")
+                    if text and isinstance(text, str):
+                        tokens = len(text.split())
+                
                 return {
                     "status": "success",
                     "latency": latency,
                     "status_code": response.status,
-                    "tokens": len(result.get("choices", [{}])[0].get("text", "").split()) if result.get("choices") else 0,
+                    "tokens": tokens,
                     "workflow_metadata": workflow_metadata
                 }
                 
@@ -149,7 +156,7 @@ class WorkflowBenchmark:
             "num_agents": num_agents,
             "total_latency": total_latency,
             "avg_latency": statistics.mean(r["latency"] for r in successful_results) if successful_results else 0,
-            "success_rate": len(successful_results) / len(results),
+            "success_rate": len(successful_results) / len(results) if results else 0.0,
             "results": results
         }
     
@@ -210,7 +217,7 @@ class WorkflowBenchmark:
             "total_time": total_time,
             "avg_latency": avg_latency,
             "speedup": speedup,
-            "success_rate": len(successful_results) / len(results),
+            "success_rate": len(successful_results) / len(results) if results else 0.0,
             "results": results
         }
     
@@ -309,48 +316,55 @@ class WorkflowBenchmark:
         receive_latencies = []
         
         for i in range(num_messages):
-            # Send message
-            start_send = time.time()
-            
-            async with self.session.post(
-                f"{self.base_url}/v1/workflows/{workflow_id}/messages",
-                json={
-                    "source_agent": "sender",
-                    "target_agent": "receiver",
-                    "payload": payload,
-                    "message_type": "data"
-                }
-            ) as response:
-                await response.json()
-                send_latency = time.time() - start_send
-                send_latencies.append(send_latency)
-            
-            # Receive message
-            start_receive = time.time()
-            
-            async with self.session.get(
-                f"{self.base_url}/v1/workflows/{workflow_id}/agents/receiver/messages",
-                params={"timeout": 1.0}
-            ) as response:
-                result = await response.json()
-                receive_latency = time.time() - start_receive
-                receive_latencies.append(receive_latency)
+            try:
+                # Send message
+                start_send = time.time()
                 
-                messages_received = len(result.get("messages", []))
-                if i % 10 == 0:
-                    print(f"  Message {i+1}: send={send_latency*1000:.1f}ms, "
-                          f"receive={receive_latency*1000:.1f}ms, received={messages_received}")
+                async with self.session.post(
+                    f"{self.base_url}/v1/workflows/{workflow_id}/messages",
+                    json={
+                        "source_agent": "sender",
+                        "target_agent": "receiver",
+                        "payload": payload,
+                        "message_type": "data"
+                    }
+                ) as response:
+                    await response.json()
+                    send_latency = time.time() - start_send
+                    send_latencies.append(send_latency)
+                
+                # Receive message
+                start_receive = time.time()
+                
+                async with self.session.get(
+                    f"{self.base_url}/v1/workflows/{workflow_id}/agents/receiver/messages",
+                    params={"timeout": 1.0}
+                ) as response:
+                    result = await response.json()
+                    receive_latency = time.time() - start_receive
+                    receive_latencies.append(receive_latency)
+                    
+                    messages_received = len(result.get("messages", []))
+                    if i % 10 == 0:
+                        print(f"  Message {i+1}: send={send_latency*1000:.1f}ms, "
+                              f"receive={receive_latency*1000:.1f}ms, received={messages_received}")
+            
+            except Exception as e:
+                print(f"  Message {i+1}: ERROR - {e}")
+                # Add zero latencies for failed messages to maintain count
+                send_latencies.append(0)
+                receive_latencies.append(0)
         
         return {
             "type": "a2a_communication",
             "workflow_id": workflow_id,
             "num_messages": num_messages,
             "message_size": message_size,
-            "avg_send_latency_ms": statistics.mean(send_latencies) * 1000,
-            "avg_receive_latency_ms": statistics.mean(receive_latencies) * 1000,
-            "p95_send_latency_ms": statistics.quantiles(send_latencies, n=20)[18] * 1000,
-            "p95_receive_latency_ms": statistics.quantiles(receive_latencies, n=20)[18] * 1000,
-            "throughput_msgs_per_sec": num_messages / sum(send_latencies) if send_latencies else 0
+            "avg_send_latency_ms": statistics.mean(send_latencies) * 1000 if send_latencies else 0,
+            "avg_receive_latency_ms": statistics.mean(receive_latencies) * 1000 if receive_latencies else 0,
+            "p95_send_latency_ms": statistics.quantiles(send_latencies, n=20)[18] * 1000 if len(send_latencies) >= 20 else (max(send_latencies) * 1000 if send_latencies else 0),
+            "p95_receive_latency_ms": statistics.quantiles(receive_latencies, n=20)[18] * 1000 if len(receive_latencies) >= 20 else (max(receive_latencies) * 1000 if receive_latencies else 0),
+            "throughput_msgs_per_sec": num_messages / sum(send_latencies) if send_latencies and sum(send_latencies) > 0 else 0
         }
     
     async def get_workflow_stats(self) -> Dict[str, Any]:

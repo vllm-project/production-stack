@@ -32,6 +32,12 @@ logger = init_logger(__name__)
 class WorkflowAwareRouter(KvawareRouter):
     """Router with workflow-aware capabilities for multi-agent optimization."""
     
+    # Default load calculation weights
+    DEFAULT_GPU_WEIGHT = 0.4
+    DEFAULT_MEMORY_WEIGHT = 0.3
+    DEFAULT_QPS_WEIGHT = 0.3
+    DEFAULT_QPS_NORMALIZATION = 100.0
+    
     def __init__(
         self,
         lmcache_controller_port: int,
@@ -39,7 +45,11 @@ class WorkflowAwareRouter(KvawareRouter):
         kv_aware_threshold: int = 2000,
         workflow_ttl: int = 3600,
         max_workflows: int = 1000,
-        batching_preference: float = 0.8
+        batching_preference: float = 0.8,
+        gpu_weight: float = DEFAULT_GPU_WEIGHT,
+        memory_weight: float = DEFAULT_MEMORY_WEIGHT,
+        qps_weight: float = DEFAULT_QPS_WEIGHT,
+        qps_normalization: float = DEFAULT_QPS_NORMALIZATION
     ):
         """Initialize workflow-aware router.
         
@@ -50,6 +60,10 @@ class WorkflowAwareRouter(KvawareRouter):
             workflow_ttl: TTL for workflow contexts in seconds
             max_workflows: Maximum concurrent workflows
             batching_preference: Preference for batching same workflow (0.0-1.0)
+            gpu_weight: Weight for GPU utilization in load calculation
+            memory_weight: Weight for memory usage in load calculation
+            qps_weight: Weight for QPS in load calculation
+            qps_normalization: Factor to normalize QPS values
         """
         super().__init__(lmcache_controller_port, session_key, kv_aware_threshold)
         
@@ -58,6 +72,12 @@ class WorkflowAwareRouter(KvawareRouter):
             max_workflows=max_workflows
         )
         self.batching_preference = batching_preference
+        
+        # Load calculation weights
+        self.gpu_weight = gpu_weight
+        self.memory_weight = memory_weight
+        self.qps_weight = qps_weight
+        self.qps_normalization = qps_normalization
         
         # Metrics
         self.workflow_cache_hits = 0
@@ -186,17 +206,17 @@ class WorkflowAwareRouter(KvawareRouter):
                 stats = engine_stats[url]
                 # Normalize GPU utilization
                 if hasattr(stats, 'gpu_utilization'):
-                    load += stats.gpu_utilization * 0.4
+                    load += stats.gpu_utilization * self.gpu_weight
                 # Normalize memory usage
                 if hasattr(stats, 'memory_usage_fraction'):
-                    load += stats.memory_usage_fraction * 0.3
+                    load += stats.memory_usage_fraction * self.memory_weight
                     
             # Factor in request stats if available
             if url in request_stats:
                 stats = request_stats[url]
-                # Normalize QPS (assume max 100 QPS)
+                # Normalize QPS using configurable factor
                 if hasattr(stats, 'qps'):
-                    load += min(stats.qps / 100.0, 1.0) * 0.3
+                    load += min(stats.qps / self.qps_normalization, 1.0) * self.qps_weight
                     
             loads[url] = min(load, 1.0)  # Cap at 1.0
             
