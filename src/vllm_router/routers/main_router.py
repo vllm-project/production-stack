@@ -26,6 +26,7 @@ from vllm_router.services.request_service.request import (
 )
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
 from vllm_router.version import __version__
+from vllm_router.routers.workflow_router import router as workflow_router
 
 try:
     # Semantic cache integration

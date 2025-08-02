@@ -31,6 +31,7 @@ from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
 from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
+from vllm_router.routers.workflow_router import router as workflow_router
 from vllm_router.routers.routing_logic import (
     get_routing_logic,
     initialize_routing_logic,
@@ -85,7 +86,21 @@ async def lifespan(app: FastAPI):
     app.state.httpx_client_wrapper.start()
     if hasattr(app.state, "batch_processor"):
         await app.state.batch_processor.initialize()
+    
+    # Start workflow components if available
+    if hasattr(app.state, "router") and hasattr(app.state.router, "start"):
+        await app.state.router.start()
+    if hasattr(app.state, "message_queue") and hasattr(app.state.message_queue, "start"):
+        await app.state.message_queue.start()
+        
     yield
+    
+    # Stop workflow components if available
+    if hasattr(app.state, "router") and hasattr(app.state.router, "stop"):
+        await app.state.router.stop()
+    if hasattr(app.state, "message_queue") and hasattr(app.state.message_queue, "stop"):
+        await app.state.message_queue.stop()
+    
     await app.state.httpx_client_wrapper.stop()
 
     # Close the threaded-components
@@ -194,7 +209,18 @@ def initialize_all(app: FastAPI, args):
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
         kv_aware_threshold=args.kv_aware_threshold,
+        workflow_ttl=getattr(args, 'workflow_ttl', 3600),
+        max_workflows=getattr(args, 'max_workflows', 1000),
+        batching_preference=getattr(args, 'batching_preference', 0.8),
     )
+    
+    # Initialize workflow message queue if workflow-aware routing is enabled
+    if args.routing_logic == "workflow_aware":
+        from vllm_router.services.workflow_service import WorkflowMessageQueue
+        app.state.message_queue = WorkflowMessageQueue(
+            max_queue_size=getattr(args, 'max_message_queue_size', 1000),
+            max_message_size=getattr(args, 'max_message_size', 1024 * 1024),  # 1MB
+        )
 
     # Initialize feature gates
     initialize_feature_gates(args.feature_gates)
@@ -265,6 +291,7 @@ app.include_router(main_router)
 app.include_router(files_router)
 app.include_router(batches_router)
 app.include_router(metrics_router)
+app.include_router(workflow_router)
 app.state.httpx_client_wrapper = HTTPXClientWrapper()
 app.state.semantic_cache_available = semantic_cache_available
 
