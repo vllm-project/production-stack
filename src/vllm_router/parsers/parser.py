@@ -181,6 +181,7 @@ def parse_args():
             "kvaware",
             "prefixaware",
             "disaggregated_prefill",
+            "workflow_aware",
         ],
         help="The routing logic to use",
     )
@@ -201,6 +202,38 @@ def parse_args():
         type=str,
         default=None,
         help="Path to the callback instance extending CustomCallbackHandler. Consists of <file path without .py ending>.<instance variable name>.",
+    )
+    
+    # Workflow-aware routing arguments
+    parser.add_argument(
+        "--workflow-ttl",
+        type=int,
+        default=3600,
+        help="Time-to-live for workflow contexts in seconds (default: 3600).",
+    )
+    parser.add_argument(
+        "--max-workflows",
+        type=int,
+        default=1000,
+        help="Maximum number of concurrent workflows (default: 1000).",
+    )
+    parser.add_argument(
+        "--batching-preference",
+        type=float,
+        default=0.8,
+        help="Preference for batching same workflow requests (0.0-1.0, default: 0.8).",
+    )
+    parser.add_argument(
+        "--max-message-queue-size",
+        type=int,
+        default=1000,
+        help="Maximum messages per agent queue (default: 1000).",
+    )
+    parser.add_argument(
+        "--max-message-size",
+        type=int,
+        default=1024 * 1024,  # 1MB
+        help="Maximum message size in bytes (default: 1MB).",
     )
 
     # Request rewriter arguments

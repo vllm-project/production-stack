@@ -52,6 +52,7 @@ class RoutingLogic(str, enum.Enum):
     KVAWARE = "kvaware"
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
+    WORKFLOW_AWARE = "workflow_aware"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -487,6 +488,19 @@ def initialize_routing_logic(
         return DisaggregatedPrefillRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
+    elif routing_logic == RoutingLogic.WORKFLOW_AWARE:
+        logger.info("Initializing workflow-aware routing logic")
+        from vllm_router.routers.workflow_aware_router import WorkflowAwareRouter
+        router = WorkflowAwareRouter(
+            kwargs.get("lmcache_controller_port"),
+            kwargs.get("session_key"),
+            kwargs.get("kv_aware_threshold", 2000),
+            kwargs.get("workflow_ttl", 3600),
+            kwargs.get("max_workflows", 1000),
+            kwargs.get("batching_preference", 0.8)
+        )
+        router.start_kv_manager()
+        return router
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
