@@ -12,8 +12,9 @@ RUN --mount=type=cache,target=/var/lib/apt --mount=type=cache,target=/var/cache/
 COPY pyproject.toml .
 COPY .git/ .git/
 
-# Copy the rest of the application code
-COPY src/ src/
+# Copy only production code (exclude tests and examples)
+COPY src/vllm_router/ src/vllm_router/
+COPY src/gateway_inference_extension/ src/gateway_inference_extension/
 
 ARG INSTALL_OPTIONAL_DEP=semantic_cache,lmcache
 ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
