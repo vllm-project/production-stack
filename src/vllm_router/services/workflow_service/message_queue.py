@@ -15,7 +15,7 @@
 """Message queue for agent-to-agent communication."""
 
 import asyncio
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import time
 import logging
 

@@ -16,7 +16,7 @@
 
 from fastapi import APIRouter, HTTPException, Request, Query
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from vllm_router.models.error_response import (
     ValidationErrorResponse, ServiceErrorResponse, NotFoundErrorResponse, 
@@ -40,14 +40,14 @@ class SendMessageRequest(BaseModel):
     payload: Dict[str, Any] = Field(..., description="Message payload")
     ttl: int = Field(300, description="Message TTL in seconds", ge=1, le=86400)  # 1 second to 24 hours
     
-    @validator('message_type')
+    @field_validator('message_type')
     def validate_message_type(cls, v):
         allowed_types = {'data', 'signal', 'query', 'response'}
         if v not in allowed_types:
             raise ValueError(f'message_type must be one of: {", ".join(allowed_types)}')
         return v
         
-    @validator('source_agent', 'target_agent')
+    @field_validator('source_agent', 'target_agent')
     def validate_agent_id(cls, v):
         # Agent IDs should be alphanumeric with optional hyphens/underscores
         import re
@@ -55,7 +55,7 @@ class SendMessageRequest(BaseModel):
             raise ValueError('Agent ID must contain only alphanumeric characters, hyphens, and underscores')
         return v
         
-    @validator('payload')
+    @field_validator('payload')
     def validate_payload_size(cls, v):
         # Rough size check (actual JSON size will be larger)
         import json
