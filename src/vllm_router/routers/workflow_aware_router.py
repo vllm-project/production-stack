@@ -14,7 +14,7 @@
 
 """Workflow-aware routing for multi-agent optimization."""
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import logging
 
 from vllm_router.routers.routing_logic import KvawareRouter, RoutingInterface

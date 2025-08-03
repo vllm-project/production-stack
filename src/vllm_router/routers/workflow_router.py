@@ -94,14 +94,15 @@ class MessageResponse(BaseModel):
     status: str
     timestamp: float
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "message_id": "msg_12345",
                 "status": "sent",
                 "timestamp": 1672531200.0
             }
         }
+    }
 
 
 class MessagesListResponse(BaseModel):
@@ -110,8 +111,8 @@ class MessagesListResponse(BaseModel):
     count: int
     has_more: bool = False
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "messages": [
                     {
@@ -126,6 +127,7 @@ class MessagesListResponse(BaseModel):
                 "has_more": False
             }
         }
+    }
 
 
 class WorkflowStatusResponse(BaseModel):
@@ -139,8 +141,8 @@ class WorkflowStatusResponse(BaseModel):
     cache_hit_rate: float
     assigned_instance: Optional[str] = None
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "workflow_id": "wf_12345",
                 "created_at": 1672531200.0,
@@ -152,6 +154,7 @@ class WorkflowStatusResponse(BaseModel):
                 "assigned_instance": "http://engine1.example.com"
             }
         }
+    }
 
 
 @router.post("/{workflow_id}/messages", response_model=MessageResponse)
