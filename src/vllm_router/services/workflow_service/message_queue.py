@@ -15,12 +15,12 @@
 """Message queue for agent-to-agent communication."""
 
 import asyncio
-from typing import Dict, List, Optional, Tuple, Any
-import time
 import logging
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
-from vllm_router.models.workflow import AgentMessage
 from vllm_router.log import init_logger
+from vllm_router.models.workflow import AgentMessage
 
 logger = init_logger(__name__)
 

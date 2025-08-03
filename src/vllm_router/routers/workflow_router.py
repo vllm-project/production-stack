@@ -14,18 +14,23 @@
 
 """Workflow API endpoints for multi-agent coordination."""
 
-from fastapi import APIRouter, HTTPException, Request, Query
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 
-from vllm_router.models.error_response import (
-    ValidationErrorResponse, ServiceErrorResponse, NotFoundErrorResponse, 
-    InternalErrorResponse, create_validation_error, create_service_error,
-    create_not_found_error, create_internal_error
-)
-
-from vllm_router.models.workflow import AgentMessage
 from vllm_router.log import init_logger
+from vllm_router.models.error_response import (
+    InternalErrorResponse,
+    NotFoundErrorResponse,
+    ServiceErrorResponse,
+    ValidationErrorResponse,
+    create_internal_error,
+    create_not_found_error,
+    create_service_error,
+    create_validation_error,
+)
+from vllm_router.models.workflow import AgentMessage
 
 logger = init_logger(__name__)
 
@@ -34,25 +39,38 @@ router = APIRouter(prefix="/v1/workflows", tags=["workflows"])
 
 class SendMessageRequest(BaseModel):
     """Request model for sending agent messages."""
-    source_agent: str = Field(..., description="Source agent ID", min_length=1, max_length=100)
-    target_agent: str = Field(..., description="Target agent ID", min_length=1, max_length=100)
-    message_type: str = Field("data", description="Message type: data|signal|query|response")
+    source_agent: str = Field(
+        ..., description="Source agent ID", min_length=1, max_length=100
+    )
+    target_agent: str = Field(
+        ..., description="Target agent ID", min_length=1, max_length=100
+    )
+    message_type: str = Field(
+        "data", description="Message type: data|signal|query|response"
+    )
     payload: Dict[str, Any] = Field(..., description="Message payload")
-    ttl: int = Field(300, description="Message TTL in seconds", ge=1, le=86400)  # 1 second to 24 hours
+    ttl: int = Field(
+        300, description="Message TTL in seconds", ge=1, le=86400
+    )  # 1 second to 24 hours
     
     @field_validator('message_type')
     def validate_message_type(cls, v):
         allowed_types = {'data', 'signal', 'query', 'response'}
         if v not in allowed_types:
-            raise ValueError(f'message_type must be one of: {", ".join(allowed_types)}')
+            raise ValueError(
+                f'message_type must be one of: {", ".join(allowed_types)}'
+            )
         return v
         
     @field_validator('source_agent', 'target_agent')
     def validate_agent_id(cls, v):
-        # Agent IDs should be alphanumeric with optional hyphens/underscores
+        # Agent IDs should be alphanumeric with hyphens/underscores
         import re
         if not re.match(r'^[a-zA-Z0-9_-]+$', v):
-            raise ValueError('Agent ID must contain only alphanumeric characters, hyphens, and underscores')
+            raise ValueError(
+                'Agent ID must contain only alphanumeric characters, '
+                'hyphens, and underscores'
+            )
         return v
         
     @field_validator('payload')
@@ -227,8 +245,12 @@ async def get_agent_messages(
     workflow_id: str,
     agent_id: str,
     app_request: Request,
-    timeout: float = Query(1.0, ge=0.1, le=30.0, description="Timeout in seconds (0.1-30.0)"),
-    max_messages: int = Query(100, ge=1, le=1000, description="Max messages to return (1-1000)")
+    timeout: float = Query(
+        1.0, ge=0.1, le=30.0, description="Timeout in seconds (0.1-30.0)"
+    ),
+    max_messages: int = Query(
+        100, ge=1, le=1000, description="Max messages to return (1-1000)"
+    )
 ):
     """Retrieve pending messages for an agent.
     
