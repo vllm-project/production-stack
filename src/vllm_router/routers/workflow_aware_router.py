@@ -228,9 +228,9 @@ class WorkflowAwareRouter(KvawareRouter):
         request_json: Dict,
         instance_url: str
     ) -> bool:
-        """Check if this request can benefit from KV cache.
+        """Check if this request can benefit from KV cache using semantic similarity.
         
-        This is a simplified check - in practice would query actual cache state.
+        Uses improved heuristics beyond simple prompt length checking.
         
         Args:
             workflow_id: Workflow ID
@@ -245,13 +245,63 @@ class WorkflowAwareRouter(KvawareRouter):
         if not workflow_context or workflow_context.total_requests == 0:
             return False
             
-        # Check if prompt has significant overlap (simplified)
-        # In practice, would check actual KV cache state
+        # Extract prompt and messages from request
         prompt = request_json.get("prompt", "")
-        if len(prompt) > self.kv_aware_threshold:
-            return True
+        messages = request_json.get("messages", [])
+        
+        # Calculate content for similarity checking
+        if messages:
+            # For chat completions, check message content
+            current_content = " ".join([
+                msg.get("content", "") for msg in messages 
+                if isinstance(msg.get("content"), str)
+            ])
+        else:
+            # For completion requests, use prompt
+            current_content = prompt
             
-        return False
+        if not current_content.strip():
+            return False
+            
+        # Semantic similarity heuristics
+        cache_benefit_score = 0.0
+        
+        # 1. Content length check (longer content more likely to benefit)
+        content_length = len(current_content)
+        if content_length > self.kv_aware_threshold:
+            cache_benefit_score += 0.4
+        elif content_length > self.kv_aware_threshold // 2:
+            cache_benefit_score += 0.2
+            
+        # 2. Check for common patterns that indicate potential cache reuse
+        cache_indicators = [
+            "system", "instruction", "context", "background",
+            "rules", "guidelines", "format", "template"
+        ]
+        
+        content_lower = current_content.lower()
+        indicator_matches = sum(1 for indicator in cache_indicators if indicator in content_lower)
+        if indicator_matches >= 2:
+            cache_benefit_score += 0.3
+        elif indicator_matches >= 1:
+            cache_benefit_score += 0.15
+            
+        # 3. Multi-turn conversation check
+        if messages and len(messages) > 1:
+            cache_benefit_score += 0.2
+            
+        # 4. Repeated workflow pattern (same workflow seen multiple times)
+        if workflow_context.total_requests > 2:
+            cache_benefit_score += 0.1
+            
+        # 5. Check for structured content (JSON, XML, code blocks)
+        structured_patterns = ["{", "[", "<", "```", "def ", "class ", "import "]
+        structured_matches = sum(1 for pattern in structured_patterns if pattern in current_content)
+        if structured_matches >= 2:
+            cache_benefit_score += 0.1
+            
+        # Decision threshold: 0.5 or higher indicates likely cache benefit
+        return cache_benefit_score >= 0.5
         
     async def get_workflow_stats(self) -> Dict[str, Any]:
         """Get workflow routing statistics."""

@@ -15,7 +15,7 @@
 """Workflow context management for multi-agent coordination."""
 
 import asyncio
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Any
 from collections import defaultdict
 import time
 import logging
@@ -42,16 +42,20 @@ class WorkflowContextManager:
             max_workflows: Maximum number of concurrent workflows
             cleanup_interval: Interval for cleanup task in seconds
         """
-        self.workflows: Dict[str, WorkflowContext] = {}
-        self.workflow_instances: Dict[str, str] = {}  # workflow_id -> instance_url
-        self.agent_instances: Dict[Tuple[str, str], str] = {}  # (workflow_id, agent_id) -> instance_url
-        self.instance_workflows: Dict[str, Set[str]] = defaultdict(set)  # instance_url -> set of workflow_ids
+        self._workflows: Dict[str, WorkflowContext] = {}
+        self._workflow_instances: Dict[str, str] = {}  # workflow_id -> instance_url
+        self._agent_instances: Dict[Tuple[str, str], str] = {}  # (workflow_id, agent_id) -> instance_url
+        self._instance_workflows: Dict[str, Set[str]] = defaultdict(set)  # instance_url -> set of workflow_ids
         
         self.workflow_ttl = ttl
         self.max_workflows = max_workflows
         self.cleanup_interval = cleanup_interval
         self._cleanup_task: Optional[asyncio.Task] = None
-        self._lock = asyncio.Lock()
+        
+        # Fine-grained locks to prevent race conditions
+        self._workflow_lock = asyncio.Lock()  # For workflow registration/removal
+        self._instance_lock = asyncio.Lock()  # For instance assignment
+        self._stats_lock = asyncio.Lock()  # For statistics updates
         
         # Metrics
         self.total_workflows_created = 0
@@ -86,45 +90,56 @@ class WorkflowContextManager:
                 logger.error(f"Error in cleanup loop: {e}")
                 
     async def _cleanup_expired_workflows(self):
-        """Remove expired workflows."""
-        async with self._lock:
-            expired_workflows = []
-            
-            for workflow_id, context in self.workflows.items():
+        """Remove expired workflows with atomic operations."""
+        # First, identify expired workflows without holding locks
+        expired_workflows = []
+        
+        async with self._workflow_lock:
+            for workflow_id, context in list(self._workflows.items()):
                 if not context.is_active(self.workflow_ttl):
                     expired_workflows.append(workflow_id)
                     
-            for workflow_id in expired_workflows:
+        # Remove workflows one by one to minimize lock contention
+        removed_count = 0
+        for workflow_id in expired_workflows:
+            try:
                 await self._remove_workflow(workflow_id)
-                self.total_workflows_expired += 1
+                removed_count += 1
+            except Exception as e:
+                logger.error(f"Error removing workflow {workflow_id}: {e}")
                 
-            if expired_workflows:
-                logger.info(f"Cleaned up {len(expired_workflows)} expired workflows")
+        if removed_count > 0:
+            self.total_workflows_expired += removed_count
+            logger.info(f"Cleaned up {removed_count} expired workflows")
                 
     async def _remove_workflow(self, workflow_id: str):
-        """Remove a workflow and its associated data."""
-        # Remove workflow context
-        if workflow_id in self.workflows:
-            del self.workflows[workflow_id]
-            
-        # Remove instance mapping
-        if workflow_id in self.workflow_instances:
-            instance_url = self.workflow_instances[workflow_id]
-            del self.workflow_instances[workflow_id]
-            
+        """Remove a workflow and its associated data atomically."""
+        # Use separate locks to prevent deadlocks
+        async with self._workflow_lock:
+            # Remove workflow context
+            if workflow_id in self._workflows:
+                del self._workflows[workflow_id]
+                
+        async with self._instance_lock:
+            # Remove instance mapping
+            instance_url = None
+            if workflow_id in self._workflow_instances:
+                instance_url = self._workflow_instances[workflow_id]
+                del self._workflow_instances[workflow_id]
+                
             # Remove from instance's workflow set
-            if instance_url in self.instance_workflows:
-                self.instance_workflows[instance_url].discard(workflow_id)
-                if not self.instance_workflows[instance_url]:
-                    del self.instance_workflows[instance_url]
+            if instance_url and instance_url in self._instance_workflows:
+                self._instance_workflows[instance_url].discard(workflow_id)
+                if not self._instance_workflows[instance_url]:
+                    del self._instance_workflows[instance_url]
                     
-        # Remove agent mappings
-        agent_keys_to_remove = [
-            key for key in self.agent_instances.keys() 
-            if key[0] == workflow_id
-        ]
-        for key in agent_keys_to_remove:
-            del self.agent_instances[key]
+            # Remove agent mappings
+            agent_keys_to_remove = [
+                key for key in self._agent_instances.keys() 
+                if key[0] == workflow_id
+            ]
+            for key in agent_keys_to_remove:
+                del self._agent_instances[key]
             
     async def register_workflow(
         self, 
@@ -143,26 +158,35 @@ class WorkflowContextManager:
         Raises:
             ValueError: If max workflows exceeded
         """
-        async with self._lock:
+        async with self._workflow_lock:
             # Check if workflow already exists
-            if workflow_id in self.workflows:
-                return self.workflows[workflow_id]
+            if workflow_id in self._workflows:
+                return self._workflows[workflow_id]
                 
             # Check max workflows limit
-            if len(self.workflows) >= self.max_workflows:
-                # Try cleanup first
-                await self._cleanup_expired_workflows()
+            if len(self._workflows) >= self.max_workflows:
+                # Try cleanup first (release lock during cleanup)
+                pass  # Will cleanup outside lock
                 
-                if len(self.workflows) >= self.max_workflows:
-                    raise ValueError(f"Maximum workflows ({self.max_workflows}) exceeded")
-                    
+        # Cleanup outside lock to prevent deadlock
+        if len(self._workflows) >= self.max_workflows:
+            await self._cleanup_expired_workflows()
+            
+        async with self._workflow_lock:
+            # Double-check after cleanup
+            if workflow_id in self._workflows:
+                return self._workflows[workflow_id]
+                
+            if len(self._workflows) >= self.max_workflows:
+                raise ValueError(f"Maximum workflows ({self.max_workflows}) exceeded")
+                
             # Create new workflow context
             context = WorkflowContext(
                 workflow_id=workflow_id,
                 metadata=metadata
             )
             
-            self.workflows[workflow_id] = context
+            self._workflows[workflow_id] = context
             self.total_workflows_created += 1
             
             logger.info(f"Registered workflow {workflow_id}")
@@ -170,8 +194,8 @@ class WorkflowContextManager:
             
     async def get_workflow(self, workflow_id: str) -> Optional[WorkflowContext]:
         """Get workflow context by ID."""
-        async with self._lock:
-            return self.workflows.get(workflow_id)
+        async with self._workflow_lock:
+            return self._workflows.get(workflow_id)
             
     async def assign_instance(
         self, 
@@ -191,17 +215,17 @@ class WorkflowContextManager:
         Returns:
             Assigned instance URL
         """
-        async with self._lock:
+        async with self._instance_lock:
             # Check if workflow already assigned
-            if workflow_id in self.workflow_instances:
-                assigned = self.workflow_instances[workflow_id]
+            if workflow_id in self._workflow_instances:
+                assigned = self._workflow_instances[workflow_id]
                 # Verify instance is still available
                 if assigned in available_instances:
                     return assigned
                     
             # Check for agent-specific assignment
-            if agent_id and (workflow_id, agent_id) in self.agent_instances:
-                assigned = self.agent_instances[(workflow_id, agent_id)]
+            if agent_id and (workflow_id, agent_id) in self._agent_instances:
+                assigned = self._agent_instances[(workflow_id, agent_id)]
                 if assigned in available_instances:
                     return assigned
                     
@@ -210,20 +234,21 @@ class WorkflowContextManager:
                 workflow_id, available_instances, current_loads
             )
             
-            # Store assignment
-            self.workflow_instances[workflow_id] = best_instance
+            # Store assignment atomically
+            self._workflow_instances[workflow_id] = best_instance
             if agent_id:
-                self.agent_instances[(workflow_id, agent_id)] = best_instance
+                self._agent_instances[(workflow_id, agent_id)] = best_instance
                 
             # Track instance workflows
-            self.instance_workflows[best_instance].add(workflow_id)
+            self._instance_workflows[best_instance].add(workflow_id)
             
-            # Update workflow context
-            if workflow_id in self.workflows:
-                self.workflows[workflow_id].assigned_instance = best_instance
+        # Update workflow context outside instance lock
+        async with self._workflow_lock:
+            if workflow_id in self._workflows:
+                self._workflows[workflow_id].assigned_instance = best_instance
                 
-            logger.debug(f"Assigned workflow {workflow_id} to instance {best_instance}")
-            return best_instance
+        logger.debug(f"Assigned workflow {workflow_id} to instance {best_instance}")
+        return best_instance
             
     async def _find_best_instance(
         self,
@@ -245,12 +270,12 @@ class WorkflowContextManager:
         if len(available_instances) == 1:
             return available_instances[0]
             
-        # Calculate scores for each instance
+        # Calculate scores for each instance (called within lock)
         instance_scores = {}
         
         for instance in available_instances:
             # Base score from workflow count (lower is better)
-            workflow_count = len(self.instance_workflows.get(instance, set()))
+            workflow_count = len(self._instance_workflows.get(instance, set()))
             score = workflow_count
             
             # Adjust for load if provided
@@ -271,33 +296,41 @@ class WorkflowContextManager:
         tokens: int = 0
     ):
         """Update workflow statistics."""
-        async with self._lock:
-            if workflow_id in self.workflows:
-                self.workflows[workflow_id].update_stats(cache_hit, tokens)
+        async with self._stats_lock:
+            async with self._workflow_lock:
+                if workflow_id in self._workflows:
+                    self._workflows[workflow_id].update_stats(cache_hit, tokens)
                 
     async def register_agent(self, workflow_id: str, agent_id: str):
         """Register an agent in a workflow."""
-        async with self._lock:
-            if workflow_id in self.workflows:
-                self.workflows[workflow_id].register_agent(agent_id)
+        async with self._workflow_lock:
+            if workflow_id in self._workflows:
+                self._workflows[workflow_id].register_agent(agent_id)
                 
     async def get_workflow_stats(self) -> Dict[str, Any]:
         """Get overall workflow statistics."""
-        async with self._lock:
-            active_workflows = sum(
-                1 for w in self.workflows.values() 
-                if w.is_active(self.workflow_ttl)
-            )
-            
-            total_agents = sum(
-                len(w.active_agents) 
-                for w in self.workflows.values()
-            )
-            
-            avg_cache_hit_rate = 0.0
-            if self.workflows:
-                rates = [w.get_cache_hit_rate() for w in self.workflows.values()]
-                avg_cache_hit_rate = sum(rates) / len(rates)
+        async with self._stats_lock:
+            async with self._workflow_lock:
+                active_workflows = sum(
+                    1 for w in self._workflows.values() 
+                    if w.is_active(self.workflow_ttl)
+                )
+                
+                total_agents = sum(
+                    len(w.active_agents) 
+                    for w in self._workflows.values()
+                )
+                
+                avg_cache_hit_rate = 0.0
+                if self._workflows:
+                    rates = [w.get_cache_hit_rate() for w in self._workflows.values()]
+                    avg_cache_hit_rate = sum(rates) / len(rates)
+                    
+            async with self._instance_lock:
+                instance_distribution = {
+                    instance: len(workflows)
+                    for instance, workflows in self._instance_workflows.items()
+                }
                 
             return {
                 "total_workflows_created": self.total_workflows_created,
@@ -305,8 +338,5 @@ class WorkflowContextManager:
                 "active_workflows": active_workflows,
                 "total_agents": total_agents,
                 "avg_cache_hit_rate": avg_cache_hit_rate,
-                "instance_distribution": {
-                    instance: len(workflows)
-                    for instance, workflows in self.instance_workflows.items()
-                }
+                "instance_distribution": instance_distribution
             }

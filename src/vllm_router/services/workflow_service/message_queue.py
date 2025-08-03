@@ -32,7 +32,9 @@ class WorkflowMessageQueue:
         self,
         max_queue_size: int = 1000,
         max_message_size: int = 1024 * 1024,  # 1MB
-        cleanup_interval: int = 60
+        cleanup_interval: int = 60,
+        max_total_queues: int = 10000,  # Prevent unlimited queue growth
+        max_messages_per_cleanup: int = 1000  # Limit cleanup batch size
     ):
         """Initialize message queue.
         
@@ -46,14 +48,21 @@ class WorkflowMessageQueue:
         self.max_queue_size = max_queue_size
         self.max_message_size = max_message_size
         self.cleanup_interval = cleanup_interval
+        self.max_total_queues = max_total_queues
+        self.max_messages_per_cleanup = max_messages_per_cleanup
         
         # Metrics
         self.total_messages_sent = 0
         self.total_messages_received = 0
         self.total_messages_expired = 0
+        self.total_queues_created = 0
+        self.total_queues_removed = 0
         
         self._cleanup_task: Optional[asyncio.Task] = None
         self._lock = asyncio.Lock()
+        
+        # Track queue creation times for LRU eviction
+        self._queue_creation_times: Dict[Tuple[str, str], float] = {}
         
     async def start(self):
         """Start background cleanup task."""
@@ -84,29 +93,47 @@ class WorkflowMessageQueue:
                 logger.error(f"Error in message cleanup loop: {e}")
                 
     async def _cleanup_expired_messages(self):
-        """Remove expired messages from all queues."""
+        """Remove expired messages from all queues with memory leak protection."""
         async with self._lock:
             empty_queues = []
+            messages_processed = 0
             
-            for key, queue in self.queues.items():
+            # Limit processing to prevent memory spikes
+            for key, queue in list(self.queues.items()):
+                if messages_processed >= self.max_messages_per_cleanup:
+                    logger.debug(f"Cleanup batch limit reached: {self.max_messages_per_cleanup}")
+                    break
+                    
                 # Check and remove expired messages
                 temp_messages = []
                 expired_count = 0
                 
-                # Get all messages from queue
-                while not queue.empty():
+                # Get all messages from queue with safety limit
+                queue_size = queue.qsize()
+                for _ in range(min(queue_size, self.max_queue_size)):
                     try:
                         message = queue.get_nowait()
+                        messages_processed += 1
+                        
                         if not message.is_expired():
                             temp_messages.append(message)
                         else:
                             expired_count += 1
+                            
+                        # Break if we've processed too many
+                        if messages_processed >= self.max_messages_per_cleanup:
+                            break
+                            
                     except asyncio.QueueEmpty:
                         break
                         
                 # Put non-expired messages back
                 for message in temp_messages:
-                    await queue.put(message)
+                    try:
+                        await asyncio.wait_for(queue.put(message), timeout=0.1)
+                    except asyncio.TimeoutError:
+                        logger.warning(f"Failed to restore message to queue {key}")
+                        break
                     
                 self.total_messages_expired += expired_count
                 
@@ -114,9 +141,16 @@ class WorkflowMessageQueue:
                 if queue.empty():
                     empty_queues.append(key)
                     
-            # Remove empty queues
+            # Remove empty queues with cleanup tracking
+            removed_count = 0
             for key in empty_queues:
-                del self.queues[key]
+                if key in self.queues:
+                    del self.queues[key]
+                    removed_count += 1
+                if key in self._queue_creation_times:
+                    del self._queue_creation_times[key]
+                    
+            self.total_queues_removed += removed_count
                 
             if empty_queues or self.total_messages_expired > 0:
                 logger.debug(
@@ -148,7 +182,18 @@ class WorkflowMessageQueue:
         async with self._lock:
             # Create queue if it doesn't exist
             if key not in self.queues:
+                # Check total queue limit before creating new queue
+                if len(self.queues) >= self.max_total_queues:
+                    # Try cleanup first
+                    await self._cleanup_expired_messages()
+                    
+                    # If still at limit, remove oldest unused queue
+                    if len(self.queues) >= self.max_total_queues:
+                        await self._evict_oldest_queue()
+                        
                 self.queues[key] = asyncio.Queue(maxsize=self.max_queue_size)
+                self._queue_creation_times[key] = time.time()
+                self.total_queues_created += 1
                 
             queue = self.queues[key]
             
@@ -250,9 +295,13 @@ class WorkflowMessageQueue:
                 "total_messages_sent": self.total_messages_sent,
                 "total_messages_received": self.total_messages_received,
                 "total_messages_expired": self.total_messages_expired,
+                "total_queues_created": self.total_queues_created,
+                "total_queues_removed": self.total_queues_removed,
                 "queue_sizes": queue_sizes,
                 "max_queue_size": max(queue_sizes.values()) if queue_sizes else 0,
-                "total_pending_messages": sum(queue_sizes.values())
+                "total_pending_messages": sum(queue_sizes.values()),
+                "max_total_queues": self.max_total_queues,
+                "memory_usage_mb": len(self.queues) * 0.1  # Rough estimate
             }
             
     async def clear_workflow_messages(self, workflow_id: str):
@@ -266,4 +315,30 @@ class WorkflowMessageQueue:
             for key in keys_to_remove:
                 del self.queues[key]
                 
+            # Update metrics
+            self.total_queues_removed += len(keys_to_remove)
+            
+            # Remove from creation times tracking
+            for key in keys_to_remove:
+                if key in self._queue_creation_times:
+                    del self._queue_creation_times[key]
+                    
             logger.info(f"Cleared {len(keys_to_remove)} queues for workflow {workflow_id}")
+            
+    async def _evict_oldest_queue(self):
+        """Evict the oldest unused queue to free memory."""
+        if not self._queue_creation_times:
+            return
+            
+        # Find oldest queue
+        oldest_key = min(self._queue_creation_times, key=self._queue_creation_times.get)
+        oldest_queue = self.queues.get(oldest_key)
+        
+        # Only evict if queue is empty
+        if oldest_queue and oldest_queue.empty():
+            del self.queues[oldest_key]
+            del self._queue_creation_times[oldest_key]
+            self.total_queues_removed += 1
+            logger.debug(f"Evicted oldest empty queue: {oldest_key}")
+        else:
+            logger.warning("Cannot evict oldest queue - not empty or not found")
