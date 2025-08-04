@@ -123,6 +123,7 @@ Currently, the dynamic config supports the following fields:
 - `callbacks`: The path to the callback instance extending CustomCallbackHandler.
 - (When using `static` service discovery) `static_backends`: The URLs of static serving engines, separated by commas (e.g., `http://localhost:9001,http://localhost:9002,http://localhost:9003`).
 - (When using `static` service discovery) `static_models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
+- (When using `static` service discovery) `static_aliases`: The aliases of the models running in the static serving engines, separated by commas and associated using colons (e.g., `model_alias1:model,mode_alias2:model`).
 - (When using `static` service discovery and if you enable the `--static-backend-health-checks` flag) `static_model_types`: The model types running in the static serving engines, separated by commas (e.g., `chat,chat`).
 - (When using `k8s` service discovery) `k8s_port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
 - (When using `k8s` service discovery) `k8s_namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
@@ -145,6 +146,9 @@ static_models:
         static_backends:
             - http://localhost:9002
         static_model_type: chat
+static_aliases:
+    "my-alias": "facebook/opt-125m"
+    "my-other-alias": "meta-llama/Llama-3.1-8B-Instruct"
 ```
 
 Here is an example of a dynamic JSON config file:
@@ -156,7 +160,8 @@ Here is an example of a dynamic JSON config file:
     "callbacks": "module.custom.callback_handler",
     "static_backends": "http://localhost:9001,http://localhost:9002,http://localhost:9003",
     "static_models": "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m",
-    "static_model_types": "completion,chat,completion"
+    "static_model_types": "completion,chat,completion",
+    "static_aliases": "my-alias:meta-llama/Llama-3.1-8B-Instruct,my-other-alias:meta-llama/Llama-3.1-8B-Instruct"
 }
 ```
 

@@ -33,6 +33,7 @@ from vllm_router.service_discovery import (
 from vllm_router.utils import (
     SingletonMeta,
     parse_comma_separated_args,
+    parse_static_aliases,
     parse_static_urls,
 )
 
@@ -163,7 +164,11 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 app=self.app,
                 urls=parse_static_urls(config.static_backends),
                 models=parse_comma_separated_args(config.static_models),
-                aliases=parse_comma_separated_args(config.static_aliases),
+                aliases=(
+                    parse_static_aliases(config.static_aliases)
+                    if config.static_aliases
+                    else None
+                ),
                 model_labels=parse_comma_separated_args(config.static_model_labels),
                 model_types=parse_comma_separated_args(config.static_model_types),
                 static_backend_health_checks=config.static_backend_health_checks,
