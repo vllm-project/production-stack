@@ -109,13 +109,10 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install Python dependencies
         run: |
+          source /usr/local/bin/conda-init
+          conda activate llmstack
           python -m pip install --upgrade pip
           pip install -r benchmarks/multi-round-qa/requirements.txt
           pip install -e .
@@ -142,6 +139,8 @@ jobs:
 
       - name: Run all k8s discovery routing tests
         run: |
+          source /usr/local/bin/conda-init
+          conda activate llmstack
           echo "🧪 Running all k8s discovery routing tests"
           ./tests/e2e/run-k8s-routing-test.sh all \
             --model "facebook/opt-125m" \
@@ -173,23 +172,24 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install Python dependencies
         run: |
+          source /usr/local/bin/conda-init
+          conda activate llmstack
           python -m pip install --upgrade pip
           pip install -e .
 
       - name: Install vLLM and lmcache
         run: |
+          source /usr/local/bin/conda-init
+          conda activate llmstack
           pip install vllm
           pip install lmcache
 
       - name: Start 2 vLLM serve backends
         run: |
+          source /usr/local/bin/conda-init
+          conda activate llmstack
           echo "🚀 Starting vLLM serve backend"
           mkdir -p "$LOG_DIR"
           CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
@@ -202,9 +202,9 @@ jobs:
           ./tests/e2e/wait-for-backends.sh 180 "http://localhost:8001" "http://localhost:8002"
 
       - name: Run All Static Discovery Routing Tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}/src
         run: |
+          source /usr/local/bin/conda-init
+          conda activate llmstack
           echo "🧪 Running all static discovery routing tests sequentially"
           chmod +x tests/e2e/run-static-discovery-routing-test.sh
           ./tests/e2e/run-static-discovery-routing-test.sh all \

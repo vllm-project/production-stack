@@ -116,7 +116,13 @@ def initialize_all(app: FastAPI, args):
         ValueError: if the service discovery type is invalid
     """
     if sentry_dsn := args.sentry_dsn:
-        sentry_sdk.init(dsn=sentry_dsn, send_default_pii=True)
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            send_default_pii=True,
+            profile_lifecycle="trace",
+            traces_sample_rate=args.sentry_traces_sample_rate,
+            profile_session_sample_rate=args.sentry_profile_session_sample_rate,
+        )
 
     if args.service_discovery == "static":
         initialize_service_discovery(
@@ -146,6 +152,7 @@ def initialize_all(app: FastAPI, args):
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
             ServiceDiscoveryType.K8S,
+            k8s_service_discovery_type=args.k8s_service_discovery_type,
             app=app,
             namespace=args.k8s_namespace,
             port=args.k8s_port,

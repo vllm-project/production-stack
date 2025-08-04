@@ -43,6 +43,9 @@ spec:
         helm-release-name: {{ .Release.Name }}
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
+      {{- if $modelSpec.priorityClassName }}
+      priorityClassName: {{ $modelSpec.priorityClassName | quote }}
+      {{- end }}
       {{- if hasKey $modelSpec "initContainer" }}
       {{- $container := $modelSpec.initContainer }}
       initContainers:
@@ -170,17 +173,12 @@ spec:
           {{-     if hasKey $modelSpec.lmcacheConfig "enablePD" }}
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}","kv_connector_extra_config":{"discard_partial_chunks": false, "lmcache_rpc_port": {{ $modelSpec.lmcacheConfig.nixlRole | quote }}}}'
-          {{-     else if hasKey $modelSpec.vllmConfig "v1" }}
-          {{-       if eq (toString $modelSpec.vllmConfig.v1) "1" }}
-          - "--kv-transfer-config"
-          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}"}'
-          {{-       else }}
+          {{-     else if and (hasKey $modelSpec.vllmConfig "v0") (eq (toString $modelSpec.vllmConfig.v0) "1") }}
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
-          {{-       end }}
           {{-     else }}
           - "--kv-transfer-config"
-          - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}"}'
           {{-     end }}
           {{-   end }}
           {{- end }}
@@ -188,7 +186,7 @@ spec:
           - "--chat-template"
           - "/templates/{{ $modelSpec.chatTemplate }}"
           {{- end }}
-          imagePullPolicy: Always
+          imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
           env:
           - name: HF_HOME
             {{- if hasKey $modelSpec "pvcStorage" }}
@@ -203,18 +201,14 @@ spec:
           {{- with $modelSpec.vllmConfig}}
           - name: LMCACHE_LOG_LEVEL
             value: "DEBUG"
-          {{- if hasKey . "v1" }}
-          {{- if eq ($modelSpec.vllmConfig.v1 | toString) "1" }}
+          {{- if and (hasKey . "v0") (eq (toString $modelSpec.vllmConfig.v0) "1") }}
+          - name: VLLM_USE_V1
+            value: "0"
+          {{- else }}
           {{- $dir := default "/tmp" $modelSpec.vllmConfig.prometheusMultiprocDir }}
           - name: PROMETHEUS_MULTIPROC_DIR
             value: {{ $dir | quote }}
           {{- end }}
-          - name: VLLM_USE_V1
-            value: {{ $modelSpec.vllmConfig.v1 | quote }}
-          {{- else }}
-          - name: VLLM_USE_V1
-            value: "0"
-          {{- end}}
           {{- end}}
           {{- if $modelSpec.hf_token }}
           - name: HF_TOKEN
@@ -372,17 +366,39 @@ spec:
           {{- if hasKey $modelSpec "extraVolumeMounts" }}
           {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
           {{- end }}
+          {{- if hasKey $.Values "sharedPvcStorage" }}
+          - name: {{ .Release.Name }}-shared-pvc-storage
+            mountPath: /data/shared-pvc-storage
+          {{- end }}
+        {{- if and $modelSpec.enableLoRA (hasKey $modelSpec "pvcStorage") }}
+        - name: sidecar
+          image: {{ .Values.servingEngineSpec.sidecar.image }}
+          imagePullPolicy: {{ .Values.servingEngineSpec.sidecar.imagePullPolicy | default "Always" }}
+          env:
+            - name: PORT
+              value: "30090"
+            - name: LORA_DOWNLOAD_BASE_DIR
+              value: /data/lora-adapters
+          volumeMounts:
+            - name: {{ .Release.Name }}-storage
+              mountPath: /data
+        {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
-      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") (hasKey $.Values "sharedPvcStorage") }}
       volumes:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
+        {{- end }}
+        {{- if hasKey $.Values "sharedPvcStorage" }}
+        - name: {{ .Release.Name }}-shared-pvc-storage
+          persistentVolumeClaim:
+            claimName: "{{ .Release.Name }}-shared-pvc-storage-claim"
         {{- end }}
         {{- with $modelSpec.vllmConfig }}
         {{- if hasKey $modelSpec.vllmConfig "tensorParallelSize"}}
