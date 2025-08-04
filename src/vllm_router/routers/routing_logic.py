@@ -130,6 +130,9 @@ class RoundRobinRouter(RoutingInterface):
         if hasattr(self, "_initialized"):
             return
         self.req_id = 0
+        self.sorted_endpoints = []
+        self.last_endpoints_id = None
+        self.last_endpoints_hash = None
         self._initialized = True
 
     def route_request(
@@ -151,8 +154,14 @@ class RoundRobinRouter(RoutingInterface):
                 indicating the request-level performance of each engine
             request (Request): The incoming request
         """
-        len_engines = len(endpoints)
-        chosen = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
+        endpoints_id = id(endpoints)
+        if endpoints_id != self.last_endpoints_id:
+            current_hash = hash(tuple(e.url for e in endpoints))
+            if current_hash != self.last_endpoints_hash:
+                self.sorted_endpoints = sorted(endpoints, key=lambda e: e.url)
+                self.last_endpoints_hash = current_hash
+            self.last_endpoints_id = endpoints_id
+        chosen = self.sorted_endpoints[self.req_id % len(self.sorted_endpoints)]
         self.req_id += 1
         return chosen.url
 
