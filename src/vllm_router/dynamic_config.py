@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import dataclasses
 import json
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 from fastapi import FastAPI
 
