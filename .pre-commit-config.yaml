@@ -58,3 +58,14 @@ repos:
     hooks:
       - id: codespell
         args: ["--ignore-words", ".codespell-ignore"]
+  - repo: https://github.com/bridgecrewio/checkov
+    rev: 3.2.446  # Update as needed
+    hooks:
+      - id: checkov
+        name: "Checkov security scan for infra and config"
+        args:
+          - --soft-fail
+          - --quiet
+          - --framework
+          - github_configuration,github_actions,sast_python,sast_golang,helm,dockerfile,yaml
+        stages: [manual] # Only run manually and soft-fail for infomation for now, remove it once we have solve the issues

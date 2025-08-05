@@ -1,0 +1,132 @@
+{{- if .Values.loraController.enableLoraController }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-lora-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: lora-controller
+    helm-release-name: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: lora-controller
+      helm-release-name: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: lora-controller
+        helm-release-name: {{ .Release.Name }}
+      {{- with .Values.loraController.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.loraController.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Release.Name }}-lora-controller
+      securityContext:
+        {{- toYaml .Values.loraController.podSecurityContext | nindent 8 }}
+      {{- if hasKey $.Values "sharedPvcStorage" }}
+      initContainers:
+        - name: fix-perms
+          image: busybox:1.37
+          command: ["sh", "-c", "chown -R 65532:65532 /data/shared-pvc-storage"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+          volumeMounts:
+            - name: {{ .Release.Name }}-shared-pvc-storage
+              mountPath: /data/shared-pvc-storage
+      {{- end }}
+      containers:
+        - name: manager
+          image: "{{ .Values.loraController.image.repository }}:{{ .Values.loraController.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.loraController.image.pullPolicy }}
+          args:
+            - --leader-elect
+            - --health-probe-bind-address=:8081
+            {{- if .Values.loraController.metrics.enabled }}
+            - --metrics-bind-address=:8443
+            - --metrics-secure
+            {{- else }}
+            - --metrics-bind-address=0
+            {{- end }}
+            {{- if .Values.loraController.webhook.enabled }}
+            - --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
+            {{- end }}
+            {{- with .Values.loraController.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            - name: WATCH_NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: KUBERNETES_CLUSTER_DOMAIN
+              value: {{ quote .Values.loraController.kubernetesClusterDomain }}
+            {{- with .Values.loraController.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: metrics
+              containerPort: 8443
+              protocol: TCP
+            {{- if .Values.loraController.webhook.enabled }}
+            - name: webhook-server
+              containerPort: 9443
+              protocol: TCP
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.loraController.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.loraController.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+          {{- if .Values.loraController.webhook.enabled }}
+            - name: webhook-server-cert
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+          {{- end }}
+          {{- if hasKey $.Values "sharedPvcStorage" }}
+            - name: {{ .Release.Name }}-shared-pvc-storage
+              mountPath: /data/shared-pvc-storage
+          {{- end }}
+      volumes:
+      {{- if .Values.loraController.webhook.enabled }}
+        - name: webhook-server-cert
+          secret:
+            secretName: {{ .Release.Name }}-lora-controller-webhook-server-cert
+      {{- end }}
+      {{- if hasKey $.Values "sharedPvcStorage" }}
+        - name: {{ .Release.Name }}-shared-pvc-storage
+          persistentVolumeClaim:
+            claimName: "{{ .Release.Name }}-shared-pvc-storage-claim"
+      {{- end }}
+      {{- with .Values.loraController.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.loraController.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.loraController.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+{{- end }}

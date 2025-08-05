@@ -16,13 +16,10 @@ import abc
 import asyncio
 import enum
 import math
-import os
 import random
-import socket
 import threading
 from typing import Dict, List
 
-import requests
 from fastapi import Request
 
 try:
@@ -35,7 +32,6 @@ try:
     from lmcache.v1.cache_controller.message import (
         LookupMsg,
         QueryInstMsg,
-        QueryInstRetMsg,
     )
 except ImportError:
     pass
@@ -135,6 +131,9 @@ class RoundRobinRouter(RoutingInterface):
         if hasattr(self, "_initialized"):
             return
         self.req_id = 0
+        self.sorted_endpoints = []
+        self.last_endpoints_id = None
+        self.last_endpoints_hash = None
         self._initialized = True
 
     def route_request(
@@ -156,8 +155,14 @@ class RoundRobinRouter(RoutingInterface):
                 indicating the request-level performance of each engine
             request (Request): The incoming request
         """
-        len_engines = len(endpoints)
-        chosen = sorted(endpoints, key=lambda e: e.url)[self.req_id % len_engines]
+        endpoints_id = id(endpoints)
+        if endpoints_id != self.last_endpoints_id:
+            current_hash = hash(tuple(e.url for e in endpoints))
+            if current_hash != self.last_endpoints_hash:
+                self.sorted_endpoints = sorted(endpoints, key=lambda e: e.url)
+                self.last_endpoints_hash = current_hash
+            self.last_endpoints_id = endpoints_id
+        chosen = self.sorted_endpoints[self.req_id % len(self.sorted_endpoints)]
         self.req_id += 1
         return chosen.url
 
@@ -283,31 +288,7 @@ class KvawareRouter(RoutingInterface):
         if self.tokenizer is None:
             self.tokenizer = AutoTokenizer.from_pretrained(endpoints[0].model_names[0])
         url = endpoints[0].url + "/tokenize"
-        headers = {"Content-Type": "application/json"}
-
-        # Handle chat completions
-        if "messages" in request_json:
-            # Get the last message from the messages array
-            messages = request_json["messages"]
-            if messages:
-                last_message = messages[-1]
-                prompt = last_message.get("content", "")
-                if isinstance(prompt, list):
-                    # Handle multimodal messages
-                    prompt = " ".join(
-                        part.get("text", "")
-                        for part in prompt
-                        if part.get("type") == "text"
-                    )
-                data = {"model": endpoints[0].model_names[0], "prompt": prompt}
-            else:
-                data = {"model": endpoints[0].model_names[0], "prompt": ""}
-        else:
-            # Handle regular completions
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json["prompt"],
-            }
+        # TODO (Yuhan): Handle chat completions
         token_ids = self.tokenizer.encode(request_json["prompt"])
         msg = LookupMsg(tokens=token_ids)
         instance_id = await self.query_manager(msg)

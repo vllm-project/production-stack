@@ -194,8 +194,9 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // deploymentForVLLMRouter returns a VLLMRouter Deployment object
 func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.VLLMRouter) *appsv1.Deployment {
-	labels := map[string]string{
-		"app": router.Name,
+	labels := map[string]string{"app": router.Name}
+	for k, v := range router.Labels {
+		labels[k] = v
 	}
 
 	// Add user-defined environment variables
@@ -363,6 +364,10 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
 func (r *VLLMRouterReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, router *servingv1alpha1.VLLMRouter) bool {
+	// Compare replicas
+	if *dep.Spec.Replicas != router.Spec.Replicas {
+		return true
+	}
 	// Generate the expected deployment
 	expectedDep := r.deploymentForVLLMRouter(router)
 
@@ -410,8 +415,9 @@ func (r *VLLMRouterReconciler) updateStatus(ctx context.Context, router *serving
 
 // serviceForVLLMRouter returns a VLLMRouter Service object
 func (r *VLLMRouterReconciler) serviceForVLLMRouter(router *servingv1alpha1.VLLMRouter) *corev1.Service {
-	labels := map[string]string{
-		"app": router.Name,
+	labels := map[string]string{"app": router.Name}
+	for k, v := range router.Labels {
+		labels[k] = v
 	}
 
 	svc := &corev1.Service{

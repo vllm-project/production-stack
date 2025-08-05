@@ -82,12 +82,16 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	logger.Info("Found LoraAdapter resources", "count", len(loraAdapters.Items))
 
+	// Track if any adapters are waiting for pods
+	hasWaitingAdapters := false
+
 	// Iterate through each LoraAdapter
 	for _, loraAdapter := range loraAdapters.Items {
 		logger.Info("Processing LoraAdapter", "namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 
 		// Check if the adapter is being deleted
 		if loraAdapter.DeletionTimestamp.IsZero() {
+			logger.Info("Adding finalizer", "namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 			if !controllerutil.ContainsFinalizer(&loraAdapter, loraAdapterFinalizer) {
 				controllerutil.AddFinalizer(&loraAdapter, loraAdapterFinalizer)
 				if err := r.Update(ctx, &loraAdapter); err != nil {
@@ -144,6 +148,25 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		logger.Info("Desired pod placements", "placements", desiredPlacements,
 			"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 
+		// Check if no pods are ready yet
+		if len(desiredPlacements) == 0 {
+			logger.Info("No pods are ready yet, waiting for pods to become ready",
+				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+
+			// Update status to reflect waiting state
+			if err := r.updateStatusWithWaitingState(ctx, &loraAdapter, "Waiting for pods to become ready"); err != nil {
+				logger.Error(err, "Failed to update status with waiting state",
+					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+				continue
+			}
+
+			// Mark that we have waiting adapters
+			hasWaitingAdapters = true
+
+			// Continue to next adapter
+			continue
+		}
+
 		// Step 4: Compare current and desired state
 		if needsReconciliation, err := r.compareStates(currentRegistrations, desiredPlacements); err != nil {
 			logger.Error(err, "Failed to compare states",
@@ -198,9 +221,14 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	// Schedule periodic reconciliation
+	// Schedule periodic reconciliation based on whether we have waiting adapters
 	logger.Info("Reconciliation loop completed")
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	if hasWaitingAdapters {
+		// If we have adapters waiting for pods, requeue more frequently
+		logger.Info("Some adapters are waiting for pods, requeuing with shorter interval")
+		return ctrl.Result{Requeue: true}, nil
+	}
+	return ctrl.Result{Requeue: true}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -277,7 +305,7 @@ func (r *LoraAdapterReconciler) findLoraAdaptersForPod(ctx context.Context, pod 
 }
 
 // discoverAdapter discovers the adapter from its source location
-func (r *LoraAdapterReconciler) discoverAdapter(adapter *productionstackv1alpha1.LoraAdapter) (string, error) {
+func (r *LoraAdapterReconciler) discoverAdapter(ctx context.Context, adapter *productionstackv1alpha1.LoraAdapter, podName, namespace string) (string, error) {
 	source := adapter.Spec.AdapterSource
 
 	// If path is already set, return it
@@ -296,11 +324,69 @@ func (r *LoraAdapterReconciler) discoverAdapter(adapter *productionstackv1alpha1
 		// TODO: Implement HTTP discovery
 		return "", fmt.Errorf("HTTP adapter discovery not implemented yet")
 	case "huggingface":
-		// TODO: Implement HuggingFace discovery
-		return "", fmt.Errorf("HF adapter discovery not implemented yet")
+		return r.downloadHuggingFaceAdapter(ctx, adapter, podName, namespace)
 	default:
 		return "", fmt.Errorf("unsupported adapter source type: %s", source.Type)
 	}
+}
+
+// downloadHuggingFaceAdapter downloads a LoRA adapter from HuggingFace Hub
+func (r *LoraAdapterReconciler) downloadHuggingFaceAdapter(ctx context.Context, adapter *productionstackv1alpha1.LoraAdapter, podName, namespace string) (string, error) {
+	logger := logf.Log.WithName("huggingface-download")
+
+	source := adapter.Spec.AdapterSource
+
+	// Validate required fields
+	if source.Repository == nil || *source.Repository == "" {
+		return "", fmt.Errorf("repository is required for huggingface adapter source")
+	}
+
+	// Download the adapter directly using command line tools
+	adapterPath := strings.ReplaceAll(source.AdapterName, "/", "-")
+
+	// Get the HuggingFace token from the secret
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{
+		Name:      source.CredentialsSecretRef.Name,
+		Namespace: adapter.Namespace,
+	}, secret); err != nil {
+		return "", fmt.Errorf("failed to get secret: %w", err)
+	}
+
+	token, ok := secret.Data[source.CredentialsSecretRef.Key]
+	if !ok {
+		return "", fmt.Errorf("secret does not contain key %s", source.CredentialsSecretRef.Key)
+	}
+
+	// Download using sidecar
+	endpoint, err := r.getPodEndpoint(ctx, podName, namespace, "/model/download", 30090)
+	if err != nil {
+		return "", fmt.Errorf("failed to get pod endpoint: %w", err)
+	}
+
+	payload := map[string]string{
+		"model_id":  *source.Repository,
+		"token":     string(token),
+		"local_dir": adapterPath,
+	}
+
+	body, err := r.sendRequest(ctx, "POST", endpoint, payload, adapter)
+	if err != nil {
+		return "", fmt.Errorf("failed to download adapter: %w", err)
+	}
+
+	// Update the adapter path in the spec
+	bodyMap := make(map[string]string)
+	if err := json.Unmarshal(body, &bodyMap); err != nil {
+		return "", fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	adapter.Spec.AdapterSource.AdapterPath = bodyMap["path"]
+	if err := r.Update(ctx, adapter); err != nil {
+		return "", fmt.Errorf("failed to update adapter path: %w", err)
+	}
+
+	logger.Info("Successfully downloaded HuggingFace adapter", "adapter", source.AdapterName, "path", adapter.Spec.AdapterSource.AdapterPath)
+	return adapter.Spec.AdapterSource.AdapterPath, nil
 }
 
 // GetOptimalPlacement determines the optimal pod placement for an adapter
@@ -326,8 +412,10 @@ func (r *LoraAdapterReconciler) getOptimalPlacement(ctx context.Context, adapter
 		}
 	}
 
+	// If no pods are ready yet, return empty placement list instead of error
+	// This allows the controller to continue processing and wait for pods to become ready
 	if len(validPods) == 0 {
-		return nil, fmt.Errorf("no valid pods found for model %s", adapter.Spec.BaseModel)
+		return []PodPlacement{}, nil
 	}
 
 	// Determine number of pods to use
@@ -358,7 +446,7 @@ type PodPlacement struct {
 }
 
 // getPodEndpoint gets the HTTP endpoint for a pod
-func (r *LoraAdapterReconciler) getPodEndpoint(ctx context.Context, podName, namespace string, path string) (string, error) {
+func (r *LoraAdapterReconciler) getPodEndpoint(ctx context.Context, podName, namespace string, path string, port ...int) (string, error) {
 	// Get pod details
 	pod := &corev1.Pod{}
 	if err := r.Get(ctx, types.NamespacedName{
@@ -373,19 +461,24 @@ func (r *LoraAdapterReconciler) getPodEndpoint(ctx context.Context, podName, nam
 		return "", fmt.Errorf("pod %s has no IP address", podName)
 	}
 
+	podPort := 0
 	// Get container port
-	port := 8000 // default port
-	for _, container := range pod.Spec.Containers {
-		for _, containerPort := range container.Ports {
-			if containerPort.Name == "container-port" {
-				port = int(containerPort.ContainerPort)
-				break
+	if len(port) == 0 { // if no port is provided, use the default port
+		podPort = 8000 // default port
+		for _, container := range pod.Spec.Containers {
+			for _, containerPort := range container.Ports {
+				if containerPort.Name == "container-port" {
+					podPort = int(containerPort.ContainerPort)
+					break
+				}
 			}
 		}
+	} else {
+		podPort = port[0] // if a port is provided, use it
 	}
 
 	// Construct endpoint URL using pod IP and container port
-	return fmt.Sprintf("http://%s:%d%s", pod.Status.PodIP, port, path), nil
+	return fmt.Sprintf("http://%s:%d%s", pod.Status.PodIP, podPort, path), nil
 }
 
 // sendRequest sends an HTTP request to the specified endpoint
@@ -462,16 +555,11 @@ func (r *LoraAdapterReconciler) getVLLMApiKey(ctx context.Context, adapter *prod
 		return "", nil
 	}
 
-	// If direct value is provided, use it
-	if adapter.Spec.VLLMApiKey.Value != "" {
-		return adapter.Spec.VLLMApiKey.Value, nil
-	}
-
 	// If secret reference is provided, get the key from the secret
-	if adapter.Spec.VLLMApiKey.SecretRef != nil {
+	if adapter.Spec.VLLMApiKey.SecretName != "" && adapter.Spec.VLLMApiKey.SecretKey != "" {
 		secret := &corev1.Secret{}
 		err := r.Get(ctx, types.NamespacedName{
-			Name:      adapter.Spec.VLLMApiKey.SecretRef.SecretName,
+			Name:      adapter.Spec.VLLMApiKey.SecretName,
 			Namespace: adapter.Namespace,
 		}, secret)
 		if err != nil {
@@ -479,9 +567,9 @@ func (r *LoraAdapterReconciler) getVLLMApiKey(ctx context.Context, adapter *prod
 		}
 
 		// Get the API key from the secret using the specified key
-		apiKey, ok := secret.Data[adapter.Spec.VLLMApiKey.SecretRef.SecretKey]
+		apiKey, ok := secret.Data[adapter.Spec.VLLMApiKey.SecretKey]
 		if !ok {
-			return "", fmt.Errorf("secret does not contain key %s", adapter.Spec.VLLMApiKey.SecretRef.SecretKey)
+			return "", fmt.Errorf("secret does not contain key %s", adapter.Spec.VLLMApiKey.SecretKey)
 		}
 
 		return string(apiKey), nil
@@ -619,6 +707,15 @@ func (r *LoraAdapterReconciler) updateStatusWithRegistrations(ctx context.Contex
 		adapter.Status.LoadedAdapters = registrations
 		adapter.Status.ObservedGeneration = adapter.Generation
 
+		// Clear any waiting conditions since we now have registrations
+		var updatedConditions []productionstackv1alpha1.Condition
+		for _, condition := range adapter.Status.Conditions {
+			if condition.Type != "WaitingForPods" {
+				updatedConditions = append(updatedConditions, condition)
+			}
+		}
+		adapter.Status.Conditions = updatedConditions
+
 		// Try to update the status
 		updateErr = r.Status().Update(ctx, adapter)
 		if updateErr == nil {
@@ -636,6 +733,63 @@ func (r *LoraAdapterReconciler) updateStatusWithRegistrations(ctx context.Contex
 	}
 
 	return fmt.Errorf("failed to update status with current registrations after retries: %w", updateErr)
+}
+
+// updateStatusWithWaitingState updates the adapter status when waiting for pods to become ready
+func (r *LoraAdapterReconciler) updateStatusWithWaitingState(ctx context.Context, adapter *productionstackv1alpha1.LoraAdapter, message string) error {
+	var updateErr error
+	for retries := 0; retries < 3; retries++ {
+		// Get the latest version before updating
+		if err := r.Get(ctx, types.NamespacedName{
+			Namespace: adapter.Namespace,
+			Name:      adapter.Name,
+		}, adapter); err != nil {
+			return fmt.Errorf("failed to get latest LoraAdapter: %w", err)
+		}
+
+		// Update status to reflect waiting state
+		adapter.Status.LoadedAdapters = []productionstackv1alpha1.LoadedAdapter{}
+		adapter.Status.ObservedGeneration = adapter.Generation
+
+		// Add a condition to indicate waiting state
+		waitingCondition := productionstackv1alpha1.Condition{
+			Type:               "WaitingForPods",
+			Status:             "True",
+			LastTransitionTime: metav1.Now(),
+			Reason:             "NoReadyPods",
+			Message:            message,
+		}
+
+		// Update or add the condition
+		found := false
+		for i, condition := range adapter.Status.Conditions {
+			if condition.Type == "WaitingForPods" {
+				adapter.Status.Conditions[i] = waitingCondition
+				found = true
+				break
+			}
+		}
+		if !found {
+			adapter.Status.Conditions = append(adapter.Status.Conditions, waitingCondition)
+		}
+
+		// Try to update the status
+		updateErr = r.Status().Update(ctx, adapter)
+		if updateErr == nil {
+			return nil
+		}
+
+		// If we get a conflict error, wait a bit and retry
+		if errors.IsConflict(updateErr) {
+			time.Sleep(time.Second * time.Duration(retries+1))
+			continue
+		}
+
+		// If we get any other error, return it
+		return fmt.Errorf("failed to update status with waiting state: %w", updateErr)
+	}
+
+	return fmt.Errorf("failed to update status with waiting state after retries: %w", updateErr)
 }
 
 // compareStates compares current and desired states
@@ -687,7 +841,7 @@ func (r *LoraAdapterReconciler) reconcileToDesiredState(ctx context.Context, ada
 		key := fmt.Sprintf("%s/%s", placement.Namespace, placement.PodName)
 		if _, exists := currentMap[key]; !exists {
 			logger.Info("Loading adapter on pod", "pod", placement.PodName, "namespace", placement.Namespace)
-			adapterPath, err := r.discoverAdapter(adapter)
+			adapterPath, err := r.discoverAdapter(ctx, adapter, placement.PodName, placement.Namespace)
 			if err != nil {
 				return fmt.Errorf("failed to discover adapter: %w", err)
 			}
