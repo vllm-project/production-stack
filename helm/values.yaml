@@ -32,9 +32,16 @@ servingEngineSpec:
   # - requestMemory: (string) The amount of memory requested for the model, e.g., "16Gi"
   # - requestGPU: (int) The number of GPUs requested for the model, e.g., 1
   # - requestGPUType: (Optional, string) The type of GPU requested, e.g., "nvidia.com/mig-4g.71gb". If not specified, defaults to "nvidia.com/gpu"
+  # - requestGPUMem: (Optional, string) Requires HAMi. The amount of GPU memory requested, e.g., 3000. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage
+  # - requestGPUMemPercentage: (Optional, string) Requires HAMi. The percentage of GPU memory requested, e.g., "80". It cannot be used together with requestGPUMem.
+  # - requestGPUCores: (Optional, string) Requires HAMi. The percentage of GPU cores requested, e.g., "10". Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage
   # - limitCPU: (Optional, string) The CPU limit for the model, e.g., "8"
   # - limitMemory: (Optional, string) The memory limit for the model, e.g., "32Gi"
   # Note: If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.
+  # - limitGPUMem: (Optional, string) Requires HAMi. The limit of GPU memory, e.g., 3000. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage
+  # - limitGPUMemPercentage: (Optional, string) Requires HAMi. The limit of GPU memory of GPU, e.g., "80"
+  # - limitGPUCores: (Optional, string) Requires HAMi. The limit of GPU cores, e.g., "10". Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage
+
   # - pvcStorage: (Optional, string) The amount of storage requested for the model, e.g., "50Gi".
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
