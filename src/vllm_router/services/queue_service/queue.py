@@ -3,7 +3,7 @@
 import asyncio
 import time
 from threading import Lock
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from fastapi.responses import StreamingResponse
 
@@ -34,6 +34,7 @@ class EndpointQueueManager:
         self.enable_queue = enable_queue
         self.endpoint_queues: Dict[str, asyncio.PriorityQueue] = {}
         self.conditions: Dict[str, asyncio.Condition] = {}
+        self._register_lock = Lock()
 
         self.scraper = scraper or get_engine_stats_scraper()
         if self.scraper is None:
@@ -60,13 +61,14 @@ class EndpointQueueManager:
         Args:
             endpoint_url (str): The unique identifier (typically URL) for the backend endpoint.
         """
-        if endpoint_url in self.endpoint_queues:
-            return  # Already registered
+        async with self._register_lock:
+            if endpoint_url in self.endpoint_queues:
+                return  # Already registered
 
-        self.endpoint_queues[endpoint_url] = asyncio.PriorityQueue()
-        self.conditions[endpoint_url] = asyncio.Condition()
-        task = asyncio.create_task(self._scheduler_loop(endpoint_url))
-        self.endpoint_tasks[endpoint_url] = task
+            self.endpoint_queues[endpoint_url] = asyncio.PriorityQueue()
+            self.conditions[endpoint_url] = asyncio.Condition()
+            task = asyncio.create_task(self._scheduler_loop(endpoint_url))
+            self.endpoint_tasks[endpoint_url] = task
 
     async def enqueue(
         self, endpoint_url: str, request: Dict[str, Any], priority: int = 0
@@ -119,6 +121,8 @@ class EndpointQueueManager:
                         asyncio.create_task(
                             self._dispatch_and_signal(endpoint_url, request)
                         )
+                    except asyncio.QueueEmpty:
+                        pass
                     except Exception as e:
                         print(f"[Dispatch error] {e}")
                     continue
@@ -179,7 +183,7 @@ class EndpointQueueManager:
         """
         from vllm_router.services.request_service.request import process_request
 
-        result_future = request.get("_result_future")
+        result_future = request.get("result_future")
         try:
             stream_generator = process_request(
                 request["request"],
@@ -216,9 +220,6 @@ class EndpointQueueManager:
     async def _reroute_or_dispatch_stale_request(
         self, request: dict, original_endpoint: str
     ):
-        request_id = request.get("request_id")
-        session_id = request.get("session_id")
-        model = request.get("model_name")
         """
         Handles requests that have waited in the queue too long. Either reroutes
         them to a different eligible endpoint or re-enqueues them with higher priority.
@@ -230,13 +231,16 @@ class EndpointQueueManager:
 
         # TODO: Use KV cache hit estimation in future, session aware id
 
+        priority = max(
+            0, self.calculate_request_priority(request) - 1
+        )  # priority is boosted
+
         if (
             True
         ):  # Replace with conditionals, ie, no session affinity or high KV cache matches
-            priority = max(
-                0, self.calculate_request_priority(request) - 1
-            )  # priority is boosted
+
             new_endpoint = self.find_new_endpoint(exclude=original_endpoint)
+            await self.register_endpoint(new_endpoint)
             if new_endpoint and new_endpoint != original_endpoint:
                 # print(f"[Rerouting] Request {request_id} → {new_endpoint} (was {original_endpoint})")
 
@@ -245,14 +249,12 @@ class EndpointQueueManager:
                         self._dispatch_and_signal(new_endpoint, request)
                     )
                 else:
-                    self.enqueue(new_endpoint, request, priority)
+                    await self.enqueue(new_endpoint, request, priority)
                 return
 
         # Keep original endpoint
         # print(f"[Requeue] Request {request_id} stays at {original_endpoint}")
-        queue = self.endpoint_queues[original_endpoint]
-        async with self.conditions[original_endpoint]:
-            self.enqueue(original_endpoint, request, priority)
+        await self.enqueue(original_endpoint, request, priority)
 
     def find_new_endpoint(self, exclude: str) -> str:
         """
@@ -272,9 +274,11 @@ class EndpointQueueManager:
             return exclude
 
         with self._lock:
-            chosen = sorted(endpoints, key=lambda e: e)[self.req % len(endpoints)]
+            new_endpoint = sorted(endpoints, key=lambda e: e)[
+                self.req_id % len(endpoints)
+            ]
             self.req_id += 1
-        return chosen
+        return new_endpoint
 
     def calculate_request_priority(self, request) -> int:  # TODO
         """

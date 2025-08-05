@@ -315,9 +315,9 @@ def parse_args():
 
     parser.add_argument(
         "--enable_queue",
-        type=bool,
+        action=argparse.BooleanOptionalAction,
         default=True,
-        help="Enable router-side queuing.",
+        help="Enable router-side queuing. Note that queue will still be initialized, just not actually enqueued.",
     )
     parser.add_argument(
         "--max-wait-time",
@@ -334,7 +334,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--max_gpu_perc",
+        "--max-gpu-perc",
         type=int,
         default=95,
         help="The maximum GPU use percentage of an endpoint before the router enqueues an incoming request",

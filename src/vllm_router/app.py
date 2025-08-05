@@ -108,10 +108,14 @@ async def lifespan(app: FastAPI):
         dyn_cfg_watcher.close()
 
     # Close the queue manager
-    queue_manager = get_queue_manager()
-    if queue_manager is not None:
-        logger.info("Closing per endpoint queues and tasks")
-        queue_manager.close()
+    try:
+        queue_manager = get_queue_manager()
+        if queue_manager is not None:
+            logger.info("Closing per endpoint queues and tasks")
+            await queue_manager.close()
+    except ValueError:
+        # Queue manager was not initialized
+        pass
 
 
 def initialize_all(app: FastAPI, args):

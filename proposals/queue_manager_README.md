@@ -23,7 +23,7 @@ This module implements an asynchronous queue manager for dispatching of LLM infe
 
 ---
 
-## File: `services/queue_manager.py`
+## File: `src/vllm_router/services/queue_service/queue_manager.py`
 
 ### Class: `EndpointQueueManager`
 
