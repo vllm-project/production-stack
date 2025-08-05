@@ -1,0 +1,85 @@
+{
+  "timestamp": 1754149492.823457,
+  "sequential_vs_parallel": {
+    "sequential": {
+      "total_time": 3.6754231452941895,
+      "avg_latency": 0.7350658416748047,
+      "cache_hits": 4,
+      "cache_hit_rate": 0.8
+    },
+    "parallel": {
+      "total_time": 0.5502877235412598,
+      "avg_latency": 0.44800424575805664,
+      "cache_hits": 5,
+      "cache_hit_rate": 1.0,
+      "speedup": 6.679093477938749
+    }
+  },
+  "cache_efficiency": {
+    "workflow_aware": {
+      "avg_latency": 0.5227095186710358,
+      "latencies": [
+        1.3581788539886475,
+        0.3710300922393799,
+        0.3465878963470459,
+        0.35285091400146484,
+        0.47663187980651855,
+        0.4452369213104248,
+        0.4467158317565918,
+        0.3844437599182129
+      ]
+    },
+    "standard": {
+      "avg_latency": 1.43278107047081,
+      "latencies": [
+        1.3578386306762695,
+        1.5765070915222168,
+        1.1723172664642334,
+        1.0188422203063965,
+        1.939251184463501,
+        1.7006592750549316,
+        1.6414539813995361,
+        1.0553789138793945
+      ]
+    },
+    "cache_speedup": 2.7410655809628035,
+    "time_saved_ms": 910.0715517997742
+  },
+  "workflow_isolation": {
+    "workflow-0": {
+      "requests": 3,
+      "servers_used": [
+        "vllm-3"
+      ],
+      "server_affinity": true,
+      "cache_hits": 0,
+      "cache_hit_rate": 0.0,
+      "avg_latency": 1.8419075806935628
+    },
+    "workflow-1": {
+      "requests": 3,
+      "servers_used": [
+        "vllm-3"
+      ],
+      "server_affinity": true,
+      "cache_hits": 0,
+      "cache_hit_rate": 0.0,
+      "avg_latency": 1.8468141555786133
+    },
+    "workflow-2": {
+      "requests": 3,
+      "servers_used": [
+        "vllm-3"
+      ],
+      "server_affinity": true,
+      "cache_hits": 0,
+      "cache_hit_rate": 0.0,
+      "avg_latency": 1.5899171034495037
+    }
+  },
+  "summary": {
+    "parallel_speedup": 6.679093477938749,
+    "cache_speedup": 2.7410655809628035,
+    "overall_improvement": 18.30783324441105
+  }
+}
