@@ -48,50 +48,43 @@ Documentation
 
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Getting Started
 
-   getting_started/installation
-   getting_started/examples
-   getting_started/troubleshooting
+   getting_started/prerequisite
+   getting_started/quickstart
+   getting_started/faq
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Tutorials
-
-   tutorials/disagg.rst
-   tutorials/kv_cache.rst
-   tutorials/kvaware.rst
-   tutorials/prefixaware.rst
-
-.. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Deployment
 
-   deployment/helm
-   deployment/crd
-   deployment/cloud-deployment/index.rst
-   deployment/ray/ray.rst
+   deployment/index
 
 .. toctree::
-   :maxdepth: 1
-   :caption: User Manual
+   :maxdepth: 2
+   :caption: Use Cases
 
-   user_manual/router/index.rst
-   user_manual/lora/index.rst
-   user_manual/kv_cache/index.rst
+   use_cases/kv-cache-aware-routing
+   use_cases/prefix-aware-routing
+   use_cases/disaggregated-prefill
+   use_cases/sharing-kv-cache
+   use_cases/benchmarking
+   use_cases/distributed-tracing
+   use_cases/tool-enabled-installation
+   use_cases/pipeline-parallelism-kuberay
+   use_cases/sleep-wakeup-mode
+   use_cases/autoscaling-keda
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Developer Guide
 
-   dev_guide/peripheral/index.rst
-   dev_guide/dev_api/index.rst
-
-
+   developer_guide/contributing
+   developer_guide/docker
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Benchmarks
+   :maxdepth: 2
+   :caption: Community
 
-   benchmarks/multiround-qa
+   community/meetings

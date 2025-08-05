@@ -54,6 +54,8 @@ The router can be configured using command-line arguments. Below are the availab
 ### Sentry Options
 
 - `--sentry-dsn`: The Sentry Data Source Name to use for error reporting.
+- `--sentry-traces-sample-rate`: The sample rate for Sentry traces (0.0 to 1.0). Default is 0.1 (10%).
+- `--sentry-profile-session-sample-rate`: The sample rate for Sentry profiling sessions (0.0 to 1.0). Default is 1.0 (100%).
 
 ## Build docker image
 

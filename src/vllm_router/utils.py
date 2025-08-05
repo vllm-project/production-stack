@@ -3,6 +3,7 @@ import enum
 import json
 import re
 import resource
+from typing import Optional
 
 import requests
 from fastapi.requests import Request
@@ -65,10 +66,9 @@ class ModelType(enum.Enum):
                     ],
                     "temperature": 0.0,
                     "max_tokens": 3,
-                    "max_completion_tokens": 3,
                 }
             case ModelType.completion:
-                return {"prompt": "Hello"}
+                return {"prompt": "Hello", "max_tokens": 3}
             case ModelType.embeddings:
                 return {"input": "Hello"}
             case ModelType.rerank:
@@ -132,7 +132,9 @@ def parse_static_urls(static_backends: str):
     return backend_urls
 
 
-def parse_comma_separated_args(comma_separated_string: str):
+def parse_comma_separated_args(comma_separated_string: Optional[str]):
+    if comma_separated_string is None:
+        return None
     return comma_separated_string.split(",")
 
 

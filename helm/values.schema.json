@@ -88,6 +88,27 @@
               "requestGPUType": {
                 "type": "string"
               },
+              "requestGPUMem": {
+                "type": "string"
+              },
+              "requestGPUMemPercentage": {
+                "type": "string"
+              },
+              "requestGPUCores": {
+                "type": "string"
+              },
+              "limitGPUMem": {
+                "type": "string"
+              },
+              "limitGPUMemPercentage": {
+                "type": "string"
+              },
+              "limitGPUCores": {
+                "type": "string"
+              },
+              "priorityClassName": {
+                "type": "string"
+              },
               "pvcStorage": {
                 "type": "string"
               },
@@ -394,6 +415,15 @@
       "properties": {
         "replicaCount": {
           "type": "integer"
+        },
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minReplicas": {"type": "integer"},
+            "maxReplicas": {"type": "integer"},
+            "targetCPUUtilizationPercentage": {"type": "integer"}
+          }
         },
         "containerPort": {
           "type": "integer"

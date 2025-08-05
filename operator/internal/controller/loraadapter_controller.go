@@ -23,9 +23,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -229,9 +226,9 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if hasWaitingAdapters {
 		// If we have adapters waiting for pods, requeue more frequently
 		logger.Info("Some adapters are waiting for pods, requeuing with shorter interval")
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return ctrl.Result{Requeue: true}, nil
 	}
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	return ctrl.Result{Requeue: true}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -308,7 +305,7 @@ func (r *LoraAdapterReconciler) findLoraAdaptersForPod(ctx context.Context, pod 
 }
 
 // discoverAdapter discovers the adapter from its source location
-func (r *LoraAdapterReconciler) discoverAdapter(ctx context.Context, adapter *productionstackv1alpha1.LoraAdapter) (string, error) {
+func (r *LoraAdapterReconciler) discoverAdapter(ctx context.Context, adapter *productionstackv1alpha1.LoraAdapter, podName, namespace string) (string, error) {
 	source := adapter.Spec.AdapterSource
 
 	// If path is already set, return it
@@ -327,14 +324,14 @@ func (r *LoraAdapterReconciler) discoverAdapter(ctx context.Context, adapter *pr
 		// TODO: Implement HTTP discovery
 		return "", fmt.Errorf("HTTP adapter discovery not implemented yet")
 	case "huggingface":
-		return r.downloadHuggingFaceAdapter(ctx, adapter)
+		return r.downloadHuggingFaceAdapter(ctx, adapter, podName, namespace)
 	default:
 		return "", fmt.Errorf("unsupported adapter source type: %s", source.Type)
 	}
 }
 
 // downloadHuggingFaceAdapter downloads a LoRA adapter from HuggingFace Hub
-func (r *LoraAdapterReconciler) downloadHuggingFaceAdapter(ctx context.Context, adapter *productionstackv1alpha1.LoraAdapter) (string, error) {
+func (r *LoraAdapterReconciler) downloadHuggingFaceAdapter(ctx context.Context, adapter *productionstackv1alpha1.LoraAdapter, podName, namespace string) (string, error) {
 	logger := logf.Log.WithName("huggingface-download")
 
 	source := adapter.Spec.AdapterSource
@@ -344,26 +341,8 @@ func (r *LoraAdapterReconciler) downloadHuggingFaceAdapter(ctx context.Context, 
 		return "", fmt.Errorf("repository is required for huggingface adapter source")
 	}
 
-	// Verify whether the adapter is already downloaded
-	if source.AdapterPath != "" {
-		// Check if the adapter exists
-		if _, err := os.Stat(source.AdapterPath); os.IsNotExist(err) {
-			// If adapter doesn't exist, start download process
-			logger.Info("Adapter not found at path, starting download", "path", source.AdapterPath)
-			// Continue with download process instead of returning error
-		} else {
-			// Adapter exists, return the path
-			return source.AdapterPath, nil
-		}
-	}
-
 	// Download the adapter directly using command line tools
-	adapterPath := filepath.Join("/data/shared-pvc-storage/lora-adapters", source.AdapterName)
-
-	// Create the adapter directory if it doesn't exist
-	if err := os.MkdirAll(adapterPath, 0755); err != nil {
-		return "", fmt.Errorf("failed to create adapter directory: %w", err)
-	}
+	adapterPath := strings.ReplaceAll(source.AdapterName, "/", "-")
 
 	// Get the HuggingFace token from the secret
 	secret := &corev1.Secret{}
@@ -379,17 +358,29 @@ func (r *LoraAdapterReconciler) downloadHuggingFaceAdapter(ctx context.Context, 
 		return "", fmt.Errorf("secret does not contain key %s", source.CredentialsSecretRef.Key)
 	}
 
-	// Download using huggingface-cli
-	cmd := exec.CommandContext(ctx, "huggingface-cli", "download", *source.Repository, "--local-dir", adapterPath, "--token", string(token))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Download using sidecar
+	endpoint, err := r.getPodEndpoint(ctx, podName, namespace, "/model/download", 30090)
+	if err != nil {
+		return "", fmt.Errorf("failed to get pod endpoint: %w", err)
+	}
 
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to download adapter with huggingface-cli: %w", err)
+	payload := map[string]string{
+		"model_id":  *source.Repository,
+		"token":     string(token),
+		"local_dir": adapterPath,
+	}
+
+	body, err := r.sendRequest(ctx, "POST", endpoint, payload, adapter)
+	if err != nil {
+		return "", fmt.Errorf("failed to download adapter: %w", err)
 	}
 
 	// Update the adapter path in the spec
-	adapter.Spec.AdapterSource.AdapterPath = adapterPath
+	bodyMap := make(map[string]string)
+	if err := json.Unmarshal(body, &bodyMap); err != nil {
+		return "", fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	adapter.Spec.AdapterSource.AdapterPath = bodyMap["path"]
 	if err := r.Update(ctx, adapter); err != nil {
 		return "", fmt.Errorf("failed to update adapter path: %w", err)
 	}
@@ -455,7 +446,7 @@ type PodPlacement struct {
 }
 
 // getPodEndpoint gets the HTTP endpoint for a pod
-func (r *LoraAdapterReconciler) getPodEndpoint(ctx context.Context, podName, namespace string, path string) (string, error) {
+func (r *LoraAdapterReconciler) getPodEndpoint(ctx context.Context, podName, namespace string, path string, port ...int) (string, error) {
 	// Get pod details
 	pod := &corev1.Pod{}
 	if err := r.Get(ctx, types.NamespacedName{
@@ -470,19 +461,24 @@ func (r *LoraAdapterReconciler) getPodEndpoint(ctx context.Context, podName, nam
 		return "", fmt.Errorf("pod %s has no IP address", podName)
 	}
 
+	podPort := 0
 	// Get container port
-	port := 8000 // default port
-	for _, container := range pod.Spec.Containers {
-		for _, containerPort := range container.Ports {
-			if containerPort.Name == "container-port" {
-				port = int(containerPort.ContainerPort)
-				break
+	if len(port) == 0 { // if no port is provided, use the default port
+		podPort = 8000 // default port
+		for _, container := range pod.Spec.Containers {
+			for _, containerPort := range container.Ports {
+				if containerPort.Name == "container-port" {
+					podPort = int(containerPort.ContainerPort)
+					break
+				}
 			}
 		}
+	} else {
+		podPort = port[0] // if a port is provided, use it
 	}
 
 	// Construct endpoint URL using pod IP and container port
-	return fmt.Sprintf("http://%s:%d%s", pod.Status.PodIP, port, path), nil
+	return fmt.Sprintf("http://%s:%d%s", pod.Status.PodIP, podPort, path), nil
 }
 
 // sendRequest sends an HTTP request to the specified endpoint
@@ -845,7 +841,7 @@ func (r *LoraAdapterReconciler) reconcileToDesiredState(ctx context.Context, ada
 		key := fmt.Sprintf("%s/%s", placement.Namespace, placement.PodName)
 		if _, exists := currentMap[key]; !exists {
 			logger.Info("Loading adapter on pod", "pod", placement.PodName, "namespace", placement.Namespace)
-			adapterPath, err := r.discoverAdapter(ctx, adapter)
+			adapterPath, err := r.discoverAdapter(ctx, adapter, placement.PodName, placement.Namespace)
 			if err != nil {
 				return fmt.Errorf("failed to discover adapter: %w", err)
 			}
