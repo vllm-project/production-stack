@@ -92,7 +92,7 @@ async def test_dispatch_and_signal(queue_manager):
         "request": MagicMock(),
         "endpoint": "endpoint1",
         "background_tasks": MagicMock(),
-        "_result_future": asyncio.Future(),
+        "result_future": asyncio.Future(),
     }
 
     with patch(
@@ -117,12 +117,21 @@ async def test_scheduler_loop(queue_manager):
         "request": MagicMock(),
         "endpoint": "endpoint1",
         "background_tasks": MagicMock(),
-        "_result_future": asyncio.Future(),
+        "result_future": asyncio.Future(),
     }
 
-    await queue_manager.enqueue("endpoint1", test_request)
-    await asyncio.sleep(1)
-    assert test_request["_result_future"].done()
+    with patch(
+        "vllm_router.services.request_service.request.process_request"
+    ) as mock_process:
+        mock_headers = {"content-type": "application/json"}
+        mock_status = 200
+        mock_stream = MagicMock()
+        mock_process.return_value = (mock_headers, mock_status, mock_stream)
+
+        await queue_manager.enqueue("endpoint1", test_request)
+        await asyncio.sleep(1.5)  # Wait enough time for scheduler loop
+
+        assert test_request["result_future"].done()
 
 
 @pytest.mark.asyncio
@@ -155,7 +164,7 @@ async def test_stale_request_rerouting(
         "request": dummy_request,
         "endpoint": "endpoint1",
         "background_tasks": MagicMock(),
-        "_result_future": asyncio.Future(),
+        "result_future": asyncio.Future(),
         "enqueue_timestamp": time.time() - 15,  # 15s ago
     }
     queue_manager._endpoint_is_free = MagicMock(return_value=False)

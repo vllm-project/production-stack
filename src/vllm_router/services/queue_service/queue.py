@@ -34,7 +34,7 @@ class EndpointQueueManager:
         self.enable_queue = enable_queue
         self.endpoint_queues: Dict[str, asyncio.PriorityQueue] = {}
         self.conditions: Dict[str, asyncio.Condition] = {}
-        self._register_lock = Lock()
+        self._register_lock = asyncio.Lock()
 
         self.scraper = scraper or get_engine_stats_scraper()
         if self.scraper is None:
@@ -44,6 +44,8 @@ class EndpointQueueManager:
         self.max_running_requests = max_running_requests
         self.max_gpu_perc = max_gpu_perc
         self.max_queue_wait_time = max_queue_wait_time
+
+        self.stale_check_interval = 2
 
         # Stale request round-robin fallback strategy
         self.req_id = 0
@@ -104,52 +106,48 @@ class EndpointQueueManager:
         queue = self.endpoint_queues[endpoint_url]
         condition = self.conditions[endpoint_url]
 
-        try:
-            while not self._shutdown_event.is_set():
-                async with condition:
-                    await condition.wait_for(lambda: not queue.empty())
+        last_stale_check = 0
 
+        while not self._shutdown_event.is_set():
+            async with condition:
+                # Wait until queue not empty or shutdown
+                await condition.wait_for(
+                    lambda: (not queue.empty()) or self._shutdown_event.is_set()
+                )
+                if self._shutdown_event.is_set():
+                    break
+
+                # Dispatch as many requests as endpoint allows
+                while not queue.empty() and self._endpoint_is_free(endpoint_url):
+                    _, _, request = queue.get_nowait()
+                    asyncio.create_task(
+                        self._dispatch_and_signal(endpoint_url, request)
+                    )
+
+            # After dispatching, periodically check stale requests outside the condition
+            now = time.time()
+            if now - last_stale_check > self.stale_check_interval:
+                last_stale_check = now
+
+                # Check for stale requests without holding the condition lock
                 try:
-                    # Peek at the top of the queue without removing
-                    priority, enqueue_time, request = queue._queue[0]
+                    priority, enqueue_time, stale_request = queue._queue[0]
                 except IndexError:
-                    continue  # Queue is empty
+                    continue  # queue empty
 
-                if self._endpoint_is_free(endpoint_url):
-                    try:
-                        _, _, request = queue.get_nowait()  # Dequeue
-                        asyncio.create_task(
-                            self._dispatch_and_signal(endpoint_url, request)
-                        )
-                    except asyncio.QueueEmpty:
-                        pass
-                    except Exception as e:
-                        print(f"[Dispatch error] {e}")
-                    continue
-
-                wait_duration = time.time() - enqueue_time
-                # print(f"Request waited {wait_duration:.2f}s, threshold is {self.max_queue_wait_time}s")
+                wait_duration = now - enqueue_time
                 if wait_duration > self.max_queue_wait_time:
-                    # Dequeue and reroute
-                    try:
-                        _, _, stale_request = queue.get_nowait()
+                    async with condition:
+                        try:
+                            _, _, stale_request = queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            continue
+
                         await self._reroute_or_dispatch_stale_request(
                             stale_request, endpoint_url
                         )
-                    except Exception as e:
-                        print(f"[Stale reroute error] {e}")
-                    continue
 
-                # Endpoint not free and not stale → yield loop
-                await asyncio.sleep(0.05)
-
-        except asyncio.CancelledError:
-            print(f"Scheduler loop for {endpoint_url} cancelled.")
-        except Exception as e:
-            import traceback
-
-            traceback.print_exc()
-            print(f"Error in scheduler loop ({endpoint_url}): {e}")
+            await asyncio.sleep(0.05)  # small sleep to avoid tight loop
 
     def _endpoint_is_free(
         self, endpoint_url: str
