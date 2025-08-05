@@ -1,0 +1,38 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "opt125m"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "facebook/opt-125m"
+
+    replicaCount: 1
+
+    requestCPU: 6
+    requestMemory: "16Gi"
+    requestGPU: 1
+
+routerSpec:
+  enableRouter: true
+  route:
+    main:
+      enabled: true
+      hostnames:
+        - llm-api.example.com
+      parentRefs:
+        - name: llm-api-gateway
+          namespace: vllm-stack
+          sectionName: https
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+    http:
+      enabled: true
+      hostnames:
+        - llm-api.example.com
+      parentRefs:
+        - name: llm-api-gateway
+          namespace: vllm-stack
+          sectionName: http
+      httpsRedirect: true
