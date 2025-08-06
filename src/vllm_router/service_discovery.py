@@ -22,7 +22,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-import httpx
+import aiohttp
 import requests
 from kubernetes import client, config, watch
 
@@ -308,22 +308,29 @@ class StaticServiceDiscovery(ServiceDiscovery):
                 model_info=self._get_model_info(model),
             )
             endpoint_infos.append(endpoint_info)
+        return endpoint_infos
+
+    async def initialize_client_sessions(self) -> None:
+        """
+        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        This must be called from an async context during app startup.
+        """
         if (
             self.prefill_model_labels is not None
             and self.decode_model_labels is not None
         ):
+            endpoint_infos = self.get_endpoint_info()
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
-                    self.app.state.prefill_client = httpx.AsyncClient(
+                    self.app.state.prefill_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
-                        timeout=None,
+                        timeout=aiohttp.ClientTimeout(total=None),
                     )
                 elif endpoint_info.model_label in self.decode_model_labels:
-                    self.app.state.decode_client = httpx.AsyncClient(
+                    self.app.state.decode_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
-                        timeout=None,
+                        timeout=aiohttp.ClientTimeout(total=None),
                     )
-        return endpoint_infos
 
 
 class K8sPodIPServiceDiscovery(ServiceDiscovery):
@@ -629,20 +636,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 namespace=self.namespace,
                 model_info=model_info,
             )
-            if (
-                self.prefill_model_labels is not None
-                and self.decode_model_labels is not None
-            ):
-                if model_label in self.prefill_model_labels:
-                    self.app.state.prefill_client = httpx.AsyncClient(
-                        base_url=f"http://{engine_ip}:{self.port}",
-                        timeout=None,
-                    )
-                elif model_label in self.decode_model_labels:
-                    self.app.state.decode_client = httpx.AsyncClient(
-                        base_url=f"http://{engine_ip}:{self.port}",
-                        timeout=None,
-                    )
+
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
@@ -719,6 +713,28 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         self.running = False
         self.k8s_watcher.stop()
         self.watcher_thread.join()
+
+    async def initialize_client_sessions(self) -> None:
+        """
+        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        This must be called from an async context during app startup.
+        """
+        if (
+            self.prefill_model_labels is not None
+            and self.decode_model_labels is not None
+        ):
+            endpoint_infos = self.get_endpoint_info()
+            for endpoint_info in endpoint_infos:
+                if endpoint_info.model_label in self.prefill_model_labels:
+                    self.app.state.prefill_client = aiohttp.ClientSession(
+                        base_url=endpoint_info.url,
+                        timeout=aiohttp.ClientTimeout(total=None),
+                    )
+                elif endpoint_info.model_label in self.decode_model_labels:
+                    self.app.state.decode_client = aiohttp.ClientSession(
+                        base_url=endpoint_info.url,
+                        timeout=aiohttp.ClientTimeout(total=None),
+                    )
 
 
 class K8sServiceNameServiceDiscovery(ServiceDiscovery):
@@ -1024,20 +1040,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
                 namespace=self.namespace,
                 model_info=model_info,
             )
-            if (
-                self.prefill_model_labels is not None
-                and self.decode_model_labels is not None
-            ):
-                if model_label in self.prefill_model_labels:
-                    self.app.state.prefill_client = httpx.AsyncClient(
-                        base_url=f"http://{engine_name}:{self.port}",
-                        timeout=None,
-                    )
-                elif model_label in self.decode_model_labels:
-                    self.app.state.decode_client = httpx.AsyncClient(
-                        base_url=f"http://{engine_name}:{self.port}",
-                        timeout=None,
-                    )
+
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
@@ -1113,6 +1116,28 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         self.running = False
         self.k8s_watcher.stop()
         self.watcher_thread.join()
+
+    async def initialize_client_sessions(self) -> None:
+        """
+        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        This must be called from an async context during app startup.
+        """
+        if (
+            self.prefill_model_labels is not None
+            and self.decode_model_labels is not None
+        ):
+            endpoint_infos = self.get_endpoint_info()
+            for endpoint_info in endpoint_infos:
+                if endpoint_info.model_label in self.prefill_model_labels:
+                    self.app.state.prefill_client = aiohttp.ClientSession(
+                        base_url=endpoint_info.url,
+                        timeout=aiohttp.ClientTimeout(total=None),
+                    )
+                elif endpoint_info.model_label in self.decode_model_labels:
+                    self.app.state.decode_client = aiohttp.ClientSession(
+                        base_url=endpoint_info.url,
+                        timeout=aiohttp.ClientTimeout(total=None),
+                    )
 
 
 def _create_service_discovery(
