@@ -88,6 +88,24 @@
               "requestGPUType": {
                 "type": "string"
               },
+              "requestGPUMem": {
+                "type": "string"
+              },
+              "requestGPUMemPercentage": {
+                "type": "string"
+              },
+              "requestGPUCores": {
+                "type": "string"
+              },
+              "limitGPUMem": {
+                "type": "string"
+              },
+              "limitGPUMemPercentage": {
+                "type": "string"
+              },
+              "limitGPUCores": {
+                "type": "string"
+              },
               "priorityClassName": {
                 "type": "string"
               },
