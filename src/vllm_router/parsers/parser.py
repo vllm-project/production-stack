@@ -342,7 +342,7 @@ def parse_args():
     parser.add_argument(
         "--enable_queue",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help="Enable router-side queuing. Note that queue will still be initialized, just not actually enqueued.",
     )
     parser.add_argument(
