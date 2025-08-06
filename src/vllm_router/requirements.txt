@@ -1,12 +1,12 @@
 aiofiles==24.1.0
+aiohttp==3.9.5
 fastapi==0.115.8
-httpx==0.28.1
 kubernetes==32.0.0
 numpy==1.26.4
 prometheus_client==0.21.1
 psutil==7.0.0
 python-multipart==0.0.20
-sentry-sdk[fastapi,httpx]==2.27.0
+sentry-sdk[fastapi]==2.27.0
 uhashring==2.3
 uvicorn==0.34.0
 xxhash==3.5.0
