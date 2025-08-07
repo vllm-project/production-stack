@@ -11,14 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import httpx
+import aiohttp
 
 from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
 
 
-class HTTPXClientWrapper:
+class AiohttpClientWrapper:
 
     async_client = None
 
@@ -26,24 +26,23 @@ class HTTPXClientWrapper:
         """Instantiate the client. Call from the FastAPI startup hook."""
         # To fully leverage the router's concurrency capabilities,
         # we set the maximum number of connections to be unlimited.
-        limits = httpx.Limits(max_connections=None)
-        self.async_client = httpx.AsyncClient(limits=limits)
-        logger.info(f"httpx AsyncClient instantiated. Id {id(self.async_client)}")
+        self.async_client = aiohttp.ClientSession()
+        logger.info(f"aiohttp ClientSession instantiated. Id {id(self.async_client)}")
 
     async def stop(self):
         """Gracefully shutdown. Call from FastAPI shutdown hook."""
         logger.info(
-            f"httpx async_client.is_closed(): {self.async_client.is_closed} - Now close it. Id (will be unchanged): {id(self.async_client)}"
+            f"aiohttp async_client.closed: {self.async_client.closed} - Now close it. Id (will be unchanged): {id(self.async_client)}"
         )
-        await self.async_client.aclose()
+        await self.async_client.close()
         logger.info(
-            f"httpx async_client.is_closed(): {self.async_client.is_closed}. Id (will be unchanged): {id(self.async_client)}"
+            f"aiohttp async_client.closed: {self.async_client.closed}. Id (will be unchanged): {id(self.async_client)}"
         )
         self.async_client = None
-        logger.info("httpx AsyncClient closed")
+        logger.info("aiohttp ClientSession closed")
 
     def __call__(self):
-        """Calling the instantiated HTTPXClientWrapper returns the wrapped singleton."""
+        """Calling the instantiated AiohttpClientWrapper returns the wrapped singleton."""
         # Ensure we don't use it if not started / running
         assert self.async_client is not None
         return self.async_client
