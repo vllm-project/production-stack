@@ -41,6 +41,27 @@ else
     echo "BPF JIT hardening configuration not available, skipping..."
 fi
 
+calculate_safe_memory() {
+  # cgroup v2 limit if present
+  local cg=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)
+  local total_mb
+  if [[ "$cg" != "max" ]]; then
+    total_mb=$(( cg / 1024 / 1024 ))
+  else
+    total_mb=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+  fi
+  local avail_mb=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
+  [[ -z "$avail_mb" || "$avail_mb" -le 0 ]] && avail_mb=$(( total_mb * 60 / 100 ))
+
+  local target=$(( avail_mb * 80 / 100 ))
+  (( target < 2048 )) && target=2048
+  local max_allowed=$(( total_mb - 2048 ))
+  (( target > max_allowed )) && target=$max_allowed
+  (( target < 2048 )) && target=2048
+
+  echo "$target"
+}
+
 # --- NVIDIA GPU Setup ---
 GPU_AVAILABLE=false
 if command -v "$NVIDIA_SMI_PATH" >/dev/null 2>&1; then
@@ -53,6 +74,10 @@ if command -v "$NVIDIA_SMI_PATH" >/dev/null 2>&1; then
     fi
 else
     echo "No NVIDIA GPU detected. Will start minikube without GPU support."
+fi
+
+if [[ -z "${MINIKUBE_MEM:-}" ]]; then
+  MINIKUBE_MEM="$(calculate_safe_memory)"
 fi
 
 if [ "$GPU_AVAILABLE" = true ]; then
@@ -69,7 +94,7 @@ if [ "$GPU_AVAILABLE" = true ]; then
 
     # Start minikube with GPU support.
     echo "Starting minikube with GPU support..."
-    minikube start --memory=max --driver=docker --container-runtime=docker --gpus=all --force --addons=nvidia-device-plugin
+    minikube start --memory=${MINIKUBE_MEM} --driver=docker --container-runtime=docker --gpus=all --force --addons=nvidia-device-plugin
 
     # Update kubeconfig context.
     echo "Updating kubeconfig context..."
@@ -85,7 +110,7 @@ else
     echo "Starting minikube without GPU support..."
     # Fix potential permission issues.
     sudo sysctl fs.protected_regular=0
-    minikube start --memory=max --driver=docker --force
+    minikube start --memory=${MINIKUBE_MEM} --driver=docker --force
 fi
 
 echo "Minikube cluster installation complete."
