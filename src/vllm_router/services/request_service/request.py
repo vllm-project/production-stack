@@ -163,7 +163,7 @@ async def route_general_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
-    request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+    request_json = json.loads(request_body)
 
     if request.query_params:
         request_endpoint = request.query_params.get("id")
@@ -203,7 +203,6 @@ async def route_general_request(
                 status_code=400, detail="Request body is not JSON parsable."
             )
 
-    # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
 
