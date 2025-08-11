@@ -1,0 +1,55 @@
+{{- if .Values.routerSpec.enableRouter -}}
+  {{- $serviceName := printf "%s-router-service" $.Release.Name -}}
+  {{- $servicePort := .Values.routerSpec.servicePort -}}
+  {{- range $name, $route := .Values.routerSpec.route }}
+  {{- if $route.enabled }}
+---
+apiVersion: {{ $route.apiVersion | default "gateway.networking.k8s.io/v1" }}
+kind: {{ $route.kind | default "HTTPRoute" }}
+metadata:
+  {{- with $route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  name: {{ $.Release.Name }}-router{{ if ne $name "main" }}-{{ $name }}{{ end }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "chart.routerLabels" $ | nindent 4 }}
+    {{- with $route.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- with $route.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $route.hostnames }}
+  hostnames:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- if $route.additionalRules }}
+    {{- tpl (toYaml $route.additionalRules) $ | nindent 4 }}
+    {{- end }}
+    {{- if $route.httpsRedirect }}
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+    {{- else }}
+    - backendRefs:
+        - name: {{ $serviceName }}
+          port: {{ $servicePort }}
+      {{- with $route.filters }}
+      filters:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $route.matches }}
+      matches:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+{{- end }}

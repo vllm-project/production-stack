@@ -32,9 +32,16 @@ servingEngineSpec:
   # - requestMemory: (string) The amount of memory requested for the model, e.g., "16Gi"
   # - requestGPU: (int) The number of GPUs requested for the model, e.g., 1
   # - requestGPUType: (Optional, string) The type of GPU requested, e.g., "nvidia.com/mig-4g.71gb". If not specified, defaults to "nvidia.com/gpu"
+  # - requestGPUMem: (Optional, string) Requires HAMi. The amount of GPU memory requested, e.g., 3000. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage
+  # - requestGPUMemPercentage: (Optional, string) Requires HAMi. The percentage of GPU memory requested, e.g., "80". It cannot be used together with requestGPUMem.
+  # - requestGPUCores: (Optional, string) Requires HAMi. The percentage of GPU cores requested, e.g., "10". Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage
   # - limitCPU: (Optional, string) The CPU limit for the model, e.g., "8"
   # - limitMemory: (Optional, string) The memory limit for the model, e.g., "32Gi"
   # Note: If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.
+  # - limitGPUMem: (Optional, string) Requires HAMi. The limit of GPU memory, e.g., 3000. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage
+  # - limitGPUMemPercentage: (Optional, string) Requires HAMi. The limit of GPU memory of GPU, e.g., "80"
+  # - limitGPUCores: (Optional, string) Requires HAMi. The limit of GPU cores, e.g., "10". Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage
+
   # - pvcStorage: (Optional, string) The amount of storage requested for the model, e.g., "50Gi".
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
@@ -59,6 +66,7 @@ servingEngineSpec:
   #   - env: (optional, list) List of environment variables to set in the container, each being a map with:
   #   - resources: (optional, map) The resource requests and limits for the container:
   #   - mountPvcStorage: (optional, bool) Whether to mount the model's volume.
+  #   - extraVolumeMounts: (Optional, list) Additional volume mounts to add to the init container, in Kubernetes volumeMount format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volumemount-v1-core
   #
   # - vllmConfig: (optional, map) The configuration for the VLLM model, supported options are:
   #   - v0: (optional, map) Specify to 1 to use vLLM v0, otherwise vLLM v1 is used. e.g., 0
@@ -255,6 +263,10 @@ servingEngineSpec:
     # -- Read-only root filesystem
     # readOnlyRootFilesystem: true
 
+  # -- Sidecar configuration
+  sidecar:
+    image: "lmcache/lmstack-sidecar:latest"
+    imagePullPolicy: "Always"
 
 routerSpec:
   # -- The docker image of the router. The following values are defaults:
@@ -357,6 +369,45 @@ routerSpec:
     #  - secretName: vllm-router-tls
     #    hosts:
     #      - vllm-router.local
+
+  # -- Expose the service via gateway-api HTTPRoute
+  # More routes can be added by adding a dictionary key like the 'main' route.
+  # Requires Gateway API resources and suitable controller installed within the cluster
+  # (see: https://gateway-api.sigs.k8s.io/guides/)
+  route:
+    main:
+      # -- Enables or disables the route
+      enabled: false
+
+      # -- Set the route apiVersion, e.g. gateway.networking.k8s.io/v1 or gateway.networking.k8s.io/v1alpha2
+      apiVersion: gateway.networking.k8s.io/v1
+      # -- Set the route kind
+      # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
+      kind: HTTPRoute
+
+      annotations: {}
+      labels: {}
+
+      hostnames: []
+      # - my-filter.example.com
+      parentRefs: []
+      # - name: acme-gw
+
+      # -- create http route for redirect (https://gateway-api.sigs.k8s.io/guides/http-redirect-rewrite/#http-to-https-redirects)
+      ## Take care that you only enable this on the http listener of the gateway to avoid an infinite redirect.
+      ## matches, filters and additionalRules will be ignored if this is set to true.
+      httpsRedirect: false
+
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+      ## Filters define the filters that are applied to requests that match this rule.
+      filters: []
+
+      ## Additional custom rules that can be added to the route
+      additionalRules: []
 
   # The node selector terms to match the nodes
   # Example:
