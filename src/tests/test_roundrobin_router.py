@@ -48,14 +48,14 @@ def generate_request(request_type="http") -> Request:
 
 
 def test_roundrobin_logic(
-    dynamic_discoveries=10, max_endpoints=1000, max_requests=10000
+    dynamic_discoveries: int = 10, max_endpoints: int = 1000, max_requests: int = 10000
 ):
     """
     Ensure that all active urls have roughly same number of requests (difference at most 1)
     """
     router = RoundRobinRouter()
 
-    def _fixed_router_check(num_endpoints, num_requests) -> bool:
+    def _fixed_router_check(num_endpoints: int, num_requests: int) -> bool:
         # Make num_requests requests to the router and check even output distribution
         endpoints, engine_stats, request_stats = generate_request_args(num_endpoints)
         output_distribution = {}
@@ -67,8 +67,8 @@ def test_roundrobin_logic(
         return max(request_counts) - min(request_counts) <= 1
 
     for _ in range(dynamic_discoveries):
-        num_endpoints = int(random.random() * max_endpoints)
-        num_requests = int(random.random() * max_requests)
+        num_endpoints = random.randint(1, max_endpoints)
+        num_requests = random.randint(1, max_requests)
         # Perform router check
         res = _fixed_router_check(num_endpoints, num_requests)
         assert res
