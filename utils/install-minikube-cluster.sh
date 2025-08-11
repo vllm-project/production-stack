@@ -41,6 +41,45 @@ else
     echo "BPF JIT hardening configuration not available, skipping..."
 fi
 
+calculate_safe_memory() {
+  local floor_mb=2048
+  local host_reserve_mb=2048
+
+  local total_kb avail_kb total_mb avail_mb
+  total_kb=$(awk '/MemTotal:/ {print $2}' /proc/meminfo)
+  avail_kb=$(awk  '/MemAvailable:/ {print $2}' /proc/meminfo)
+  total_mb=$(( total_kb / 1024 ))
+  avail_mb=$(( avail_kb > 0 ? avail_kb / 1024 : (total_mb * 60 / 100) ))
+
+  # cgroup v2 limit if any
+  local cg_raw cg_mb=0
+  if [[ -r /sys/fs/cgroup/memory.max ]]; then
+    cg_raw=$(cat /sys/fs/cgroup/memory.max)
+    [[ "$cg_raw" != "max" ]] && cg_mb=$(( cg_raw / 1024 / 1024 ))
+  fi
+
+  local target=$(( avail_mb * 80 / 100 ))
+  local total_cap=$(( total_mb * 90 / 100 ))
+  (( target > total_cap )) && target=$total_cap
+
+  local max_allowed=$(( total_mb - host_reserve_mb ))
+  if (( cg_mb > 0 )); then
+    local cg_cap=$(( cg_mb - host_reserve_mb ))
+    (( cg_cap < max_allowed )) && max_allowed=$cg_cap
+  fi
+
+  # If the machine is too small, fail
+  if (( max_allowed < floor_mb )); then
+    echo "ERROR: Not enough RAM to auto-size (total=${total_mb}MB, allowed=${max_allowed}MB). Set MINIKUBE_MEM manually." >&2
+    return 1
+  fi
+
+  (( target < floor_mb )) && target=$floor_mb
+  (( target > max_allowed )) && target=$max_allowed
+
+  echo "$target"
+}
+
 # --- NVIDIA GPU Setup ---
 GPU_AVAILABLE=false
 if command -v "$NVIDIA_SMI_PATH" >/dev/null 2>&1; then
@@ -53,6 +92,10 @@ if command -v "$NVIDIA_SMI_PATH" >/dev/null 2>&1; then
     fi
 else
     echo "No NVIDIA GPU detected. Will start minikube without GPU support."
+fi
+
+if [[ -z "${MINIKUBE_MEM:-}" ]]; then
+  MINIKUBE_MEM="$(calculate_safe_memory)"
 fi
 
 if [ "$GPU_AVAILABLE" = true ]; then
@@ -69,7 +112,7 @@ if [ "$GPU_AVAILABLE" = true ]; then
 
     # Start minikube with GPU support.
     echo "Starting minikube with GPU support..."
-    minikube start --memory=max --driver=docker --container-runtime=docker --gpus=all --force --addons=nvidia-device-plugin
+    minikube start --memory="${MINIKUBE_MEM}" --driver=docker --container-runtime=docker --gpus=all --force --addons=nvidia-device-plugin
 
     # Update kubeconfig context.
     echo "Updating kubeconfig context..."
@@ -85,7 +128,7 @@ else
     echo "Starting minikube without GPU support..."
     # Fix potential permission issues.
     sudo sysctl fs.protected_regular=0
-    minikube start --memory=max --driver=docker --force
+    minikube start --memory="${MINIKUBE_MEM}" --driver=docker --force
 fi
 
 echo "Minikube cluster installation complete."
