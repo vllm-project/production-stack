@@ -193,6 +193,11 @@ spec:
           - "/templates/{{ $modelSpec.chatTemplate }}"
           {{- end }}
           imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
+          {{- if $modelSpec.envFromSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ $modelSpec.envFromSecret.name }}
+          {{- end }}
           env:
           - name: HF_HOME
             {{- if hasKey $modelSpec "pvcStorage" }}
