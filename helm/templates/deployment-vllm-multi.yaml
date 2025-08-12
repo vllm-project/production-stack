@@ -193,11 +193,6 @@ spec:
           - "/templates/{{ $modelSpec.chatTemplate }}"
           {{- end }}
           imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
-          {{- if $modelSpec.envFromSecret }}
-          envFrom:
-            - secretRef:
-                name: {{ $modelSpec.envFromSecret.name }}
-          {{- end }}
           env:
           - name: HF_HOME
             {{- if hasKey $modelSpec "pvcStorage" }}
@@ -338,10 +333,16 @@ spec:
             value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
           {{-   end }}
           {{- end }}
-          {{- if .Values.servingEngineSpec.configs }}
+          {{- if or .Values.servingEngineSpec.configs $modelSpec.envFromSecret }}
           envFrom:
+          {{- if .Values.servingEngineSpec.configs }}
             - configMapRef:
                 name: "{{ .Release.Name }}-configs"
+          {{- end }}
+          {{- if $modelSpec.envFromSecret }}
+            - secretRef:
+                name: {{ $modelSpec.envFromSecret.name }}
+          {{- end }}
           {{- end }}
           ports:
             - name: {{ include "chart.container-port-name" . }}
