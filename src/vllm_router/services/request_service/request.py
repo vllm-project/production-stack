@@ -137,7 +137,7 @@ async def process_request(
         )
 
 
-def perform_service_discovery(request, request_json, request_endpoint):
+def perform_service_discovery(request, request_json, request_endpoint, requested_model):
     # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
@@ -253,7 +253,11 @@ async def route_general_request(
     # Perform service discovery to request path a number of times equal to reroutes + 1
     for _ in range(attempted_reroutes + 1):
         endpoints, engine_stats, request_stats = await asyncio.to_thread(
-            perform_service_discovery, request, request_json, request_endpoint
+            perform_service_discovery,
+            request,
+            request_json,
+            request_endpoint,
+            requested_model,
         )
 
         logger.debug(f"Routing request {request_id} for model: {requested_model}")
