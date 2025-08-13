@@ -520,7 +520,6 @@ async def route_general_transcriptions(
     """Handles audio transcription requests by parsing form data and proxying to backend."""
 
     request_id = request.headers.get("X-Request-Id", str(uuid.uuid4()))
-    in_router_time = time.time()
 
     # --- 1. Form parsing ---
     try:
