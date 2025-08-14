@@ -57,6 +57,11 @@ spec:
           {{- if $container.args }}
           args: {{ toYaml $container.args | nindent 12 }}
           {{- end }}
+          {{- if $modelSpec.envFromSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ $modelSpec.envFromSecret.name }}
+          {{- end }}
           env:
             - name: RELEASE_NAME
               value: {{ $.Release.Name }}
@@ -333,10 +338,16 @@ spec:
             value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
           {{-   end }}
           {{- end }}
-          {{- if .Values.servingEngineSpec.configs }}
+          {{- if or .Values.servingEngineSpec.configs $modelSpec.envFromSecret }}
           envFrom:
+          {{- if .Values.servingEngineSpec.configs }}
             - configMapRef:
                 name: "{{ .Release.Name }}-configs"
+          {{- end }}
+          {{- if $modelSpec.envFromSecret }}
+            - secretRef:
+                name: {{ $modelSpec.envFromSecret.name }}
+          {{- end }}
           {{- end }}
           ports:
             - name: {{ include "chart.container-port-name" . }}
