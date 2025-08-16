@@ -113,7 +113,7 @@ routerSpec:
     limits:
       cpu: "1"
       memory: "2G"
-  routingLogic: "session"
+  routingLogic: "kvaware"
   lmcacheControllerPort: 9000
   hf_token: <HF_TOKEN>
   sessionKey: "x-user-id"
