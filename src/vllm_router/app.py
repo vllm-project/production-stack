@@ -41,7 +41,7 @@ from vllm_router.service_discovery import (
     initialize_service_discovery,
 )
 from vllm_router.services.batch_service import initialize_batch_processor
-from vllm_router.services.callbacks_service.callbacks import initialize_custom_callbacks
+from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
@@ -183,14 +183,19 @@ def initialize_all(app: FastAPI, args):
         )
 
     # Initialize dynamic config watcher
-    if args.dynamic_config_json:
+    if args.dynamic_config_yaml or args.dynamic_config_json:
         init_config = DynamicRouterConfig.from_args(args)
-        initialize_dynamic_config_watcher(
-            args.dynamic_config_json, 10, init_config, app
-        )
+        if args.dynamic_config_yaml:
+            initialize_dynamic_config_watcher(
+                args.dynamic_config_yaml, "YAML", 10, init_config, app
+            )
+        elif args.dynamic_config_json:
+            initialize_dynamic_config_watcher(
+                args.dynamic_config_json, "JSON", 10, init_config, app
+            )
 
     if args.callbacks:
-        initialize_custom_callbacks(args.callbacks, app)
+        configure_custom_callbacks(args.callbacks, app)
 
     initialize_routing_logic(
         args.routing_logic,

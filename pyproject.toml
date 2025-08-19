@@ -25,6 +25,7 @@ dependencies = [
     "uvicorn==0.34.0",
     "xxhash==3.5.0",
     "psutil==7.0.0",
+    "pyyaml>=6.0.2",
 ]
 
 [project.scripts]
