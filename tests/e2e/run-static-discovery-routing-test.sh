@@ -99,7 +99,8 @@ start_router() {
         --decode-model-labels "decode" \
         --static-model-labels "prefill,decode" \
         --session-key "$SESSION_KEY" \
-        --routing-logic "$routing_logic" > "$log_file" 2>&1 &
+        --routing-logic "$routing_logic" \
+        --drop-params "test-param-to-drop" > "$log_file" 2>&1 &
 
     ROUTER_PID=$!
     print_status "Router started with PID: $ROUTER_PID"
