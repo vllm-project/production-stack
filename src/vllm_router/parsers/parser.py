@@ -97,6 +97,8 @@ def validate_args(args):
             validate_static_model_types(args.static_model_types)
     if args.service_discovery == "k8s" and args.k8s_port is None:
         raise ValueError("K8s port must be provided when using K8s service discovery.")
+    if args.k8s_timeout_seconds <= 0:
+        raise ValueError("k8s-timeout-seconds must be greater than 0.")
     if args.routing_logic == "session" and args.session_key is None:
         raise ValueError(
             "Session key must be provided when using session routing logic."
