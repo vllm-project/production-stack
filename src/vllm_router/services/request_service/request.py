@@ -17,9 +17,10 @@ import json
 import os
 import time
 import uuid
+from typing import Optional
 
 import aiohttp
-from fastapi import BackgroundTasks, HTTPException, Request
+from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from requests import JSONDecodeError
 
@@ -304,9 +305,7 @@ async def route_general_request(
 async def send_request_to_prefiller(
     client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
 ):
-    """
-    Send a request to a prefiller service.
-    """
+    """Send a request to a prefiller service."""
     req_data = req_data.copy()
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
@@ -325,9 +324,7 @@ async def send_request_to_prefiller(
 async def send_request_to_decode(
     client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
 ):
-    """
-    Asynchronously stream the response from a service using a persistent client.
-    """
+    """Asynchronously stream the response from a service using a persistent client."""
     headers = {
         "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
         "X-Request-Id": request_id,
@@ -511,3 +508,182 @@ async def route_sleep_wakeup_request(
                 content={"status": "success"},
                 headers={"X-Request-Id": request_id},
             )
+
+
+async def route_general_transcriptions(
+    request: Request,
+    endpoint: str,  # "/v1/audio/transcriptions"
+    background_tasks: BackgroundTasks,
+):
+    """Handles audio transcription requests by parsing form data and proxying to backend."""
+
+    request_id = request.headers.get("X-Request-Id", str(uuid.uuid4()))
+
+    # --- 1. Form parsing ---
+    try:
+        form = await request.form()
+
+        # Extract parameters from the form data
+        file: UploadFile = form["file"]
+        model: str = form["model"]
+        prompt: Optional[str] = form.get("prompt", None)
+        response_format: Optional[str] = form.get("response_format", "json")
+        temperature_str: Optional[str] = form.get("temperature", None)
+        temperature: Optional[float] = (
+            float(temperature_str) if temperature_str is not None else None
+        )
+        language: Optional[str] = form.get("language", "en")
+    except KeyError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Invalid request: missing '{e.args[0]}' in form data."},
+        )
+
+    logger.debug("==== Enter audio_transcriptions ====")
+    logger.debug("Received upload: %s (%s)", file.filename, file.content_type)
+    logger.debug(
+        "Params: model=%s prompt=%r response_format=%r temperature=%r language=%s",
+        model,
+        prompt,
+        response_format,
+        temperature,
+        language,
+    )
+
+    # --- 2. Service Discovery and Routing ---
+    # Access singletons via request.app.state for consistent style
+    service_discovery = (
+        get_service_discovery()
+    )  # This one is often still accessed directly via its get function
+    router = request.app.state.router  # Access router from app.state
+    engine_stats_scraper = (
+        request.app.state.engine_stats_scraper
+    )  # Access engine_stats_scraper from app.state
+    request_stats_monitor = (
+        request.app.state.request_stats_monitor
+    )  # Access request_stats_monitor from app.state
+
+    endpoints = service_discovery.get_endpoint_info()
+
+    logger.debug("==== Total endpoints ====")
+    logger.debug(endpoints)
+    logger.debug("==== Total endpoints ====")
+
+    # filter the endpoints url by model name and label for transcriptions
+    transcription_endpoints = [
+        ep
+        for ep in endpoints
+        if model == ep.model_name
+        and ep.model_label == "transcription"
+        and not ep.sleep  # Added ep.sleep == False
+    ]
+
+    logger.debug("====List of transcription endpoints====")
+    logger.debug(transcription_endpoints)
+    logger.debug("====List of transcription endpoints====")
+
+    if not transcription_endpoints:
+        logger.error("No transcription backend available for model %s", model)
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"No transcription backend for model {model}"},
+        )
+
+    # grab the current engine and request stats
+    engine_stats = engine_stats_scraper.get_engine_stats()
+    request_stats = request_stats_monitor.get_request_stats(time.time())
+
+    # pick one using the router's configured logic (roundrobin, least-loaded, etc.)
+    chosen_url = router.route_request(
+        transcription_endpoints,
+        engine_stats,
+        request_stats,
+        request,
+    )
+
+    logger.debug("Proxying transcription request to %s", chosen_url)
+
+    # --- 3. Prepare and Proxy the Request ---
+    payload_bytes = await file.read()
+    files = {"file": (file.filename, payload_bytes, file.content_type)}
+
+    data = {"model": model, "language": language}
+
+    if prompt:
+        data["prompt"] = prompt
+
+    if response_format:
+        data["response_format"] = response_format
+
+    if temperature is not None:
+        data["temperature"] = str(temperature)
+
+    logger.info("Proxying transcription request for model %s to %s", model, chosen_url)
+
+    logger.debug("==== data payload keys ====")
+    logger.debug(list(data.keys()))
+    logger.debug("==== data payload keys ====")
+
+    try:
+        client = request.app.state.aiohttp_client_wrapper()
+
+        form_data = aiohttp.FormData()
+
+        # add file data
+        for key, (filename, content, content_type) in files.items():
+            form_data.add_field(
+                key, content, filename=filename, content_type=content_type
+            )
+
+        # add from data
+        for key, value in data.items():
+            form_data.add_field(key, value)
+
+        backend_response = await client.post(
+            f"{chosen_url}{endpoint}",
+            data=form_data,
+            timeout=aiohttp.ClientTimeout(total=300),
+        )
+
+        # --- 4. Return the response ---
+        response_content = await backend_response.json()
+        headers = {
+            k: v
+            for k, v in backend_response.headers.items()
+            if k.lower() not in ("content-encoding", "transfer-encoding", "connection")
+        }
+
+        headers["X-Request-Id"] = request_id
+
+        return JSONResponse(
+            content=response_content,
+            status_code=backend_response.status,
+            headers=headers,
+        )
+    except aiohttp.ClientResponseError as response_error:
+        if response_error.response is not None:
+            try:
+                error_content = await response_error.response.json()
+            except (
+                aiohttp.ContentTypeError,
+                json.JSONDecodeError,
+                aiohttp.ClientError,
+            ):
+                # If JSON parsing fails, get text content
+                try:
+                    text_content = await response_error.response.text()
+                    error_content = {"error": text_content}
+                except aiohttp.ClientError:
+                    error_content = {
+                        "error": f"HTTP {response_error.status}: {response_error.message}"
+                    }
+        else:
+            error_content = {
+                "error": f"HTTP {response_error.status}: {response_error.message}"
+            }
+        return JSONResponse(status_code=response_error.status, content=error_content)
+    except aiohttp.ClientError as client_error:
+        return JSONResponse(
+            status_code=503,
+            content={"error": f"Failed to connect to backend: {str(client_error)}"},
+        )

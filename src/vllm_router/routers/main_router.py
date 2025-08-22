@@ -13,7 +13,11 @@
 # limitations under the License.
 import json
 
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Request,
+)
 from fastapi.responses import JSONResponse, Response
 
 from vllm_router.dynamic_config import get_dynamic_config_watcher
@@ -22,6 +26,7 @@ from vllm_router.protocols import ModelCard, ModelList
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.request import (
     route_general_request,
+    route_general_transcriptions,
     route_sleep_wakeup_request,
 )
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
@@ -123,7 +128,7 @@ async def show_version():
 @main_router.get("/v1/models")
 async def show_models():
     """
-    Returns a list of all models available in the stack
+    Returns a list of all models available in the stack.
 
     Args:
         None
@@ -229,3 +234,13 @@ async def health() -> Response:
         )
     else:
         return JSONResponse(content={"status": "healthy"}, status_code=200)
+
+
+@main_router.post("/v1/audio/transcriptions")
+async def route_v1_audio_transcriptions(
+    request: Request, background_tasks: BackgroundTasks
+):
+    """Handles audio transcription requests."""
+    return await route_general_transcriptions(
+        request, "/v1/audio/transcriptions", background_tasks
+    )
