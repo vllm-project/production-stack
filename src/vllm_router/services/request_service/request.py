@@ -20,7 +20,6 @@ import uuid
 from typing import Optional
 
 import aiohttp
-import httpx
 from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from requests import JSONDecodeError
@@ -627,14 +626,26 @@ async def route_general_transcriptions(
     logger.debug("==== data payload keys ====")
 
     try:
-        async with request.app.state.httpx_client_wrapper() as client:
-            backend_response = await client.post(
-                f"{chosen_url}{endpoint}", data=data, files=files, timeout=300.0
-            )
-        backend_response.raise_for_status()
+        client = request.app.state.aiohttp_client_wrapper()
+
+        form_data = aiohttp.FormData()
+
+        # add file data
+        for key, (filename, content, content_type) in files.items():
+            form_data.add_field(key, content, filename=filename, content_type=content_type)
+
+        # add from data
+        for key, value in data.items():
+            form_data.add_field(key,value)
+
+        backend_response = await client.post(
+            f"{chosen_url}{endpoint}",
+            data=form_data,
+            timeout=aiohttp.ClientTimeout(total=300)
+        )
 
         # --- 4. Return the response ---
-        response_content = backend_response.json()
+        response_content = await backend_response.json()
         headers = {
             k: v
             for k, v in backend_response.headers.items()
@@ -645,17 +656,19 @@ async def route_general_transcriptions(
 
         return JSONResponse(
             content=response_content,
-            status_code=backend_response.status_code,
+            status_code=backend_response.status,
             headers=headers,
         )
-    except httpx.HTTPStatusError as e:
-        error_content = (
-            e.response.json()
-            if "json" in e.response.headers.get("content-type", "")
-            else e.response.text
-        )
-        return JSONResponse(status_code=e.response.status_code, content=error_content)
-    except httpx.RequestError as e:
+    except aiohttp.ClientResponseError as e:
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                error_content = await e.response.json()
+            except:
+                error_content = await e.response.text()
+        else:
+            error_content = {"error": f"HTTP {e.status}: {e.message}"}
+        return JSONResponse(status_code=e.status, content=error_content)
+    except aiohttp.ClientError as e:
         return JSONResponse(
-            status_code=503, content={"error": f"Failed to connect to backend: {e}"}
+            status_code=503, content={"error": f"Failed to connect to backend: {str(e)}"}
         )
