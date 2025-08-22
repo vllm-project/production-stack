@@ -632,16 +632,18 @@ async def route_general_transcriptions(
 
         # add file data
         for key, (filename, content, content_type) in files.items():
-            form_data.add_field(key, content, filename=filename, content_type=content_type)
+            form_data.add_field(
+                key, content, filename=filename, content_type=content_type
+            )
 
         # add from data
         for key, value in data.items():
-            form_data.add_field(key,value)
+            form_data.add_field(key, value)
 
         backend_response = await client.post(
             f"{chosen_url}{endpoint}",
             data=form_data,
-            timeout=aiohttp.ClientTimeout(total=300)
+            timeout=aiohttp.ClientTimeout(total=300),
         )
 
         # --- 4. Return the response ---
@@ -670,5 +672,6 @@ async def route_general_transcriptions(
         return JSONResponse(status_code=e.status, content=error_content)
     except aiohttp.ClientError as e:
         return JSONResponse(
-            status_code=503, content={"error": f"Failed to connect to backend: {str(e)}"}
+            status_code=503,
+            content={"error": f"Failed to connect to backend: {str(e)}"},
         )
