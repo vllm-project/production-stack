@@ -137,7 +137,9 @@ async def process_request(
         )
 
 
-def perform_service_discovery(request, request_json, request_endpoint, error_urls):
+def perform_service_discovery(
+    request, request_json, request_endpoint, requested_model, error_urls
+):
     # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
@@ -261,6 +263,7 @@ async def route_general_request(
             request,
             request_json,
             request_endpoint,
+            requested_model,
             error_urls,
         )
 
