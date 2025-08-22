@@ -41,7 +41,7 @@ from vllm_router.service_discovery import (
     initialize_service_discovery,
 )
 from vllm_router.services.batch_service import initialize_batch_processor
-from vllm_router.services.callbacks_service.callbacks import initialize_custom_callbacks
+from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
@@ -195,7 +195,7 @@ def initialize_all(app: FastAPI, args):
             )
 
     if args.callbacks:
-        initialize_custom_callbacks(args.callbacks, app)
+        configure_custom_callbacks(args.callbacks, app)
 
     initialize_routing_logic(
         args.routing_logic,

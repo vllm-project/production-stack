@@ -130,7 +130,7 @@ async def process_request(
         await store_in_semantic_cache(
             endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
         )
-    if background_tasks and hasattr(request.app.state, "callbacks"):
+    if background_tasks and getattr(request.app.state, "callbacks", None):
         background_tasks.add_task(
             request.app.state.callbacks.post_request, request, full_response
         )
@@ -170,7 +170,7 @@ async def route_general_request(
     else:
         request_endpoint = None
 
-    if hasattr(request.app.state, "callbacks") and (
+    if getattr(request.app.state, "callbacks", None) and (
         response_overwrite := request.app.state.callbacks.pre_request(
             request, request_body, request_json
         )
