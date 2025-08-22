@@ -137,7 +137,7 @@ async def process_request(
         )
 
 
-def perform_service_discovery(request, request_json, request_endpoint):
+def perform_service_discovery(request, request_json, request_endpoint, error_urls):
     # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
@@ -151,7 +151,9 @@ def perform_service_discovery(request, request_json, request_endpoint):
     if not request_endpoint:
         endpoints = list(
             filter(
-                lambda x: requested_model in x.model_names and not x.sleep,
+                lambda x: requested_model in x.model_names
+                and not x.sleep
+                and x.url not in error_urls,
                 endpoints,
             )
         )
@@ -164,7 +166,8 @@ def perform_service_discovery(request, request_json, request_endpoint):
             filter(
                 lambda x: requested_model in x.model_names
                 and x.Id == request_endpoint
-                and not x.sleep,
+                and not x.sleep
+                and x.url not in error_urls,
                 endpoints,
             )
         )
@@ -251,9 +254,14 @@ async def route_general_request(
             )
 
     # Perform service discovery to request path a number of times equal to reroutes + 1
+    error_urls = set()
     for _ in range(attempted_reroutes + 1):
         endpoints, engine_stats, request_stats = await asyncio.to_thread(
-            perform_service_discovery, request, request_json, request_endpoint
+            perform_service_discovery,
+            request,
+            request_json,
+            request_endpoint,
+            error_urls,
         )
 
         logger.debug(f"Routing request {request_id} for model: {requested_model}")
@@ -315,6 +323,7 @@ async def route_general_request(
             # Break out of the loop when the request's stream is fully generated
             break
         except Exception as e:
+            error_urls.add(server_url)
             error = e
 
     if error:
