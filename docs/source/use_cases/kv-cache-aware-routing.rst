@@ -1,7 +1,7 @@
 KV Cache Aware Routing
 ======================
 
-This tutorial demonstrates how to use KV cache aware routing in the vLLM Production Stack. KV cache aware routing ensures that subsequent requests with the same prompt prefix are routed to the same instance, maximizing KV cache utilization and improving performance.
+In this tutorial, you'll learn how to enable and use KV cache aware routing in the vLLM Production Stack. With KV cache aware routing, incoming requests are routed to the instance with the highest KV cache hit rate, which helps maximize cache efficiency and boost overall performance. Unlike prefix aware routing—which always sends requests with the same prefix to the same instance, even if the cache has been evicted—KV cache aware routing prioritizes cache hits to optimize resource usage.
 
 Table of Contents
 -----------------
@@ -78,7 +78,7 @@ Then, send another request with the same prompt prefix:
        "max_tokens": 100
      }'
 
-You should observe that the second request is routed to the same instance as the first request. This is because the KV cache aware router detects that the second request shares a prefix with the first request and routes it to the same instance to maximize KV cache utilization.
+You should observe that the second request is routed to the same instance as the first request. This is because the KV cache aware router detects that the second request has a higher KV cache hit rate in the instance of the first request and routes it to the same instance to maximize KV cache utilization.
 
 Step 4: Clean Up
 -----------------
@@ -98,4 +98,4 @@ In this tutorial, we've demonstrated how to:
 2. Set up port forwarding to access the router
 3. Test the KV cache aware routing functionality
 
-The KV cache aware routing feature helps improve performance by ensuring that requests with shared prefixes are routed to the same instance, maximizing KV cache utilization.
+The KV cache aware routing feature helps improve performance by ensuring that requests will be routed to the instance with the highest KV cache hit rate, maximizing KV cache utilization.

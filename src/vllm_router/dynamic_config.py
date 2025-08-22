@@ -29,6 +29,7 @@ from vllm_router.service_discovery import (
     ServiceDiscoveryType,
     reconfigure_service_discovery,
 )
+from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.utils import (
     SingletonMeta,
     parse_comma_separated_args,
@@ -223,6 +224,15 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         # TODO (ApostaC): Implement reconfigure_stats
         pass
 
+    def reconfigure_callbacks(self, config: DynamicRouterConfig):
+        """
+        Reconfigures the router with the given config.
+        """
+        if config.callbacks:
+            configure_custom_callbacks(config.callbacks, self.app)
+        else:
+            self.app.state.callbacks = None
+
     def reconfigure_all(self, config: DynamicRouterConfig):
         """
         Reconfigures the router with the given config.
@@ -231,6 +241,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         self.reconfigure_routing_logic(config)
         self.reconfigure_batch_api(config)
         self.reconfigure_stats(config)
+        self.reconfigure_callbacks(config)
 
     def _sleep_or_break(self, check_interval: float = 1):
         """

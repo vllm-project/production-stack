@@ -131,7 +131,7 @@ async def process_request(
         await store_in_semantic_cache(
             endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
         )
-    if background_tasks and hasattr(request.app.state, "callbacks"):
+    if background_tasks and getattr(request.app.state, "callbacks", None):
         background_tasks.add_task(
             request.app.state.callbacks.post_request, request, full_response
         )
@@ -215,14 +215,14 @@ async def route_general_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
-    request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+    request_json = json.loads(request_body)
 
     if request.query_params:
         request_endpoint = request.query_params.get("id")
     else:
         request_endpoint = None
 
-    if hasattr(request.app.state, "callbacks") and (
+    if getattr(request.app.state, "callbacks", None) and (
         response_overwrite := request.app.state.callbacks.pre_request(
             request, request_body, request_json
         )
