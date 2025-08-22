@@ -661,17 +661,30 @@ async def route_general_transcriptions(
             status_code=backend_response.status,
             headers=headers,
         )
-    except aiohttp.ClientResponseError as e:
-        if hasattr(e, "response") and e.response is not None:
+    except aiohttp.ClientResponseError as response_error:
+        if response_error.response is not None:
             try:
-                error_content = await e.response.json()
-            except:
-                error_content = await e.response.text()
+                error_content = await response_error.response.json()
+            except (
+                aiohttp.ContentTypeError,
+                json.JSONDecodeError,
+                aiohttp.ClientError,
+            ):
+                # If JSON parsing fails, get text content
+                try:
+                    text_content = await response_error.response.text()
+                    error_content = {"error": text_content}
+                except aiohttp.ClientError:
+                    error_content = {
+                        "error": f"HTTP {response_error.status}: {response_error.message}"
+                    }
         else:
-            error_content = {"error": f"HTTP {e.status}: {e.message}"}
-        return JSONResponse(status_code=e.status, content=error_content)
-    except aiohttp.ClientError as e:
+            error_content = {
+                "error": f"HTTP {response_error.status}: {response_error.message}"
+            }
+        return JSONResponse(status_code=response_error.status, content=error_content)
+    except aiohttp.ClientError as client_error:
         return JSONResponse(
             status_code=503,
-            content={"error": f"Failed to connect to backend: {str(e)}"},
+            content={"error": f"Failed to connect to backend: {str(client_error)}"},
         )
