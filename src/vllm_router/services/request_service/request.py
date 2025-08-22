@@ -602,7 +602,7 @@ async def route_general_transcriptions(
         request,
     )
 
-    logger.info("Proxying transcription request to %s", chosen_url)
+    logger.debug("Proxying transcription request to %s", chosen_url)
 
     # --- 3. Prepare and Proxy the Request ---
     payload_bytes = await file.read()
