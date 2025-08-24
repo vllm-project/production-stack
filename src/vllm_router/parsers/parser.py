@@ -368,7 +368,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--request-reroutes",
+        "--max-instance-failover-reroute-attempts",
         type=int,
         default=0,
         help="Number of reroute attempts per failed request",
