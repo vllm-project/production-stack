@@ -367,6 +367,13 @@ def parse_args():
         help="The threshold for kv-aware routing.",
     )
 
+    parser.add_argument(
+        "--request-reroutes",
+        type=int,
+        default=0,
+        help="Number of reroute attempts per failed request",
+    )
+
     args = parser.parse_args()
     args = load_initial_config_from_config_file_if_required(parser, args)
 

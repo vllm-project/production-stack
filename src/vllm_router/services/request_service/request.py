@@ -189,7 +189,6 @@ async def route_general_request(
     request: Request,
     endpoint: str,
     background_tasks: BackgroundTasks,
-    attempted_reroutes: int = 0,
 ):
     """
     Route the incoming request to the backend server and stream the response back to the client.
@@ -257,7 +256,7 @@ async def route_general_request(
 
     # Perform service discovery to request path a number of times equal to reroutes + 1
     error_urls = set()
-    for _ in range(attempted_reroutes + 1):
+    for _ in range(request.app.state.router.reroutes + 1):
         endpoints, engine_stats, request_stats = await asyncio.to_thread(
             perform_service_discovery,
             request,
