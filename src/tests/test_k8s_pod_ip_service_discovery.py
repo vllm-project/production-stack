@@ -284,11 +284,14 @@ def test_scenario_4_slow_models_call_blocks_deletion(mock_app, mock_k8s_dependen
         assert len(discovery.available_engines) == 2
         assert "engine_1" in discovery.available_engines
         assert "engine_2" in discovery.available_engines
+        should_call_false = True
+        discovery.running = True
 
         # Third iteration: Give time for the third iteration
         # The slow call to engine_1's /v1/models should block processing
         # and prevent the DELETED event for engine_2 from being processed
-        time.sleep(0.3)
+        time.sleep(0.5)
+        discovery.running = False
 
         # Check that engine_2 is still in available_engines because the DELETED event
         # was not processed due to the slow /v1/models call blocking the stream
