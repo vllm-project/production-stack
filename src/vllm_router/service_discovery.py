@@ -571,6 +571,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
     def _watch_engines(self):
         while self.running:
             try:
+                logger.info(f"Watching engines: {self.available_engines}")
                 for event in self.k8s_watcher.stream(
                     self.k8s_api.list_namespaced_pod,
                     namespace=self.namespace,
