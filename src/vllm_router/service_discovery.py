@@ -503,6 +503,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             List of model names available on the serving engine, including both base models and adapters
         """
         url = f"http://{pod_ip}:{self.port}/v1/models"
+        logger.debug(f"Get model names for pod {pod_ip}")
         try:
             headers = None
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
@@ -571,7 +572,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
     def _watch_engines(self):
         while self.running:
             try:
-                logger.info(f"Watching engines: {self.available_engines}")
+                logger.debug(f"Watching engines: {self.available_engines}")
                 for event in self.k8s_watcher.stream(
                     self.k8s_api.list_namespaced_pod,
                     namespace=self.namespace,

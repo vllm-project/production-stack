@@ -209,3 +209,100 @@ def test_scenario_3_pod_addition_after_timeout(mock_app, mock_k8s_dependencies, 
         assert engine_3.model_label == "model-3"
 
         discovery.close()
+
+
+def test_scenario_4_slow_models_call_blocks_deletion(mock_app, mock_k8s_dependencies):
+    """Test scenario 4: Slow /v1/models call blocks deletion event processing."""
+
+    # Track how many times we've been called to simulate different behaviors
+    should_call_false = False
+
+    def mock_slow_requests_get(url, headers=None):
+        if should_call_false:
+            # Third call to engine_1's /v1/models - simulate slow response
+            time.sleep(40)  # Simulate a slow call that would exceed timeout in real scenario
+            raise Exception("Simulated slow response")
+        else:
+            # Normal fast response for other calls
+            mock_response = MagicMock()
+            mock_response.json.return_value = {"data": [{"id": "test-model"}]}
+            mock_response.raise_for_status.return_value = None
+            return mock_response
+
+    # Create generators for each watch iteration
+    def mock_stream_generator_first():
+        # First iteration: 2 pods added
+        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
+        yield create_mock_pod_event("ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
+        raise Exception("Simulated timeout")
+
+    def mock_stream_generator_second():
+        # Second iteration: same 2 pods added again (no change)
+        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
+        yield create_mock_pod_event("ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
+        raise Exception("Simulated timeout")
+
+    def mock_stream_generator_third():
+        # Third iteration: engine_1 slow call, engine_2 deleted
+        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
+        yield create_mock_pod_event("DELETED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
+        raise Exception("Simulated timeout")
+
+    # Mock the watcher stream to use our generators
+    mock_k8s_dependencies['watcher'].stream.side_effect = [
+        mock_stream_generator_first(),
+        mock_stream_generator_second(),
+        mock_stream_generator_third()
+    ]
+
+    # Mock the requests.get to simulate slow response
+    mock_k8s_dependencies['requests'].get.side_effect = mock_slow_requests_get
+
+    # Mock sleep mode check to return False
+    with patch.object(K8sPodIPServiceDiscovery, '_check_engine_sleep_mode', return_value=False):
+        discovery = K8sPodIPServiceDiscovery(
+            app=mock_app,
+            namespace="test-namespace",
+            port="8000"
+        )
+
+        # First iteration: Give time for both engines to be added
+        time.sleep(0.5)
+        discovery.running = False
+
+        # Check that both engines are in available_engines after first iteration
+        assert len(discovery.available_engines) == 2
+        assert "engine_1" in discovery.available_engines
+        assert "engine_2" in discovery.available_engines
+        discovery.running = True
+
+        # Second iteration: Give time for the second iteration (should be no change)
+        time.sleep(0.5)
+        discovery.running = False
+
+        # Check that both engines are still in available_engines after second iteration
+        assert len(discovery.available_engines) == 2
+        assert "engine_1" in discovery.available_engines
+        assert "engine_2" in discovery.available_engines
+
+        # Third iteration: Give time for the third iteration
+        # The slow call to engine_1's /v1/models should block processing
+        # and prevent the DELETED event for engine_2 from being processed
+        time.sleep(0.3)
+
+        # Check that engine_2 is still in available_engines because the DELETED event
+        # was not processed due to the slow /v1/models call blocking the stream
+        assert len(discovery.available_engines) == 2
+        assert "engine_1" in discovery.available_engines
+        assert "engine_2" in discovery.available_engines  # Should still be here!
+
+        # Verify that engine_1 is still there (even though the /v1/models call was slow)
+        engine_1 = discovery.available_engines["engine_1"]
+        engine_2 = discovery.available_engines["engine_2"]
+
+        assert isinstance(engine_1, EndpointInfo)
+        assert isinstance(engine_2, EndpointInfo)
+        assert engine_1.url == "http://10.0.0.1:8000"
+        assert engine_2.url == "http://10.0.0.2:8000"
+
+        discovery.close()
