@@ -396,7 +396,6 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         self.watcher_thread.start()
         self.prefill_model_labels = prefill_model_labels
         self.decode_model_labels = decode_model_labels
-        self.failing_counter = 0 # TODO: remove when implementation works
 
     @staticmethod
     def _check_pod_ready(container_statuses):
@@ -517,15 +516,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         url = f"http://{pod_ip}:{self.port}/v1/models"
         try:
             headers = None
-            self.failing_counter += 1
-            logger.info(f"{self.failing_counter=}")
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
-                if self.failing_counter > 3:
-                    await asyncio.sleep(60)
-                    VLLM_API_KEY = "wrong_key_jklkjlkj"
                 logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            
             # Use aiohttp for async HTTP requests
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=headers) as response:
