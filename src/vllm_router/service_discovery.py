@@ -701,8 +701,6 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         is_container_ready = self._check_pod_ready(
             pod.status.container_statuses
         )
-
-        logger.info(f"{is_container_ready=}")
         # Pod is ready if container is ready and pod is not terminating
         is_pod_ready = is_container_ready and not is_pod_terminating
 
