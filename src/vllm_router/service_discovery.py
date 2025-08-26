@@ -599,8 +599,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         """
         while self.running:
             try:
-                logger.info(f"K8s watcher started{self.get_endpoint_info()}")
-
+                logger.debug(f"K8s watcher started{self.get_endpoint_info()}")
                 # Use resource version for efficient watching
                 watch_params = {
                     "namespace": self.namespace,
@@ -611,12 +610,10 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                     watch_params["resource_version"] = self.resource_version
 
 
-                logger.debug(f"{watch_params=}")
                 for event in self.k8s_watcher.stream(
                     self.k8s_api.list_namespaced_pod,
                     **watch_params
                 ):
-                    logger.debug(f"Watching pod {event["object"].metadata.name} as event type: {event['type']}")
                     # Update resource version
                     self.resource_version = event["object"].metadata.resource_version
 
@@ -687,7 +684,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         pod_name = pod.metadata.name
         pod_ip = pod.status.pod_ip
 
-        logger.info(f"pod_name: {pod_name} pod_ip: {pod_ip} event_type: {event_type}")
+        logger.info(f"Processing event: pod_name: {pod_name} pod_ip: {pod_ip} event_type: {event_type}")
 
         # Preprocess the event to get all necessary information
         preprocessed_data = await self._preprocess_event(pod, pod_ip)
@@ -704,8 +701,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
 
     async def _preprocess_event(self, pod, pod_ip: str) -> dict:
         """
-        Preprocess event data to extract all necessary information.
-        This method contains the logic that was previously inline in _watch_engines.
+        Preprocess event data to extract information about model names/labels/pod readiness
         """
         # Check if pod is terminating
         is_pod_terminating = self._is_pod_terminating(pod)
