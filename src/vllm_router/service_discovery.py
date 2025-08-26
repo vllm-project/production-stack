@@ -677,7 +677,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         pod_name = pod.metadata.name
         pod_ip = pod.status.pod_ip
 
-        logger.info(f"Processing event: pod_name: {pod_name} pod_ip: {pod_ip} event_type: {event_type}")
+        logger.debug(f"Processing event: pod_name: {pod_name} pod_ip: {pod_ip} event_type: {event_type}")
 
         # Preprocess the event to get all necessary information
         preprocessed_data = await self._preprocess_event(pod, pod_ip)
