@@ -16,10 +16,12 @@ def mock_app():
 @pytest.fixture
 def mock_k8s_dependencies():
     """Mock all Kubernetes dependencies."""
-    with patch('vllm_router.service_discovery.config') as mock_config, \
-            patch('vllm_router.service_discovery.client.CoreV1Api') as mock_api_class, \
-            patch('vllm_router.service_discovery.watch.Watch') as mock_watch_class, \
-            patch('vllm_router.service_discovery.requests') as mock_requests:
+    with (
+        patch("vllm_router.service_discovery.config") as mock_config,
+        patch("vllm_router.service_discovery.client.CoreV1Api") as mock_api_class,
+        patch("vllm_router.service_discovery.watch.Watch") as mock_watch_class,
+        patch("vllm_router.service_discovery.requests") as mock_requests,
+    ):
         # Mock config loading
         mock_config.load_incluster_config.return_value = None
 
@@ -38,14 +40,21 @@ def mock_k8s_dependencies():
         mock_requests.get.return_value = mock_response
 
         yield {
-            'config': mock_config,
-            'api': mock_api,
-            'watcher': mock_watcher,
-            'requests': mock_requests
+            "config": mock_config,
+            "api": mock_api,
+            "watcher": mock_watcher,
+            "requests": mock_requests,
         }
 
 
-def create_mock_pod_event(event_type, pod_name, pod_ip, ready=True, terminating=False, model_label="test-model"):
+def create_mock_pod_event(
+    event_type,
+    pod_name,
+    pod_ip,
+    ready=True,
+    terminating=False,
+    model_label="test-model",
+):
     """Helper method to create a mock Kubernetes pod event."""
     pod = MagicMock()
     pod.metadata.name = pod_name
@@ -58,33 +67,37 @@ def create_mock_pod_event(event_type, pod_name, pod_ip, ready=True, terminating=
     pod.status.pod_ip = pod_ip
     pod.status.container_statuses = [MagicMock(ready=ready)] if ready else []
 
-    return {
-        "type": event_type,
-        "object": pod
-    }
+    return {"type": event_type, "object": pod}
 
 
 def test_scenario_1_two_pods_present(mock_app, mock_k8s_dependencies):
     """Test scenario 1: 2 model pods present and running."""
+
     # Create a generator that yields events and then stops
     def mock_stream_generator():
-        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
-        yield create_mock_pod_event("ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
+        yield create_mock_pod_event(
+            "ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1"
+        )
+        yield create_mock_pod_event(
+            "ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2"
+        )
         # Stop after yielding the events
         raise Exception("Simulated timeout")
 
-    mock_k8s_dependencies['watcher'].stream.return_value = mock_stream_generator()
+    mock_k8s_dependencies["watcher"].stream.return_value = mock_stream_generator()
 
     # Mock sleep mode check to return False
-    with patch.object(K8sPodIPServiceDiscovery, '_check_engine_sleep_mode', return_value=False):
+    with patch.object(
+        K8sPodIPServiceDiscovery, "_check_engine_sleep_mode", return_value=False
+    ):
         discovery = K8sPodIPServiceDiscovery(
-            app=mock_app,
-            namespace="test-namespace",
-            port="8000"
+            app=mock_app, namespace="test-namespace", port="8000"
         )
 
         # Give the watcher thread time to process the events
-        time.sleep(0.1) # hardcoded 0.1 so that while the watcher sleeps after failing, this sleeping is exhausted
+        time.sleep(
+            0.1
+        )  # hardcoded 0.1 so that while the watcher sleeps after failing, this sleeping is exhausted
 
         # Check that both engines are in available_engines
         assert len(discovery.available_engines) == 2
@@ -109,23 +122,30 @@ def test_scenario_1_two_pods_present(mock_app, mock_k8s_dependencies):
 
 def test_scenario_2_pod_deletion(mock_app, mock_k8s_dependencies):
     """Test scenario 2: 2 pods present, then 1 gets deleted."""
+
     # Mock the watcher stream to return 2 ADDED events followed by 1 DELETED event
     # Create a generator that yields events and then stops
     def mock_stream_generator():
-        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
-        yield create_mock_pod_event("ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
-        yield create_mock_pod_event("DELETED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
+        yield create_mock_pod_event(
+            "ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1"
+        )
+        yield create_mock_pod_event(
+            "ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2"
+        )
+        yield create_mock_pod_event(
+            "DELETED", "engine_1", "10.0.0.1", ready=True, model_label="model-1"
+        )
         # Stop after yielding the events
         raise Exception("Simulated timeout")
 
-    mock_k8s_dependencies['watcher'].stream.return_value = mock_stream_generator()
+    mock_k8s_dependencies["watcher"].stream.return_value = mock_stream_generator()
 
     # Mock sleep mode check to return False
-    with patch.object(K8sPodIPServiceDiscovery, '_check_engine_sleep_mode', return_value=False):
+    with patch.object(
+        K8sPodIPServiceDiscovery, "_check_engine_sleep_mode", return_value=False
+    ):
         discovery = K8sPodIPServiceDiscovery(
-            app=mock_app,
-            namespace="test-namespace",
-            port="8000"
+            app=mock_app, namespace="test-namespace", port="8000"
         )
 
         # Give the watcher thread time to process all events
@@ -152,45 +172,55 @@ def test_scenario_3_pod_addition_after_timeout(mock_app, mock_k8s_dependencies, 
     # Create a generator that yields different events on each iteration
     def mock_stream_generator():
         # First iteration: 2 pods
-        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
-        yield create_mock_pod_event("ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
+        yield create_mock_pod_event(
+            "ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1"
+        )
+        yield create_mock_pod_event(
+            "ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2"
+        )
 
         # Simulate timeout by raising StopIteration
         raise StopIteration()
 
     def mock_stream_generator_second():
         # Second iteration: 3 pods (including the new one)
-        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
-        yield create_mock_pod_event("ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
-        yield create_mock_pod_event("ADDED", "engine_3", "10.0.0.3", ready=True, model_label="model-3")
+        yield create_mock_pod_event(
+            "ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1"
+        )
+        yield create_mock_pod_event(
+            "ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2"
+        )
+        yield create_mock_pod_event(
+            "ADDED", "engine_3", "10.0.0.3", ready=True, model_label="model-3"
+        )
 
         # Simulate timeout
         raise StopIteration()
 
     # Mock the watcher stream to use our generator
-    mock_k8s_dependencies['watcher'].stream.side_effect = [
+    mock_k8s_dependencies["watcher"].stream.side_effect = [
         mock_stream_generator(),
-        mock_stream_generator_second()
+        mock_stream_generator_second(),
     ]
 
     # Mock sleep mode check to return False
-    with patch.object(K8sPodIPServiceDiscovery, '_check_engine_sleep_mode', return_value=False):
+    with patch.object(
+        K8sPodIPServiceDiscovery, "_check_engine_sleep_mode", return_value=False
+    ):
         discovery = K8sPodIPServiceDiscovery(
-            app=mock_app,
-            namespace="test-namespace",
-            port="8000"
+            app=mock_app, namespace="test-namespace", port="8000"
         )
 
         # Give the watcher thread time to process the first iteration
         time.sleep(0.5)
-        discovery.running = False # Stop the while loop
+        discovery.running = False  # Stop the while loop
 
         # Check that both engines are in available_engines after first iteration
         assert len(discovery.available_engines) == 2
         assert "engine_1" in discovery.available_engines
         assert "engine_2" in discovery.available_engines
         assert "engine_3" not in discovery.available_engines
-        discovery.running = True # Restart the while loop
+        discovery.running = True  # Restart the while loop
 
         # Give more time for the second iteration to process
         time.sleep(0.5)
@@ -220,7 +250,9 @@ def test_scenario_4_slow_models_call_blocks_deletion(mock_app, mock_k8s_dependen
     def mock_slow_requests_get(url, headers=None):
         if should_call_false:
             # Third call to engine_1's /v1/models - simulate slow response
-            time.sleep(40)  # Simulate a slow call that would exceed timeout in real scenario
+            time.sleep(
+                40
+            )  # Simulate a slow call that would exceed timeout in real scenario
             raise Exception("Simulated slow response")
         else:
             # Normal fast response for other calls
@@ -232,38 +264,50 @@ def test_scenario_4_slow_models_call_blocks_deletion(mock_app, mock_k8s_dependen
     # Create generators for each watch iteration
     def mock_stream_generator_first():
         # First iteration: 2 pods added
-        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
-        yield create_mock_pod_event("ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
+        yield create_mock_pod_event(
+            "ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1"
+        )
+        yield create_mock_pod_event(
+            "ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2"
+        )
         raise Exception("Simulated timeout")
 
     def mock_stream_generator_second():
         # Second iteration: same 2 pods added again (no change)
-        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
-        yield create_mock_pod_event("ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
+        yield create_mock_pod_event(
+            "ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1"
+        )
+        yield create_mock_pod_event(
+            "ADDED", "engine_2", "10.0.0.2", ready=True, model_label="model-2"
+        )
         raise Exception("Simulated timeout")
 
     def mock_stream_generator_third():
         # Third iteration: engine_1 slow call, engine_2 deleted
-        yield create_mock_pod_event("ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1")
-        yield create_mock_pod_event("DELETED", "engine_2", "10.0.0.2", ready=True, model_label="model-2")
+        yield create_mock_pod_event(
+            "ADDED", "engine_1", "10.0.0.1", ready=True, model_label="model-1"
+        )
+        yield create_mock_pod_event(
+            "DELETED", "engine_2", "10.0.0.2", ready=True, model_label="model-2"
+        )
         raise Exception("Simulated timeout")
 
     # Mock the watcher stream to use our generators
-    mock_k8s_dependencies['watcher'].stream.side_effect = [
+    mock_k8s_dependencies["watcher"].stream.side_effect = [
         mock_stream_generator_first(),
         mock_stream_generator_second(),
-        mock_stream_generator_third()
+        mock_stream_generator_third(),
     ]
 
     # Mock the requests.get to simulate slow response
-    mock_k8s_dependencies['requests'].get.side_effect = mock_slow_requests_get
+    mock_k8s_dependencies["requests"].get.side_effect = mock_slow_requests_get
 
     # Mock sleep mode check to return False
-    with patch.object(K8sPodIPServiceDiscovery, '_check_engine_sleep_mode', return_value=False):
+    with patch.object(
+        K8sPodIPServiceDiscovery, "_check_engine_sleep_mode", return_value=False
+    ):
         discovery = K8sPodIPServiceDiscovery(
-            app=mock_app,
-            namespace="test-namespace",
-            port="8000"
+            app=mock_app, namespace="test-namespace", port="8000"
         )
 
         # First iteration: Give time for both engines to be added

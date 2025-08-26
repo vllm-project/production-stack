@@ -433,7 +433,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
                 logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            
+
             # Use aiohttp for async HTTP requests
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=headers) as response:
@@ -554,7 +554,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
                 logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            
+
             # Use aiohttp for async HTTP requests
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=headers) as response:
@@ -602,17 +602,15 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 if self.resource_version:
                     watch_params["resource_version"] = self.resource_version
 
-
                 for event in self.k8s_watcher.stream(
-                    self.k8s_api.list_namespaced_pod,
-                    **watch_params
+                    self.k8s_api.list_namespaced_pod, **watch_params
                 ):
                     # Update resource version
                     self.resource_version = event["object"].metadata.resource_version
 
                     # Enqueue event by key (pod_name) to avoid duplicates
                     self._enqueue_event(event)
-                    
+
             except Exception as e:
                 logger.error(f"K8s watcher error: {e}")
                 time.sleep(0.5)
@@ -624,12 +622,12 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         """
         pod_name = event["object"].metadata.name
         # Create a key-based queue using OrderedDict
-        if not hasattr(self, '_event_queue_dict'):
+        if not hasattr(self, "_event_queue_dict"):
             self._event_queue_dict = OrderedDict()
-        
+
         # Add/update event in the ordered dict
         self._event_queue_dict[pod_name] = event
-        
+
         # Put the pod name in the queue for processing
         try:
             self.event_queue.put_nowait(pod_name)
@@ -653,15 +651,15 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 pod_name = await asyncio.get_event_loop().run_in_executor(
                     None, self.event_queue.get, True, 1.0
                 )
-                
+
                 # Get the event from our ordered dict
                 event = self._event_queue_dict.pop(pod_name, None)
                 if event is None:
                     continue
-                
+
                 # Process the event asynchronously
                 await self._process_single_event(event)
-                
+
             except queue.Empty:
                 continue
             except Exception as e:
@@ -677,11 +675,13 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         pod_name = pod.metadata.name
         pod_ip = pod.status.pod_ip
 
-        logger.debug(f"Processing event: pod_name: {pod_name} pod_ip: {pod_ip} event_type: {event_type}")
+        logger.debug(
+            f"Processing event: pod_name: {pod_name} pod_ip: {pod_ip} event_type: {event_type}"
+        )
 
         # Preprocess the event to get all necessary information
         preprocessed_data = await self._preprocess_event(pod, pod_ip)
-        
+
         # Call the async engine update handler
         await self._on_engine_update_async(
             pod_name,
@@ -698,9 +698,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         """
         # Check if pod is terminating
         is_pod_terminating = self._is_pod_terminating(pod)
-        is_container_ready = self._check_pod_ready(
-            pod.status.container_statuses
-        )
+        is_container_ready = self._check_pod_ready(pod.status.container_statuses)
         # Pod is ready if container is ready and pod is not terminating
         is_pod_ready = is_container_ready and not is_pod_terminating
 
@@ -780,7 +778,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if not model_names:
                 return
 
-            await self._add_engine_async(engine_name, engine_ip, model_names, model_label)
+            await self._add_engine_async(
+                engine_name, engine_ip, model_names, model_label
+            )
 
         elif event == "DELETED":
             if engine_name not in self.available_engines:
@@ -793,7 +793,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 return
 
             if is_pod_ready and model_names:
-                await self._add_engine_async(engine_name, engine_ip, model_names, model_label)
+                await self._add_engine_async(
+                    engine_name, engine_ip, model_names, model_label
+                )
                 return
 
             if (
@@ -828,11 +830,11 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         """
         self.running = False
         self.k8s_watcher.stop()
-        
+
         # Cancel the event processor task
         if self.event_processor_task:
             self.event_processor_task.cancel()
-        
+
         self.watcher_thread.join()
 
     async def initialize_client_sessions(self) -> None:
@@ -842,7 +844,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         """
         # Start the event processor
         await self._start_event_processor()
-        
+
         if (
             self.prefill_model_labels is not None
             and self.decode_model_labels is not None
