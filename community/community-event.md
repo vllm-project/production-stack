@@ -6,8 +6,6 @@ Info can be found in the [Google Doc](https://docs.google.com/document/d/1SCye2q
 
 ## Logistics
 
-Time: Weekly
+Time: Bi-weekly
 
-Please download and import the following iCalendar (.ics) files to your calendar system:
-
-**5:30--6:00PM PT on Tuesdays**: [Zoom link](https://uchicago.zoom.us/j/6603596916?pwd=Z1E5MDRWUSt2am5XbEt4dTFkNGx6QT09), [Calendar Invite](prod_stack_community_meeting.ics)
+**Every other Tuesday 5:30 - 6:00 PM PT** – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1I3WuivUVAq1vZ2XSW4rmqgD5c0bQcxE0&export=download)
