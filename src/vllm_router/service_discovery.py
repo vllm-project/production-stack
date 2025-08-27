@@ -387,6 +387,8 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
 
         # Event queue and processor
         self.event_queue = queue.Queue()
+        self._event_queue_dict = OrderedDict()
+        self._event_queue_dict_lock = threading.Lock()
         self.event_processor_task = None
         self.resource_version = None
 
@@ -621,12 +623,10 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         replace the older event.
         """
         pod_name = event["object"].metadata.name
-        # Create a key-based queue using OrderedDict
-        if not hasattr(self, "_event_queue_dict"):
-            self._event_queue_dict = OrderedDict()
 
         # Add/update event in the ordered dict
-        self._event_queue_dict[pod_name] = event
+        with self._event_queue_dict_lock:
+            self._event_queue_dict[pod_name] = event
 
         # Put the pod name in the queue for processing
         try:
@@ -653,7 +653,8 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 )
 
                 # Get the event from our ordered dict
-                event = self._event_queue_dict.pop(pod_name, None)
+                with self._event_queue_dict_lock:
+                    event = self._event_queue_dict.pop(pod_name, None)
                 if event is None:
                     continue
 
