@@ -20,6 +20,26 @@ spec:
       port: 9000
       targetPort: lmcache-port
       protocol: TCP
+    - name: pd-port-1
+      port: 7100
+      targetPort: pd-port-1
+      protocol: TCP
+    - name: pd-port-2
+      port: 7200
+      targetPort: pd-port-2
+      protocol: TCP
+    - name: pd-port-3
+      port: 7300
+      targetPort: pd-port-3
+      protocol: TCP
+    - name: pd-port-4
+      port: 7400
+      targetPort: pd-port-4
+      protocol: TCP
+    - name: pd-port-5
+      port: 7500
+      targetPort: pd-port-5
+      protocol: TCP
   selector:
   {{- include "chart.routerLabels" . | nindent 4 }}
 {{- end }}

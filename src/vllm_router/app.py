@@ -46,6 +46,10 @@ from vllm_router.services.files_service import initialize_storage
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
 )
+from vllm_router.services.request_service.request import (
+    start_zmq_task,
+    stop_zmq_task,
+)
 from vllm_router.stats.engine_stats import (
     get_engine_stats_scraper,
     initialize_engine_stats_scraper,
@@ -61,6 +65,8 @@ from vllm_router.utils import (
     parse_static_urls,
     set_ulimit,
 )
+
+import asyncio
 
 try:
     # Semantic cache integration
@@ -90,7 +96,16 @@ async def lifespan(app: FastAPI):
     if hasattr(service_discovery, "initialize_client_sessions"):
         await service_discovery.initialize_client_sessions()
 
+    app.state.event_loop = asyncio.get_event_loop()
+
+    # Start the ZMQ task
+    await start_zmq_task()
+
     yield
+    
+    # Stop the ZMQ task
+    await stop_zmq_task()
+    
     await app.state.aiohttp_client_wrapper.stop()
 
     # Close the threaded-components
@@ -270,6 +285,7 @@ def initialize_all(app: FastAPI, args):
     app.state.request_stats_monitor = get_request_stats_monitor()
     app.state.router = get_routing_logic()
     app.state.request_rewriter = get_request_rewriter()
+    app.state.args = args
 
 
 app = FastAPI(lifespan=lifespan)
