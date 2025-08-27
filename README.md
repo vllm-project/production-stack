@@ -11,9 +11,9 @@
 
 ## Community Events
 
-We host **weekly** community meetings at the following timeslot:
+We host **bi-weekly** community meetings at the following timeslot:
 
-- Tuesdays at 5:30 PM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1E4rcnwZHV84IEFXAGtJ-TP3o1rslNDei&export=download)
+- Every other Tuesdays at 5:30 PM PT – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1I3WuivUVAq1vZ2XSW4rmqgD5c0bQcxE0&export=download)
 
 All are welcome to join!
 

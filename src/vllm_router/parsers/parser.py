@@ -97,6 +97,8 @@ def validate_args(args):
             validate_static_model_types(args.static_model_types)
     if args.service_discovery == "k8s" and args.k8s_port is None:
         raise ValueError("K8s port must be provided when using K8s service discovery.")
+    if args.k8s_watcher_timeout_seconds <= 0:
+        raise ValueError("k8s-watcher-timeout-seconds must be greater than 0.")
     if args.routing_logic == "session" and args.session_key is None:
         raise ValueError(
             "Session key must be provided when using session routing logic."
@@ -187,6 +189,12 @@ def parse_args():
         type=str,
         default="",
         help="The label selector to filter vLLM pods when using K8s service discovery.",
+    )
+    parser.add_argument(
+        "--k8s-watcher-timeout-seconds",
+        type=int,
+        default=30,
+        help="Timeout in seconds for Kubernetes watcher streams (default: 30).",
     )
     parser.add_argument(
         "--routing-logic",
