@@ -350,6 +350,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         label_selector=None,
         prefill_model_labels: List[str] | None = None,
         decode_model_labels: List[str] | None = None,
+        watcher_timeout_seconds: int = 30,
     ):
         """
         Initialize the Kubernetes service discovery module. This module
@@ -363,6 +364,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             namespace: the namespace of the engine pods
             port: the port of the engines
             label_selector: the label selector of the engines
+            watcher_timeout_seconds: timeout in seconds for Kubernetes watcher streams (default: 30)
         """
         self.app = app
         self.namespace = namespace
@@ -370,6 +372,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
         self.label_selector = label_selector
+        self.watcher_timeout_seconds = watcher_timeout_seconds
 
         # Init kubernetes watcher
         try:
@@ -566,15 +569,13 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         return pod.metadata.labels.get("model")
 
     def _watch_engines(self):
-        # TODO (ApostaC): remove the hard-coded timeouts
-
         while self.running:
             try:
                 for event in self.k8s_watcher.stream(
                     self.k8s_api.list_namespaced_pod,
                     namespace=self.namespace,
                     label_selector=self.label_selector,
-                    timeout_seconds=30,
+                    timeout_seconds=self.watcher_timeout_seconds,
                 ):
                     pod = event["object"]
                     event_type = event["type"]
@@ -754,6 +755,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         label_selector=None,
         prefill_model_labels: List[str] | None = None,
         decode_model_labels: List[str] | None = None,
+        watcher_timeout_seconds: int = 30,
     ):
         """
         Initialize the Kubernetes service discovery module. This module
@@ -782,6 +784,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             namespace: the namespace of the engine services
             port: the port of the engines
             label_selector: the label selector of the engines
+            watcher_timeout_seconds: timeout in seconds for Kubernetes watcher streams (default: 30)
         """
         self.app = app
         self.namespace = namespace
@@ -789,6 +792,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
         self.label_selector = label_selector
+        self.watcher_timeout_seconds = watcher_timeout_seconds
 
         # Init kubernetes watcher
         try:
@@ -988,15 +992,13 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         return service.spec.selector.get("model")
 
     def _watch_engines(self):
-        # TODO (ApostaC): remove the hard-coded timeouts
-
         while self.running:
             try:
                 for event in self.k8s_watcher.stream(
                     self.k8s_api.list_namespaced_service,
                     namespace=self.namespace,
                     label_selector=self.label_selector,
-                    timeout_seconds=30,
+                    timeout_seconds=self.watcher_timeout_seconds,
                 ):
                     service = event["object"]
                     event_type = event["type"]
