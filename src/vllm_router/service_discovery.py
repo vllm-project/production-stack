@@ -418,7 +418,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         """
         return pod.metadata.deletion_timestamp is not None
 
-    async def _get_engine_sleep_status_async(self, pod_ip) -> Optional[bool]:
+    async def _get_engine_sleep_status(self, pod_ip) -> Optional[bool]:
         """
         Get the engine sleeping status by querying the engine's
         '/is_sleeping' endpoint.
@@ -684,7 +684,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         preprocessed_data = await self._preprocess_event(pod, pod_ip)
 
         # Call the async engine update handler
-        await self._on_engine_update_async(
+        await self._on_engine_update(
             pod_name,
             pod_ip,
             event_type,
@@ -722,7 +722,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             "model_label": model_label,
         }
 
-    async def _add_engine_async(
+    async def _add_engine(
         self, engine_name: str, engine_ip: str, model_names: List[str], model_label: str
     ):
         logger.info(
@@ -735,7 +735,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
 
         # Check if engine is enabled with sleep mode and set engine sleep status
         if self._check_engine_sleep_mode(engine_name):
-            sleep_status = await self._get_engine_sleep_status_async(engine_ip)
+            sleep_status = await self._get_engine_sleep_status(engine_ip)
         else:
             sleep_status = False
 
@@ -760,7 +760,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         with self.available_engines_lock:
             del self.available_engines[engine_name]
 
-    async def _on_engine_update_async(
+    async def _on_engine_update(
         self,
         engine_name: str,
         engine_ip: Optional[str],
@@ -779,7 +779,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if not model_names:
                 return
 
-            await self._add_engine_async(
+            await self._add_engine(
                 engine_name, engine_ip, model_names, model_label
             )
 
@@ -794,7 +794,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 return
 
             if is_pod_ready and model_names:
-                await self._add_engine_async(
+                await self._add_engine(
                     engine_name, engine_ip, model_names, model_label
                 )
                 return
