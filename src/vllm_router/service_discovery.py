@@ -504,7 +504,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         except client.rest.ApiException as e:
             logger.error(f"Error removing sleeping label: {e}")
 
-    async def _get_model_names_async(self, pod_ip) -> List[str]:
+    async def _get_model_names(self, pod_ip) -> List[str]:
         """
         Get the model names of the serving engine pod by querying the pod's
         '/v1/models' endpoint.
@@ -540,7 +540,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             logger.error(f"Failed to get model names from {url}: {e}")
             return []
 
-    async def _get_model_info_async(self, pod_ip) -> Dict[str, ModelInfo]:
+    async def _get_model_info(self, pod_ip) -> Dict[str, ModelInfo]:
         """
         Get detailed model information from the serving engine pod.
 
@@ -704,7 +704,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         is_pod_ready = is_container_ready and not is_pod_terminating
 
         if is_pod_ready:
-            model_names = await self._get_model_names_async(pod_ip)
+            model_names = await self._get_model_names(pod_ip)
             model_label = self._get_model_label(pod)
         else:
             model_names = []
@@ -731,7 +731,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         )
 
         # Get detailed model information
-        model_info = await self._get_model_info_async(engine_ip)
+        model_info = await self._get_model_info(engine_ip)
 
         # Check if engine is enabled with sleep mode and set engine sleep status
         if self._check_engine_sleep_mode(engine_name):
