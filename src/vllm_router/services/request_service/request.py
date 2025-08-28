@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+
 # --- Request Processing & Routing ---
 import json
 import os
@@ -20,6 +22,9 @@ import uuid
 from typing import Optional
 
 import aiohttp
+import msgspec
+import zmq
+import zmq.asyncio
 from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from lmcache.v1.storage_backend.connector.nixl_connector_v3 import (
@@ -52,12 +57,6 @@ except ImportError:
 
 
 logger = init_logger(__name__)
-
-import asyncio
-
-import msgspec
-import zmq
-import zmq.asyncio
 
 finished_reqs = set()
 run_proxy = True
