@@ -31,7 +31,7 @@ servingEngineSpec:
         enableXpyd: true
         nixlRole: "sender"
         nixlProxyHost: "vllm-router-service"
-        nixlProxyPort: 7500 
+        nixlProxyPort: 7500
         nixlBufferSize: "1073741824"
         nixlBufferDevice: "cuda"
         enablePD: true

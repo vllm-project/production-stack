@@ -22,6 +22,9 @@ from typing import Optional
 import aiohttp
 from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
+from lmcache.v1.storage_backend.connector.nixl_connector_v3 import (
+    NixlMsg,
+)
 from requests import JSONDecodeError
 
 from vllm_router.log import init_logger
@@ -37,10 +40,6 @@ from vllm_router.services.request_service.rewriter import (
 )
 from vllm_router.utils import replace_model_in_request_body, update_content_length
 
-from lmcache.v1.storage_backend.connector.nixl_connector_v3 import (
-    NixlMsg,
-)
-
 try:
     # Semantic cache integration
     from vllm_router.experimental.semantic_cache_integration import (
@@ -54,20 +53,23 @@ except ImportError:
 
 logger = init_logger(__name__)
 
+import asyncio
+
+import msgspec
 import zmq
 import zmq.asyncio
-import msgspec
-import asyncio
 
 finished_reqs = set()
 run_proxy = True
 zmq_ctx = zmq.asyncio.Context()
+
 
 async def zmq_pull_server():
     try:
         socket = zmq_ctx.socket(zmq.PULL)
         try:
             from vllm_router.app import app
+
             proxy_host = app.state.args.nixl_proxy_host
             proxy_port = app.state.args.nixl_proxy_port
         except Exception as e:
@@ -96,8 +98,10 @@ async def zmq_pull_server():
     socket.close()
     logger.info("ZMQ PULL server stopped.")
 
+
 # ZMQ task will be created in the FastAPI lifespan manager
 zmq_task = None
+
 
 async def start_zmq_task():
     """Start the ZMQ pull server task."""
@@ -105,9 +109,10 @@ async def start_zmq_task():
     if zmq_task is None:
         zmq_task = asyncio.create_task(zmq_pull_server())
         logger.info("ZMQ task started")
-        
+
         # Add a small delay to allow the task to start and potentially log any errors
         await asyncio.sleep(0.1)
+
 
 async def stop_zmq_task():
     """Stop the ZMQ pull server task."""
@@ -374,6 +379,7 @@ async def route_general_request(
         media_type="text/event-stream",
     )
 
+
 # TODO: Combine with send_request_to_tokenizer and send_request_to_decode
 async def send_request_to_prefiller(
     client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
@@ -431,6 +437,7 @@ async def wait_decode_kv_ready(req_id: str):
     logger.debug(f"Prefill node signaled kv ready for req {req_id}")
     finished_reqs.remove(req_id)
 
+
 async def route_disaggregated_prefill_request(
     request: Request,
     endpoint: str,
@@ -443,7 +450,7 @@ async def route_disaggregated_prefill_request(
 
     orig_max_tokens = request_json.get("max_tokens", 0)
     stream_options = request_json.pop("stream_options", None)
-    
+
     # # Check if client sessions are initialized, if not, try to initialize them
     # if not hasattr(request.app.state, 'prefill_client') or request.app.state.prefill_client is None:
     #     logger.warning("prefill_client not initialized, attempting to initialize client sessions")
@@ -469,7 +476,7 @@ async def route_disaggregated_prefill_request(
     #             },
     #             headers={"X-Request-Id": request_id},
     #         )
-    
+
     st = time.time()
     try:
         # Step 1: Tokenize the prompt
@@ -479,14 +486,17 @@ async def route_disaggregated_prefill_request(
         #     print(f"{key}: {value}")
 
         tokenize_output = await send_request_to_tokenizer(
-            request.app.state.prefill_client, "/tokenize", {"prompt": request_json["prompt"]}, request_id
+            request.app.state.prefill_client,
+            "/tokenize",
+            {"prompt": request_json["prompt"]},
+            request_id,
         )
         # tokenize_output {'count': 6, 'max_model_len': 2048, 'tokens': [2, 2264, 1248, 16, 452, 116], 'token_strs': None}
-        
+
         # Update request with tokenized prompt
         request_json["prompt"] = tokenize_output["tokens"]
         request_json["max_tokens"] = 1
-        
+
         # Step 2: Create disagg_spec for KV transfer
         disagg_spec = {
             "req_id": request_id,
@@ -500,13 +510,13 @@ async def route_disaggregated_prefill_request(
         #     "receiver_init_port": [7300],
         #     "receiver_alloc_port": [7400],
         # }
-        
+
         request_json["kv_transfer_params"] = {
             "ret_first_tok": True,
             "disagg_spec": disagg_spec,
         }
         request_json["stream"] = False
-        
+
         # Step 3: Send to prefiller
         prefill_output = await send_request_to_prefiller(
             request.app.state.prefill_client, endpoint, request_json, request_id
@@ -516,7 +526,7 @@ async def route_disaggregated_prefill_request(
         logger.info(
             f"Routing request {request_id} with session id None to {request.app.state.prefill_client._base_url} at {et}, process time = {et - in_router_time:.4f}"
         )
-        
+
         # Step 4: Prepare decode request
         request_json["max_tokens"] = orig_max_tokens - 1
         request_json["prompt"].append(prefill_output["kv_transfer_params"]["first_tok"])
@@ -524,7 +534,7 @@ async def route_disaggregated_prefill_request(
         request_json["stream"] = True
         if stream_options is not None:
             request_json["stream_options"] = stream_options
-            
+
     except aiohttp.ClientResponseError as e:
         logger.error(f"HTTP error in prefiller: {e}", exc_info=True)
         return JSONResponse(
@@ -574,7 +584,7 @@ async def route_disaggregated_prefill_request(
             yield (
                 "data: " + json.dumps(head_chunk, separators=(",", ":")) + "\n\n"
             ).encode()
-            
+
             await wait_decode_kv_ready(request_id)
 
             # Stream the rest from decode service
