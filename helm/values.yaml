@@ -90,6 +90,23 @@ servingEngineSpec:
   #     secretName: "my-existing-secret"
   #     secretKey: "hf-token-key"
   #
+  # - envFromSecret: (optional) Reference to an existing Kubernetes Secret from which
+  #   all key/value pairs will be loaded as environment variables into the container.
+  #   Example:
+  #     envFromSecret:
+  #       name: s3-registry
+  #
+  #   The referenced Secret could look like:
+  #     apiVersion: v1
+  #     kind: Secret
+  #     metadata:
+  #       name: s3-registry
+  #       namespace: vllm
+  #     data:
+  #       AWS_ACCESS_KEY_ID: <base64-encoded-value>
+  #       AWS_SECRET_ACCESS_KEY: <base64-encoded-value>
+  #       AWS_ENDPOINT_URL: <base64-encoded-value>
+  #
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
   # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes
