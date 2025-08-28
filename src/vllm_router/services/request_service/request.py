@@ -26,9 +26,13 @@ import zmq
 import zmq.asyncio
 from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from lmcache.v1.storage_backend.connector.nixl_connector_v3 import (
-    NixlMsg,
-)
+
+try:
+    from lmcache.v1.storage_backend.connector.nixl_connector_v3 import (
+        NixlMsg,
+    )
+except ImportError:
+    pass
 from requests import JSONDecodeError
 
 from vllm_router.log import init_logger
