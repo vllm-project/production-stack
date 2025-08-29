@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -43,6 +44,10 @@ from vllm_router.service_discovery import (
 from vllm_router.services.batch_service import initialize_batch_processor
 from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
+from vllm_router.services.request_service.request import (
+    start_zmq_task,
+    stop_zmq_task,
+)
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
 )
@@ -90,7 +95,16 @@ async def lifespan(app: FastAPI):
     if hasattr(service_discovery, "initialize_client_sessions"):
         await service_discovery.initialize_client_sessions()
 
+    app.state.event_loop = asyncio.get_event_loop()
+
+    # Start the ZMQ task
+    await start_zmq_task()
+
     yield
+
+    # Stop the ZMQ task
+    await stop_zmq_task()
+
     await app.state.aiohttp_client_wrapper.stop()
 
     # Close the threaded-components
@@ -270,6 +284,7 @@ def initialize_all(app: FastAPI, args):
     app.state.request_stats_monitor = get_request_stats_monitor()
     app.state.router = get_routing_logic()
     app.state.request_rewriter = get_request_rewriter()
+    app.state.args = args
 
 
 app = FastAPI(lifespan=lifespan)
