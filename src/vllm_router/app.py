@@ -206,6 +206,7 @@ def initialize_all(app: FastAPI, args):
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
         kv_aware_threshold=args.kv_aware_threshold,
+        max_instance_failover_reroute_attempts=args.max_instance_failover_reroute_attempts,
     )
 
     # Initialize feature gates
