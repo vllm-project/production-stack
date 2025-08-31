@@ -7,108 +7,53 @@ all: python_tests precommit precommit_hadolint precommit_helmlint precommit_shel
 
 # 1. Python Tests - CI Python tests (from ci.yml)
 python_tests:
-	@echo "🔍 Running Python tests..."
-	@if command -v uv >/dev/null 2>&1; then \
-		echo "Using uv for dependency management..."; \
-		uv sync --all-extras --all-groups; \
-		uv run pytest; \
-	else \
-		echo "uv not found, using pip and pytest directly..."; \
-		pip install -e .; \
-		pytest; \
-	fi
-	@echo "✅ Python tests completed!"
+	pip install uv
+	uv sync --all-extras --all-groups
+	uv run pytest
+	echo "✅ Python tests completed!"
 
 # 2. Pre-commit - General pre-commit checks (from pre-commit.yml)
 precommit:
-	@echo "🔍 Running pre-commit checks..."
-	@if command -v pre-commit >/dev/null 2>&1; then \
-		pre-commit run --all-files; \
-	else \
-		echo "⚠️  pre-commit not installed. Installing..."; \
-		pip install pre-commit; \
-		pre-commit run --all-files; \
-	fi
-	@echo "✅ Pre-commit checks completed!"
+	pip install ruff
+	ruff check src
+	echo "✅ Pre-commit checks completed!"
 
 # 3. Pre-commit manual: hadolint-docker - Docker linting
 precommit_hadolint:
-	@echo "🔍 Running hadolint-docker checks..."
-	@if command -v pre-commit >/dev/null 2>&1; then \
-		pre-commit run --all-files -v --hook-stage manual hadolint-docker; \
-	else \
-		echo "⚠️  pre-commit not installed. Installing..."; \
-		pip install pre-commit; \
-		pre-commit run --all-files -v --hook-stage manual hadolint-docker; \
-	fi
-	@echo "✅ Hadolint-docker checks completed!"
+	pre-commit run --all-files -v --hook-stage manual hadolint-docker; \
+	echo "✅ Hadolint-docker checks completed!"
 
 # 4. Pre-commit manual: helmlint - Helm chart linting
 precommit_helmlint:
-	@echo "🔍 Running helmlint checks..."
-	@if command -v helm >/dev/null 2>&1; then \
-		if command -v pre-commit >/dev/null 2>&1; then \
-			pre-commit run --all-files -v --hook-stage manual helmlint; \
-		else \
-			echo "⚠️  pre-commit not installed. Installing..."; \
-			pip install pre-commit; \
-			pre-commit run --all-files -v --hook-stage manual helmlint; \
-		fi; \
-	else \
-		echo "⚠️  helm not installed. Please install helm first."; \
-		exit 1; \
-	fi
-	@echo "✅ Helmlint checks completed!"
+	pre-commit run --all-files -v --hook-stage manual helmlint; \
+	echo "✅ Helmlint checks completed!"
 
 # 5. Pre-commit manual: shellcheck - Shell script linting
 precommit_shellcheck:
-	@echo "🔍 Running shellcheck checks..."
-	@if command -v pre-commit >/dev/null 2>&1; then \
-		pre-commit run --all-files -v --hook-stage manual shellcheck; \
-	else \
-		echo "⚠️  pre-commit not installed. Installing..."; \
-		pip install pre-commit; \
-		pre-commit run --all-files -v --hook-stage manual shellcheck; \
-	fi
-	@echo "✅ Shellcheck checks completed!"
+	pre-commit run --all-files -v --hook-stage manual shellcheck; \
+	echo "✅ Shellcheck checks completed!"
 
 # 6. Pre-commit manual: checkov - Security scanning
 precommit_checkov:
-	@echo "🔍 Running checkov security checks..."
-	@if command -v pre-commit >/dev/null 2>&1; then \
-		pre-commit run --all-files -v --hook-stage manual checkov; \
-	else \
-		echo "⚠️  pre-commit not installed. Installing..."; \
-		pip install pre-commit; \
-		pre-commit run --all-files -v --hook-stage manual checkov; \
-	fi
-	@echo "✅ Checkov security checks completed!"
-
+	pre-commit run --all-files -v --hook-stage manual checkov; \
+	echo "✅ Checkov security checks completed!"
 
 
 # 7. Router E2E tests: e2e-test - Basic E2E test (from router-e2e-test.yml)
 router_e2e:
-	@echo "🔍 Running Router E2E tests..."
-	@echo "Installing dependencies..."
-	@pip install -r src/tests/requirements.txt || echo "requirements.txt not found, continuing..."
-	@pip install -r requirements-test.txt || echo "requirements-test.txt not found, continuing..."
-	@pip install -e .
-	@echo "Making scripts executable..."
-	@chmod +x src/vllm_router/perf-test.sh || echo "perf-test.sh not found"
-	@chmod +x src/tests/perftest/*.sh || echo "perftest scripts not found"
-	@echo "Starting Mock OpenAI servers..."
-	@cd src/tests/perftest && bash run-multi-server.sh 4 500 && sleep 10 || echo "Mock servers setup failed"
-	@echo "Starting Router for Testing..."
-	@bash src/vllm_router/perf-test.sh 8000 & sleep 5 || echo "Router startup failed"
-	@echo "Running Performance tests..."
-	@cd src/tests/perftest && mkdir -p logs && python3 request_generator.py --qps 10 --num-workers 32 --duration 60 || echo "Performance tests failed"
-	@echo "Running E2E Tests with Coverage..."
-	@pip install coverage
-	@coverage run --source=src/vllm_router -m pytest src/tests/test_*.py || echo "E2E tests failed"
-	@coverage report -m > coverage.txt || echo "Coverage report failed"
-	@echo "Cleaning up..."
-	@cd src/tests/perftest && bash clean-up.sh || echo "Cleanup failed"
-	@echo "✅ Router E2E tests completed!"
+	pip install -r src/tests/requirements.txt 
+	pip install -r requirements-test.txt 
+	pip install -e .
+	chmod +x src/vllm_router/perf-test.sh 
+	chmod +x src/tests/perftest/*.sh
+	cd src/tests/perftest && bash run-multi-server.sh 4 500 && sleep 10
+	bash src/vllm_router/perf-test.sh 8000 & sleep 5
+	cd src/tests/perftest && mkdir -p logs && python3 request_generator.py --qps 10 --num-workers 32 --duration 60
+	pip install coverage
+	coverage run --source=src/vllm_router -m pytest src/tests/test_*.py 
+	coverage report -m > coverage.txt 
+	cd src/tests/perftest && bash clean-up.sh || echo "Cleanup failed"
+	echo "✅ Router E2E tests completed!"
 
 # 8. Router E2E tests: k8s-discovery-e2e-test - Kubernetes discovery test (from router-e2e-test.yml)
 router_k8s_discovery:
