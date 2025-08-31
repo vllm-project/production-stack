@@ -41,18 +41,28 @@ precommit_checkov:
 
 # 7. Router E2E tests: e2e-test - Basic E2E test (from router-e2e-test.yml)
 router_e2e:
-	pip install -r src/tests/requirements.txt 
-	pip install -r requirements-test.txt 
-	pip install -e .
-	chmod +x src/vllm_router/perf-test.sh 
-	chmod +x src/tests/perftest/*.sh
-	cd src/tests/perftest && bash run-multi-server.sh 4 500 && sleep 10
-	bash src/vllm_router/perf-test.sh 8000 & sleep 5
-	cd src/tests/perftest && mkdir -p logs && python3 request_generator.py --qps 10 --num-workers 32 --duration 60
-	pip install coverage
-	coverage run --source=src/vllm_router -m pytest src/tests/test_*.py 
-	coverage report -m > coverage.txt 
-	cd src/tests/perftest && bash clean-up.sh || echo "Cleanup failed"
+	@set -eu; \
+	echo "🔧 Ensuring port 8000 is free"; \
+	if command -v lsof >/dev/null 2>&1 && lsof -i :8000 -t >/dev/null 2>&1; then \
+		lsof -i :8000 -t | xargs -r kill -9 || true; \
+		sleep 2; \
+	fi; \
+	python -m pip install --upgrade pip; \
+	pip install -r src/tests/requirements.txt; \
+	pip install -r requirements-test.txt; \
+	pip install -e .; \
+	chmod +x src/vllm_router/perf-test.sh; \
+	chmod +x src/tests/perftest/*.sh; \
+	( cd src/tests/perftest && bash run-multi-server.sh 4 500 ); \
+	sleep 10; \
+	bash src/vllm_router/perf-test.sh 8000 & \
+	sleep 5; \
+	mkdir -p src/tests/perftest/logs; \
+	PYTHONPATH=$$(pwd) python3 -v src/tests/perftest/request_generator.py --qps 10 --num-workers 32 --duration 300 2>&1 | tee src/tests/perftest/logs/request_generator.log; \
+	pip install coverage; \
+	coverage run --source=src/vllm_router -m pytest src/tests/test_*.py; \
+	coverage report -m > coverage.txt; \
+	( cd src/tests/perftest && bash clean-up.sh ) || echo "Cleanup failed"; \
 	echo "✅ Router E2E tests completed!"
 
 # 8. Router E2E tests: k8s-discovery-e2e-test - Kubernetes discovery test (from router-e2e-test.yml)
