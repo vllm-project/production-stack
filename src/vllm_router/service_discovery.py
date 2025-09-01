@@ -16,17 +16,17 @@ import asyncio
 import enum
 import hashlib
 import os
+import queue
 import threading
 import time
 import uuid
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 import aiohttp
 import requests
-import queue
 from kubernetes import client, config, watch
-from collections import OrderedDict
 
 from vllm_router import utils
 from vllm_router.log import init_logger
@@ -779,9 +779,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if not model_names:
                 return
 
-            await self._add_engine(
-                engine_name, engine_ip, model_names, model_label
-            )
+            await self._add_engine(engine_name, engine_ip, model_names, model_label)
 
         elif event == "DELETED":
             if engine_name not in self.available_engines:
@@ -794,9 +792,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 return
 
             if is_pod_ready and model_names:
-                await self._add_engine(
-                    engine_name, engine_ip, model_names, model_label
-                )
+                await self._add_engine(engine_name, engine_ip, model_names, model_label)
                 return
 
             if (
