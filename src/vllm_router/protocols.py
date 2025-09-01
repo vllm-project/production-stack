@@ -64,7 +64,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
     
     # Core required fields
     messages: List[dict]  # Simplified message type to avoid complex nested definitions
-    model: Optional[str] = None
+    model: str  # Required field according to OpenAI API spec
     
     # Core sampling parameters
     max_tokens: Optional[int] = None
@@ -89,7 +89,7 @@ class CompletionRequest(OpenAIBaseModel):
     
     # Core required fields
     prompt: Optional[Union[str, List[str], List[int], List[List[int]]]] = None
-    model: Optional[str] = None
+    model: str  # Required field according to OpenAI API spec
     
     # Core sampling parameters
     max_tokens: Optional[int] = 16
@@ -117,7 +117,7 @@ class EmbeddingRequest(OpenAIBaseModel):
     
     # Core required fields
     input: Union[str, List[str], List[int], List[List[int]]]
-    model: Optional[str] = None
+    model: str  # Required field according to OpenAI API spec
     
     # Core control parameters
     encoding_format: Optional[str] = "float"
