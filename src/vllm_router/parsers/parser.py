@@ -20,6 +20,7 @@ from vllm_router import utils
 from vllm_router.parsers.yaml_utils import (
     read_and_process_yaml_config_file,
 )
+from vllm_router.routers.routing_logic import RoutingLogic
 from vllm_router.version import __version__
 
 try:
@@ -203,13 +204,7 @@ def parse_args():
     parser.add_argument(
         "--routing-logic",
         type=str,
-        choices=[
-            "roundrobin",
-            "session",
-            "kvaware",
-            "prefixaware",
-            "disaggregated_prefill",
-        ],
+        choices=[routing for routing in RoutingLogic],
         help="The routing logic to use",
     )
     parser.add_argument(
@@ -219,10 +214,23 @@ def parse_args():
         help="The port of the LMCache controller.",
     )
     parser.add_argument(
+        "--lmcache-instances",
+        type=str,
+        default=None,
+        help="The instance id in the lmcache config files, must be with the length of static-backends,"
+             " separated by commas. E.g., instance_0,instance_1",
+    )
+    parser.add_argument(
         "--session-key",
         type=str,
         default=None,
         help="The key (in the header) to identify a session.",
+    )
+    parser.add_argument(
+        "--tokenizer",
+        type=str,
+        default=None,
+        help="The tokenizer model.",
     )
     parser.add_argument(
         "--callbacks",
