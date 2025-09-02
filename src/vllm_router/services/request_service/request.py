@@ -169,6 +169,8 @@ async def route_general_request(
         request_body = await request.body()
     
     request_json = json.loads(request_body)
+    # Determine if request expects streaming (OpenAI style)
+    is_streaming = bool(request_json.get("stream", False))
 
     if request.query_params:
         request_endpoint = request.query_params.get("id")
@@ -199,6 +201,11 @@ async def route_general_request(
         )
         logger.info(f"Request for model {requested_model} was rewritten")
         request_body = rewritten_body
+        # IMPORTANT: after rewriting, update Content-Length so backend reads full JSON
+        try:
+            update_content_length(request, request_body)
+        except Exception as e:
+            logger.warning(f"Failed to update Content-Length after rewrite: {e}")
         # Update request_json if the body was rewritten
         try:
             request_json = json.loads(request_body)
@@ -298,11 +305,13 @@ async def route_general_request(
     headers, status = await anext(stream_generator)
     headers_dict = {key: value for key, value in headers.items()}
     headers_dict["X-Request-Id"] = request_id
+    # Choose appropriate media type. If client didn't request streaming, return JSON.
+    media_type = "text/event-stream" if is_streaming else "application/json"
     return StreamingResponse(
         stream_generator,
         status_code=status,
         headers=headers_dict,
-        media_type="text/event-stream",
+        media_type=media_type,
     )
 
 
