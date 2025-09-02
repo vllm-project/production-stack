@@ -1,8 +1,10 @@
 import abc
 import enum
+import io
 import json
 import re
 import resource
+import wave
 from typing import Optional
 
 import requests
@@ -12,6 +14,23 @@ from starlette.datastructures import MutableHeaders
 from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
+
+# prepare a WAV byte to prevent repeatedly generating it
+# Generate a 0.1 second silent audio file
+# This will be used for the /v1/audio/transcriptions endpoint
+_SILENT_WAV_BYTES = None
+with io.BytesIO() as wav_buffer:
+    with wave.open(wav_buffer, "wb") as wf:
+        wf.setnchannels(1)  # mono audio channel, standard configuration
+        wf.setsampwidth(2)  # 16 bit audio, common bit depth for wav file
+        wf.setframerate(16000)  # 16 kHz sample rate
+        wf.writeframes(b"\x00\x00" * 1600)  # 0.1 second of silence
+
+    # retrieves the generated wav bytes, return
+    _SILENT_WAV_BYTES = wav_buffer.getvalue()
+    logger.debug(
+        "======A default silent WAV file has been stored in memory within py application process===="
+    )
 
 
 class SingletonMeta(type):
@@ -52,6 +71,7 @@ class ModelType(enum.Enum):
     embeddings = "/v1/embeddings"
     rerank = "/v1/rerank"
     score = "/v1/score"
+    transcription = "/v1/audio/transcriptions"
 
     @staticmethod
     def get_test_payload(model_type: str):
@@ -75,6 +95,12 @@ class ModelType(enum.Enum):
                 return {"query": "Hello", "documents": ["Test"]}
             case ModelType.score:
                 return {"encoding_format": "float", "text_1": "Test", "test_2": "Test2"}
+            case ModelType.transcription:
+                if _SILENT_WAV_BYTES is not None:
+                    logger.debug("=====Silent WAV Bytes is being used=====")
+                    return {
+                        "file": ("empty.wav", _SILENT_WAV_BYTES, "audio/wav"),
+                    }
 
     @staticmethod
     def get_all_fields():
@@ -161,14 +187,37 @@ def update_content_length(request: Request, request_body: str):
 
 def is_model_healthy(url: str, model: str, model_type: str) -> bool:
     model_details = ModelType[model_type]
+
     try:
-        response = requests.post(
-            f"{url}{model_details.value}",
-            headers={"Content-Type": "application/json"},
-            json={"model": model} | model_details.get_test_payload(model_type),
-            timeout=30,
-        )
-    except Exception as e:
-        logger.error(e)
+        if model_type == "transcription":
+
+            # for transcription, the backend expects multipart/form-data with a file
+            # we will use pre-generated silent wav bytes
+            files = {"file": ("empty.wav", _SILENT_WAV_BYTES, "audio/wav")}
+            data = {"model": model}
+            response = requests.post(
+                f"{url}{model_details.value}",
+                files=files,  # multipart/form-data
+                data=data,
+                timeout=10,
+            )
+        else:
+            # for other model types (chat, completion, etc.)
+            response = requests.post(
+                f"{url}{model_details.value}",
+                headers={"Content-Type": "application/json"},
+                json={"model": model} | model_details.get_test_payload(model_type),
+                timeout=10,
+            )
+
+        response.raise_for_status()
+
+        if model_type == "transcription":
+            return True
+        else:
+            response.json()  # verify it's valid json for other model types
+            return True  # validation passed
+
+    except requests.exceptions.RequestException as e:
+        logger.debug(f"{model_type} Model {model} at {url} is not healthy: {e}")
         return False
-    return response.status_code == 200
