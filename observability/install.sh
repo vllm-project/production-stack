@@ -5,7 +5,7 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm upgrade --install kube-prom-stack prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
   --create-namespace \
-  -f kube-prom-stack.yaml --wait
+  -f "$SCRIPT_DIR/kube-prom-stack.yaml" --wait
 
 helm upgrade --install prometheus-adapter prometheus-community/prometheus-adapter \
     --namespace monitoring \
