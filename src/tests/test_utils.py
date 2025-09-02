@@ -104,6 +104,14 @@ def test_is_model_healthy_when_requests_raises_exception_returns_false(
 def test_is_model_healthy_when_requests_status_with_status_code_not_200_returns_false(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    request_mock = MagicMock(return_value=MagicMock(status_code=500))
+
+    # Mock an internal server error response
+    mock_response = MagicMock(status_code=500)
+
+    # Tell the mock to raise an HTTP Error when raise_for_status() is called
+    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError
+
+    request_mock = MagicMock(return_value=mock_response)
     monkeypatch.setattr("requests.post", request_mock)
+
     assert utils.is_model_healthy("http://localhost", "test", "chat") is False
