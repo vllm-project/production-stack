@@ -477,6 +477,13 @@ class TtftRouter(RoutingInterface):
     Route the request to the qppropriate engine URL by the least estimated TTFT.
     """
 
+    CACHE_LOC_TO_TRANS_TIME: Dict[str, float] = {
+        "LocalCPUBackend": 0.01,
+        "LocalDiskBackend": 0.015,
+    }
+
+    DEFAULT_CACHE_TRANS_TIME: float = 0.01
+
     def __init__(
         self,
         lmcache_controller_port: int,
@@ -652,13 +659,9 @@ class TtftRouter(RoutingInterface):
         for chunk in best_matched_info[1]:
             if matched_info is not None and chunk[1] <= matched_info[1][-1][1]:
                 continue
-            # TODO better estimations
-            if chunk[0] == "LocalCpuBackend":
-                transfer_time += 0.01
-            elif chunk[0] == "LocalDiskBackend":
-                transfer_time += 0.015
-            else:
-                transfer_time += 0.01
+            # TODO chunk transfer time measured realtime inside vllm engine
+            transfer_time += self.CACHE_LOC_TO_TRANS_TIME.get(chunk[0],
+                                                              self.DEFAULT_CACHE_TRANS_TIME)
         return transfer_time
 
     def _fallback_routing(self, endpoints, request_stats, request):
