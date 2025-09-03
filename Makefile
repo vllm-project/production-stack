@@ -364,4 +364,3 @@ operator_crd_test:
 	./tests/e2e/test-crds.sh; \
 	\
 	echo "✅ Operator CRD and CR Testing completed!"
-
