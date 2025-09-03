@@ -18,6 +18,7 @@ import enum
 import math
 import random
 import threading
+import uuid
 from typing import Dict, List
 
 from fastapi import Request
@@ -289,7 +290,9 @@ class KvawareRouter(RoutingInterface):
         url = endpoints[0].url + "/tokenize"
         # TODO (Yuhan): Handle chat completions
         token_ids = self.tokenizer.encode(request_json["prompt"])
-        msg = LookupMsg(tokens=token_ids)
+        event_id = "Lookup" + str(uuid.uuid4())
+        logger.debug(f"Lookup event id: {event_id}")
+        msg = LookupMsg(tokens=token_ids, event_id=event_id)
         instance_id = await self.query_manager(msg)
         matched_tokens = math.inf
         if len(list(instance_id.layout_info.keys())) > 0:
@@ -321,10 +324,13 @@ class KvawareRouter(RoutingInterface):
             queried_instance_ids = [info for info in instance_id.layout_info]
             if queried_instance_ids[0] not in self.instance_id_to_ip:
                 for endpoint in endpoints:
+                    event_id = "QueryInst" + str(uuid.uuid4())
+                    logger.debug(f"QueryInst event id: {event_id}")
                     query_message = QueryInstMsg(
                         ip=endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
                             0
-                        ].split("//")[1]
+                        ].split("//")[1],
+                        event_id=event_id,
                     )
                     endpoint_instance_id = await self.query_manager(query_message)
 
