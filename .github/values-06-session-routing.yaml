@@ -3,12 +3,12 @@ servingEngineSpec:
     type: Recreate
   runtimeClassName: ""
   modelSpec:
-    - name: "opt125m"
+    - name: "opt125m-1"
       repository: "lmcache/vllm-openai"
       tag: "2025-05-27-v1"
       modelURL: "facebook/opt-125m"
-      replicaCount: 2
-      requestCPU: 8
+      replicaCount: 1
+      requestCPU: 6
       requestMemory: "30Gi"
       # requestGPU: 1
       pvcStorage: "50Gi"
@@ -17,11 +17,51 @@ servingEngineSpec:
         maxModelLen: 1024
         v1: 1
         gpuMemoryUtilization: 0.6
+
       lmcacheConfig:
         enabled: true
-        cpuOffloadingBufferSize: 0
-      labels:
-        model: "opt125m"
+        cpuOffloadingBufferSize: "10"
+        enableController: true
+        instanceId: "default1"
+        controllerPort: "9000"
+        workerPort: "8001"
+
+      env:
+        - name: LMCACHE_LOG_LEVEL
+          value: "DEBUG"
+
+      chatTemplate: "chat.jinja2"
+      chatTemplateConfigMap: |-
+        {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
+        {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
+
+    - name: "opt125m-2"
+      repository: "lmcache/vllm-openai"
+      tag: "2025-05-27-v1"
+      modelURL: "facebook/opt-125m"
+      replicaCount: 1
+      requestCPU: 6
+      requestMemory: "30Gi"
+      # requestGPU: 1
+      pvcStorage: "50Gi"
+      vllmConfig:
+        enablePrefixCaching: true
+        maxModelLen: 1024
+        v1: 1
+        gpuMemoryUtilization: 0.6
+
+      lmcacheConfig:
+        enabled: true
+        cpuOffloadingBufferSize: "10"
+        enableController: true
+        instanceId: "default2"
+        controllerPort: "9000"
+        workerPort: "8002"
+
+      env:
+        - name: LMCACHE_LOG_LEVEL
+          value: "DEBUG"
+
       chatTemplate: "chat.jinja2"
       chatTemplateConfigMap: |-
         {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
@@ -39,6 +79,7 @@ routerSpec:
   enableRouter: true
   routingLogic: "session"
   sessionKey: "x-user-id"
+  lmcacheControllerPort: 9000
   extraArgs:
     - "--log-level"
     - "info"
