@@ -12,11 +12,16 @@ from __future__ import annotations
 
 import os
 import sys
+
 from _swagger_smoke_core import run_smoke
 
 
 def main():  # pragma: no cover
-    base = sys.argv[1] if len(sys.argv) > 1 else os.getenv("SWAGGER_BASE_URL", "http://localhost:8080")
+    base = (
+        sys.argv[1]
+        if len(sys.argv) > 1
+        else os.getenv("SWAGGER_BASE_URL", "http://localhost:8080")
+    )
     ok = run_smoke(base)
     sys.exit(0 if ok else 1)
 

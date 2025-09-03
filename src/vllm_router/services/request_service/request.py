@@ -138,7 +138,10 @@ async def process_request(
 
 
 async def route_general_request(
-    request: Request, endpoint: str, background_tasks: BackgroundTasks, request_body: Optional[bytes] = None
+    request: Request,
+    endpoint: str,
+    background_tasks: BackgroundTasks,
+    request_body: Optional[bytes] = None,
 ):
     """
     Route the incoming request to the backend server and stream the response back to the client.
@@ -163,11 +166,11 @@ async def route_general_request(
     in_router_time = time.time()
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
-    
+
     # Use pre-provided request_body if available, otherwise read from request
     if request_body is None:
         request_body = await request.body()
-    
+
     request_json = json.loads(request_body)
     # Determine if request expects streaming (OpenAI style)
     is_streaming = bool(request_json.get("stream", False))

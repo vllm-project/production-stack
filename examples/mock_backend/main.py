@@ -29,15 +29,18 @@ from __future__ import annotations
 import argparse
 import time
 import uuid
+
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-import uvicorn
 
 app = FastAPI(title="Mock vLLM Backend", version="1.0.0")
 
 
 @app.post("/v1/chat/completions")
-async def mock_chat_completions(request: Request):  # pragma: no cover - exercised in e2e
+async def mock_chat_completions(
+    request: Request,
+):  # pragma: no cover - exercised in e2e
     body = await request.json()
     response = {
         "id": f"chatcmpl-{uuid.uuid4().hex[:10]}",
@@ -68,7 +71,11 @@ async def mock_completions(request: Request):  # pragma: no cover
         "created": int(time.time()),
         "model": body.get("model", "mock-model"),
         "choices": [
-            {"text": " This is a mock completion response.", "index": 0, "finish_reason": "stop"}
+            {
+                "text": " This is a mock completion response.",
+                "index": 0,
+                "finish_reason": "stop",
+            }
         ],
         "usage": {"prompt_tokens": 5, "completion_tokens": 8, "total_tokens": 13},
     }

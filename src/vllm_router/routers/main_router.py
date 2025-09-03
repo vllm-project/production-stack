@@ -55,7 +55,9 @@ logger = init_logger(__name__)
 
 @main_router.post("/v1/chat/completions")
 async def route_chat_completion(
-    request: ChatCompletionRequest, raw_request: Request, background_tasks: BackgroundTasks
+    request: ChatCompletionRequest,
+    raw_request: Request,
+    background_tasks: BackgroundTasks,
 ):
     if semantic_cache_available:
         # Check if the request can be served from the semantic cache
@@ -67,10 +69,10 @@ async def route_chat_completion(
             return cache_response
 
     logger.debug("No cache hit, forwarding request to backend")
-    
+
     # Convert Pydantic model to JSON bytes for existing service
-    request_body = request.model_dump_json().encode('utf-8')
-    
+    request_body = request.model_dump_json().encode("utf-8")
+
     return await route_general_request(
         raw_request, "/v1/chat/completions", background_tasks, request_body
     )
@@ -81,8 +83,8 @@ async def route_completion(
     request: CompletionRequest, raw_request: Request, background_tasks: BackgroundTasks
 ):
     # Convert Pydantic model to JSON bytes for existing service
-    request_body = request.model_dump_json().encode('utf-8')
-    
+    request_body = request.model_dump_json().encode("utf-8")
+
     return await route_general_request(
         raw_request, "/v1/completions", background_tasks, request_body
     )
@@ -93,8 +95,8 @@ async def route_embeddings(
     request: EmbeddingRequest, raw_request: Request, background_tasks: BackgroundTasks
 ):
     # Convert Pydantic model to JSON bytes for existing service
-    request_body = request.model_dump_json().encode('utf-8')
-    
+    request_body = request.model_dump_json().encode("utf-8")
+
     return await route_general_request(
         raw_request, "/v1/embeddings", background_tasks, request_body
     )

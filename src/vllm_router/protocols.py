@@ -59,13 +59,14 @@ class ModelList(OpenAIBaseModel):
 # ===== Core Request Models =====
 # Based on vLLM official protocol.py definitions
 
+
 class ChatCompletionRequest(OpenAIBaseModel):
     """ChatCompletion API request model based on OpenAI specification"""
-    
+
     # Core required fields
     messages: List[dict]  # Simplified message type to avoid complex nested definitions
     model: str  # Required field according to OpenAI API spec
-    
+
     # Core sampling parameters
     max_tokens: Optional[int] = None
     max_completion_tokens: Optional[int] = None
@@ -73,12 +74,12 @@ class ChatCompletionRequest(OpenAIBaseModel):
     top_p: Optional[float] = None
     frequency_penalty: Optional[float] = 0.0
     presence_penalty: Optional[float] = 0.0
-    
+
     # Core control parameters
     stream: Optional[bool] = False
     stop: Optional[Union[str, List[str]]] = None
     n: Optional[int] = 1
-    
+
     # Other common parameters
     seed: Optional[int] = None
     user: Optional[str] = None
@@ -86,24 +87,24 @@ class ChatCompletionRequest(OpenAIBaseModel):
 
 class CompletionRequest(OpenAIBaseModel):
     """Completion API request model based on OpenAI specification"""
-    
+
     # Core required fields
     prompt: Optional[Union[str, List[str], List[int], List[List[int]]]] = None
     model: str  # Required field according to OpenAI API spec
-    
+
     # Core sampling parameters
     max_tokens: Optional[int] = 16
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     frequency_penalty: Optional[float] = 0.0
     presence_penalty: Optional[float] = 0.0
-    
+
     # Core control parameters
     stream: Optional[bool] = False
     stop: Optional[Union[str, List[str]]] = None
     n: int = 1
     echo: Optional[bool] = False
-    
+
     # Other common parameters
     seed: Optional[int] = None
     user: Optional[str] = None
@@ -114,11 +115,11 @@ class CompletionRequest(OpenAIBaseModel):
 
 class EmbeddingRequest(OpenAIBaseModel):
     """Embedding API request model based on OpenAI specification"""
-    
+
     # Core required fields
     input: Union[str, List[str], List[int], List[List[int]]]
     model: str  # Required field according to OpenAI API spec
-    
+
     # Core control parameters
     encoding_format: Optional[str] = "float"
     dimensions: Optional[int] = None
