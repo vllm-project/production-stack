@@ -574,6 +574,7 @@ class StaticDiscoveryTest:
             # Check router logs for evidence that parameters were dropped
             content = self._read_log_file()
             if content is not None:
+                logger.info(str(content))
                 if "Dropped param test-param-to-drop from request" in str(content):
                     print_status("✅ Drop params test request completed successfully")
                     return True
