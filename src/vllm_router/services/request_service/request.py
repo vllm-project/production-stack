@@ -565,18 +565,15 @@ async def route_general_transcriptions(
 
     endpoints = service_discovery.get_endpoint_info()
 
-    logger.debug("==== Total endpoints ====")
-    logger.debug(endpoints)
-    logger.debug("==== Total endpoints ====")
-
     # filter the endpoints url by model name and label for transcriptions
-    transcription_endpoints = [
-        ep
-        for ep in endpoints
-        if model == ep.model_name
-        and ep.model_label == "transcription"
-        and not ep.sleep  # Added ep.sleep == False
-    ]
+    logger.debug(endpoints)
+    transcription_endpoints = []
+    for ep in endpoints:
+        for model_name in ep.model_names:
+            logger.debug(f"{model_name} - {ep.model_label} - {ep.model_type} - {ep.sleep}")
+            logger.debug(dir(ep))
+            if model == model_name and ep.model_type == "transcription" and not ep.sleep:
+                transcription_endpoints.append(ep)
 
     logger.debug("====List of transcription endpoints====")
     logger.debug(transcription_endpoints)
@@ -660,7 +657,12 @@ async def route_general_transcriptions(
             status_code=backend_response.status,
             headers=headers,
         )
-    except aiohttp.ClientResponseError as response_error:
+    except Exception as e:
+        logger.error(e)
+        return JSONResponse(
+            status_code=503,
+            content={"error": f"Failed to connect to backend: {str(e)}"},
+        )
         if response_error.response is not None:
             try:
                 error_content = await response_error.response.json()
