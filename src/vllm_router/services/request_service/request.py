@@ -204,6 +204,15 @@ async def route_general_request(
                 status_code=400, detail="Request body is not JSON parsable."
             )
 
+    logger.info(hasattr(request.app.state, "drop_params"))
+    if hasattr(request.app.state, "drop_params") and request.app.state.drop_params:
+        logger.info(request.app.state)
+        for param in request.app.state.drop_params:
+            request_json.pop(param, None)
+            logger.info(f"Dropped param {param} from request")
+        request_body = json.dumps(request_json)
+        update_content_length(request, request_body)
+
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
 

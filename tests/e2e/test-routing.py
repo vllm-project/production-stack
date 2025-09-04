@@ -157,15 +157,20 @@ class StaticDiscoveryTest:
             )
             return False
 
-    def send_request(self, request_id: str, prompt: str) -> bool:
+    def send_request(
+        self, request_id: str, prompt: str, custom_payload: dict = None
+    ) -> bool:
         """Send a single request and track which endpoint it goes to"""
         try:
-            payload = {
-                "model": self.model,
-                "prompt": prompt,
-                "temperature": 0.7,
-                "max_tokens": 10,
-            }
+            if custom_payload is not None:
+                payload = custom_payload
+            else:
+                payload = {
+                    "model": self.model,
+                    "prompt": prompt,
+                    "temperature": 0.7,
+                    "max_tokens": 10,
+                }
 
             headers = {
                 "Content-Type": "application/json",
@@ -542,6 +547,43 @@ class StaticDiscoveryTest:
             print_error(f"❌ Chat completions failed: {e} payload: {payload}")
             return False
 
+    def test_drop_params(self) -> bool:
+        """Test that the router drops specified parameters from requests"""
+        print_status("🧪 Testing drop_params functionality")
+
+        # Send a request with parameters that should be dropped
+        try:
+            # Use the existing send_request method with custom payload to test drop_params
+            custom_payload = {
+                "model": self.model,
+                "prompt": "Test prompt with parameters to drop",
+                "temperature": 0.7,
+                "max_tokens": 10,
+                "test-param-to-drop": 0.5,  # This should be dropped
+            }
+
+            # Send request using existing method with custom payload
+            if not self.send_request(
+                "test-drop-params-request",
+                "Test prompt with parameters to drop",
+                custom_payload,
+            ):
+                print_error("❌ Drop params test request failed")
+                return False
+
+            # Check router logs for evidence that parameters were dropped
+            content = self._read_log_file()
+            if content is not None:
+                if "Dropped param test-param-to-drop from request" in str(content):
+                    print_status("✅ Drop params test request completed successfully")
+                    return True
+
+            print_error("❌ Drop params test request failed")
+            return False
+        except Exception as e:
+            print_error(f"❌ Unexpected error in drop params test: {e}")
+            return False
+
     def run_test(self) -> bool:
         """Run the complete routing test"""
         try:
@@ -557,6 +599,10 @@ class StaticDiscoveryTest:
 
             # Test chat completions
             if not self.test_chat_completions():
+                return False
+
+            # Test drop_params functionality
+            if not self.test_drop_params():
                 return False
 
             # Test routing logic

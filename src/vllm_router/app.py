@@ -199,6 +199,8 @@ def initialize_all(app: FastAPI, args):
     if args.callbacks:
         configure_custom_callbacks(args.callbacks, app)
 
+    app.state.drop_params = parse_comma_separated_args(args.drop_params)
+
     initialize_routing_logic(
         args.routing_logic,
         session_key=args.session_key,
