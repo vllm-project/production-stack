@@ -33,6 +33,9 @@ num_prefill_requests = Gauge(
 num_decoding_requests = Gauge(
     "vllm:num_decoding_requests", "Number of Decoding Requests", ["server"]
 )
+num_incoming_requests_total = Gauge(
+    "vllm:num_incoming_requests_total", "Total valid incoming requests to router (including when no backends available).", ["model"]
+)
 
 # New metrics per dashboard update
 healthy_pods_total = Gauge(
