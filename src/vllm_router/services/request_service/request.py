@@ -49,7 +49,6 @@ except ImportError:
 
 from vllm_router.services.metrics_service import num_incoming_requests_total
 
-
 logger = init_logger(__name__)
 
 
@@ -217,7 +216,7 @@ async def route_general_request(
 
     # Check if model has ever been seen (even if currently scaled to zero)
     model_ever_existed = False
-    if hasattr(service_discovery, 'has_ever_seen_model'):
+    if hasattr(service_discovery, "has_ever_seen_model"):
         model_ever_existed = service_discovery.has_ever_seen_model(requested_model)
 
     if not request_endpoint:
@@ -240,7 +239,7 @@ async def route_general_request(
                 endpoints,
             )
         )
-        
+
     # Track all valid incoming requests
     num_incoming_requests_total.labels(model=requested_model).inc()
 

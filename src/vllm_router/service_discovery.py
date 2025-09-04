@@ -372,7 +372,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         self.port = port
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
-        self.known_models: Set[str] = set()  
+        self.known_models: Set[str] = set()
         self.known_models_lock = threading.Lock()
         self.label_selector = label_selector
         self.watcher_timeout_seconds = watcher_timeout_seconds

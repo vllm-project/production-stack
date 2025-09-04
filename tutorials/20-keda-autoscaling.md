@@ -171,16 +171,15 @@ python3 assets/example-10-load-generator.py --num-requests 100 --prompt-len 3000
 
 Within a few minutes, the `REPLICAS` value should increase to 2.
 
-
---- 
+---
 
 ### 7. Scale Down to Zero
 
 Sometimes you want to scale down to zero replicas when there's no traffic. This is a unique capability of KEDA compared to Kubernetes' HPA, which always maintains at least one replica. Scale-to-zero is particularly useful for:
 
-- **Cost optimization**: Eliminate resource usage during idle periods
-- **Resource efficiency**: Free up GPU resources for other workloads
-- **Cold start scenarios**: Scale up only when requests arrive
+* **Cost optimization**: Eliminate resource usage during idle periods
+* **Resource efficiency**: Free up GPU resources for other workloads
+* **Cold start scenarios**: Scale up only when requests arrive
 
 We provide this capability through a dual-trigger configuration. To configure it, modify the `tutorials/assets/values-20-keda.yaml`:
 
@@ -240,6 +239,7 @@ kubectl apply -f assets/values-20-keda.yaml
 **Test the scale-to-zero behavior:**
 
 1. **Monitor the pods:**
+
    ```bash
    kubectl get pods -w
    ```
@@ -248,11 +248,13 @@ kubectl apply -f assets/values-20-keda.yaml
    Within a few minutes, you should see the backend pod get terminated, meaning KEDA decided to scale down to zero.
 
 3. **Test scale-up from zero:**
+
    ```bash
    kubectl port-forward svc/vllm-router-service 30080:80
    ```
 
    In a separate terminal:
+
    ```bash
    curl -X POST http://localhost:30080/v1/completions \
      -H "Content-Type: application/json" \
@@ -266,9 +268,10 @@ kubectl apply -f assets/values-20-keda.yaml
    You should initially get a HTTP 503 error saying the service is temporarily unavailable. However, within a few minutes, you should see a fresh pod being brought up and the same query should succeed.
 
 **Expected behavior:**
-- **Scale down**: Pods terminate when there's no traffic and no queued requests
-- **Scale up**: New pods start when requests arrive, even from zero replicas
-- **Cold start delay**: First request after scale-to-zero will experience a delay while the pod initializes
+
+* **Scale down**: Pods terminate when there's no traffic and no queued requests
+* **Scale up**: New pods start when requests arrive, even from zero replicas
+* **Cold start delay**: First request after scale-to-zero will experience a delay while the pod initializes
 
 ---
 
