@@ -1,0 +1,53 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  labels: {app: "vllm"}
+  modelSpec:
+  - name: "llama3"
+    repository: "lmcache/vllm-openai"
+    tag: "nightly-2025-08-25"
+    modelURL: "meta-llama/Llama-3.3-70B-Instruct"
+    replicaCount: 1
+
+    requestCPU: 20
+    requestMemory: "1024Gi"
+    requestGPU: 8
+    shmSize: "20Gi"
+
+    extraVolumes:
+      - name: kv-store-disk
+        emptyDir: {}
+
+    extraVolumeMounts:
+      - mountPath: /kv-store-disk
+        name: kv-store-disk
+
+    vllmConfig:
+      enablePrefixCaching: true
+      enableChunkedPrefill: true
+      gpuMemoryUtilization: "0.9"
+      tensorParallelSize: 8
+      dtype: "bfloat16"
+      extraArgs:
+        - "--disable-log-requests"
+        - "--max_num_batched_tokens"
+        - "2048"
+
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "128" # 128GB per worker
+      diskOffloadingBufferSize: "640" # 640GB per worker
+
+    hf_token: <YOUR HF TOKEN>
+
+    env:
+      # Local disk using ephemeral storage backed local SSD on emptyDir
+      - name: LMCACHE_LOCAL_DISK
+        value: "file:///kv-store-disk/"
+
+  # Increase initialDelaySeconds to allow time for the large model to load.
+  startupProbe:
+    initialDelaySeconds: 300
+
+routerSpec:
+  serviceType: "LoadBalancer"
+  labels: {app: "vllm"}
