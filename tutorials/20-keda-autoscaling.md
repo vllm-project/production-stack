@@ -22,6 +22,8 @@ This tutorial shows you how to automatically scale a vLLM deployment using [KEDA
 
 ---
 
+> **Note**: This tutorial only supports non-disaggregated prefill request autoscaling.
+
 ## Prerequisites
 
 * A working vLLM deployment on Kubernetes (see [01-minimal-helm-installation](01-minimal-helm-installation.md))
