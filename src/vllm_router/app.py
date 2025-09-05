@@ -33,9 +33,9 @@ from vllm_router.routers.files_router import files_router
 from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
 from vllm_router.routers.routing_logic import (
+    DisaggregatedPrefillRouter,
     get_routing_logic,
     initialize_routing_logic,
-    DisaggregatedPrefillRouter,
 )
 from vllm_router.service_discovery import (
     ServiceDiscoveryType,
@@ -100,7 +100,9 @@ async def lifespan(app: FastAPI):
 
     # only start the ZMQ task if the routing logic is RoutingLogic.DISAGGREGATED_PREFILL
     if isinstance(app.state.router, DisaggregatedPrefillRouter):
-        logger.info("Starting ZMQ task because the routing logic is RoutingLogic.DISAGGREGATED_PREFILL")
+        logger.info(
+            "Starting ZMQ task because the routing logic is RoutingLogic.DISAGGREGATED_PREFILL"
+        )
         # Start the ZMQ task
         await start_zmq_task()
 
