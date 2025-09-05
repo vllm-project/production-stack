@@ -112,16 +112,13 @@ async def lifespan(app: FastAPI):
 def create_instance_id_to_url(lmcache_instances, static_backends):
     if lmcache_instances is None or static_backends is None:
         return None
-    instance_ids = lmcache_instances.strip().split(',')
+    instance_ids = [s.strip() for s in lmcache_instances.split(',') if s.strip()]
     urls = parse_static_urls(static_backends)
     if not instance_ids or not urls:
         return None
     if len(instance_ids) != len(urls):
         raise ValueError("length of lmcache-instances & static-backends mismatched")
-    instance_id_to_url = {}
-    for instance_id, url in zip(instance_ids, urls):
-        instance_id_to_url[instance_id] = url
-    return instance_id_to_url
+    return dict(zip(instance_ids, urls))
 
 
 def initialize_all(app: FastAPI, args):

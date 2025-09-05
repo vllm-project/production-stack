@@ -19,7 +19,7 @@ import math
 import random
 import threading
 import traceback
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, Union
 
 from fastapi import Request
 
@@ -137,7 +137,7 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
-    ) -> str:
+    ) -> Union(str, Tuple[str, RequestStatsCacheInfo]):
         """
         Route the request to the appropriate engine URL
 
@@ -525,7 +525,7 @@ class TtftRouter(RoutingInterface):
         request_stats: Dict[str, RequestStats],
         request: Request,
         request_json: Dict,
-    ) -> str:
+    ) -> Tuple[str, RequestStatsCacheInfo]:
         """
         Route the request to the appropriate engine URL by where the KV cache
         of the longest prefix match is found.

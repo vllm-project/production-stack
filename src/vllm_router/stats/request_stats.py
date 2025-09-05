@@ -146,7 +146,7 @@ class RequestStatsCacheInfo:
     """
     Cache information.
     """
-    def __int__(self):
+    def __init__(self):
         self.num_prefix_tokens : int = 0
         self.num_cached_tokens : int = 0
 
