@@ -7,7 +7,7 @@ servingEngineSpec:
     # Prefill node configuration
     - name: "llama-prefill"
       repository: "lmcache/vllm-openai"
-      tag: "nightly-2025-08-20"
+      tag: "nightly-2025-09-04"
       modelURL: "meta-llama/Llama-3.1-8B-Instruct"
       replicaCount: 1
       requestCPU: 8
@@ -42,7 +42,7 @@ servingEngineSpec:
     # Decode node configuration
     - name: "llama-decode"
       repository: "lmcache/vllm-openai"
-      tag: "nightly-2025-08-20"
+      tag: "nightly-2025-09-04"
       modelURL: "meta-llama/Llama-3.1-8B-Instruct"
       replicaCount: 1
       requestCPU: 8
@@ -69,7 +69,7 @@ servingEngineSpec:
         nixlPeerAllocPort: 7400
         nixlBufferSize: "2147483648"
         nixlBufferDevice: "cuda"
-        nixlBackends: ["UCX"]
+        # nixlBackends: ["UCX"]
         enablePD: true
         rpcPort: "consumer1"
         skipLastNTokens: 1
