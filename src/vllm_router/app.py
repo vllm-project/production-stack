@@ -110,6 +110,8 @@ async def lifespan(app: FastAPI):
 
         # Stop the ZMQ task
         await stop_zmq_task()
+    else:
+        yield
 
     await app.state.aiohttp_client_wrapper.stop()
 
