@@ -114,7 +114,7 @@ spec:
   minReplicaCount: 1
   maxReplicaCount: 2
   pollingInterval: 15
-  cooldownPeriod: 180
+  cooldownPeriod: 360
   triggers:
     - type: prometheus
       metadata:
@@ -199,7 +199,7 @@ spec:
   # How often KEDA should check the metrics (in seconds)
   pollingInterval: 15
   # How long to wait before scaling down after scaling up (in seconds)
-  cooldownPeriod: 180
+  cooldownPeriod: 360
   # Scaling triggers configuration
   triggers:
     # Trigger 1: Queue-based scaling
