@@ -35,6 +35,7 @@ from vllm_router.routers.metrics_router import metrics_router
 from vllm_router.routers.routing_logic import (
     get_routing_logic,
     initialize_routing_logic,
+    DisaggregatedPrefillRouter,
 )
 from vllm_router.service_discovery import (
     ServiceDiscoveryType,
@@ -97,13 +98,16 @@ async def lifespan(app: FastAPI):
 
     app.state.event_loop = asyncio.get_event_loop()
 
-    # Start the ZMQ task
-    await start_zmq_task()
+    # only start the ZMQ task if the routing logic is RoutingLogic.DISAGGREGATED_PREFILL
+    if isinstance(app.state.router, DisaggregatedPrefillRouter):
+        logger.info("Starting ZMQ task because the routing logic is RoutingLogic.DISAGGREGATED_PREFILL")
+        # Start the ZMQ task
+        await start_zmq_task()
 
-    yield
+        yield
 
-    # Stop the ZMQ task
-    await stop_zmq_task()
+        # Stop the ZMQ task
+        await stop_zmq_task()
 
     await app.state.aiohttp_client_wrapper.stop()
 
