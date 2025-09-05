@@ -40,7 +40,7 @@ from vllm_router.version import __version__
 try:
     # Semantic cache integration
     from vllm_router.services.request_service.request import (
-        route_general_transcriptions
+        route_general_transcriptions,
     )
 
     _route_general_transcriptions = True
@@ -274,6 +274,7 @@ async def health() -> Response:
 
 
 if _route_general_transcriptions:
+
     @main_router.post("/v1/audio/transcriptions")
     async def route_v1_audio_transcriptions(
         request: Request, background_tasks: BackgroundTasks
