@@ -379,6 +379,32 @@ def parse_args():
         help="The threshold for kv-aware routing.",
     )
 
+    parser.add_argument(
+        "--enable_queue",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Enable router-side queuing. Note that queue will still be initialized, just not actually enqueued.",
+    )
+    parser.add_argument(
+        "--max-wait-time",
+        type=int,
+        default=10,
+        help="The maximum amount of time a request waits in a queue before it gets rerouted. E.g., 10s",
+    )
+
+    parser.add_argument(
+        "--max-running-requests",
+        type=int,
+        default=10,
+        help="The maximum number of running requests in an endpoint before the router enqueues an incoming request",
+    )
+
+    parser.add_argument(
+        "--max-gpu-perc",
+        type=int,
+        default=95,
+        help="The maximum GPU use percentage of an endpoint before the router enqueues an incoming request",
+    )
     args = parser.parse_args()
     args = load_initial_config_from_config_file_if_required(parser, args)
 
