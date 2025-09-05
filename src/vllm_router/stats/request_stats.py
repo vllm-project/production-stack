@@ -54,8 +54,8 @@ class RequestStats:
     avg_itl: float
     # Number of swapped requests (moved from GPU to CPU)
     num_swapped_requests: int
-    # Engine prefill TPS
-    engine_prefill_tps: float
+    # Engine prefill computation speed
+    engine_prefill_comp_speed: float
     # Uncomputed prefix tokens
     uncomputed_prefix_tokens: int
 
@@ -142,6 +142,12 @@ class MovingAverageMonitor:
         return sum(self.values)
 
 
+class CacheInfo:
+    def __int__(self):
+        self.num_prefix_tokens : int = 0
+        self.num_cached_tokens : int = 0
+
+
 class RequestStatsMonitor(metaclass=SingletonMeta):
     """
     Monitors the request statistics of all serving engines.
@@ -166,8 +172,8 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         self.request_start_time: Dict[Tuple[str, str], float] = {}
         # Record time when first token is received: (engine_url, request_id) -> timestamp
         self.first_token_time: Dict[Tuple[str, str], float] = {}
-        # The number of uncached prefix tokens
-        self.uncached_prefix_tokens: Dict[Tuple[str, str], int] = {}
+        # The number of cached prefix tokens
+        self.cache_infos: Dict[Tuple[str, str], CacheInfo] = {}
 
         # Number of requests in different stages (from the start of the router)
         self.in_prefill_requests: Dict[str, int] = {}
@@ -183,7 +189,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         self.first_query_time: float = None
         self._initialized = True
 
-    def on_new_request(self, engine_url: str, request_id: str, timestamp: float, uncached_prefix_tokens:int = None):
+    def on_new_request(self, engine_url: str, request_id: str, timestamp: float, cache_info: CacheInfo = None):
         """
         Tell the monitor that a new request has been created.
 
@@ -191,12 +197,12 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             engine_url: The URL of the serving engine
             request_id: The global request ID
             timestamp: the timestamp when the request was created
-            uncached_prefix_tokens: The number of uncached prefix tokens
+            cache_info: The cache information
         """
         self.request_start_time[(engine_url, request_id)] = timestamp
 
-        if uncached_prefix_tokens is not None:
-            self.uncached_prefix_tokens[(engine_url, request_id)] = uncached_prefix_tokens
+        if cache_info is not None:
+            self.cache_infos[(engine_url, request_id)] = cache_info
 
         if engine_url not in self.in_prefill_requests:
             self.in_prefill_requests[engine_url] = 0
@@ -339,7 +345,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
                 swapped = 0
 
 
-            engine_prefill_tps = self._calc_engine_prefill_tps(current_time, engine_url)
+            engine_prefill_comp_speed = self._calc_engine_prefill_comp_speed(current_time, engine_url)
             uncomputed_prefix_tokens = self._get_uncomputed_prefix_tokens(engine_url)
 
             ret[engine_url] = RequestStats(
@@ -355,38 +361,44 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
                 avg_latency=avg_lat,
                 avg_itl=avg_itl_val,
                 num_swapped_requests=swapped,
-                engine_prefill_tps=engine_prefill_tps,
+                engine_prefill_comp_speed=engine_prefill_comp_speed,
                 uncomputed_prefix_tokens=uncomputed_prefix_tokens,
             )
         return ret
 
-    def _calc_engine_prefill_tps(self, current_time: float, engine_url: str) -> float:
+    def _calc_engine_prefill_comp_speed(self, current_time: float, engine_url: str) -> float:
         min_start_time = current_time - self.sliding_window_size
         prefill_periods = TimePeriods()
-        all_uncached_prefix_tokens = 0
+        total_comp_amount = 0
         for (url, request_id), start_time in self.request_start_time.items():
             if url != engine_url or start_time < min_start_time:
                 continue
             if ((url, request_id) not in self.first_token_time or
-                    (url, request_id) not in self.uncached_prefix_tokens):
+                    (url, request_id) not in self.cache_infos):
                 continue
 
-            uncached_prefix_tokens = self.uncached_prefix_tokens[(url, request_id)]
-            if uncached_prefix_tokens > 0:
+            cache_info = self.cache_infos[(url, request_id)]
+            computed_tokens = cache_info.num_prefix_tokens - cache_info.num_cached_tokens
+            if computed_tokens > 0:
                 prefill_periods.union(start_time, self.first_token_time[(url, request_id)])
-                all_uncached_prefix_tokens += uncached_prefix_tokens
+                # find computation amount by trapezoid area formula
+                top = cache_info.num_cached_tokens
+                bottom = cache_info.num_prefix_tokens - 1
+                height = computed_tokens
+                total_comp_amount += (top + bottom) * height / 2
 
         length = prefill_periods.compute_length()
         if length > 0:
-            return all_uncached_prefix_tokens / length
+            return total_comp_amount / length
         return -1
 
     def _get_uncomputed_prefix_tokens(self, engine_url: str) -> int:
         uncomputed_prefix_tokens = 0
-        for (url, request_id), uncached_prefix_tokens in self.uncached_prefix_tokens.items():
+        for (url, request_id), cache_info in self.cache_infos.items():
             if url != engine_url or (url, request_id) in self.first_token_time:
                 continue
-            uncomputed_prefix_tokens += uncached_prefix_tokens
+            uncomputed_prefix_tokens += (cache_info.num_prefix_tokens -
+                                         cache_info.num_cached_tokens)
         return uncomputed_prefix_tokens
 
 

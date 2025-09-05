@@ -505,7 +505,7 @@ class TtftRouter(RoutingInterface):
         self.hash_ring = HashRing()
         self.tokenizer_name = tokenizer_name
         self.tokenizer = None
-        self.uncached_prefix_tokens = None
+        self.cached_prefix_tokens = None
 
     def start_kv_manager(self):
         """
@@ -555,14 +555,14 @@ class TtftRouter(RoutingInterface):
             matched_infos = ret_msg.matched_info
             if matched_infos:
                 best_matched_info = self._find_best_matched(matched_infos)
-                self.uncached_prefix_tokens = len(token_ids) - best_matched_info[1][-1][1]
+                self.cached_prefix_tokens = best_matched_info[1][-1][1]
                 best_ttft_url = await self._find_best_ttft(endpoints, matched_infos,
                                                            best_matched_info, request_stats)
                 return best_ttft_url
         except ValueError:
             logger.info("Fallback to QPS routing due to:")
             logger.info(traceback.format_exc())
-        self.uncached_prefix_tokens = len(token_ids)
+        self.cached_prefix_tokens = 0
         return self._fallback_routing(endpoints, request_stats, request)
 
     def _find_best_matched(self, matched_infos):
