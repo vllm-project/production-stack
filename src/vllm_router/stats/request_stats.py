@@ -142,7 +142,10 @@ class MovingAverageMonitor:
         return sum(self.values)
 
 
-class CacheInfo:
+class RequestStatsCacheInfo:
+    """
+    Cache information.
+    """
     def __int__(self):
         self.num_prefix_tokens : int = 0
         self.num_cached_tokens : int = 0
@@ -173,7 +176,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         # Record time when first token is received: (engine_url, request_id) -> timestamp
         self.first_token_time: Dict[Tuple[str, str], float] = {}
         # The number of cached prefix tokens
-        self.cache_infos: Dict[Tuple[str, str], CacheInfo] = {}
+        self.cache_infos: Dict[Tuple[str, str], RequestStatsCacheInfo] = {}
 
         # Number of requests in different stages (from the start of the router)
         self.in_prefill_requests: Dict[str, int] = {}
@@ -189,7 +192,10 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         self.first_query_time: float = None
         self._initialized = True
 
-    def on_new_request(self, engine_url: str, request_id: str, timestamp: float, cache_info: CacheInfo = None):
+    def on_new_request(self, engine_url: str,
+                       request_id: str,
+                       timestamp: float,
+                       cache_info: RequestStatsCacheInfo = None):
         """
         Tell the monitor that a new request has been created.
 

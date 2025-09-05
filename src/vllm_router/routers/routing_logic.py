@@ -42,7 +42,7 @@ from uhashring import HashRing
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import EndpointInfo
 from vllm_router.stats.engine_stats import EngineStats
-from vllm_router.stats.request_stats import RequestStats
+from vllm_router.stats.request_stats import RequestStats, RequestStatsCacheInfo
 from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)
@@ -547,6 +547,8 @@ class TtftRouter(RoutingInterface):
             self.tokenizer = AutoTokenizer.from_pretrained(endpoints[0].model_names[0])
 
         token_ids = self.tokenizer.encode(extract_prompt(request_json))
+        cache_info = RequestStatsCacheInfo()
+        cache_info.num_prefix_tokens = len(token_ids)
         try:
             if request_stats is None:
                 raise ValueError("no request stats was provided")
@@ -555,15 +557,15 @@ class TtftRouter(RoutingInterface):
             matched_infos = ret_msg.matched_info
             if matched_infos:
                 best_matched_info = self._find_best_matched(matched_infos)
-                self.cached_prefix_tokens = best_matched_info[1][-1][1]
                 best_ttft_url = await self._find_best_ttft(endpoints, matched_infos,
                                                            best_matched_info, request_stats)
-                return best_ttft_url
+                cache_info.num_cached_tokens = best_matched_info[1][-1][1]
+                return best_ttft_url, cache_info
         except ValueError:
             logger.info("Fallback to QPS routing due to:")
             logger.info(traceback.format_exc())
-        self.cached_prefix_tokens = 0
-        return self._fallback_routing(endpoints, request_stats, request)
+        cache_info.num_cached_tokens = 0
+        return self._fallback_routing(endpoints, request_stats, request), cache_info
 
     def _find_best_matched(self, matched_infos):
         best_matched_info = None
