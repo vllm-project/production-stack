@@ -83,7 +83,7 @@ servingEngineSpec:
 routerSpec:
   enableRouter: true
   repository: "xiaokunchen/vllm-router"
-  tag: "08-27-v8"
+  tag: "09-05-v1"
   imagePullPolicy: "Always"
   replicaCount: 1
   containerPort: 8000
