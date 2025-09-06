@@ -35,7 +35,7 @@ spec:
           {{- if eq .Values.cacheserverSpec.tag "latest-nightly" }}
           - "/opt/venv/bin/lmcache_server"
           {{- else if eq .Values.cacheserverSpec.tag "latest" }}
-          - "/opt/venv/bin/lmcache_experimental_server"
+          - "/opt/venv/bin/lmcache_v0_server"
           {{- else }}
           - "lmcache_experimental_server"
           {{- end }}
