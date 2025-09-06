@@ -379,6 +379,35 @@ def parse_args():
         help="The threshold for kv-aware routing.",
     )
 
+    parser.add_argument(
+        "--nixl-peer-host",
+        type=str,
+        help="The hostname or IP address of the NIXL peer service. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-peer-init-port",
+        type=int,
+        default=7300,
+        help="The initialization port for the NIXL peer service. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-peer-alloc-port",
+        type=int,
+        default=7400,
+        help="The allocation port for the NIXL peer service. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-proxy-host",
+        type=str,
+        help="The hostname or IP address for the NIXL proxy server. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-proxy-port",
+        type=int,
+        default=7500,
+        help="The port for the NIXL proxy server. Only use for DisaggregatedPrefillRouter.",
+    )
+
     args = parser.parse_args()
     args = load_initial_config_from_config_file_if_required(parser, args)
 

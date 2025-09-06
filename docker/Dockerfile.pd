@@ -1,0 +1,31 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# hadolint ignore=DL3008
+RUN --mount=type=cache,target=/var/lib/apt --mount=type=cache,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends git curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    /root/.local/bin/uv venv /opt/venv
+
+# Copy the pyproject.toml and the git metadata first (leverage Docker layer caching)
+COPY pyproject.toml .
+COPY .git/ .git/
+
+# Copy the rest of the application code
+COPY src/ src/
+
+ARG INSTALL_OPTIONAL_DEP=semantic_cache,lmcache
+ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
+
+# hadolint ignore=SC1091
+RUN . /opt/venv/bin/activate && \
+    /root/.local/bin/uv pip install --upgrade --no-cache-dir pip setuptools_scm && \
+    /root/.local/bin/uv pip install --no-cache-dir .[$INSTALL_OPTIONAL_DEP] && \
+    /root/.local/bin/uv pip install zmq msgspec
+
+# Set the entrypoint
+ENTRYPOINT ["/opt/venv/bin/vllm-router"]
+CMD []
