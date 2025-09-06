@@ -21,6 +21,7 @@ servingEngineSpec:
       instanceId: "default1"
       controllerPort: "9000"
       workerPort: 8001
+      distributedUrl: "localhost:8201"
 
     env:
       - name: LMCACHE_LOG_LEVEL
@@ -46,6 +47,7 @@ servingEngineSpec:
       instanceId: "default2"
       controllerPort: "9000"
       workerPort: 8002
+      distributedUrl: "localhost:8202"
 
     env:
       - name: LMCACHE_LOG_LEVEL
@@ -72,6 +74,7 @@ servingEngineSpec:
       instanceId: "default3"
       controllerPort: "9000"
       workerPort: 8003
+      distributedUrl: "localhost:8203"
 
     env:
       - name: LMCACHE_LOG_LEVEL
@@ -97,6 +100,7 @@ servingEngineSpec:
       instanceId: "default4"
       controllerPort: "9000"
       workerPort: 8004
+      distributedUrl: "localhost:8204"
 
     env:
       - name: LMCACHE_LOG_LEVEL
@@ -105,7 +109,7 @@ servingEngineSpec:
 
 routerSpec:
   repository: "lmcache/lmstack-router"
-  tag: "kvaware-latest"
+  tag: "latest"
   resources:
     requests:
       cpu: "1"
