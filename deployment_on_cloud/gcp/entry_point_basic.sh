@@ -1,8 +1,10 @@
 #!/bin/bash
-CLUSTER_NAME="production-stack"
-ZONE="us-central1-a"
+CLUSTER_NAME="${CLUSTER_NAME:-production-stack}"
+CLUSTER_VERSION="${CLUSTER_VERSION:-1.32.3-gke.1440000}"
+ZONE="${ZONE:-us-central1-a}"
 # Get the current GCP project ID
 GCP_PROJECT=$(gcloud config get-value project)
+ACCELERATOR_TYPE="${ACCELERATOR_TYPE:-nvidia-tesla-t4}"
 
 # Ensure the project ID is retrieved correctly
 if [ -z "$GCP_PROJECT" ]; then
@@ -24,7 +26,7 @@ gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
   --zone "$ZONE" \
   --tier "standard" \
   --no-enable-basic-auth \
-  --cluster-version "1.32.3-gke.1440000" \
+  --cluster-version "$CLUSTER_VERSION" \
   --release-channel "regular" \
   --machine-type "n2d-standard-8" \
   --image-type "COS_CONTAINERD" \
@@ -60,6 +62,14 @@ https://www.googleapis.com/auth/trace.append" \
   --binauthz-evaluation-mode=DISABLED \
   --enable-managed-prometheus \
   --enable-shielded-nodes \
+  --enable-autoprovisioning \
+  --min-cpu 0 \
+  --min-memory 0 \
+  --max-cpu 1000 \
+  --max-memory 40960 \
+  --autoprovisioning-scopes=https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring,https://www.googleapis.com/auth/devstorage.read_only \
+  --min-accelerator=type="$ACCELERATOR_TYPE",count=0 \
+  --max-accelerator=type="$ACCELERATOR_TYPE",count=8 \
   --node-locations "$ZONE"
 
 # Deploy the application using Helm
