@@ -94,6 +94,8 @@ class EndpointInfo:
     # Model label
     model_label: str
 
+    model_type: str
+
     # Endpoint's sleep status
     sleep: bool
 
@@ -306,6 +308,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
             ):
                 continue
             model_label = self.model_labels[i] if self.model_labels else "default"
+            model_type = self.model_types[i] if self.model_types else "default"
             endpoint_info = EndpointInfo(
                 url=url,
                 model_names=[model],  # Convert single model to list
@@ -313,6 +316,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
                 sleep=False,
                 added_timestamp=self.added_timestamp,
                 model_label=model_label,
+                model_type=model_type,
                 model_info=self._get_model_info(model),
             )
             endpoint_infos.append(endpoint_info)
