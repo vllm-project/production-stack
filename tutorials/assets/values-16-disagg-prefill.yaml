@@ -8,7 +8,7 @@ servingEngineSpec:
     - name: "llama-prefill"
       repository: "lmcache/vllm-openai"
       tag: "nightly-2025-09-04"
-      modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+      modelURL: "Qwen/Qwen3-8B"
       replicaCount: 1
       requestCPU: 8
       requestMemory: "30Gi"
@@ -32,18 +32,18 @@ servingEngineSpec:
         nixlRole: "sender"
         nixlProxyHost: "vllm-router-service"
         nixlProxyPort: 7500
-        nixlBufferSize: "1073741824"
+        nixlBufferSize: "3774873600"
         nixlBufferDevice: "cuda"
         enablePD: true
         rpcPort: "producer1"
       labels:
         model: "llama-prefill"
-      hf_token: <hf-token>
+      # hf_token: <hf-token>
     # Decode node configuration
     - name: "llama-decode"
       repository: "lmcache/vllm-openai"
       tag: "nightly-2025-09-04"
-      modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+      modelURL: "Qwen/Qwen3-8B"
       replicaCount: 1
       requestCPU: 8
       requestMemory: "30Gi"
@@ -67,13 +67,13 @@ servingEngineSpec:
         nixlPeerHost: "0.0.0.0"
         nixlPeerInitPort: 7300
         nixlPeerAllocPort: 7400
-        nixlBufferSize: "2147483648"
+        nixlBufferSize: "3774873600"
         nixlBufferDevice: "cuda"
         # nixlBackends: ["UCX"]
         enablePD: true
         rpcPort: "consumer1"
         skipLastNTokens: 1
-      hf_token: <hf-token>
+      # hf_token: <hf-token>
       labels:
         model: "llama-decode"
   containerSecurityContext:
@@ -83,7 +83,7 @@ servingEngineSpec:
 routerSpec:
   enableRouter: true
   repository: "xiaokunchen/vllm-router"
-  tag: "09-05-v1"
+  tag: "08-27-v8"
   imagePullPolicy: "Always"
   replicaCount: 1
   containerPort: 8000
