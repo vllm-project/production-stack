@@ -15,6 +15,15 @@ Before running this setup, ensure you have:
 
 Disclaimer: This script requires cloud resources and will incur costs. Please make sure all resources are shut down properly.
 
+Set the environment variables. Check that they meet the minimum requirements for your LLM. Default values will be used for any unset variables
+
+```bash
+export CLUSTER_NAME="my-vllm-cluster"
+export CLUSTER_VERSION="1.32.3-gke.1440000"
+export ZONE="us-central1-c"
+export ACCELERATOR_TYPE="nvidia-h100-80gb"
+```
+
 To run the service, go to "deployment_on_cloud/gcp" and run:
 
 ```bash
@@ -47,14 +56,19 @@ This step creates a GKE cluster with specified configurations.
 
 ```bash
 #!/bin/bash
-CLUSTER_NAME="production-stack"
-ZONE="us-central1-a"
+CLUSTER_NAME="${CLUSTER_NAME:-production-stack}"
+CLUSTER_VERSION="${CLUSTER_VERSION:-1.32.3-gke.1440000}"
+ZONE="${ZONE:-us-central1-a}"
+# Get the current GCP project ID
 GCP_PROJECT=$(gcloud config get-value project)
+ACCELERATOR_TYPE="${ACCELERATOR_TYPE:-nvidia-tesla-t4}"
 ```
 
 - **Cluster Name**: Set the desired name for your cluster.
+- **Cluster Version**: Specify the GKE version for your cluster.
 - **Zone**: Define the zone where your cluster will be created.
 - **Project ID**: Retrieve the current GCP project ID.
+- **Accelerator Type**: Set the desired gpu type for your cluster.
 
 #### 1.2 Check Project ID
 
@@ -87,19 +101,20 @@ gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
   --zone "$ZONE" \
   --tier "standard" \
   --no-enable-basic-auth \
-  --cluster-version "1.31.5-gke.1023000" \
+  --cluster-version "$CLUSTER_VERSION" \
   --release-channel "regular" \
   --machine-type "n2d-standard-8" \
   --image-type "COS_CONTAINERD" \
   --disk-type "pd-balanced" \
   --disk-size "100" \
   --metadata disable-legacy-endpoints=true \
-  --scopes "https://www.googleapis.com/auth/devstorage.read_only",\
-    "https://www.googleapis.com/auth/logging.write",\
-    "https://www.googleapis.com/auth/monitoring",\
-    "https://www.googleapis.com/auth/servicecontrol",\
-    "https://www.googleapis.com/auth/service.management.readonly",\
-    "https://www.googleapis.com/auth/trace.append" \
+  --scopes \
+    "https://www.googleapis.com/auth/devstorage.read_only,\
+https://www.googleapis.com/auth/logging.write,\
+https://www.googleapis.com/auth/monitoring,\
+https://www.googleapis.com/auth/servicecontrol,\
+https://www.googleapis.com/auth/service.management.readonly,\
+https://www.googleapis.com/auth/trace.append" \
   --max-pods-per-node "110" \
   --num-nodes "1" \
   --logging=SYSTEM,WORKLOAD \
@@ -122,6 +137,14 @@ gcloud beta container --project "$GCP_PROJECT" clusters create "$CLUSTER_NAME" \
   --binauthz-evaluation-mode=DISABLED \
   --enable-managed-prometheus \
   --enable-shielded-nodes \
+  --enable-autoprovisioning \
+  --min-cpu 0 \
+  --min-memory 0 \
+  --max-cpu 1000 \
+  --max-memory 40960 \
+  --autoprovisioning-scopes=https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring,https://www.googleapis.com/auth/devstorage.read_only \
+  --min-accelerator=type="$ACCELERATOR_TYPE",count=0 \
+  --max-accelerator=type="$ACCELERATOR_TYPE",count=8 \
   --node-locations "$ZONE"
 ```
 
