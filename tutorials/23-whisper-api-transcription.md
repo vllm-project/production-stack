@@ -41,7 +41,7 @@ uv run python3 -m vllm_router.app \
   --service-discovery static \
   --static-backends "$2" \
   --static-models "openai/whisper-small" \
-  --static-model-types "transcription" \
+  --static-model-labels "transcription" \
   --routing-logic roundrobin \
   --log-stats \
   --engine-stats-interval 10 \
