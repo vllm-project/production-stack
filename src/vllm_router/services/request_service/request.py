@@ -684,5 +684,5 @@ async def route_general_transcriptions(
         logger.error(e)
         return JSONResponse(
             status_code=500,
-            content={"error": f"Internal server error"},
+            content={"error": "Internal server error"},
         )

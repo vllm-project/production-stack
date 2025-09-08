@@ -649,7 +649,12 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 time.sleep(0.5)
 
     def _add_engine(
-        self, engine_name: str, engine_ip: str, model_names: List[str], model_label: str, model_type: str
+        self,
+        engine_name: str,
+        engine_ip: str,
+        model_names: List[str],
+        model_label: str,
+        model_type: str,
     ):
         logger.info(
             f"Discovered new serving engine {engine_name} at "
@@ -711,7 +716,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             model_type = self._get_model_type(pod)
             logger.info(f"Using model_type={model_type} for pod {engine_name}")
 
-            self._add_engine(engine_name, engine_ip, model_names, model_label, model_type)
+            self._add_engine(
+                engine_name, engine_ip, model_names, model_label, model_type
+            )
 
         elif event == "DELETED":
             if engine_name not in self.available_engines:
@@ -728,7 +735,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 model_type = self._get_model_type(pod)
                 logger.info(f"Using model_type={model_type} for pod {engine_name}")
 
-                self._add_engine(engine_name, engine_ip, model_names, model_label, model_type)
+                self._add_engine(
+                    engine_name, engine_ip, model_names, model_label, model_type
+                )
                 return
 
             if (
@@ -1042,6 +1051,20 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             return None
         return service.spec.selector.get("model")
 
+    def _get_model_type(self, service) -> str:
+        """
+        Get the model type from the service's metadata labels.
+
+        Args:
+            service: The Kubernetes service object
+
+        Returns:
+            The model type if found, 'chat' as default otherwise
+        """
+        if not service.metadata.labels:
+            return "chat"  # Default to chat model type
+        return service.metadata.labels.get("model_type", "chat")
+
     def _watch_engines(self):
         while self.running:
             try:
@@ -1064,21 +1087,30 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
                     if is_service_ready:
                         model_names = self._get_model_names(service_name)
                         model_label = self._get_model_label(service)
+                        model_type = self._get_model_type(service)
                     else:
                         model_names = []
                         model_label = None
+                        model_type = None
                     self._on_engine_update(
                         service_name,
                         event_type,
                         is_service_ready,
                         model_names,
                         model_label,
+                        model_type,
                     )
             except Exception as e:
                 logger.error(f"K8s watcher error: {e}")
                 time.sleep(0.5)
 
-    def _add_engine(self, engine_name: str, model_names: List[str], model_label: str):
+    def _add_engine(
+        self,
+        engine_name: str,
+        model_names: List[str],
+        model_label: str,
+        model_type: str,
+    ):
         logger.info(
             f"Discovered new serving engine {engine_name} at "
             f"running models: {model_names}"
@@ -1100,6 +1132,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
                 added_timestamp=int(time.time()),
                 Id=str(uuid.uuid5(uuid.NAMESPACE_DNS, engine_name)),
                 model_label=model_label,
+                model_type=model_type,
                 sleep=sleep_status,
                 service_name=engine_name,
                 namespace=self.namespace,
@@ -1121,6 +1154,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         is_service_ready: bool,
         model_names: List[str],
         model_label: Optional[str],
+        model_type: Optional[str],
     ) -> None:
         if event == "ADDED":
             if not engine_name:
@@ -1132,7 +1166,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             if not model_names:
                 return
 
-            self._add_engine(engine_name, model_names, model_label)
+            self._add_engine(engine_name, model_names, model_label, model_type)
 
         elif event == "DELETED":
             if engine_name not in self.available_engines:
@@ -1145,7 +1179,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
                 return
 
             if is_service_ready and model_names:
-                self._add_engine(engine_name, model_names, model_label)
+                self._add_engine(engine_name, model_names, model_label, model_type)
                 return
 
             if (
