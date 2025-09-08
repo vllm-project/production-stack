@@ -580,6 +580,20 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             return None
         return pod.metadata.labels.get("model")
 
+    def _get_model_type(self, pod) -> str:
+        """
+        Get the model type from the pod's metadata labels.
+
+        Args:
+            pod: The Kubernetes pod object
+
+        Returns:
+            The model type if found, 'chat' as default otherwise
+        """
+        if not pod.metadata.labels:
+            return "chat"  # Default to chat model type
+        return pod.metadata.labels.get("model_type", "chat")
+
     def _watch_engines(self):
         while self.running:
             try:
@@ -622,6 +636,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                         )
 
                     self._on_engine_update(
+                        pod,
                         pod_name,
                         pod_ip,
                         event_type,
@@ -634,7 +649,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 time.sleep(0.5)
 
     def _add_engine(
-        self, engine_name: str, engine_ip: str, model_names: List[str], model_label: str
+        self, engine_name: str, engine_ip: str, model_names: List[str], model_label: str, model_type: str
     ):
         logger.info(
             f"Discovered new serving engine {engine_name} at "
@@ -657,6 +672,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 added_timestamp=int(time.time()),
                 Id=str(uuid.uuid5(uuid.NAMESPACE_DNS, engine_name)),
                 model_label=model_label,
+                model_type=model_type,
                 sleep=sleep_status,
                 pod_name=engine_name,
                 namespace=self.namespace,
@@ -673,6 +689,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
 
     def _on_engine_update(
         self,
+        pod: client.V1Pod,
         engine_name: str,
         engine_ip: Optional[str],
         event: str,
@@ -690,7 +707,11 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if not model_names:
                 return
 
-            self._add_engine(engine_name, engine_ip, model_names, model_label)
+            # Get model_type from pod labels
+            model_type = self._get_model_type(pod)
+            logger.info(f"Using model_type={model_type} for pod {engine_name}")
+
+            self._add_engine(engine_name, engine_ip, model_names, model_label, model_type)
 
         elif event == "DELETED":
             if engine_name not in self.available_engines:
@@ -703,7 +724,11 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 return
 
             if is_pod_ready and model_names:
-                self._add_engine(engine_name, engine_ip, model_names, model_label)
+                # Get model_type from pod labels
+                model_type = self._get_model_type(pod)
+                logger.info(f"Using model_type={model_type} for pod {engine_name}")
+
+                self._add_engine(engine_name, engine_ip, model_names, model_label, model_type)
                 return
 
             if (
