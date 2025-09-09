@@ -391,7 +391,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
                 top = cache_info.num_cached_tokens + 1
                 bottom = cache_info.num_prefix_tokens
                 height = computed_tokens
-                total_comp_amount += (top + bottom) * height / 2
+                total_comp_amount += (top + bottom) * height // 2
 
         length = prefill_periods.compute_length()
         if length > 0:
