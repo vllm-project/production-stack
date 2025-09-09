@@ -47,8 +47,6 @@ main_router = APIRouter()
 logger = init_logger(__name__)
 
 
-
-
 @main_router.post("/v1/chat/completions")
 async def route_chat_completion(request: Request, background_tasks: BackgroundTasks):
     if semantic_cache_available:
