@@ -16,10 +16,13 @@ This tutorial shows you how to automatically scale a vLLM deployment using [KEDA
   * [4. Verify Metric Export](#4-verify-metric-export)
   * [5. Configure the ScaledObject](#5-configure-the-scaledobject)
   * [6. Test Autoscaling](#6-test-autoscaling)
-  * [7. Cleanup](#7-cleanup)
+  * [7. Scale down to zero](#7-scale-down-to-zero)
+  * [8. Cleanup](#8-cleanup)
 * [Additional Resources](#additional-resources)
 
 ---
+
+> **Note**: This tutorial only supports non-disaggregated prefill request autoscaling.
 
 ## Prerequisites
 
@@ -99,7 +102,7 @@ This means that at the given timestamp, there were 0 pending requests in the que
 
 ### 5. Configure the ScaledObject
 
-The following `ScaledObject` configuration is provided in `tutorials/assets/values-19-keda.yaml`. Review its contents:
+The following `ScaledObject` configuration is provided in `tutorials/assets/values-20-keda.yaml`. Review its contents:
 
 ```yaml
 apiVersion: keda.sh/v1alpha1
@@ -113,7 +116,7 @@ spec:
   minReplicaCount: 1
   maxReplicaCount: 2
   pollingInterval: 15
-  cooldownPeriod: 30
+  cooldownPeriod: 360
   triggers:
     - type: prometheus
       metadata:
@@ -127,7 +130,7 @@ Apply the ScaledObject:
 
 ```bash
 cd ../tutorials
-kubectl apply -f assets/values-19-keda.yaml
+kubectl apply -f assets/values-20-keda.yaml
 ```
 
 This tells KEDA to:
@@ -172,12 +175,114 @@ Within a few minutes, the `REPLICAS` value should increase to 2.
 
 ---
 
-### 7. Cleanup
+### 7. Scale Down to Zero
+
+Sometimes you want to scale down to zero replicas when there's no traffic. This is a unique capability of KEDA compared to Kubernetes' HPA, which always maintains at least one replica. Scale-to-zero is particularly useful for:
+
+* **Cost optimization**: Eliminate resource usage during idle periods
+* **Resource efficiency**: Free up GPU resources for other workloads
+* **Cold start scenarios**: Scale up only when requests arrive
+
+We provide this capability through a dual-trigger configuration. To configure it, modify the `tutorials/assets/values-20-keda.yaml`:
+
+```yaml
+# KEDA ScaledObject for vLLM deployment with scale-to-zero capability
+# This configuration enables automatic scaling of vLLM pods based on queue length metrics
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: vllm-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: vllm-llama3-deployment-vllm
+  minReplicaCount: 0  # Allow scaling down to zero
+  maxReplicaCount: 2
+  # How often KEDA should check the metrics (in seconds)
+  pollingInterval: 15
+  # How long to wait before scaling down after scaling up (in seconds)
+  cooldownPeriod: 360
+  # Scaling triggers configuration
+  triggers:
+    # Trigger 1: Queue-based scaling
+    - type: prometheus
+      metadata:
+        # Prometheus server address within the cluster
+        serverAddress: http://prometheus-operated.monitoring.svc:9090
+        # Name of the metric to monitor
+        metricName: vllm:num_requests_waiting
+        # Prometheus query to fetch the metric
+        query: vllm:num_requests_waiting
+        # Threshold value that triggers scaling
+        # When queue length exceeds this value, KEDA will scale up
+        threshold: '5'
+    # Trigger 2: Traffic-based "keepalive" - prevents scale-to-zero when there's active traffic
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-operated.monitoring.svc:9090
+        metricName: vllm:incoming_keepalive
+        # This query returns 1 if there's any incoming traffic in the last minute, 0 otherwise
+        query: sum(rate(vllm:num_incoming_requests_total[1m]) > bool 0)
+        threshold: "1"
+```
+
+**How the dual-trigger system works:**
+
+1. **Queue trigger**: Scales up when `vllm:num_requests_waiting > 5`
+2. **Traffic trigger**: Prevents scale-to-zero when there's active incoming traffic (rate > 0 in the last minute)
+3. **Scale-to-zero**: Only occurs when both triggers are below their thresholds (no queue AND no traffic)
+
+Apply the updated configuration:
+
+```bash
+kubectl apply -f assets/values-20-keda.yaml
+```
+
+**Test the scale-to-zero behavior:**
+
+1. **Monitor the pods:**
+
+   ```bash
+   kubectl get pods -w
+   ```
+
+2. **Wait for scale-down:**
+   Within a few minutes, you should see the backend pod get terminated, meaning KEDA decided to scale down to zero.
+
+3. **Test scale-up from zero:**
+
+   ```bash
+   kubectl port-forward svc/vllm-router-service 30080:80
+   ```
+
+   In a separate terminal:
+
+   ```bash
+   curl -X POST http://localhost:30080/v1/completions \
+     -H "Content-Type: application/json" \
+     -d '{
+       "model": "meta-llama/Llama-3.1-8B-Instruct",
+       "prompt": "Once upon a time,",
+       "max_tokens": 10
+     }'
+   ```
+
+   You should initially get a HTTP 503 error saying the service is temporarily unavailable. However, within a few minutes, you should see a fresh pod being brought up and the same query should succeed.
+
+**Expected behavior:**
+
+* **Scale down**: Pods terminate when there's no traffic and no queued requests
+* **Scale up**: New pods start when requests arrive, even from zero replicas
+* **Cold start delay**: First request after scale-to-zero will experience a delay while the pod initializes
+
+---
+
+### 8. Cleanup
 
 To remove KEDA configuration and observability components:
 
 ```bash
-kubectl delete -f assets/values-19-keda.yaml
+kubectl delete -f assets/values-20-keda.yaml
 helm uninstall keda -n keda
 kubectl delete namespace keda
 
