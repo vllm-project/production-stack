@@ -388,8 +388,8 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             if computed_tokens > 0:
                 prefill_periods.union(start_time, self.first_token_time[(url, request_id)])
                 # find computation amount by trapezoid area formula
-                top = cache_info.num_cached_tokens
-                bottom = cache_info.num_prefix_tokens - 1
+                top = cache_info.num_cached_tokens + 1
+                bottom = cache_info.num_prefix_tokens
                 height = computed_tokens
                 total_comp_amount += (top + bottom) * height / 2
 
