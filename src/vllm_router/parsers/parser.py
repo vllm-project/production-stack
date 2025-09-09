@@ -381,7 +381,14 @@ def parse_args():
     )
 
     # Get default workers from environment variable or use 1
-    default_workers = int(os.environ.get("VLLM_ROUTER_WORKERS", "1"))
+    try:
+        default_workers = int(os.environ.get("VLLM_ROUTER_WORKERS", "1"))
+    except ValueError:
+        logger.warning(
+            "Invalid value for VLLM_ROUTER_WORKERS environment variable. "
+            "It must be an integer. Defaulting to 1."
+        )
+        default_workers = 1
 
     parser.add_argument(
         "--workers",
