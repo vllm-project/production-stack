@@ -22,6 +22,9 @@ ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
 RUN pip install --upgrade --no-cache-dir pip setuptools_scm && \
     pip install --no-cache-dir .[$INSTALL_OPTIONAL_DEP]
 
+# Set environment variable for workers (can be overridden)
+ENV VLLM_ROUTER_WORKERS=1
+
 # Set the entrypoint
 ENTRYPOINT ["vllm-router"]
 CMD []
