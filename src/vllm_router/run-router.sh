@@ -1,16 +1,11 @@
 #!/bin/bash
-if [[ $# -lt 1 ]]; then
-    echo "Usage $0 <router port> [workers]"
-    echo "  router port: The port to run the router on"
-    echo "  workers: (optional) Number of worker processes (default: 1)"
+if [[ $# -ne 1 ]]; then
+    echo "Usage $0 <router port>"
     exit 1
 fi
 
-PORT=$1
-WORKERS=${2:-1}
-
 # Use this command when testing with k8s service discovery
-# python3 -m vllm_router.app --port "$PORT" --workers "$WORKERS" \
+# python3 -m vllm_router.app --port "$1" \
 #     --service-discovery k8s \
 #     --k8s-label-selector release=test \
 #     --k8s-namespace default \
@@ -20,7 +15,7 @@ WORKERS=${2:-1}
 #     --log-stats
 
 # Use this command when testing with static service discovery
-python3 -m vllm_router.app --port "$PORT" --workers "$WORKERS" \
+python3 -m vllm_router.app --port "$1" \
     --service-discovery static \
     --static-backends "http://localhost:8000" \
     --static-models "facebook/opt-125m" \
@@ -33,7 +28,7 @@ python3 -m vllm_router.app --port "$PORT" --workers "$WORKERS" \
     --routing-logic roundrobin
 
 # Use this command when testing with roundrobin routing logic
-#python3 -m vllm_router.app --port "$PORT" --workers "$WORKERS" \
+#python3 router.py --port "$1" \
 #    --service-discovery k8s \
 #    --k8s-label-selector release=test \
 #    --routing-logic roundrobin \
