@@ -79,9 +79,52 @@ except ImportError:
 
 logger = logging.getLogger("uvicorn")
 
+# Global variable to store parsed arguments for multi-worker mode
+_global_args: object | None = None
+
+
+def set_global_args(args):
+    """Set global arguments for multi-worker mode.
+
+    This function should be called before importing the app module
+    in multi-worker scenarios.
+    """
+    global _global_args
+    _global_args = args
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize all components for this worker process
+    # This ensures each worker has its own properly initialized state
+    args = getattr(app.state, "args", None)
+    if args is None:
+        # Fallback: use global args or parse args if not available
+        global _global_args
+        if _global_args is not None:
+            args = _global_args
+        else:
+            # This should only happen in single-worker mode
+            args = parse_args()
+
+    # Initialize all components
+    initialize_all(app, args)
+
+    # Start log stats thread if enabled
+    # Note: In multi-worker mode, each worker will have its own log stats thread
+    # This is actually fine as each worker can log its own stats independently
+    if args.log_stats and not getattr(app.state, "log_stats_started", False):
+        threading.Thread(
+            target=log_stats,
+            args=(
+                app,
+                args.log_stats_interval,
+            ),
+            daemon=True,
+        ).start()
+        app.state.log_stats_started = True
+
+    # Start aiohttp client wrapper
     app.state.aiohttp_client_wrapper.start()
     if hasattr(app.state, "batch_processor"):
         await app.state.batch_processor.initialize()
@@ -135,21 +178,9 @@ def initialize_all(app: FastAPI, args):
             app=app,
             urls=parse_static_urls(args.static_backends),
             models=parse_comma_separated_args(args.static_models),
-            aliases=(
-                parse_static_aliases(args.static_aliases)
-                if args.static_aliases
-                else None
-            ),
-            model_types=(
-                parse_comma_separated_args(args.static_model_types)
-                if args.static_model_types
-                else None
-            ),
-            model_labels=(
-                parse_comma_separated_args(args.static_model_labels)
-                if args.static_model_labels
-                else None
-            ),
+            aliases=(parse_static_aliases(args.static_aliases) if args.static_aliases else None),
+            model_types=(parse_comma_separated_args(args.static_model_types) if args.static_model_types else None),
+            model_labels=(parse_comma_separated_args(args.static_model_labels) if args.static_model_labels else None),
             static_backend_health_checks=args.static_backend_health_checks,
             prefill_model_labels=args.prefill_model_labels,
             decode_model_labels=args.decode_model_labels,
@@ -177,9 +208,7 @@ def initialize_all(app: FastAPI, args):
 
     if args.enable_batch_api:
         logger.info("Initializing batch API")
-        app.state.batch_storage = initialize_storage(
-            args.file_storage_class, args.file_storage_path
-        )
+        app.state.batch_storage = initialize_storage(args.file_storage_class, args.file_storage_path)
         app.state.batch_processor = initialize_batch_processor(
             args.batch_processor, args.file_storage_path, app.state.batch_storage
         )
@@ -188,13 +217,9 @@ def initialize_all(app: FastAPI, args):
     if args.dynamic_config_yaml or args.dynamic_config_json:
         init_config = DynamicRouterConfig.from_args(args)
         if args.dynamic_config_yaml:
-            initialize_dynamic_config_watcher(
-                args.dynamic_config_yaml, "YAML", 10, init_config, app
-            )
+            initialize_dynamic_config_watcher(args.dynamic_config_yaml, "YAML", 10, init_config, app)
         elif args.dynamic_config_json:
-            initialize_dynamic_config_watcher(
-                args.dynamic_config_json, "JSON", 10, init_config, app
-            )
+            initialize_dynamic_config_watcher(args.dynamic_config_json, "JSON", 10, init_config, app)
 
     if args.callbacks:
         configure_custom_callbacks(args.callbacks, app)
@@ -225,15 +250,9 @@ def initialize_all(app: FastAPI, args):
 
             # Initialize the semantic cache with the model if specified
             if args.semantic_cache_model:
-                logger.info(
-                    f"Initializing semantic cache with model: {args.semantic_cache_model}"
-                )
-                logger.info(
-                    f"Semantic cache directory: {args.semantic_cache_dir or 'default'}"
-                )
-                logger.info(
-                    f"Semantic cache threshold: {args.semantic_cache_threshold}"
-                )
+                logger.info(f"Initializing semantic cache with model: {args.semantic_cache_model}")
+                logger.info(f"Semantic cache directory: {args.semantic_cache_dir or 'default'}")
+                logger.info(f"Semantic cache threshold: {args.semantic_cache_threshold}")
 
                 cache = initialize_semantic_cache(
                     embedding_model=args.semantic_cache_model,
@@ -243,16 +262,10 @@ def initialize_all(app: FastAPI, args):
 
                 # Update cache size metric
                 if cache and hasattr(cache, "db") and hasattr(cache.db, "index"):
-                    semantic_cache_size.labels(server="router").set(
-                        cache.db.index.ntotal
-                    )
-                    logger.info(
-                        f"Semantic cache initialized with {cache.db.index.ntotal} entries"
-                    )
+                    semantic_cache_size.labels(server="router").set(cache.db.index.ntotal)
+                    logger.info(f"Semantic cache initialized with {cache.db.index.ntotal} entries")
 
-                logger.info(
-                    f"Semantic cache initialized with model {args.semantic_cache_model}"
-                )
+                logger.info(f"Semantic cache initialized with model {args.semantic_cache_model}")
             else:
                 logger.warning(
                     "SemanticCache feature gate is enabled but no embedding model specified. "
@@ -272,32 +285,46 @@ def initialize_all(app: FastAPI, args):
     app.state.request_rewriter = get_request_rewriter()
 
 
-app = FastAPI(lifespan=lifespan)
-app.include_router(main_router)
-app.include_router(files_router)
-app.include_router(batches_router)
-app.include_router(metrics_router)
-app.state.aiohttp_client_wrapper = AiohttpClientWrapper()
-app.state.semantic_cache_available = semantic_cache_available
+def create_app():
+    """Create and configure the FastAPI application."""
+    app = FastAPI(lifespan=lifespan)
+    app.include_router(main_router)
+    app.include_router(files_router)
+    app.include_router(batches_router)
+    app.include_router(metrics_router)
+    app.state.aiohttp_client_wrapper = AiohttpClientWrapper()
+    app.state.semantic_cache_available = semantic_cache_available
+    return app
+
+
+def setup_app_with_args(app: FastAPI, args):
+    """Set up the application with parsed arguments.
+
+    This function is called to store args in app.state so they can be
+    accessed by the lifespan context manager in each worker process.
+    """
+    app.state.args = args
+
+
+# Create the app instance
+app = create_app()
 
 
 def main():
     args = parse_args()
-    initialize_all(app, args)
-    if args.log_stats:
-        threading.Thread(
-            target=log_stats,
-            args=(
-                app,
-                args.log_stats_interval,
-            ),
-            daemon=True,
-        ).start()
+
+    # Set up the app with arguments (for single-worker mode)
+    setup_app_with_args(app, args)
+
+    # Set global args for multi-worker mode
+    set_global_args(args)
 
     # Workaround to avoid footguns where uvicorn drops requests with too
     # many concurrent requests active.
     set_ulimit()
-    uvicorn.run(app, host=args.host, port=args.port, workers=args.workers)
+
+    # Use import string for multi-worker support
+    uvicorn.run("vllm_router.app:app", host=args.host, port=args.port, workers=args.workers, log_level=args.log_level)
 
 
 if __name__ == "__main__":
