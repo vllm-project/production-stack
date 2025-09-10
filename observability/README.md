@@ -42,7 +42,6 @@ Open the webpage at `http://<IP of your node>:3000` to access the Grafana web pa
 
 To import the dashboard, click **+** in the top-right corner and then upload the `vllm-dashboard.json` file from this folder.
 
-
 ## Import LMCache Dashboard
 
 If you use LMCache image in production stack, you can try the LMCache dashboard. It contains the following six fields showing the benefits of cpu offloading: Average time to first token (sec), Cache hit rate (%) in last 1 minute, LMCache retrieve speed (K Tokens / sec), Local CPU cache usage (GB), Number of requested tokens in total, and Number of hit tokens in total.
