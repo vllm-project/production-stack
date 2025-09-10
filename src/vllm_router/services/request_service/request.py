@@ -47,6 +47,7 @@ try:
 except ImportError:
     semantic_cache_available = False
 
+from vllm_router.services.metrics_service import num_incoming_requests_total
 
 logger = init_logger(__name__)
 
@@ -213,6 +214,11 @@ async def route_general_request(
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
 
+    # Check if model has ever been seen (even if currently scaled to zero)
+    model_ever_existed = False
+    if hasattr(service_discovery, "has_ever_seen_model"):
+        model_ever_existed = service_discovery.has_ever_seen_model(requested_model)
+
     if not request_endpoint:
         endpoints = list(
             filter(
@@ -234,13 +240,27 @@ async def route_general_request(
             )
         )
 
+    # Track all valid incoming requests
+    num_incoming_requests_total.labels(model=requested_model).inc()
+
     if not endpoints:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": f"Model {requested_model} not found or vLLM engine is sleeping."
-            },
-        )
+        if not model_ever_existed:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": f"Model '{requested_model}' not found. Available models can be listed at /v1/models."
+                },
+                headers={"X-Request-Id": request_id},
+            )
+        else:
+            # Model existed before but is now scaled to zero
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": f"Model '{requested_model}' is temporarily unavailable. Please try again later."
+                },
+                headers={"X-Request-Id": request_id},
+            )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
     if request_endpoint:
