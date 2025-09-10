@@ -20,7 +20,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import aiohttp
 import requests
@@ -372,6 +372,8 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         self.port = port
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
+        self.known_models: Set[str] = set()
+        self.known_models_lock = threading.Lock()
         self.label_selector = label_selector
         self.watcher_timeout_seconds = watcher_timeout_seconds
         self.health_check_timeout_seconds = health_check_timeout_seconds
@@ -662,6 +664,10 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
+        # Track all models we've ever seen
+        with self.known_models_lock:
+            self.known_models.update(model_names)
+
     def _delete_engine(self, engine_name: str):
         logger.info(f"Serving engine {engine_name} is deleted")
         with self.available_engines_lock:
@@ -757,6 +763,16 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
+
+    def has_ever_seen_model(self, model_name: str) -> bool:
+        """Check if we've ever seen this model, even if currently scaled to zero."""
+        with self.known_models_lock:
+            return model_name in self.known_models
+
+    def get_known_models(self) -> Set[str]:
+        """Get all models that have ever been discovered."""
+        with self.known_models_lock:
+            return self.known_models.copy()
 
 
 class K8sServiceNameServiceDiscovery(ServiceDiscovery):

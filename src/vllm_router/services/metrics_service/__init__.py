@@ -1,4 +1,4 @@
-from prometheus_client import Gauge
+from prometheus_client import Counter, Gauge
 
 # --- Prometheus Gauges ---
 # Existing metrics
@@ -32,6 +32,11 @@ num_prefill_requests = Gauge(
 )
 num_decoding_requests = Gauge(
     "vllm:num_decoding_requests", "Number of Decoding Requests", ["server"]
+)
+num_incoming_requests_total = Counter(
+    "vllm:num_incoming_requests",
+    "Total valid incoming requests to router (including when no backends available).",
+    ["model"],
 )
 
 # New metrics per dashboard update
