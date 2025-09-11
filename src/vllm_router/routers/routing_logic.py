@@ -137,7 +137,7 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
-    ) -> Union(str, Tuple[str, RequestStatsCacheInfo]):
+    ) -> Union[str, Tuple[str, RequestStatsCacheInfo]]:
         """
         Route the request to the appropriate engine URL
 
