@@ -558,7 +558,8 @@ class TtftRouter(RoutingInterface):
             if matched_infos:
                 best_matched_info = self._find_best_matched(matched_infos)
                 best_ttft_url = await self._find_best_ttft(endpoints, matched_infos,
-                                                           best_matched_info, request_stats)
+                                                           best_matched_info, request_stats,
+                                                           len(token_ids))
                 cache_info.num_cached_tokens = best_matched_info[1][-1][1]
                 return best_ttft_url, cache_info
         except ValueError:
@@ -577,7 +578,7 @@ class TtftRouter(RoutingInterface):
         return best_matched_info
 
     async def _find_best_ttft(self, endpoints, matched_infos, best_matched_info,
-                              request_stats):
+                              request_stats, num_prefix_tokens):
         matched_stats = []
         matched_urls = []
         for matched_info in matched_infos:
@@ -585,7 +586,7 @@ class TtftRouter(RoutingInterface):
             stats = request_stats.get(url, None)
             if stats is None:
                 raise ValueError(f"{url} provides no request stats ")
-            if stats.uncomputed_prefix_tokens > 0 and stats.engine_prefill_tps <= 0:
+            if stats.engine_prefill_comp_speed <= 0 or stats.prefill_uncomputed_amount < 0:
                 raise ValueError(f"{url} provides no way to forecasted queue time")
             matched_urls.append(url)
             matched_stats.append(stats)
@@ -594,9 +595,9 @@ class TtftRouter(RoutingInterface):
         best_ttft = float('inf')
         best_ttft_url = None
         for i, matched_info in enumerate(matched_infos):
-            logger.debug(f"-------------- URL:{matched_urls[i]} --------------")
+            print(f"-------------- URL:{matched_urls[i]} --------------")
             ttft = self._estimate_ttft(matched_info, best_matched_info,
-                                       matched_stats[i])
+                                       matched_stats[i], num_prefix_tokens)
             if best_ttft_url is None or ttft <= best_ttft:
                 best_ttft = ttft
                 best_ttft_url = matched_urls[i]
@@ -609,8 +610,9 @@ class TtftRouter(RoutingInterface):
             stats = request_stats.get(url, None)
             if stats is None:
                 raise ValueError(f"{url} provides no request stats ")
-            logger.debug(f"-------------- URL:{url} --------------")
-            ttft = self._estimate_ttft(None, best_matched_info, stats)
+            print(f"-------------- URL:{url} --------------")
+            ttft = self._estimate_ttft(None, best_matched_info,
+                                       stats, num_prefix_tokens)
             if best_ttft_url is None or ttft <= best_ttft:
                 best_ttft = ttft
                 best_ttft_url = url
@@ -619,22 +621,29 @@ class TtftRouter(RoutingInterface):
             raise ValueError(f"no best TTFT instance was found")
         return best_ttft_url
 
-    def _estimate_ttft(self, matched_info, best_matched_info, stats):
-        transfer_time = self._calc_transfer_time(matched_info, best_matched_info)
+    def _estimate_ttft(self, matched_info, best_matched_info, stats, num_prefix_tokens):
+        #
         # TODO take computation time of num_uncached_token into account
-        if stats.uncomputed_prefix_tokens == 0:
-            forecasted_queue_time = 0
+        if stats.prefill_uncomputed_amount == 0:
+            queue_time = 0
         else:
-            forecasted_queue_time = (stats.uncomputed_prefix_tokens /
-                                     stats.engine_prefill_tps)
-        ttft = forecasted_queue_time + transfer_time
+            queue_time = (stats.prefill_uncomputed_amount /
+                          stats.engine_prefill_comp_speed)
+        transfer_time = self._calc_transfer_time(matched_info, best_matched_info)
+        num_cached_tokens = 0
+        if matched_info is not None:
+            num_cached_tokens = matched_info[1][-1][1]
+        compute_time = (self._calc_compute_amount(num_prefix_tokens, num_cached_tokens) /
+                        stats.engine_prefill_comp_speed)
+        ttft = queue_time + transfer_time + compute_time
 
-        logger.debug(f"-------------- time estimations --------------")
-        logger.debug(f"uncomputed_prefix_tokens: {stats.uncomputed_prefix_tokens}")
-        logger.debug(f"engine_prefill_tps: {stats.engine_prefill_tps}")
-        logger.debug(f"transfer_time: {transfer_time}")
-        logger.debug(f"forecasted_queue_time: {forecasted_queue_time}")
-        logger.debug(f"ttft: {ttft}")
+        print(f"-------------- time estimations --------------")
+        print(f"prefill_uncomputed_amount: {stats.prefill_uncomputed_amount}")
+        print(f"engine_prefill_comp_speed: {stats.engine_prefill_comp_speed}")
+        print(f"queue_time: {queue_time}")
+        print(f"transfer_time: {transfer_time}")
+        print(f"compute_time: {compute_time}")
+        print(f"ttft: {ttft}")
         return ttft
 
     async def _get_instance_url(self, endpoints, instance_id):
@@ -657,6 +666,7 @@ class TtftRouter(RoutingInterface):
         return url
 
     def _calc_transfer_time(self, matched_info, best_matched_info):
+        return 0
         transfer_time = 0
         for chunk in best_matched_info[1]:
             if matched_info is not None and chunk[1] <= matched_info[1][-1][1]:
@@ -665,6 +675,12 @@ class TtftRouter(RoutingInterface):
             transfer_time += self.CACHE_LOC_TO_TRANS_TIME.get(chunk[0],
                                                               self.DEFAULT_CACHE_TRANS_TIME)
         return transfer_time
+
+    def _calc_compute_amount(self, num_prefix_tokens, num_cached_tokens):
+        top = num_cached_tokens + 1
+        bottom = num_prefix_tokens
+        height = num_prefix_tokens - num_cached_tokens
+        return (top + bottom) * height // 2
 
     def _fallback_routing(self, endpoints, request_stats, request):
         session_id = request.headers.get(self.session_key, None)

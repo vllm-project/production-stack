@@ -56,8 +56,8 @@ class RequestStats:
     num_swapped_requests: int
     # Engine prefill computation speed
     engine_prefill_comp_speed: float
-    # Uncomputed prefix tokens
-    uncomputed_prefix_tokens: int
+    # prefill uncomputed amount
+    prefill_uncomputed_amount: int
 
 
 class TimePeriods:
@@ -352,7 +352,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
 
 
             engine_prefill_comp_speed = self._calc_engine_prefill_comp_speed(current_time, engine_url)
-            uncomputed_prefix_tokens = self._get_uncomputed_prefix_tokens(engine_url)
+            prefill_uncomputed_amount = self._get_prefill_uncomputed_amount(engine_url)
 
             ret[engine_url] = RequestStats(
                 qps=qps,
@@ -368,7 +368,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
                 avg_itl=avg_itl_val,
                 num_swapped_requests=swapped,
                 engine_prefill_comp_speed=engine_prefill_comp_speed,
-                uncomputed_prefix_tokens=uncomputed_prefix_tokens,
+                prefill_uncomputed_amount=prefill_uncomputed_amount,
             )
         return ret
 
@@ -398,14 +398,16 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             return total_comp_amount / length
         return -1
 
-    def _get_uncomputed_prefix_tokens(self, engine_url: str) -> int:
-        uncomputed_prefix_tokens = 0
+    def _get_prefill_uncomputed_amount(self, engine_url: str) -> int:
+        amount = 0
         for (url, request_id), cache_info in self.cache_infos.items():
             if url != engine_url or (url, request_id) in self.first_token_time:
                 continue
-            uncomputed_prefix_tokens += (cache_info.num_prefix_tokens -
-                                         cache_info.num_cached_tokens)
-        return uncomputed_prefix_tokens
+            top = cache_info.num_cached_tokens + 1
+            bottom = cache_info.num_prefix_tokens
+            height = cache_info.num_prefix_tokens - cache_info.num_cached_tokens
+            amount += (top + bottom) * height // 2
+        return amount
 
 
 def initialize_request_stats_monitor(sliding_window_size: float):
