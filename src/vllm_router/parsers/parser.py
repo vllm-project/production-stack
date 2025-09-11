@@ -14,6 +14,7 @@
 import argparse
 import json
 import logging
+import os
 import sys
 
 from vllm_router import utils
@@ -377,6 +378,23 @@ def parse_args():
         type=int,
         default=2000,
         help="The threshold for kv-aware routing.",
+    )
+
+    # Get default workers from environment variable or use 1
+    try:
+        default_workers = int(os.environ.get("VLLM_ROUTER_WORKERS", "1"))
+    except ValueError:
+        logger.warning(
+            "Invalid value for VLLM_ROUTER_WORKERS environment variable. "
+            "It must be an integer. Defaulting to 1."
+        )
+        default_workers = 1
+
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=default_workers,
+        help="The number of worker processes to run. Default is 1 (single process). Can also be set via VLLM_ROUTER_WORKERS environment variable.",
     )
 
     args = parser.parse_args()
