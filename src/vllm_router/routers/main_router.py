@@ -18,7 +18,7 @@ from fastapi import (
     BackgroundTasks,
     Request,
 )
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response
 
 from vllm_router.dynamic_config import get_dynamic_config_watcher
 from vllm_router.log import init_logger

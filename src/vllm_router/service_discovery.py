@@ -23,7 +23,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
 import aiohttp
-import httpx
 import requests
 from kubernetes import client, config, watch
 
