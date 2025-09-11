@@ -68,16 +68,9 @@ run_proxy = True
 zmq_ctx = zmq.asyncio.Context()
 
 
-async def zmq_pull_server():
+async def zmq_pull_server(proxy_host: str = "0.0.0.0", proxy_port: int = 7500):
     try:
         socket = zmq_ctx.socket(zmq.PULL)
-        try:
-            from vllm_router.app import app
-
-            proxy_host = app.state.args.nixl_proxy_host
-            proxy_port = app.state.args.nixl_proxy_port
-        except Exception as e:
-            logger.error(f"Failed to get proxy host and port from app state: {e}")
         proxy_url = f"{proxy_host}:{proxy_port}"
         socket.bind(f"tcp://{proxy_url}")
         logger.info(f"ZMQ proxy server started on {proxy_url}")
@@ -107,11 +100,11 @@ async def zmq_pull_server():
 zmq_task = None
 
 
-async def start_zmq_task():
+async def start_zmq_task(proxy_host: str = "0.0.0.0", proxy_port: int = 7500):
     """Start the ZMQ pull server task."""
     global zmq_task
     if zmq_task is None:
-        zmq_task = asyncio.create_task(zmq_pull_server())
+        zmq_task = asyncio.create_task(zmq_pull_server(proxy_host, proxy_port))
         logger.info("ZMQ task started")
 
         # Add a small delay to allow the task to start and potentially log any errors

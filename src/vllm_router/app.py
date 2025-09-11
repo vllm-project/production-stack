@@ -104,7 +104,9 @@ async def lifespan(app: FastAPI):
             "Starting ZMQ task because the routing logic is RoutingLogic.DISAGGREGATED_PREFILL"
         )
         # Start the ZMQ task
-        await start_zmq_task()
+        await start_zmq_task(
+            app.state.args.nixl_proxy_host, app.state.args.nixl_proxy_port
+        )
 
         yield
 
