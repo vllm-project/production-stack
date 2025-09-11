@@ -2,7 +2,7 @@
 {{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- with $ -}}
-{{- if and (hasKey $modelSpec "pvcStorage") (not (empty $modelSpec.pvcStorage)) }}
+{{- if and (hasKey $modelSpec "pvcStorage") (not (empty $modelSpec.pvcStorage)) (kindIs "string" $modelSpec.pvcStorage) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
