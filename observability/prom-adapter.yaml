@@ -18,3 +18,14 @@ rules:
       matches: ""
       as: "vllm_num_requests_waiting"
     metricsQuery: sum by(namespace) (vllm:num_requests_waiting)
+
+  # Export num_incoming_requests_total by model name
+  - seriesQuery: '{__name__=~"^vllm:num_incoming_requests_total$"}'
+    resources:
+      overrides:
+        namespace:
+          resource: "namespace"
+    name:
+      matches: ""
+      as: "vllm_num_incoming_requests_total"
+    metricsQuery: sum by(namespace, model) (vllm:num_incoming_requests_total)
