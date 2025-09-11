@@ -8,7 +8,7 @@ servingEngineSpec:
     - name: "llama-prefill"
       repository: "lmcache/vllm-openai"
       tag: "nightly-2025-09-04"
-      modelURL: "Qwen/Qwen3-8B"
+      modelURL: "facebook/opt-125m"
       replicaCount: 1
       requestCPU: 8
       requestMemory: "30Gi"
@@ -38,12 +38,16 @@ servingEngineSpec:
         rpcPort: "producer1"
       labels:
         model: "llama-prefill"
+      chatTemplate: "chat.jinja2"
+      chatTemplateConfigMap: |-
+        {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
+        {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
       # hf_token: <hf-token>
     # Decode node configuration
     - name: "llama-decode"
       repository: "lmcache/vllm-openai"
       tag: "nightly-2025-09-04"
-      modelURL: "Qwen/Qwen3-8B"
+      modelURL: "facebook/opt-125m"
       replicaCount: 1
       requestCPU: 8
       requestMemory: "30Gi"
@@ -76,6 +80,10 @@ servingEngineSpec:
       # hf_token: <hf-token>
       labels:
         model: "llama-decode"
+      chatTemplate: "chat.jinja2"
+      chatTemplateConfigMap: |-
+        {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
+        {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
   containerSecurityContext:
     capabilities:
       add:
@@ -83,7 +91,7 @@ servingEngineSpec:
 routerSpec:
   enableRouter: true
   repository: "xiaokunchen/vllm-router"
-  tag: "08-27-v8"
+  tag: "09-10-v9"
   imagePullPolicy: "Always"
   replicaCount: 1
   containerPort: 8000

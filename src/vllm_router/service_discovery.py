@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 import aiohttp
+import httpx
 import requests
 from kubernetes import client, config, watch
 
@@ -320,7 +321,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
 
     async def initialize_client_sessions(self) -> None:
         """
-        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        Initialize httpx AsyncClient objects for prefill and decode endpoints.
         This must be called from an async context during app startup.
         """
         if (
@@ -330,16 +331,20 @@ class StaticServiceDiscovery(ServiceDiscovery):
             endpoint_infos = self.get_endpoint_info()
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
-                    # TODO: fix Unclosed client session
-                    self.app.state.prefill_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.prefill_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
                 elif endpoint_info.model_label in self.decode_model_labels:
-                    # TODO: fix Unclosed client session
-                    self.app.state.decode_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.decode_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
 
 
@@ -748,7 +753,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
 
     async def initialize_client_sessions(self) -> None:
         """
-        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        Initialize httpx AsyncClient objects for prefill and decode endpoints.
         This must be called from an async context during app startup.
         """
         if (
@@ -758,17 +763,21 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             endpoint_infos = self.get_endpoint_info()
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
-                    # TODO: fix Unclosed client session
-                    self.app.state.prefill_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.prefill_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
 
                 elif endpoint_info.model_label in self.decode_model_labels:
-                    # TODO: fix Unclosed client session
-                    self.app.state.decode_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.decode_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
 
 
@@ -1176,7 +1185,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
 
     async def initialize_client_sessions(self) -> None:
         """
-        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        Initialize httpx AsyncClient objects for prefill and decode endpoints.
         This must be called from an async context during app startup.
         """
         if (
@@ -1186,16 +1195,20 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             endpoint_infos = self.get_endpoint_info()
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
-                    # TODO: fix Unclosed client session
-                    self.app.state.prefill_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.prefill_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
                 elif endpoint_info.model_label in self.decode_model_labels:
-                    # TODO: fix Unclosed client session
-                    self.app.state.decode_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.decode_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
 
 

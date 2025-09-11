@@ -18,13 +18,14 @@ from fastapi import (
     BackgroundTasks,
     Request,
 )
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from vllm_router.dynamic_config import get_dynamic_config_watcher
 from vllm_router.log import init_logger
 from vllm_router.protocols import ModelCard, ModelList
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.request import (
+    route_disaggregated_prefill_request,
     route_general_request,
     route_general_transcriptions,
     route_sleep_wakeup_request,
@@ -57,6 +58,15 @@ async def route_chat_completion(request: Request, background_tasks: BackgroundTa
         if cache_response:
             logger.info("Serving response from semantic cache")
             return cache_response
+
+    # Check if using disaggregated prefill router
+    from vllm_router.routers.routing_logic import DisaggregatedPrefillRouter
+
+    if isinstance(request.app.state.router, DisaggregatedPrefillRouter):
+        # route_disaggregated_prefill_request now handles chat completions format conversion
+        return await route_disaggregated_prefill_request(
+            request, "/v1/chat/completions", background_tasks
+        )
 
     logger.debug("No cache hit, forwarding request to backend")
     return await route_general_request(
