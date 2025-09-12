@@ -100,10 +100,10 @@ start_router() {
         --static-model-labels "prefill,decode" \
         --session-key "$SESSION_KEY" \
         --routing-logic "$routing_logic" \
-        --nixl-peer-host "localhost" \
+        --nixl-peer-host "0.0.0.0" \
         --nixl-peer-init-port 7300 \
         --nixl-peer-alloc-port 7400 \
-        --nixl-proxy-host "localhost" \
+        --nixl-proxy-host "0.0.0.0" \
         --nixl-proxy-port 7500 > "$log_file" 2>&1 &
 
     ROUTER_PID=$!

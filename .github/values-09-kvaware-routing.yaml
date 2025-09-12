@@ -90,7 +90,8 @@ servingEngineSpec:
         - SYS_PTRACE
 
 routerSpec:
-  repository: "git-act-router"
+  repository: "xiaokunchen/vllm-router"
+  tag: "09-10-v9"
   imagePullPolicy: "IfNotPresent"
   strategy:
     type: Recreate
