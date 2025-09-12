@@ -450,10 +450,12 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             )
             for container in pod.spec.containers:
                 if container.name == "vllm":
-                    for arg in container.command:
-                        if arg == "--enable-sleep-mode":
-                            enable_sleep_mode = True
-                            break
+                    if (
+                        not container.command
+                        or "--enable-sleep-mode" in container.command
+                    ):
+                        enable_sleep_mode = True
+                    break
             return enable_sleep_mode
         except client.rest.ApiException as e:
             logger.error(
