@@ -552,7 +552,7 @@ class TtftRouter(RoutingInterface):
         try:
             if request_stats is None:
                 raise ValueError("no request stats was provided")
-            msg = FullLookupMsg(tokens=token_ids)
+            msg = FullLookupMsg(event_id="", tokens=token_ids)
             ret_msg = await self.kv_manager.handle_orchestration_message(msg)
             matched_infos = ret_msg.matched_info
             if matched_infos:
