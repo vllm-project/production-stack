@@ -484,7 +484,7 @@ class TtftRouter(RoutingInterface):
 
     DEFAULT_CACHE_TRANS_TIME: float = 0.01
 
-    class Component(enum.Enum):
+    class Component(int, enum.Enum):
         QUEUE = 0
         TRANSFER = 1
         COMPUTE = 2
