@@ -589,12 +589,10 @@ class TtftRouter(RoutingInterface):
 
     async def _find_best_ttft(self, endpoints, matched_infos, best_matched_info,
                               request_stats, num_prefix_tokens):
-        matched_stats = []
-        matched_urls = []
+
         components = [True] * TtftRouter.Component.LAST
-        for matched_info in matched_infos:
-            url = await self._get_instance_url(endpoints, matched_info[0])
-            stats = request_stats.get(url, None)
+        for endpoint in endpoints:
+            stats = request_stats.get(endpoint.url, None)
             if stats is None:
                 components[TtftRouter.Component.QUEUE] = False
                 components[TtftRouter.Component.COMPUTE] = False
@@ -602,6 +600,12 @@ class TtftRouter(RoutingInterface):
                 components[TtftRouter.Component.COMPUTE] = False
                 if stats.prefill_uncomputed_amount > 0:
                     components[TtftRouter.Component.QUEUE] = False
+
+        matched_stats = []
+        matched_urls = []
+        for matched_info in matched_infos:
+            url = await self._get_instance_url(endpoints, matched_info[0])
+            stats = request_stats.get(url, None)
             matched_urls.append(url)
             matched_stats.append(stats)
 
@@ -621,12 +625,9 @@ class TtftRouter(RoutingInterface):
         matched_url_set = set(matched_urls)
         not_matched_endpoints = [endpoint for endpoint in endpoints
                                  if endpoint.url not in matched_url_set]
-        components[TtftRouter.Component.COMPUTE] = False
         for endpoint in not_matched_endpoints:
             url = endpoint.url
             stats = request_stats.get(url, None)
-            if stats is None:
-                raise ValueError(f"{url} provides no request stats ")
             print(f"-------------- URL:{url} --------------")
             ttft = self._estimate_ttft(None, best_matched_info,
                                        stats, num_prefix_tokens, components)
@@ -662,8 +663,9 @@ class TtftRouter(RoutingInterface):
         ttft = queue_time + transfer_time + compute_time
 
         print(f"-------------- time estimations --------------")
-        print(f"prefill_uncomputed_amount: {stats.prefill_uncomputed_amount}")
-        print(f"engine_prefill_comp_speed: {stats.engine_prefill_comp_speed}")
+        if stats is not None:
+            print(f"prefill_uncomputed_amount: {stats.prefill_uncomputed_amount}")
+            print(f"engine_prefill_comp_speed: {stats.engine_prefill_comp_speed}")
         print(f"queue_time: {queue_time}")
         print(f"transfer_time: {transfer_time}")
         print(f"compute_time: {compute_time}")
