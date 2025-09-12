@@ -598,7 +598,7 @@ class TtftRouter(RoutingInterface):
             if stats is None:
                 components[TtftRouter.Component.QUEUE] = False
                 components[TtftRouter.Component.COMPUTE] = False
-            if stats.engine_prefill_comp_speed <= 0:
+            elif stats.engine_prefill_comp_speed <= 0:
                 components[TtftRouter.Component.COMPUTE] = False
                 if stats.prefill_uncomputed_amount > 0:
                     components[TtftRouter.Component.QUEUE] = False
