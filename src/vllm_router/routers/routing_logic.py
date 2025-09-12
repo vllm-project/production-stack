@@ -621,6 +621,7 @@ class TtftRouter(RoutingInterface):
         matched_url_set = set(matched_urls)
         not_matched_endpoints = [endpoint for endpoint in endpoints
                                  if endpoint.url not in matched_url_set]
+        components[TtftRouter.Component.COMPUTE] = False
         for endpoint in not_matched_endpoints:
             url = endpoint.url
             stats = request_stats.get(url, None)
