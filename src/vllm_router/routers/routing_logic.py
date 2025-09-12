@@ -484,6 +484,12 @@ class TtftRouter(RoutingInterface):
 
     DEFAULT_CACHE_TRANS_TIME: float = 0.01
 
+    class Component(enum.Enum):
+        QUEUE = 0
+        TRANSFER = 1
+        COMPUTE = 2
+        LAST = 3
+
     def __init__(
         self,
         lmcache_controller_port: int,
@@ -585,13 +591,17 @@ class TtftRouter(RoutingInterface):
                               request_stats, num_prefix_tokens):
         matched_stats = []
         matched_urls = []
+        components = [True] * TtftRouter.Component.LAST
         for matched_info in matched_infos:
             url = await self._get_instance_url(endpoints, matched_info[0])
             stats = request_stats.get(url, None)
             if stats is None:
-                raise ValueError(f"{url} provides no request stats ")
-            if stats.engine_prefill_comp_speed <= 0 or stats.prefill_uncomputed_amount < 0:
-                raise ValueError(f"{url} provides no way to forecasted queue time")
+                components[TtftRouter.Component.QUEUE] = False
+                components[TtftRouter.Component.COMPUTE] = False
+            if stats.engine_prefill_comp_speed <= 0:
+                components[TtftRouter.Component.COMPUTE] = False
+                if stats.prefill_uncomputed_amount > 0:
+                    components[TtftRouter.Component.QUEUE] = False
             matched_urls.append(url)
             matched_stats.append(stats)
 
@@ -601,7 +611,8 @@ class TtftRouter(RoutingInterface):
         for i, matched_info in enumerate(matched_infos):
             print(f"-------------- URL:{matched_urls[i]} --------------")
             ttft = self._estimate_ttft(matched_info, best_matched_info,
-                                       matched_stats[i], num_prefix_tokens)
+                                       matched_stats[i], num_prefix_tokens,
+                                       components)
             if best_ttft_url is None or ttft <= best_ttft:
                 best_ttft = ttft
                 best_ttft_url = matched_urls[i]
@@ -625,20 +636,27 @@ class TtftRouter(RoutingInterface):
             raise ValueError(f"no best TTFT instance was found")
         return best_ttft_url
 
-    def _estimate_ttft(self, matched_info, best_matched_info, stats, num_prefix_tokens):
+    def _estimate_ttft(self, matched_info, best_matched_info, stats, num_prefix_tokens, components):
         #
         # TODO take computation time of num_uncached_token into account
-        if stats.prefill_uncomputed_amount == 0:
+        if not components[TtftRouter.Component.QUEUE] or stats.prefill_uncomputed_amount == 0:
             queue_time = 0
         else:
             queue_time = (stats.prefill_uncomputed_amount /
                           stats.engine_prefill_comp_speed)
-        transfer_time = self._calc_transfer_time(matched_info, best_matched_info)
+        if components[TtftRouter.Component.TRANSFER]:
+            transfer_time = self._calc_transfer_time(matched_info, best_matched_info)
+        else:
+            transfer_time = 0
         num_cached_tokens = 0
         if matched_info is not None:
             num_cached_tokens = matched_info[1][-1][1]
-        compute_time = (self._calc_compute_amount(num_prefix_tokens, num_cached_tokens) /
-                        stats.engine_prefill_comp_speed)
+
+        if components[TtftRouter.Component.COMPUTE]:
+            compute_time = (self._calc_compute_amount(num_prefix_tokens, num_cached_tokens) /
+                            stats.engine_prefill_comp_speed)
+        else:
+            compute_time = 0
         ttft = queue_time + transfer_time + compute_time
 
         print(f"-------------- time estimations --------------")
