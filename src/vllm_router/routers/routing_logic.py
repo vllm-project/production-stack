@@ -555,13 +555,14 @@ class TtftRouter(RoutingInterface):
             msg = FullLookupMsg(event_id="", tokens=token_ids)
             ret_msg = await self.kv_manager.handle_orchestration_message(msg)
             matched_infos = ret_msg.matched_info
-            if matched_infos:
-                best_matched_info = self._find_best_matched(matched_infos)
-                best_ttft_url = await self._find_best_ttft(endpoints, matched_infos,
-                                                           best_matched_info, request_stats,
-                                                           len(token_ids))
-                cache_info.num_cached_tokens = best_matched_info[1][-1][1]
-                return best_ttft_url, cache_info
+            if matched_infos is None:
+                matched_infos = []
+            best_matched_info = self._find_best_matched(matched_infos)
+            best_ttft_url = await self._find_best_ttft(endpoints, matched_infos,
+                                                       best_matched_info, request_stats,
+                                                       len(token_ids))
+            cache_info.num_cached_tokens = best_matched_info[1][-1][1]
+            return best_ttft_url, cache_info
         except ValueError:
             logger.info("Fallback to QPS routing due to:")
             logger.info(traceback.format_exc())
@@ -569,6 +570,8 @@ class TtftRouter(RoutingInterface):
         return self._fallback_routing(endpoints, request_stats, request), cache_info
 
     def _find_best_matched(self, matched_infos):
+        if not matched_infos:
+            return None
         best_matched_info = None
         for instance_info in matched_infos:
             if best_matched_info is None or instance_info[1][-1][1] > best_matched_info[1][-1][1]:
@@ -666,7 +669,8 @@ class TtftRouter(RoutingInterface):
         return url
 
     def _calc_transfer_time(self, matched_info, best_matched_info):
-        return 0
+        if best_matched_info is None:
+            return 0
         transfer_time = 0
         for chunk in best_matched_info[1]:
             if matched_info is not None and chunk[1] <= matched_info[1][-1][1]:
