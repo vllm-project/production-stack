@@ -619,7 +619,8 @@ class TtftRouter(RoutingInterface):
 
         # cache not matched pass
         matched_url_set = set(matched_urls)
-        not_matched_endpoints = [endpoint for endpoint in endpoints if endpoint.url not in matched_url_set]
+        not_matched_endpoints = [endpoint for endpoint in endpoints
+                                 if endpoint.url not in matched_url_set]
         for endpoint in not_matched_endpoints:
             url = endpoint.url
             stats = request_stats.get(url, None)
@@ -627,7 +628,7 @@ class TtftRouter(RoutingInterface):
                 raise ValueError(f"{url} provides no request stats ")
             print(f"-------------- URL:{url} --------------")
             ttft = self._estimate_ttft(None, best_matched_info,
-                                       stats, num_prefix_tokens)
+                                       stats, num_prefix_tokens, components)
             if best_ttft_url is None or ttft <= best_ttft:
                 best_ttft = ttft
                 best_ttft_url = url
