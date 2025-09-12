@@ -561,7 +561,8 @@ class TtftRouter(RoutingInterface):
             best_ttft_url = await self._find_best_ttft(endpoints, matched_infos,
                                                        best_matched_info, request_stats,
                                                        len(token_ids))
-            cache_info.num_cached_tokens = best_matched_info[1][-1][1]
+            if best_matched_info:
+                cache_info.num_cached_tokens = best_matched_info[1][-1][1]
             return best_ttft_url, cache_info
         except ValueError:
             logger.info("Fallback to QPS routing due to:")
