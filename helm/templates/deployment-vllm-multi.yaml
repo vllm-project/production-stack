@@ -190,6 +190,8 @@ spec:
           {{- end }}
           imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
           env:
+          - name: PYTHONHASHSEED
+            value: "123"
           - name: HF_HOME
             {{- if hasKey $modelSpec "pvcStorage" }}
             value: /data
