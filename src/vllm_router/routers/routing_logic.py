@@ -352,12 +352,14 @@ class PrefixAwareRouter(RoutingInterface):
     In this class, we assume that there is no eviction of prefix cache.
     """
 
-    def __init__(self: int):
+    def __init__(self):
         if hasattr(self, "_initialized"):
             return
+        from vllm_router.prefix.config import HashTrieConfig
         from vllm_router.prefix.hashtrie import HashTrie
 
-        self.hashtrie = HashTrie()
+        config = HashTrieConfig.from_env()
+        self.hashtrie = HashTrie(config)
         self._initialized = True
 
     async def route_request(
