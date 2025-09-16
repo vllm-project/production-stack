@@ -3,7 +3,7 @@ servingEngineSpec:
   modelSpec:
   - name: "llama1"
     repository: "lmcache/vllm-openai"
-    tag: "2025-05-17-v1"
+    tag: "v0.3.5"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
     requestCPU: 6
@@ -19,9 +19,9 @@ servingEngineSpec:
       cpuOffloadingBufferSize: "60"
       enableController: true
       instanceId: "default1"
-      controllerPort: "9000"
+      controllerPort: 9000
       workerPort: 8001
-      distributedUrl: "localhost:8201"
+      distributedUrl: "localhost:30081"
 
     env:
       - name: LMCACHE_LOG_LEVEL
@@ -29,7 +29,7 @@ servingEngineSpec:
     hf_token: <HF_TOKEN>
   - name: "llama2"
     repository: "lmcache/vllm-openai"
-    tag: "2025-05-17-v1"
+    tag: "v0.3.5"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
     requestCPU: 6
@@ -45,9 +45,9 @@ servingEngineSpec:
       cpuOffloadingBufferSize: "60"
       enableController: true
       instanceId: "default2"
-      controllerPort: "9000"
+      controllerPort: 9000
       workerPort: 8002
-      distributedUrl: "localhost:8202"
+      distributedUrl: "localhost:30082"
 
     env:
       - name: LMCACHE_LOG_LEVEL
@@ -56,7 +56,7 @@ servingEngineSpec:
 
   - name: "llama3"
     repository: "lmcache/vllm-openai"
-    tag: "2025-05-17-v1"
+    tag: "v0.3.5"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
     requestCPU: 6
@@ -72,9 +72,9 @@ servingEngineSpec:
       cpuOffloadingBufferSize: "60"
       enableController: true
       instanceId: "default3"
-      controllerPort: "9000"
+      controllerPort: 9000
       workerPort: 8003
-      distributedUrl: "localhost:8203"
+      distributedUrl: "localhost:30083"
 
     env:
       - name: LMCACHE_LOG_LEVEL
@@ -82,7 +82,7 @@ servingEngineSpec:
     hf_token: <HF_TOKEN>
   - name: "llama4"
     repository: "lmcache/vllm-openai"
-    tag: "2025-05-17-v1"
+    tag: "v0.3.5"
     modelURL: "meta-llama/Llama-3.1-8B-Instruct"
     replicaCount: 1
     requestCPU: 6
@@ -100,7 +100,7 @@ servingEngineSpec:
       instanceId: "default4"
       controllerPort: "9000"
       workerPort: 8004
-      distributedUrl: "localhost:8204"
+      distributedUrl: "localhost:30084"
 
     env:
       - name: LMCACHE_LOG_LEVEL
