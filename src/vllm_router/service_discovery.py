@@ -226,6 +226,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.engines_id = [str(uuid.uuid4()) for i in range(0, len(urls))]
         self.added_timestamp = int(time.time())
         self.unhealthy_endpoint_hashes = []
+        self._running = True
         if static_backend_health_checks:
             self.start_health_check_task()
         self.prefill_model_labels = prefill_model_labels
@@ -250,10 +251,13 @@ class StaticServiceDiscovery(ServiceDiscovery):
         return unhealthy_endpoints
 
     async def check_model_health(self):
-        while True:
+        while self._running:
             try:
                 self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
-                time.sleep(60)
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                logger.debug("Health check task cancelled")
+                break
             except Exception as e:
                 logger.error(e)
 
@@ -339,6 +343,40 @@ class StaticServiceDiscovery(ServiceDiscovery):
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
+
+    def close(self):
+        """
+        Close the service discovery module and clean up health check resources.
+        """
+        self._running = False
+        if hasattr(self, "loop") and self.loop.is_running():
+            # Schedule a coroutine to gracefully shut down the event loop
+            async def shutdown():
+                tasks = [
+                    t
+                    for t in asyncio.all_tasks(self.loop)
+                    if t is not asyncio.current_task()
+                ]
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                self.loop.stop()
+
+            future = asyncio.run_coroutine_threadsafe(shutdown(), self.loop)
+            try:
+                future.result(timeout=15.0)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Timed out waiting for shutdown(loop might already be closed)"
+                )
+            except Exception as e:
+                logger.warning(f"Error during health check shutdown: {e}")
+
+        if hasattr(self, "thread") and self.thread.is_alive():
+            self.thread.join(timeout=5.0)
+
+        if hasattr(self, "loop") and not self.loop.is_closed():
+            self.loop.close()
 
 
 class K8sPodIPServiceDiscovery(ServiceDiscovery):
