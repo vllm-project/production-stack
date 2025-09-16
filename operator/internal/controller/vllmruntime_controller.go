@@ -202,7 +202,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 				Scheme: corev1.URISchemeHTTP,
 			},
 		},
-		InitialDelaySeconds: 30,
+		InitialDelaySeconds: 10,
 		PeriodSeconds:       20,
 		TimeoutSeconds:      5,
 		SuccessThreshold:    1,
@@ -217,11 +217,25 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 				Scheme: corev1.URISchemeHTTP,
 			},
 		},
-		InitialDelaySeconds: 300,
+		InitialDelaySeconds: 10,
 		PeriodSeconds:       20,
 		TimeoutSeconds:      3,
 		SuccessThreshold:    1,
 		FailureThreshold:    10,
+	}
+
+	startupProbe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path:   "/health",
+				Port:   intstr.FromInt(int(vllmRuntime.Spec.VLLMConfig.Port)),
+				Scheme: corev1.URISchemeHTTP,
+			},
+		},
+		InitialDelaySeconds: 120,
+		PeriodSeconds:       20,
+		TimeoutSeconds:      3,
+		FailureThreshold:    100,
 	}
 
 	// Build command line arguments
@@ -483,6 +497,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 			Resources:      resources,
 			VolumeMounts:   volumeMounts,
 			ReadinessProbe: readinessProbe,
+			StartupProbe:   startupProbe,
 			LivenessProbe:  livenessProbe,
 		},
 	}
