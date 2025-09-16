@@ -109,6 +109,7 @@ spec:
           {{- if or
             (eq $modelSpec.tag "2025-05-27-v1")
             (eq $modelSpec.tag "2025-05-17-v1")
+            (eq $modelSpec.tag "v0.3.5")
             (eq $modelSpec.tag "latest-nightly")
             (hasPrefix "nightly-" $modelSpec.tag)
             (and

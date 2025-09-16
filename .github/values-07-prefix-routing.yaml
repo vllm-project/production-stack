@@ -4,14 +4,43 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
     # Prefill node configuration
-    - name: "opt125m-prefill"
+    - name: "opt125m-1"
       repository: "lmcache/vllm-openai"
-      tag: "latest"
+      tag: "v0.3.5"
       modelURL: "facebook/opt-125m"
       replicaCount: 1
       requestCPU: 6
       requestMemory: "30Gi"
-      # requestGPU: 1
+      requestGPU: 1
+      pvcStorage: "50Gi"
+      vllmConfig:
+        enablePrefixCaching: true
+        maxModelLen: 1024
+        gpuMemoryUtilization: 0.8
+      lmcacheConfig:
+        enabled: true
+        cpuOffloadingBufferSize: "10"
+        enableController: true
+        instanceId: "default1"
+        controllerPort: 9000
+        workerPort: 8001
+        distributedUrl: "localhost:30081"
+      env:
+        - name: LMCACHE_LOG_LEVEL
+          value: "DEBUG"
+      chatTemplate: "chat.jinja2"
+      chatTemplateConfigMap: |-
+        {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
+        {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
+    # Decode node configuration
+    - name: "opt125m-2"
+      repository: "lmcache/vllm-openai"
+      tag: "v0.3.5"
+      modelURL: "facebook/opt-125m"
+      replicaCount: 1
+      requestCPU: 6
+      requestMemory: "30Gi"
+      requestGPU: 1
       pvcStorage: "50Gi"
       vllmConfig:
         enablePrefixCaching: true
@@ -19,60 +48,16 @@ servingEngineSpec:
         v1: 1
         gpuMemoryUtilization: 0.6
       lmcacheConfig:
-        cudaVisibleDevices: "0"
         enabled: true
-        kvRole: "kv_producer"
-        enableNixl: true
-        nixlRole: "sender"
-        nixlPeerHost: "vllm-opt125m-decode-engine-service"
-        nixlPeerPort: "55555"
-        nixlBufferSize: "1073741824"  # 1GB
-        nixlBufferDevice: "cuda"
-        nixlEnableGc: true
-        enablePD: true
-        cpuOffloadingBufferSize: 0
+        cpuOffloadingBufferSize: "10"
         enableController: true
-        controllerPort: 9000
-        workerPort: 8001
-        distributedUrl: "localhost:30081"
-      labels:
-        model: "opt125m-prefill"
-      chatTemplate: "chat.jinja2"
-      chatTemplateConfigMap: |-
-        {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
-        {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
-    # Decode node configuration
-    - name: "opt125m-decode"
-      repository: "lmcache/vllm-openai"
-      tag: "latest"
-      modelURL: "facebook/opt-125m"
-      replicaCount: 1
-      requestCPU: 6
-      requestMemory: "30Gi"
-      # requestGPU: 1
-      pvcStorage: "50Gi"
-      vllmConfig:
-        enablePrefixCaching: true
-        maxModelLen: 1024
-        v1: 1
-      lmcacheConfig:
-        cudaVisibleDevices: "1"
-        enabled: true
-        kvRole: "kv_consumer"  # Set decode node as consumer
-        enableNixl: true
-        nixlRole: "receiver"
-        nixlPeerHost: "0.0.0.0"
-        nixlPeerPort: "55555"
-        nixlBufferSize: "1073741824"  # 1GB
-        nixlBufferDevice: "cuda"
-        nixlEnableGc: true
-        enablePD: true
-        enableController: true
+        instanceId: "default2"
         controllerPort: 9000
         workerPort: 8002
         distributedUrl: "localhost:30082"
-      labels:
-        model: "opt125m-decode"
+      env:
+        - name: LMCACHE_LOG_LEVEL
+          value: "DEBUG"
       chatTemplate: "chat.jinja2"
       chatTemplateConfigMap: |-
         {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
@@ -87,6 +72,13 @@ routerSpec:
   imagePullPolicy: "IfNotPresent"
   strategy:
     type: Recreate
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2G"
+    limits:
+      cpu: "1"
+      memory: "2G"
   enableRouter: true
   routingLogic: "prefixaware"
   extraArgs:
