@@ -233,6 +233,11 @@ def parse_args():
         help="The tokenizer model.",
     )
     parser.add_argument(
+        "--enable-shared-cache",
+        action="store_true",
+        help="Enable shared KV Cache.",
+    )
+    parser.add_argument(
         "--callbacks",
         type=str,
         default=None,

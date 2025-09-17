@@ -22,6 +22,13 @@ from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 
+def calc_compute_amount(num_prefix_tokens, num_cached_tokens):
+    top = num_cached_tokens + 1
+    bottom = num_prefix_tokens
+    height = num_prefix_tokens - num_cached_tokens
+    return (top + bottom) * height // 2
+
+
 class SingletonMeta(type):
     _instances = {}
 
@@ -350,8 +357,6 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             else:
                 swapped = 0
 
-
-            engine_prefill_comp_speed = self._calc_engine_prefill_comp_speed(current_time, engine_url)
             prefill_uncomputed_amount = self._get_prefill_uncomputed_amount(engine_url)
 
             ret[engine_url] = RequestStats(
@@ -367,46 +372,17 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
                 avg_latency=avg_lat,
                 avg_itl=avg_itl_val,
                 num_swapped_requests=swapped,
-                engine_prefill_comp_speed=engine_prefill_comp_speed,
                 prefill_uncomputed_amount=prefill_uncomputed_amount,
             )
         return ret
-
-    def _calc_engine_prefill_comp_speed(self, current_time: float, engine_url: str) -> float:
-        min_start_time = current_time - self.sliding_window_size
-        prefill_periods = TimePeriods()
-        total_comp_amount = 0
-        for (url, request_id), start_time in self.request_start_time.items():
-            if url != engine_url or start_time < min_start_time:
-                continue
-            if ((url, request_id) not in self.first_token_time or
-                    (url, request_id) not in self.cache_infos):
-                continue
-
-            cache_info = self.cache_infos[(url, request_id)]
-            computed_tokens = cache_info.num_prefix_tokens - cache_info.num_cached_tokens
-            if computed_tokens > 0:
-                prefill_periods.union(start_time, self.first_token_time[(url, request_id)])
-                # find computation amount by trapezoid area formula
-                top = cache_info.num_cached_tokens + 1
-                bottom = cache_info.num_prefix_tokens
-                height = computed_tokens
-                total_comp_amount += (top + bottom) * height // 2
-
-        length = prefill_periods.compute_length()
-        if length > 0:
-            return total_comp_amount / length
-        return -1
 
     def _get_prefill_uncomputed_amount(self, engine_url: str) -> int:
         amount = 0
         for (url, request_id), cache_info in self.cache_infos.items():
             if url != engine_url or (url, request_id) in self.first_token_time:
                 continue
-            top = cache_info.num_cached_tokens + 1
-            bottom = cache_info.num_prefix_tokens
-            height = cache_info.num_prefix_tokens - cache_info.num_cached_tokens
-            amount += (top + bottom) * height // 2
+            amount += calc_compute_amount(cache_info.num_prefix_tokens,
+                                          cache_info.num_cached_tokens)
         return amount
 
 

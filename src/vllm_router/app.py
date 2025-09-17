@@ -219,6 +219,7 @@ def initialize_all(app: FastAPI, args):
         decode_model_labels=args.decode_model_labels,
         kv_aware_threshold=args.kv_aware_threshold,
         tokenizer=args.tokenizer,
+        enable_shared_cache=args.enable_shared_cache,
         instance_id_to_url=create_instance_id_to_url(args.lmcache_instances,
                                                      args.static_backends),
     )

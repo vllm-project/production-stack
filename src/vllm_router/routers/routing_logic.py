@@ -42,7 +42,7 @@ from uhashring import HashRing
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import EndpointInfo
 from vllm_router.stats.engine_stats import EngineStats
-from vllm_router.stats.request_stats import RequestStats, RequestStatsCacheInfo
+from vllm_router.stats.request_stats import RequestStats, RequestStatsCacheInfo, calc_compute_amount
 from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)
@@ -495,6 +495,7 @@ class TtftRouter(RoutingInterface):
         lmcache_controller_port: int,
         session_key: str,
         tokenizer_name: Optional[str] = None,
+        enable_shared_cache : bool = False,
         instance_id_to_url: Optional[Dict[str, str]] = None,
     ):
         logger.info(
@@ -511,6 +512,7 @@ class TtftRouter(RoutingInterface):
         self.hash_ring = HashRing()
         self.tokenizer_name = tokenizer_name
         self.tokenizer = None
+        self.enable_shared_cache = enable_shared_cache
         self.cached_prefix_tokens = None
 
     def start_kv_manager(self):
@@ -563,13 +565,19 @@ class TtftRouter(RoutingInterface):
             matched_infos = ret_msg.matched_info
             if matched_infos is None:
                 matched_infos = []
-            best_matched_info = self._find_best_matched(matched_infos)
-            best_ttft_url = await self._find_best_ttft(endpoints, matched_infos,
-                                                       best_matched_info, request_stats,
-                                                       len(token_ids))
+            if self.enable_shared_cache:
+                best_matched_info = self._find_best_matched(matched_infos)
+            else:
+                best_matched_info = None
+            best_inst_url, num_cached_tokens = \
+                await self._find_best_inst(endpoints, matched_infos,
+                                           best_matched_info, request_stats,
+                                           len(token_ids))
             if best_matched_info:
-                cache_info.num_cached_tokens = best_matched_info[1][-1][1]
-            return best_ttft_url, cache_info
+                cache_info.num_cached_tokens = num_cached_tokens
+            else:
+
+            return best_inst_url, cache_info
         except ValueError:
             logger.info("Fallback to QPS routing due to:")
             logger.info(traceback.format_exc())
@@ -587,20 +595,8 @@ class TtftRouter(RoutingInterface):
             raise ValueError("no best matched instance was found")
         return best_matched_info
 
-    async def _find_best_ttft(self, endpoints, matched_infos, best_matched_info,
+    async def _find_best_inst(self, endpoints, matched_infos, best_matched_info,
                               request_stats, num_prefix_tokens):
-
-        components = [True] * TtftRouter.Component.LAST
-        for endpoint in endpoints:
-            stats = request_stats.get(endpoint.url, None)
-            if stats is None:
-                components[TtftRouter.Component.QUEUE] = False
-                components[TtftRouter.Component.COMPUTE] = False
-            elif stats.engine_prefill_comp_speed <= 0:
-                components[TtftRouter.Component.COMPUTE] = False
-                if stats.prefill_uncomputed_amount > 0:
-                    components[TtftRouter.Component.QUEUE] = False
-
         matched_stats = []
         matched_urls = []
         for matched_info in matched_infos:
@@ -610,16 +606,17 @@ class TtftRouter(RoutingInterface):
             matched_stats.append(stats)
 
         # cache matched pass
-        best_ttft = float('inf')
-        best_ttft_url = None
+        best_workload = float('inf')
+        best_workload_url = None
+        best_workload_cached_tokens = 0
         for i, matched_info in enumerate(matched_infos):
             print(f"-------------- URL:{matched_urls[i]} --------------")
-            ttft = self._estimate_ttft(matched_info, best_matched_info,
-                                       matched_stats[i], num_prefix_tokens,
-                                       components)
-            if best_ttft_url is None or ttft <= best_ttft:
-                best_ttft = ttft
-                best_ttft_url = matched_urls[i]
+            workload, cached_tokens = self._estimate_workload(matched_info, best_matched_info,
+                                                              matched_stats[i], num_prefix_tokens)
+            if best_workload_url is None or workload <= best_workload:
+                best_workload = workload
+                best_workload_url = matched_urls[i]
+                best_workload_cached_tokens = cached_tokens
 
         # cache not matched pass
         matched_url_set = set(matched_urls)
@@ -629,48 +626,26 @@ class TtftRouter(RoutingInterface):
             url = endpoint.url
             stats = request_stats.get(url, None)
             print(f"-------------- URL:{url} --------------")
-            ttft = self._estimate_ttft(None, best_matched_info,
-                                       stats, num_prefix_tokens, components)
-            if best_ttft_url is None or ttft <= best_ttft:
-                best_ttft = ttft
-                best_ttft_url = url
+            workload, cached_tokens = self._estimate_workload(None, best_matched_info,
+                                                              stats, num_prefix_tokens)
+            if best_workload_url is None or workload <= best_workload:
+                best_workload = workload
+                best_workload_url = url
+                best_workload_cached_tokens = cached_tokens
 
-        if best_ttft_url is None:
-            raise ValueError(f"no best TTFT instance was found")
-        return best_ttft_url
+        if best_workload_url is None:
+            raise ValueError(f"no best instance was found")
+        return best_workload_url, best_workload_cached_tokens
 
-    def _estimate_ttft(self, matched_info, best_matched_info, stats, num_prefix_tokens, components):
-        #
-        # TODO take computation time of num_uncached_token into account
-        if not components[TtftRouter.Component.QUEUE] or stats.prefill_uncomputed_amount == 0:
-            queue_time = 0
-        else:
-            queue_time = (stats.prefill_uncomputed_amount /
-                          stats.engine_prefill_comp_speed)
-        if components[TtftRouter.Component.TRANSFER]:
-            transfer_time = self._calc_transfer_time(matched_info, best_matched_info)
-        else:
-            transfer_time = 0
-        num_cached_tokens = 0
-        if matched_info is not None:
-            num_cached_tokens = matched_info[1][-1][1]
-
-        if components[TtftRouter.Component.COMPUTE]:
-            compute_time = (self._calc_compute_amount(num_prefix_tokens, num_cached_tokens) /
-                            stats.engine_prefill_comp_speed)
-        else:
-            compute_time = 0
-        ttft = queue_time + transfer_time + compute_time
-
-        print(f"-------------- time estimations --------------")
-        if stats is not None:
-            print(f"prefill_uncomputed_amount: {stats.prefill_uncomputed_amount}")
-            print(f"engine_prefill_comp_speed: {stats.engine_prefill_comp_speed}")
-        print(f"queue_time: {queue_time}")
-        print(f"transfer_time: {transfer_time}")
-        print(f"compute_time: {compute_time}")
-        print(f"ttft: {ttft}")
-        return ttft
+    def _estimate_workload(self, matched_info, best_matched_info, stats, num_prefix_tokens):
+        num_cache_tokens = 0
+        if best_matched_info is not None:
+            num_cache_tokens = best_matched_info[1][-1][1]
+        elif matched_info is not None:
+            num_cache_tokens = matched_info[1][-1][1]
+        amount = (stats.prefill_uncomputed_amount +
+                  calc_compute_amount(num_prefix_tokens, num_cache_tokens))
+        return amount, num_cache_tokens
 
     async def _get_instance_url(self, endpoints, instance_id):
         url = self.instance_id_to_url.get(instance_id, None)
@@ -690,18 +665,6 @@ class TtftRouter(RoutingInterface):
         if url is None:
             raise ValueError(f"cannot resolve URL for {instance_id}")
         return url
-
-    def _calc_transfer_time(self, matched_info, best_matched_info):
-        if best_matched_info is None:
-            return 0
-        transfer_time = 0
-        for chunk in best_matched_info[1]:
-            if matched_info is not None and chunk[1] <= matched_info[1][-1][1]:
-                continue
-            # TODO chunk transfer time measured realtime inside vllm engine
-            transfer_time += self.CACHE_LOC_TO_TRANS_TIME.get(chunk[0],
-                                                              self.DEFAULT_CACHE_TRANS_TIME)
-        return transfer_time
 
     def _calc_compute_amount(self, num_prefix_tokens, num_cached_tokens):
         top = num_cached_tokens + 1
@@ -760,6 +723,7 @@ def initialize_routing_logic(
             kwargs.get("lmcache_controller_port"),
             kwargs.get("session_key"),
             kwargs.get("tokenizer"),
+            kwargs.get("enable_shared_cache"),
             kwargs.get("instance_id_to_url"),
         )
         router.start_kv_manager()
