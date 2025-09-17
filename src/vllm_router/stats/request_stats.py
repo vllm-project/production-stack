@@ -62,44 +62,8 @@ class RequestStats:
     avg_itl: float
     # Number of swapped requests (moved from GPU to CPU)
     num_swapped_requests: int
-    # Engine prefill computation speed
-    engine_prefill_comp_speed: float
-    # Unfinished prefill workload
+    # Unfinished prefill computation workload
     prefill_todo_workload: int
-
-
-class TimePeriods:
-    """
-    Utility for computing length of overlapping time periods.
-    """
-    def __init__(self):
-        self.periods: List[Tuple[float, float]] = []
-
-    def union(self, begin: float, end: float):
-        overlap_periods = []
-        for i, period in enumerate(self.periods):
-            if ((begin >= period[0] and begin <= period[1]) or \
-                    (end >= period[0] and end <= period[1])) or \
-                ((period[0] >= begin and period[0] <= end) or \
-                 (period[1] >= begin and period[1] <= end)):
-                self.periods[i] = (min(period[0], begin), max(period[1], end))
-                overlap_periods.append(i)
-        if len(overlap_periods) == 0:
-            self.periods.append((begin, end))
-            return
-        if len(overlap_periods) == 1:
-            return
-        # merge all overlapping periods
-        merge_begin = min([self.periods[i][0] for i in overlap_periods])
-        merge_end = max([self.periods[i][1] for i in overlap_periods])
-
-        remove_indices = set(overlap_periods)
-        new_periods = [period for i, period in enumerate(self.periods) if i not in remove_indices]
-        self.periods = new_periods
-        self.periods.append((merge_begin, merge_end))
-
-    def compute_length(self) -> float:
-        return sum([period[1] - period[0] for period in self.periods])
 
 
 class MovingAverageMonitor:
