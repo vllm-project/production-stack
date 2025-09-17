@@ -42,7 +42,7 @@ from uhashring import HashRing
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import EndpointInfo
 from vllm_router.stats.engine_stats import EngineStats
-from vllm_router.stats.request_stats import RequestStats, RequestStatsCacheInfo, calc_compute_amount
+from vllm_router.stats.request_stats import RequestStats, RequestStatsCacheInfo, prefill_workload
 from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)
@@ -477,19 +477,6 @@ class TtftRouter(RoutingInterface):
     Route the request to the qppropriate engine URL by the least estimated TTFT.
     """
 
-    CACHE_LOC_TO_TRANS_TIME: Dict[str, float] = {
-        "LocalCPUBackend": 0.01,
-        "LocalDiskBackend": 0.015,
-    }
-
-    DEFAULT_CACHE_TRANS_TIME: float = 0.01
-
-    class Component(int, enum.Enum):
-        QUEUE = 0
-        TRANSFER = 1
-        COMPUTE = 2
-        LAST = 3
-
     def __init__(
         self,
         lmcache_controller_port: int,
@@ -638,14 +625,15 @@ class TtftRouter(RoutingInterface):
         return best_workload_url, best_workload_cached_tokens
 
     def _estimate_workload(self, matched_info, best_matched_info, stats, num_prefix_tokens):
+        """Estimate prefill workload."""
         num_cache_tokens = 0
         if best_matched_info is not None:
             num_cache_tokens = best_matched_info[1][-1][1]
         elif matched_info is not None:
             num_cache_tokens = matched_info[1][-1][1]
-        amount = (stats.prefill_uncomputed_amount +
-                  calc_compute_amount(num_prefix_tokens, num_cache_tokens))
-        return amount, num_cache_tokens
+        workload = (stats.prefill_todo_workload +
+                    prefill_workload(num_prefix_tokens, num_cache_tokens))
+        return workload, num_cache_tokens
 
     async def _get_instance_url(self, endpoints, instance_id):
         url = self.instance_id_to_url.get(instance_id, None)
@@ -665,12 +653,6 @@ class TtftRouter(RoutingInterface):
         if url is None:
             raise ValueError(f"cannot resolve URL for {instance_id}")
         return url
-
-    def _calc_compute_amount(self, num_prefix_tokens, num_cached_tokens):
-        top = num_cached_tokens + 1
-        bottom = num_prefix_tokens
-        height = num_prefix_tokens - num_cached_tokens
-        return (top + bottom) * height // 2
 
     def _fallback_routing(self, endpoints, request_stats, request):
         session_id = request.headers.get(self.session_key, None)

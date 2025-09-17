@@ -22,7 +22,8 @@ from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 
-def calc_compute_amount(num_prefix_tokens, num_cached_tokens):
+def prefill_workload(num_prefix_tokens, num_cached_tokens):
+    """Calculate prefill workload with trapezoid area formula"""
     top = num_cached_tokens + 1
     bottom = num_prefix_tokens
     height = num_prefix_tokens - num_cached_tokens
@@ -63,8 +64,8 @@ class RequestStats:
     num_swapped_requests: int
     # Engine prefill computation speed
     engine_prefill_comp_speed: float
-    # prefill uncomputed amount
-    prefill_uncomputed_amount: int
+    # Unfinished prefill workload
+    prefill_todo_workload: int
 
 
 class TimePeriods:
@@ -357,7 +358,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             else:
                 swapped = 0
 
-            prefill_uncomputed_amount = self._get_prefill_uncomputed_amount(engine_url)
+            prefill_todo_workload = self._get_prefill_todo_workload(engine_url)
 
             ret[engine_url] = RequestStats(
                 qps=qps,
@@ -372,17 +373,17 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
                 avg_latency=avg_lat,
                 avg_itl=avg_itl_val,
                 num_swapped_requests=swapped,
-                prefill_uncomputed_amount=prefill_uncomputed_amount,
+                prefill_todo_workload=prefill_todo_workload,
             )
         return ret
 
-    def _get_prefill_uncomputed_amount(self, engine_url: str) -> int:
+    def _get_prefill_todo_workload(self, engine_url: str) -> int:
         amount = 0
         for (url, request_id), cache_info in self.cache_infos.items():
             if url != engine_url or (url, request_id) in self.first_token_time:
                 continue
-            amount += calc_compute_amount(cache_info.num_prefix_tokens,
-                                          cache_info.num_cached_tokens)
+            amount += prefill_workload(cache_info.num_prefix_tokens,
+                                       cache_info.num_cached_tokens)
         return amount
 
 
