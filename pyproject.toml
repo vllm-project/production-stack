@@ -42,7 +42,7 @@ semantic_cache = [
     "huggingface-hub==0.34.0",
 ]
 lmcache = [
-    "lmcache==0.3.5",
+    "lmcache==0.3.6",
 ]
 
 [build-system]
