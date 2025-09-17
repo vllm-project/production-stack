@@ -23,7 +23,7 @@ logger = init_logger(__name__)
 
 
 def prefill_workload(num_prefix_tokens, num_cached_tokens):
-    """Calculate prefill workload with trapezoid area formula"""
+    """Calculate prefill computation workload with trapezoid area formula"""
     top = num_cached_tokens + 1
     bottom = num_prefix_tokens
     height = num_prefix_tokens - num_cached_tokens
