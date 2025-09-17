@@ -563,8 +563,7 @@ class TtftRouter(RoutingInterface):
             if best_matched_info:
                 cache_info.num_cached_tokens = num_cached_tokens
             else:
-
-            return best_inst_url, cache_info
+                return best_inst_url, cache_info
         except ValueError:
             logger.info("Fallback to QPS routing due to:")
             logger.info(traceback.format_exc())
