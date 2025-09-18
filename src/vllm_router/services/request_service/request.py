@@ -585,22 +585,16 @@ async def route_general_transcriptions(
 
     endpoints = service_discovery.get_endpoint_info()
 
-    logger.debug("==== Total endpoints ====")
-    logger.debug(endpoints)
-    logger.debug("==== Total endpoints ====")
-
-    # filter the endpoints url by model name and label for transcriptions
-    transcription_endpoints = [
-        ep
-        for ep in endpoints
-        if model == ep.model_name
-        and ep.model_label == "transcription"
-        and not ep.sleep  # Added ep.sleep == False
-    ]
-
-    logger.debug("====List of transcription endpoints====")
-    logger.debug(transcription_endpoints)
-    logger.debug("====List of transcription endpoints====")
+    # filter the endpoints url by model name and model label for transcriptions
+    transcription_endpoints = []
+    for ep in endpoints:
+        for model_name in ep.model_names:
+            if (
+                model == model_name
+                and ep.model_label == "transcription"
+                and not ep.sleep
+            ):
+                transcription_endpoints.append(ep)
 
     if not transcription_endpoints:
         logger.error("No transcription backend available for model %s", model)
@@ -639,10 +633,6 @@ async def route_general_transcriptions(
         data["temperature"] = str(temperature)
 
     logger.info("Proxying transcription request for model %s to %s", model, chosen_url)
-
-    logger.debug("==== data payload keys ====")
-    logger.debug(list(data.keys()))
-    logger.debug("==== data payload keys ====")
 
     try:
         client = request.app.state.aiohttp_client_wrapper()
@@ -706,4 +696,10 @@ async def route_general_transcriptions(
         return JSONResponse(
             status_code=503,
             content={"error": f"Failed to connect to backend: {str(client_error)}"},
+        )
+    except Exception as e:
+        logger.error(e)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error"},
         )
