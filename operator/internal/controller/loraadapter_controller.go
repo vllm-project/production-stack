@@ -591,7 +591,13 @@ func (r *LoraAdapterReconciler) loadAdapter(ctx context.Context, podName, namesp
 	}
 
 	_, err = r.sendRequest(ctx, "POST", endpoint, payload, adapter)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Trigger pod modify event
+	r.triggerPodEvent(ctx, podName, namespace)
+	return nil
 }
 
 // unloadAdapter unloads a LoRA adapter from a specific pod
@@ -606,7 +612,30 @@ func (r *LoraAdapterReconciler) unloadAdapter(ctx context.Context, podName, name
 	}
 
 	_, err = r.sendRequest(ctx, "POST", endpoint, payload, adapter)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Trigger pod modify event
+	r.triggerPodEvent(ctx, podName, namespace)
+	return nil
+}
+
+// triggerPodEvent triggers a modify event for a pod
+func (r *LoraAdapterReconciler) triggerPodEvent(ctx context.Context, podName, namespace string) {
+	pod := &corev1.Pod{}
+	if err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: namespace}, pod); err != nil {
+		return
+	}
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations["lora-modified"] = time.Now().Format(time.RFC3339Nano)
+	logger := logf.FromContext(ctx)
+	logger.Info("Triggering pod event", "pod", podName, "namespace", namespace)
+	if err := r.Update(ctx, pod); err != nil {
+		logger.Error(err, "Failed to update pod", "pod", podName, "namespace", namespace)
+	}
 }
 
 // getAdapterRegistrations gets the current adapter registrations from all pods
