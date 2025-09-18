@@ -10,4 +10,4 @@ Run this command from the root folder path of the project:
 
 .. code-block:: bash
 
-   docker build -t <image_name>:<tag> -f docker/Dockerfile .
+   docker build -t <image_name>:<tag> -f docker/Dockerfile.pd .

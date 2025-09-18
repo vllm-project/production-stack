@@ -183,7 +183,11 @@ spec:
           {{-   if $modelSpec.lmcacheConfig.enabled }}
           {{-     if hasKey $modelSpec.lmcacheConfig "enablePD" }}
           - "--kv-transfer-config"
-          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}","kv_connector_extra_config":{"discard_partial_chunks": false, "lmcache_rpc_port": {{ $modelSpec.lmcacheConfig.nixlRole | quote }}}}'
+          {{-       if eq $kv_role "kv_producer" }}
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}","kv_connector_extra_config":{"discard_partial_chunks": false, "lmcache_rpc_port": "{{ $modelSpec.lmcacheConfig.rpcPort | default "producer1" }}"}}'
+          {{-       else }}
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}","kv_connector_extra_config":{"discard_partial_chunks": false, "lmcache_rpc_port": "{{ $modelSpec.lmcacheConfig.rpcPort | default "consumer1" }}", "skip_last_n_tokens": {{ $modelSpec.lmcacheConfig.skipLastNTokens | default 1 }}}}'
+          {{-       end }}
           {{-     else if and (hasKey $modelSpec.vllmConfig "v0") (eq (toString $modelSpec.vllmConfig.v0) "1") }}
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
@@ -259,16 +263,18 @@ spec:
             value: "True"
           - name: VLLM_RPC_TIMEOUT
             value: "1000000"
+          - name: PYTHONHASHSEED
+            value: "0"
+          - name: VLLM_ENABLE_V1_MULTIPROCESSING
+            value: "1"
+          - name: VLLM_WORKER_MULTIPROC_METHOD
+            value: "spawn"
           {{-   end }}
           {{- if hasKey $modelSpec.lmcacheConfig "cudaVisibleDevices" }}
           - name: CUDA_VISIBLE_DEVICES
             value: {{ $modelSpec.lmcacheConfig.cudaVisibleDevices | quote }}
           {{-   end }}
           {{-   if and (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
-          - name: LMCACHE_LOCAL_CPU
-            value: "False"
-          - name: LMCACHE_MAX_LOCAL_CPU_SIZE
-            value: "0"
           - name: LMCACHE_REMOTE_SERDE
             value: "NULL"
           - name: UCX_TLS
@@ -281,14 +287,29 @@ spec:
           - name: LMCACHE_NIXL_ROLE
             value: {{ $modelSpec.lmcacheConfig.nixlRole | quote }}
           {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "enableXpyd" }}
+          - name: LMCACHE_ENABLE_XPYD
+            value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.enableXpyd | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlProxyHost" }}
+          - name: LMCACHE_NIXL_PROXY_HOST
+            value: {{ $modelSpec.lmcacheConfig.nixlProxyHost | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlProxyPort" }}
+          - name: LMCACHE_NIXL_PROXY_PORT
+            value: {{ $modelSpec.lmcacheConfig.nixlProxyPort | quote }}
+          {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "nixlPeerHost" }}
-          - name: LMCACHE_NIXL_RECEIVER_HOST
-            # value:  "0.0.0.0"
+          - name: LMCACHE_NIXL_PEER_HOST
             value: {{ $modelSpec.lmcacheConfig.nixlPeerHost | quote }}
           {{-   end }}
-          {{-   if hasKey $modelSpec.lmcacheConfig "nixlPeerPort" }}
-          - name: LMCACHE_NIXL_RECEIVER_PORT
-            value: {{ $modelSpec.lmcacheConfig.nixlPeerPort | quote }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlPeerInitPort" }}
+          - name: LMCACHE_NIXL_PEER_INIT_PORT
+            value: {{ $modelSpec.lmcacheConfig.nixlPeerInitPort | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlPeerAllocPort" }}
+          - name: LMCACHE_NIXL_PEER_ALLOC_PORT
+            value: {{ $modelSpec.lmcacheConfig.nixlPeerAllocPort | quote }}
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "nixlBufferSize" }}
           - name: LMCACHE_NIXL_BUFFER_SIZE
@@ -298,22 +319,26 @@ spec:
           - name: LMCACHE_NIXL_BUFFER_DEVICE
             value: {{ $modelSpec.lmcacheConfig.nixlBufferDevice | quote }}
           {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "nixlBackends" }}
+          - name: LMCACHE_NIXL_BACKENDS
+            value: {{ $modelSpec.lmcacheConfig.nixlBackends | toJson | quote }}
+          {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "nixlEnableGc" }}
           - name: LMCACHE_NIXL_ENABLE_GC
             value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.nixlEnableGc | quote }}
           {{-   end }}
           {{-   end }}
-          {{-   if hasKey $modelSpec.lmcacheConfig "cpuOffloadingBufferSize" }}
-          {{-     if gt (int $modelSpec.lmcacheConfig.cpuOffloadingBufferSize) 0 }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "localCpu" }}
           - name: LMCACHE_LOCAL_CPU
-            value: "True"
-          - name: LMCACHE_MAX_LOCAL_CPU_SIZE
-            value: "{{ $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}"
-          {{-     end}}
+            value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.localCpu | quote }}
           {{-   end }}
-          {{-   if hasKey $modelSpec.lmcacheConfig "diskOffloadingBufferSize" }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "maxLocalCpuSize" }}
+          - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+            value: {{ $modelSpec.lmcacheConfig.maxLocalCpuSize | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "maxLocalDiskSize" }}
           - name: LMCACHE_MAX_LOCAL_DISK_SIZE
-            value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
+            value: {{ $modelSpec.lmcacheConfig.maxLocalDiskSize | quote }}
           {{-   end }}
           {{-   if .Values.cacheserverSpec }}
           - name: LMCACHE_REMOTE_URL
@@ -360,6 +385,16 @@ spec:
               containerPort: 55555
             - name: ucx-port
               containerPort: 9999
+            - name: pd-port-1
+              containerPort: 7100
+            - name: pd-port-2
+              containerPort: 7200
+            - name: pd-port-3
+              containerPort: 7300
+            - name: pd-port-4
+              containerPort: 7400
+            - name: pd-port-5
+              containerPort: 7500
           {{- include "chart.probes" . | indent 10 }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
           {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
