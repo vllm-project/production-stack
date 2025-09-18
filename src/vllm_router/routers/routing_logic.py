@@ -292,7 +292,7 @@ class KvawareRouter(RoutingInterface):
         try:
             if self.tokenizer is None:
                 self.tokenizer = AutoTokenizer.from_pretrained(endpoints[0].model_names[0])
-            token_ids = self.tokenizer.encode(request_json["prompt"])
+            token_ids = self.tokenizer.encode(request_json.get("prompt", ""))
         except Exception:
             # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
             remote_url = endpoints[0].url + "/tokenize"
