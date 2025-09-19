@@ -413,8 +413,13 @@ spec:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
+        {{- if and (kindIs "map" $modelSpec.pvcStorage) (hasKey $modelSpec.pvcStorage "emptyDir") }}
+          emptyDir:
+            {{- toYaml $modelSpec.pvcStorage.emptyDir | nindent 12 }}
+        {{- else if kindIs "string" $modelSpec.pvcStorage }}
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
+        {{- end }}
         {{- end }}
         {{- if hasKey $.Values "sharedPvcStorage" }}
         - name: {{ .Release.Name }}-shared-pvc-storage
