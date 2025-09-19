@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webapp
+  namespace: default
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing   # or "internal"
+    alb.ingress.kubernetes.io/target-type: ip          # works with Calico overlay
+    # optional: pick a security-group created by Terraform
+    alb.ingress.kubernetes.io/security-groups: sg-0123456789abcdef0
+spec:
+  ingressClassName: alb          # <-- tells the ALB controller to act
+  rules:
+    - host: myapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webapp-svc
+                port:
+                  number: 80
+

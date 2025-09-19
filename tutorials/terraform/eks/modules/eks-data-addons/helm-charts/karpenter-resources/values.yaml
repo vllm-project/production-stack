@@ -1,0 +1,45 @@
+# Shared values
+name: default
+clusterName: test-cluster
+
+# EC2NodeClass specific values
+ec2NodeClass:
+  enabled: true
+  amiSelectorTerms:
+    - alias: "bottlerocket@latest"
+  subnetSelectorTerms: # tags or id see documentation, https://karpenter.sh/docs/concepts/nodeclasses/
+    id:
+  securityGroupSelectorTerms: # tags, name, id see documentation, https://karpenter.sh/docs/concepts/nodeclasses/
+  karpenterRole:
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+  detailedMonitoring: true
+  userData:
+  instanceStorePolicy:
+# NodePool specific values
+nodePool:
+  enabled: true
+  labels:
+  taints:
+  requirements:
+  expireAfter: 720h
+  terminationGracePeriod: 48h
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 30s
+    budgets:
+    - nodes: 10%
+  limits:
+    cpu: "1000"
+    memory: 1000Gi
+  weight: 10
