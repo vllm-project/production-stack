@@ -584,8 +584,8 @@ class TtftRouter(RoutingInterface):
             matched_urls.append(url)
             matched_stats.append(stats)
 
-        # Assume the computation speed of all endpoints are equal, comparing
-        # the workload is equivalent to comparing TTFT
+        # Assume the computation speed of all endpoints are equal
+        # comparing workload is equivalent to comparing TTFT
 
         # cache matched pass
         min_workload = math.inf
