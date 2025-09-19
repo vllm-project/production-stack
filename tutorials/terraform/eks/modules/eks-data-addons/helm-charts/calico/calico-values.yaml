@@ -1,0 +1,42 @@
+# modules/eks-data-addons/helm-charts/calico/calico-values.yaml
+# ------------------------------------------------------------------
+# Minimal Calico operator values for EKS
+# ------------------------------------------------------------------
+
+# Calico will detect it’s running on EKS; leave provider unset
+# installation:
+#   kubernetesProvider: EKS
+
+# Enable Typha for clusters >50 nodes (keeps Felix chatter low)
+# overlay-values.yaml  – use this instead of the current file
+################################################################################
+# 1. Tell the operator NOT to defer to aws-node
+################################################################################
+installation:
+  kubernetesProvider: "None"            # <- critical: makes Calico own /etc/cni/net.d
+
+  calicoNetwork:
+    bgp: "Disabled"                     # overlay, so no BGP
+    ipPools:
+      - cidr: {{ .Values.podCIDR | default "192.168.0.0/16" }}   # or inject with Helm “set”
+        encapsulation: VXLAN
+        natOutgoing: Enabled
+        nodeSelector: all()
+
+################################################################################
+# 2. Everything you already had
+################################################################################
+typha:
+  enabled: true
+  replicas: 3
+
+prometheus:
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring           # change if your kube-prom stack lives elsewhere
+
+felixConfiguration:
+  failsafeInboundHostPorts:  []
+  failsafeOutboundHostPorts: []
+
+# bgp.enabled: false is redundant now – it’s disabled in calicoNetwork – but harmless

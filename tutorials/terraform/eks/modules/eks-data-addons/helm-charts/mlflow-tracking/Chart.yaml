@@ -1,0 +1,7 @@
+apiVersion: v2
+name: mlflow-tracking-server
+icon: https://mlflow.org/images/MLflow-logo-final-white-TM.png
+description: A Helm chart for MLflow Tracking
+type: application
+version: 0.2.0
+appVersion: "2.11.1"

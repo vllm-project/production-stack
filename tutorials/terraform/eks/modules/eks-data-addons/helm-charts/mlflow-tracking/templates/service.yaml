@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mlflow-tracking-server.fullname" . }}
+  labels:
+    {{- include "mlflow-tracking-server.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "mlflow-tracking-server.selectorLabels" . | nindent 4 }}
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      protocol: TCP
+      targetPort: {{ .Values.service.port }}

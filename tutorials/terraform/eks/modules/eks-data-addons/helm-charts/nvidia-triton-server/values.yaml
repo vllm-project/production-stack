@@ -1,0 +1,132 @@
+# Number of Triton server replicas for the deployment
+replicaCount: 1
+
+image:
+  repository: nvcr.io/nvidia/tritonserver
+  tag: "22.02-py3" # for vLLM look for tags like: 24.02-vllm-python-py3
+  pullPolicy: IfNotPresent
+
+# You can use local path like /models or s3://bucket-name/models
+modelRepositoryPath: /models
+
+# Service Configuration (Exposing Triton endpoints)
+service:
+  type: ClusterIP
+  ports:
+    http: 8000
+    grpc: 8001
+    metrics: 8002
+
+  metricsPort: 8080
+
+# Service account settings (Refer to Kubernetes documentation for details)
+serviceAccount:
+  create: false
+  annotations: {}
+  labels: {}
+  name: ""
+
+# Ingress Settings (Configure external access to Triton)
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  # kubernetes.io/ingress.class: nginx
+  # nginx.ingress.kubernetes.io/use-regex: "true"
+  # nginx.ingress.kubernetes.io/rewrite-target: "/$1"
+  # OR
+  # kubernetes.io/ingress.class: alb
+  # alb.ingress.kubernetes.io/scheme: internet-facing
+  # alb.ingress.kubernetes.io/target-type: ip
+  # alb.ingress.kubernetes.io/success-codes: "200-299"
+  # alb.ingress.kubernetes.io/healthcheck-path: "/v1/health/ready"
+  # alb.ingress.kubernetes.io/healthcheck-port: "8080"
+  hosts:
+  - host: "example.com"
+    paths:
+    - path: /
+      pathType: Prefix
+      service:
+        name:
+        port:
+          number: 8000
+          # - path: /serve/(.*)
+          #   pathType: ImplementationSpecific
+          #   service:
+          #     name:
+          #     port:
+          #       number: 8265
+  tls: []
+  # - hosts:
+  #     - "example.com"
+  #   secretName: "example-tls"
+
+selectorLabels:
+  app: triton-inference-server
+
+podSecurityContext:
+  runAsGroup: 1000
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext: {}
+# capabilities:
+#   drop:
+#   - ALL
+# readOnlyRootFilesystem: true
+# runAsNonRoot: true
+# runAsUser: 1000
+
+# Environment variables for Triton containers
+environment:
+- name: "LD_PRELOAD"
+  value: ""
+- name: "TRANSFORMERS_CACHE"
+  value: "/home/triton-server/.cache"
+- name: "shm-size"
+  value: "5g"
+- name: "NCCL_IGNORE_DISABLED_P2P"
+  value: "1"
+  # - name: "model_name"
+  #   value: "meta-llama/Llama-2-7b-chat-hf"
+
+# Secret environment variables to authenticate with Hugging Face to load models
+secretEnvironment:
+- name: "HUGGING_FACE_TOKEN"
+  secretName: "huggingface" # Name of the secret
+  key: "HF_TOKEN" # Key within the secret
+
+resources:
+  requests: # Minimum resource requests for each Triton pod
+    cpu: "100m"
+    memory: "512Mi"
+    nvidia.com/gpu: 1
+  limits: # Maximum resource limits
+    cpu: "500m"
+    memory: "2Gi"
+    nvidia.com/gpu: 1
+
+# Horizontal Pod Autoscaler (HPA) configuration
+hpa:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  metrics: []
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 180 # 3 minutes stabilization window
+      policies:
+      - type: Percent
+        value: 50 # Scale down by 50% at a time
+        periodSeconds: 60 # Check every 60 seconds
+    scaleUp:
+      stabilizationWindowSeconds: 60 # 1 minute stabilization window
+      policies:
+      - type: Percent
+        value: 100 # Scale up by 100% at a time
+        periodSeconds: 15
+
+# Advanced Configuration (If needed)
+nodeSelector: {} # Schedule pods on specific nodes
+tolerations: [] # Allow pods to be scheduled on nodes with 'taints'
+affinity: {} # Influence pod scheduling based on node or pod labels
