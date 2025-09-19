@@ -1,0 +1,38 @@
+## -----------------------------------------------------------------------------
+## NVIDIA GPU Operator – minimal values for EKS + AL2023 _NVIDIA_ AMI
+## -----------------------------------------------------------------------------
+
+driver:
+  enabled: false          # AMI already has kernel driver & toolkit
+  usePrecompiled: false   # ignored when driver.enabled = false
+
+toolkit:
+  enabled: false          # container-toolkit is baked into the AMI
+
+devicePlugin:
+  enabled: true
+  version: "v0.17.0"      # keep in sync with chart; change if you pin newer
+
+gfd:                      # GPU-Feature-Discovery (labels each node)
+  enabled: true
+
+dcgmExporter:             # GPU telemetry → Prometheus
+  enabled: true
+  serviceMonitor:
+    enabled: true         # so kube-prometheus-stack can auto-scrape
+
+migManager:               # only useful on A100/Hopper; harmless to keep
+  enabled: true
+
+validator:                # sanity-checks that GPU pods can run
+  enabled: true
+  # skip if cluster-wide PSPs/OPA block privileged pods
+
+nodeSelector: {}          # add “nvidia.com/gpu.present: true” if you run mixed nodes
+tolerations:
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+# Image pull secrets if you mirror NVIDIA containers to a private ECR
+imagePullSecrets: []

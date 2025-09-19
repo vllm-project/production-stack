@@ -1,0 +1,25 @@
+{{- if .Values.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "triton.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "triton.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "triton.fullname" . }}
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    {{- range .Values.hpa.metrics }}
+        - {{ . | toYaml | nindent 10 }}
+    {{- end }}
+  {{- if .Values.hpa.scaleDownStabilizationSecs }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.hpa.scaleDownStabilizationSecs }}
+  {{- end }}
+{{- end }}

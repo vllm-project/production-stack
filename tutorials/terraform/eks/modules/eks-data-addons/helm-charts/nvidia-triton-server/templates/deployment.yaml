@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "triton.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "triton.labels" . | nindent 4 }}
+spec:
+  strategy:
+    type: RollingUpdate
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "triton.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "triton.selectorLabels" . | nindent 8 }}
+    spec:
+      volumes:
+        - name: cache
+          emptyDir: {}
+        - name: dshm
+          emptyDir:
+            medium: Memory
+      serviceAccountName: {{ include "triton.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ include "triton.fullname" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - mountPath: /home/triton-server/.cache
+              name: cache
+            - mountPath: /dev/shm
+              name: dshm
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          args: ["tritonserver",
+                "--model-store={{ .Values.modelRepositoryPath }}",
+                "--model-control-mode=poll",
+                "--allow-metrics=True",
+                "--log-verbose=1",
+                "--strict-model-config=False",
+                "--repository-poll-secs=120"]
+          env:
+            {{- range .Values.environment }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+            {{- range .Values.secretEnvironment }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .secretName }}
+                  key: {{ .key }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.ports.http }}
+            - name: grpc
+              containerPort: {{ .Values.service.ports.grpc }}
+            - name: metrics
+              containerPort: {{ .Values.service.ports.metrics }}
+          livenessProbe:
+            httpGet:
+              path: /v2/health/live
+              port: http
+            initialDelaySeconds: 180
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /v2/health/ready
+              port: http
+            initialDelaySeconds: 180
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

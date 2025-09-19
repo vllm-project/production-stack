@@ -1,0 +1,6 @@
+apiVersion: v2
+name: triton-inference-server
+description: A Helm chart for deploying NVIDIA Triton Inference Server on Kubernetes with AWS EKS
+type: application
+version: "1.0.0"
+appVersion: "2.44.0"  # Triton Inference Server version
