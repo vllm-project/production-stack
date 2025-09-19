@@ -40,13 +40,13 @@ resource "helm_release" "calico" {
   provisioner "local-exec" {
     when    = destroy
     command = <<-EOF
-    KUBECONFIG=${path.module}/kubeconfig kubectl -n tigera-operator delete job tigera-operator-uninstall --ignore-not-found=true || true
+    KUBECONFIG=./kubeconfig kubectl -n tigera-operator delete job tigera-operator-uninstall --ignore-not-found=true || true
     KUBECONFIG=./kubeconfig kubectl patch namespace calico-system --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null || true
   # Delete the Installation resource that owns the calico-system namespace  
-   KUBECONFIG=./kubeconfig kubectl patch installation default --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null || true 
-    KUBECONFIG=${path.module}/kubeconfig kubectl delete installation default --ignore-not-found=true || true  
+    KUBECONFIG=./kubeconfig kubectl patch installation default --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null || true 
+    KUBECONFIG=./kubeconfig kubectl delete installation default --ignore-not-found=true || true  
   # Also clean up the stale API service  
-    KUBECONFIG=${path.module}/kubeconfig kubectl delete apiservice v3.projectcalico.org --ignore-not-found=true || true  
+    KUBECONFIG=./kubeconfig kubectl delete apiservice v3.projectcalico.org --ignore-not-found=true || true  
   EOF
   }
   depends_on = [module.eks_addons, local_file.kubeconfig]

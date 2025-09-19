@@ -31,11 +31,8 @@ export TF_VAR_nvidia_setup="plugin" # default: "plugin"
 ################################################################################
 export TF_VAR_enable_vllm="true"         # default: "false" - Set to "true" to deploy vLLM
 export TF_VAR_hf_token=""                # default: "" - Hugging Face token for model download (if needed)
-export TF_VAR_inference_hardware="gpu"   # default: "cpu" - "cpu" or "gpu"
 ################################################################################
-export TF_VAR_enable_vllm=true # default: false
-export TF_VAR_hf_token= # default: ""
-export TF_VAR_inference_hardware="gpu" # default: "cpu"
+export TF_VAR_inference_hardware="gpu"   # default: "cpu" - "cpu" or "gpu"
 export TF_VAR_nvidia_setup="plugin" # default: "" 
 # Paths to Helm chart values templates for vLLM.
 # These paths are relative to the root of your Terraform project.
@@ -82,5 +79,5 @@ export TF_VAR_gpu_capacity_type="ON_DEMAND" # "SPOT" , default: "ON_DEMAND"
 # export TF_VAR_private_subnet_cidrs='["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]'
 export TF_VAR_vpc_cidr="10.20.0.0/16" # default: "10.20.0.0/16"
 # export TF_VAR_vpc_name="vllm-vpc-prod" # default: "vllm-vpc-prod"
-export TF_VAR_enable_lb_ctl="false" # default: "true" - Enable AWS Load Balancer Controller
+export TF_VAR_enable_lb_ctl="false" # to disable AWS Load Balancer Controller (default: "true") 
  

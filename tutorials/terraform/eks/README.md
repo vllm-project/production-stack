@@ -438,9 +438,6 @@ source env-vars
    export TF_VAR_hf_token=""                # default: "" - Hugging Face token for model download (if needed)
    export TF_VAR_inference_hardware="gpu"   # default: "cpu" - "cpu" or "gpu"
    ################################################################################
-   export TF_VAR_enable_vllm=true # default: false
-   export TF_VAR_hf_token= # default: ""
-   export TF_VAR_inference_hardware="gpu" # default: "cpu"
    export TF_VAR_nvidia_setup="plugin" # default: "" 
    # Paths to Helm chart values templates for vLLM.
    # These paths are relative to the root of your Terraform project.
@@ -585,7 +582,7 @@ In rare cases, you may need to manually clean up some AWS resources while runnin
 When AWS LB controller ingress is enabled (`enable_lb_ctl=true`), you might encounter VPC deletion issues linked to LB dependency. Run the below cleanup commands:
 ```bash
 export PROFILE=profile_name  (ex: default)
-export region =<region>       (ex: "us-east-2")
+export region=<region>       (ex: "us-east-2")
  # 1. Clean up load balancer
 alb_name=`aws elbv2 describe-load-balancers --query "LoadBalancers[*].LoadBalancerName" --output text --profile $PROFILE`
  alb_arn=$(aws elbv2 describe-load-balancers \
@@ -600,7 +597,7 @@ aws elbv2 delete-load-balancer --load-balancer-arn "$alb_arn" --region $region -
 terraform destroy
 ```
 >[!note]
-> Another solution is to disable AWS load balancer control creation altogether by setting the variable `enable_lb_ctl` to `false` see line 348 in [variables.tf](./variables.tf)
+> Another solution is to disable AWS load balancer control creation altogether by setting the variable `enable_lb_ctl` to `false` see  [variables.tf](./variables.tf)
 
 **2️⃣. vllm namespace**
 
