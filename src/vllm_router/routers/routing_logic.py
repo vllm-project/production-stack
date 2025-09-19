@@ -290,13 +290,6 @@ class KvawareRouter(RoutingInterface):
         if self.tokenizer_name is not None:
             self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_name)
 
-    def query_manager(self, msg) -> str:
-        """
-        Get the instance id for the given message
-        """
-        instance_id = self.kv_manager.handle_orchestration_message(msg)
-        return instance_id
-
     async def route_request(
         self,
         endpoints: List[EndpointInfo],
@@ -327,7 +320,7 @@ class KvawareRouter(RoutingInterface):
         # TODO (Yuhan): Handle chat completions
         token_ids = self.tokenizer.encode(extract_prompt(request_json))
         msg = LookupMsg(event_id="", tokens=token_ids)
-        instance_id = await self.query_manager(msg)
+        instance_id = await self.kv_manager.handle_orchestration_message(msg)
         matched_tokens = math.inf
         if len(list(instance_id.layout_info.keys())) > 0:
             matched_instance_id = list(instance_id.layout_info.keys())[
@@ -596,7 +589,6 @@ class TtftRouter(RoutingInterface):
         best_workload_url = None
         best_workload_cached_tokens = 0
         for i, matched_info in enumerate(matched_infos):
-            print(f"-------------- URL:{matched_urls[i]} --------------")
             workload, cached_tokens = self._estimate_workload(matched_info, best_matched_info,
                                                               matched_stats[i], num_prefix_tokens)
             if best_workload_url is None or workload <= best_workload:
@@ -611,7 +603,6 @@ class TtftRouter(RoutingInterface):
         for endpoint in not_matched_endpoints:
             url = endpoint.url
             stats = request_stats.get(url, None)
-            print(f"-------------- URL:{url} --------------")
             workload, cached_tokens = self._estimate_workload(None, best_matched_info,
                                                               stats, num_prefix_tokens)
             if best_workload_url is None or workload <= best_workload:
