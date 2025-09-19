@@ -221,8 +221,8 @@ This stack provides extensive customization options to tailor your deployment:
 
 **📓** See the complete configuration template:
 - **Environment variables**: [`env-vars.template`](./env-vars.template)
-- **Terraform variables tfvars**: [`terraform.tfvars.example`](./terraform.tfvars.
-example)
+- **Terraform variables tfvars**: [`terraform.tfvars.template`](./terraform.tfvars.template)
+
 <details><summary><b> Full list of variables</b></summary>
 ## Requirements
 
