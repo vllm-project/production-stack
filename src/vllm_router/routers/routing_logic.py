@@ -584,17 +584,20 @@ class TtftRouter(RoutingInterface):
             matched_urls.append(url)
             matched_stats.append(stats)
 
+        # Assume the computation speed of all endpoints are equal, comparing
+        # the workload is equivalent to comparing TTFT
+
         # cache matched pass
-        best_workload = float('inf')
-        best_workload_url = None
-        best_workload_cached_tokens = 0
+        min_workload = math.inf
+        min_workload_url = None
+        min_workload_cached_tokens = 0
         for i, matched_info in enumerate(matched_infos):
             workload, cached_tokens = self._estimate_workload(matched_info, best_matched_info,
                                                               matched_stats[i], num_prefix_tokens)
-            if best_workload_url is None or workload <= best_workload:
-                best_workload = workload
-                best_workload_url = matched_urls[i]
-                best_workload_cached_tokens = cached_tokens
+            if min_workload_url is None or workload <= min_workload:
+                min_workload = workload
+                min_workload_url = matched_urls[i]
+                min_workload_cached_tokens = cached_tokens
 
         # cache not matched pass
         matched_url_set = set(matched_urls)
@@ -605,14 +608,14 @@ class TtftRouter(RoutingInterface):
             stats = request_stats.get(url, None)
             workload, cached_tokens = self._estimate_workload(None, best_matched_info,
                                                               stats, num_prefix_tokens)
-            if best_workload_url is None or workload <= best_workload:
-                best_workload = workload
-                best_workload_url = url
-                best_workload_cached_tokens = cached_tokens
+            if min_workload_url is None or workload <= min_workload:
+                min_workload = workload
+                min_workload_url = url
+                min_workload_cached_tokens = cached_tokens
 
-        if best_workload_url is None:
+        if min_workload_url is None:
             raise ValueError(f"no best instance was found")
-        return best_workload_url, best_workload_cached_tokens
+        return min_workload_url, min_workload_cached_tokens
 
     def _estimate_workload(self, matched_info, best_matched_info, stats, num_prefix_tokens):
         """Estimate prefill workload."""
