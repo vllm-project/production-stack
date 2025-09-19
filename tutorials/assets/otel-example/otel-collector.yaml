@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: collector
-        image: otel/opentelemetry-collector-contrib:0.86.0
+        image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:0.135.0
         args:
         - "--config=/conf/collector.yaml"
         resources:

@@ -19,7 +19,7 @@ data: # how we want to collect tracing data is specified here
         send_batch_size: 1024
 
     exporters:
-      logging:
+      debug:
         verbosity: detailed
       otlp:
         endpoint: jaeger-collector.default.svc.cluster.local:4317
@@ -31,4 +31,4 @@ data: # how we want to collect tracing data is specified here
         traces:
           receivers: [otlp]
           processors: [batch]
-          exporters: [logging, otlp]
+          exporters: [debug, otlp]
