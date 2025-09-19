@@ -291,7 +291,9 @@ class KvawareRouter(RoutingInterface):
         # TODO (Yuhan): Handle chat completions
         try:
             if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(endpoints[0].model_names[0])
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    endpoints[0].model_names[0]
+                )
             token_ids = self.tokenizer.encode(request_json.get("prompt", ""))
         except Exception:
             # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
@@ -301,7 +303,9 @@ class KvawareRouter(RoutingInterface):
                 "model": endpoints[0].model_names[0],
                 "prompt": request_json.get("prompt", ""),
             }
-            body = requests.post(remote_url, headers=headers, json=data, timeout=10).json()
+            body = requests.post(
+                remote_url, headers=headers, json=data, timeout=10
+            ).json()
             token_ids = body["tokens"]
 
         event_id = "Lookup" + str(uuid.uuid4())
