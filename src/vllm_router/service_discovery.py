@@ -16,9 +16,11 @@ import asyncio
 import enum
 import hashlib
 import os
+import statistics
 import threading
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
@@ -109,6 +111,12 @@ class EndpointInfo:
     # Model information including relationships
     model_info: Dict[str, ModelInfo] = None
 
+    # endpoint's mean request completion time
+    completion_time = Optional[float]
+
+    # standard deviation of request completion time
+    std_time = Optional[float]
+
     def __str__(self):
         return f"EndpointInfo(url={self.url}, model_names={self.model_names}, added_timestamp={self.added_timestamp}, model_label={self.model_label}, service_name={self.service_name},pod_name={self.pod_name}, namespace={self.namespace})"
 
@@ -173,6 +181,26 @@ class EndpointInfo:
         if not self.model_info:
             return None
         return self.model_info.get(model_id)
+
+
+class EndpointCalculations:
+    def __init__(self, maxlen=100):
+        # keep track of completion times to perform later calculations
+        self.maxlen = maxlen
+        self.completion_times = deque(maxlen=self.maxlen)
+
+    def add_completion_time(self, completion_time: float):
+        self.completion_times.append(completion_time)
+
+    def mean(self):
+        if not self.completion_times:
+            return 0.0
+        return statistics.mean(self.completion_times)
+
+    def stdev(self):
+        if len(self.completion_times) < 2:
+            return 0.0
+        return statistics.stdev(self.completion_times)
 
 
 class ServiceDiscovery(metaclass=abc.ABCMeta):
