@@ -16,7 +16,7 @@ import asyncio
 import logging
 import os
 from collections import OrderedDict
-from typing import Dict, Generator, List, Optional, Set, Tuple
+from typing import Dict, Generator, Optional, Set, Tuple
 
 import psutil
 import xxhash
@@ -142,8 +142,8 @@ class HashTrie:
                         logger.info(
                             f"Eviction skipped - no memory change detected: {memory_mb:.1f}MB"
                         )
-                except:
-                    pass
+                except Exception as e:
+                    logger.error(f"Eviction failed - error message: {e}")
 
     async def longest_prefix_match(
         self, request: str, available_endpoints: Set[str] = set()
