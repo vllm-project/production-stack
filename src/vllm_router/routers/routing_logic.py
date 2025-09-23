@@ -21,8 +21,8 @@ import threading
 import uuid
 from typing import Dict, List
 
-from fastapi import Request
 import requests
+from fastapi import Request
 
 try:
     from transformers import AutoTokenizer
