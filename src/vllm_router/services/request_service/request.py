@@ -585,15 +585,11 @@ async def route_general_transcriptions(
 
     endpoints = service_discovery.get_endpoint_info()
 
-    # filter the endpoints url by model name and model label for transcriptions
+    # filter the endpoints url by model name
     transcription_endpoints = []
     for ep in endpoints:
         for model_name in ep.model_names:
-            if (
-                model == model_name
-                and ep.model_label == "transcription"
-                and not ep.sleep
-            ):
+            if model == model_name and not ep.sleep:
                 transcription_endpoints.append(ep)
 
     if not transcription_endpoints:
