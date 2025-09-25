@@ -38,7 +38,7 @@ output "vpc_cidr" {
   value = data.aws_vpc.selected.cidr_block
 }
 
-# Output for cluster subnets  
+# Output for cluster subnets
 output "cluster_subnets_info" {
   description = "Information about private subnets used by the EKS cluster"
   value = {
@@ -72,15 +72,15 @@ output "grafana_forward_cmd" {
   value       = "kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n kube-prometheus-stack"
 }
 
-# Output that defaults to null when no ingress exists  
-output "vllm_ingress_hostname" {  
-  description = "The hostname of the vLLM ingress load balancer (null if no ingress configured)"  
-  value = var.enable_vllm && var.enable_lb_ctl ? try(  
-    data.kubernetes_ingress_v1.vllm_ingress[0].status[0].load_balancer[0].ingress[0].hostname,  
-    null  # Explicitly return null if ingress doesn't exist or has no hostname  
-  ) : null  
-  depends_on = [helm_release.vllm_stack]  
-}  
+# Output that defaults to null when no ingress exists
+output "vllm_ingress_hostname" {
+  description = "The hostname of the vLLM ingress load balancer (null if no ingress configured)"
+  value = var.enable_vllm && var.enable_lb_ctl ? try(
+    data.kubernetes_ingress_v1.vllm_ingress[0].status[0].load_balancer[0].ingress[0].hostname,
+    null  # Explicitly return null if ingress doesn't exist or has no hostname
+  ) : null
+  depends_on = [helm_release.vllm_stack]
+}
 
 output "vllm_api_url" {
   description = "Full HTTPS URL for the vLLM API (null until hostname exists)"

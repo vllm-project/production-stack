@@ -1,6 +1,6 @@
 installation:
   enabled: true
-  kubernetesProvider: "EKS" 
+  kubernetesProvider: "EKS"
   cni:
     type: Calico
   calicoNetwork:
@@ -12,7 +12,7 @@ installation:
         nodeSelector: "all()"
   # Add this to ensure proper CNI takeover
   variant: "Calico"
-  
+
 # API server (sometimes needed for EKS)
 apiServer:
   enabled: true

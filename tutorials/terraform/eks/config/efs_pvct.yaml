@@ -28,7 +28,7 @@ spec:
   volumes:
     - name: persistent-storage
       persistentVolumeClaim:
-        claimName: app      
+        claimName: app
 ---
 apiVersion: v1
 kind: Pod
@@ -47,4 +47,4 @@ spec:
   volumes:
     - name: persistent-storage
       persistentVolumeClaim:
-        claimName: app        
+        claimName: app

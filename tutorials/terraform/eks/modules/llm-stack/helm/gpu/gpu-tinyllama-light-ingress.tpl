@@ -1,17 +1,17 @@
 # This file is a Go template. Variables passed from Terraform are accessed with .VarName
 servingEngineSpec:
   enableEngine: true
-  runtimeClassName: ""  # Use nvidia default runtime for GPU 
-  tolerations:  
-    - key: "nvidia.com/gpu"  
-      operator: "Exists"  
-      effect: "NoSchedule"  
-  startupProbe:  
-    initialDelaySeconds: 60  
-    periodSeconds: 30  
-    failureThreshold: 120  
-    httpGet:   
-      path: /health  
+  runtimeClassName: ""  # Use nvidia default runtime for GPU
+  tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+  startupProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    failureThreshold: 120
+    httpGet:
+      path: /health
       port: 8000
   nodeSelector:
     workload-type: gpu
@@ -32,9 +32,9 @@ servingEngineSpec:
     pvcStorage: "20Gi"
     storageClass: "gp3"
     vllmConfig:
-      dtype:  "float16"  # Changed from "bfloat16" not supported by Tesla T4 GPU (compute capability 7.5) 
+      dtype:  "float16"  # Changed from "bfloat16" not supported by Tesla T4 GPU (compute capability 7.5)
       extraArgs:
-        - "--disable-log-requests" 
+        - "--disable-log-requests"
         - "--gpu-memory-utilization=0.8"  # GPU-specific optimization
     env: []        # NEW: CPU env vars removed
     #   - name: VLLM_CPU_KVCACHE_SPACE
@@ -50,7 +50,7 @@ servingEngineSpec:
           pip install --no-cache-dir --timeout=300 "huggingface_hub[cli]" &&
           huggingface-cli download TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
             --local-dir /data/models/tinyllama \
-            --local-dir-use-symlinks False 
+            --local-dir-use-symlinks False
       env:
         - name: HUGGING_FACE_HUB_TOKEN
           valueFrom:
@@ -85,13 +85,13 @@ routerSpec:
       kubernetes.io/ingress.class: alb
       alb.ingress.kubernetes.io/scheme: internet-facing
       alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'   # Remove HTTPS: 443  
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'   # Remove HTTPS: 443
       # remove alb.ingress.kubernetes.io/ssl-redirect: '443'
       # Health check configuration for vLLM
       alb.ingress.kubernetes.io/healthcheck-path: /health  # vLLM standard health endpoint
       alb.ingress.kubernetes.io/healthcheck-port: traffic-port #  router service port
       alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
-      alb.ingress.kubernetes.io/success-codes: "200-299" 
+      alb.ingress.kubernetes.io/success-codes: "200-299"
     hosts:
 #     - host:  vllm-api.com  # Replace with your domain
       - paths:
@@ -102,4 +102,4 @@ routerSpec:
   # tls:
   #   - secretName: vllm-tls-secret
   #     hosts:
-  #       - vllm-api.yourdomain.com      
+  #       - vllm-api.yourdomain.com

@@ -25,7 +25,7 @@ export TF_VAR_cluster_version="1.30"       # default: "1.30" - Kubernetes cluste
 #   • operator_no_driver -> GPU Operator (driver disabled)
 #   • operator_custom  -> GPU Operator with your YAML
 ################################################################################
-export TF_VAR_nvidia_setup="plugin" # default: "plugin" 
+export TF_VAR_nvidia_setup="plugin" # default: "plugin"
 ################################################################################
 # 🧠 LLM Inference Configuration
 ################################################################################
@@ -33,7 +33,7 @@ export TF_VAR_enable_vllm="true"         # default: "false" - Set to "true" to d
 export TF_VAR_hf_token=""                # default: "" - Hugging Face token for model download (if needed)
 ################################################################################
 export TF_VAR_inference_hardware="gpu"   # default: "cpu" - "cpu" or "gpu"
-export TF_VAR_nvidia_setup="plugin" # default: "" 
+export TF_VAR_nvidia_setup="plugin" # default: ""
 # Paths to Helm chart values templates for vLLM.
 # These paths are relative to the root of your Terraform project.
 export TF_VAR_gpu_vllm_helm_config="./modules/llm-stack/helm/gpu/gpu-tinyllama-light-ingress.tpl" # default: ""
@@ -79,5 +79,4 @@ export TF_VAR_gpu_capacity_type="ON_DEMAND" # "SPOT" , default: "ON_DEMAND"
 # export TF_VAR_private_subnet_cidrs='["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]'
 export TF_VAR_vpc_cidr="10.20.0.0/16" # default: "10.20.0.0/16"
 # export TF_VAR_vpc_name="vllm-vpc-prod" # default: "vllm-vpc-prod"
-export TF_VAR_enable_lb_ctl="false" # to disable AWS Load Balancer Controller (default: "true") 
- 
+export TF_VAR_enable_lb_ctl="false" # to disable AWS Load Balancer Controller (default: "true")

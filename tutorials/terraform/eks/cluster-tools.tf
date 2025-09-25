@@ -13,7 +13,7 @@ locals {
 }
 
 ###############################################################################
-# Deploy Calico immediately after EKS cluster  
+# Deploy Calico immediately after EKS cluster
 ###############################################################################
 
 data "template_file" "calico_values" {
@@ -42,26 +42,26 @@ resource "helm_release" "calico" {
     command = <<-EOF
     KUBECONFIG=./kubeconfig kubectl -n tigera-operator delete job tigera-operator-uninstall --ignore-not-found=true || true
     KUBECONFIG=./kubeconfig kubectl patch namespace calico-system --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null || true
-  # Delete the Installation resource that owns the calico-system namespace  
-    KUBECONFIG=./kubeconfig kubectl patch installation default --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null || true 
-    KUBECONFIG=./kubeconfig kubectl delete installation default --ignore-not-found=true || true  
-  # Also clean up the stale API service  
-    KUBECONFIG=./kubeconfig kubectl delete apiservice v3.projectcalico.org --ignore-not-found=true || true  
+  # Delete the Installation resource that owns the calico-system namespace
+    KUBECONFIG=./kubeconfig kubectl patch installation default --type=merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null || true
+    KUBECONFIG=./kubeconfig kubectl delete installation default --ignore-not-found=true || true
+  # Also clean up the stale API service
+    KUBECONFIG=./kubeconfig kubectl delete apiservice v3.projectcalico.org --ignore-not-found=true || true
   EOF
   }
   depends_on = [module.eks_addons, local_file.kubeconfig]
 }
 
 # helm -n tigera-operator uninstall calico --no-hooks
-resource "time_sleep" "wait_for_addons" {  
-  depends_on = [module.eks]  
-  create_duration = "120s"  # Wait 2 minutes for addons to be ready  
+resource "time_sleep" "wait_for_addons" {
+  depends_on = [module.eks]
+  create_duration = "120s"  # Wait 2 minutes for addons to be ready
 }
 ################################################################################
 # Add-on modules
 ################################################################################
 module "eks_addons" {
-  source = "./modules/eks-blueprints-addons"
+  source = "git::https://github.com/cloudthrill/terraform-aws-eks-modules.git//eks-blueprints-addons?ref=v1.0.0"
   # version = "~> 1.0" #ensure to update this to the latest/desired version
   cluster_name      = module.eks.cluster_name
   cluster_endpoint  = module.eks.cluster_endpoint
@@ -73,28 +73,28 @@ module "eks_addons" {
     coredns                = { most_recent = true }
     kube-proxy             = { most_recent = true }
     eks-pod-identity-agent = {}
-   # vpc-cni            = { most_recent = false, preserve = false }  # <--  
+   # vpc-cni            = { most_recent = false, preserve = false }  # <--
   #  vpc-cni = {
   #   most_recent = true
   #   configuration_values = jsonencode({
-  #     env = { 
+  #     env = {
   #       ENABLE_PREFIX_DELEGATION = "true"
   #       WARM_PREFIX_TARGET = "1"
   #     }
   #   })
  #
-  
+
   }
 # In versions 2.5+ of aws-load-balancer-controller.addons that have services (i.e cert manager) may timeout waiting for the LB webhook to be available.
 # due to no endpoints ready. Terraform therefore bombs at the first apply.
 # fix this by disabling the mutator webhook
-  aws_load_balancer_controller = {  
-     set = [  
-    {  
-      name  = "enableServiceMutatorWebhook"  
-      value = "false"  
-    }  
-  ]  
+  aws_load_balancer_controller = {
+     set = [
+    {
+      name  = "enableServiceMutatorWebhook"
+      value = "false"
+    }
+  ]
   }
   enable_aws_load_balancer_controller = var.enable_lb_ctl
   enable_external_dns                 = var.enable_external_dns
@@ -106,7 +106,7 @@ module "eks_addons" {
   enable_external_secrets             = var.enable_external_secrets
   enable_aws_cloudwatch_metrics       = var.enable_cloudwatch
   enable_vpa                          = var.enable_vpa
-  # enable_cluster_proportional_autoscaler = var.enable_autoscaler  
+  # enable_cluster_proportional_autoscaler = var.enable_autoscaler
   # enable_aws_ebs_csi_driver              = var.enable_ebs_csi_driver
   # enable_aws_privateca_issuer           = var.enable_privateca_issuer
   # external_secrets_secrets_manager_arns = var.external_secrets_secrets_manager_arns
@@ -128,29 +128,29 @@ module "eks_addons" {
   #   }
   # }
 
-  tags = var.tags 
+  tags = var.tags
   depends_on = [module.eks, ]  # Ensure EKS cluster is ready before deploying add-ons time_sleep.wait_for_addons,
 }
 
-resource "kubernetes_storage_class" "gp3" {  
-  depends_on = [module.eks_addons]  
-    
-  metadata {  
-    name = "gp3"  
-    annotations = {  
-      "storageclass.kubernetes.io/is-default-class" = "true"  
-    }  
-  }  
-    
-  storage_provisioner    = "ebs.csi.aws.com"  
-  reclaim_policy        = "Delete"  
-  volume_binding_mode   = "WaitForFirstConsumer"  
-  allow_volume_expansion = true  
-    
-  parameters = {  
-    type      = "gp3"  
-    encrypted = "true"  
-  }  
+resource "kubernetes_storage_class" "gp3" {
+  depends_on = [module.eks_addons]
+
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+
+  storage_provisioner    = "ebs.csi.aws.com"
+  reclaim_policy        = "Delete"
+  volume_binding_mode   = "WaitForFirstConsumer"
+  allow_volume_expansion = true
+
+  parameters = {
+    type      = "gp3"
+    encrypted = "true"
+  }
 }
 
 # get grafana admin password
@@ -161,7 +161,7 @@ resource "kubernetes_storage_class" "gp3" {
 
 
 locals {
-  # Flags for each scenario 
+  # Flags for each scenario
   enable_nvidia_operator = contains(["operator_custom", "operator_no_driver"], var.nvidia_setup)
   operator_use_values    = var.nvidia_setup == "operator_custom"
   enable_nvidia_plugin = contains(["plugin"], var.nvidia_setup)
@@ -175,7 +175,7 @@ locals {
 
 
 module "data_addons" {
-  source = "./modules/eks-data-addons"
+  source = "git::https://github.com/cloudthrill/terraform-aws-eks-modules.git//eks-data-addons?ref=v1.0.0"
 
   # --- required oidc provider arn ---
   oidc_provider_arn = module.eks.oidc_provider_arn
@@ -208,7 +208,7 @@ nvidia_device_plugin_helm_config = local.enable_nvidia_plugin ? {
 }
 
 # 💡Destroy tips
-# If you face terraform destroy issues because of * jobs.batch "tigera-operator-uninstall" already exists 
+# If you face terraform destroy issues because of * jobs.batch "tigera-operator-uninstall" already exists
 # use the following commands to delete the jobs manually first:
 # 1.  kubectl -n tigera-operator delete job tigera-operator-uninstall --ignore-not-found=true
 # 2.  kubectl -n tigera-operator delete job tigera-operator-delete-crds --ignore-not-found=true

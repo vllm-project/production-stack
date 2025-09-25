@@ -1,4 +1,4 @@
-# Copyright (c) 2025, Kosseila HD (Cloudthrill), released under MIT License.  
+# Copyright (c) 2025, Kosseila HD (Cloudthrill), released under MIT License.
 locals {
   aws_profile = var.aws_profile != "default" ? var.aws_profile : "default"
 }
@@ -70,7 +70,7 @@ provider "kubernetes" {
 #  Helm provider configuration
 provider "helm" {
   kubernetes {
-    host                   = module.eks.cluster_endpoint  
+    host                   = module.eks.cluster_endpoint
     cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
@@ -85,25 +85,25 @@ provider "helm" {
       )
       command = "aws"
     }
- 
+
   }
 }
 
-provider "kubectl" {  
-  host                   = module.eks.cluster_endpoint  
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)  
-  
-  exec {  
-    api_version = "client.authentication.k8s.io/v1beta1"  
-    command     = "aws"  
-    args = concat(  
-      ["eks", "get-token",  
-        "--cluster-name", module.eks.cluster_name,  
-        "--output",       "json",  
-        "--region", var.region],  
-      local.aws_profile != "" ? ["--profile", local.aws_profile] : []  
-    )  
-  }  
+provider "kubectl" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args = concat(
+      ["eks", "get-token",
+        "--cluster-name", module.eks.cluster_name,
+        "--output",       "json",
+        "--region", var.region],
+      local.aws_profile != "" ? ["--profile", local.aws_profile] : []
+    )
+  }
 }
 
 

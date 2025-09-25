@@ -8,7 +8,7 @@
 # AWS Credentials and Region
 ################################################################################
 aws_access_key = ""         # Fill your AWS Access Key ID
-aws_secret_key = ""         # Fill your AWS Secret Access Key  
+aws_secret_key = ""         # Fill your AWS Secret Access Key
 aws_profile    = ""         # Fill your AWS Profile name (e.g., default, cloudthrill)
 region         = "us-east-2" # AWS Region for your deployment
 

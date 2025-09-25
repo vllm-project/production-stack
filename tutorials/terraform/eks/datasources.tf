@@ -13,11 +13,11 @@ data "aws_availability_zones" "available" { # automatically uses the region conf
   }
 }
 
-# Local values to process the AZs  
+# Local values to process the AZs
 locals {
-  # Take first 3 AZs from the region  
+  # Take first 3 AZs from the region
   azs = slice(data.aws_availability_zones.available.names, 0, 3)
-}  
+}
 
 # Data source for the VPC
 data "aws_vpc" "selected" {
@@ -36,18 +36,18 @@ data "aws_subnet" "cluster_public_subnets" {
   id    = local.public_subnet_ids[count.index]
 }
 
-########################## 
+##########################
 # VLLM Ingress
 ##########################
 
-# Data source that only tries to read ingress if vLLM is enabled  
-data "kubernetes_ingress_v1" "vllm_ingress" {  
-  count = var.enable_vllm ? 1 : 0  
-    
-  metadata {  
-    name      = "vllm-gpu-ingress-router"  # Adjust to match your actual ingress name  
-    namespace = kubernetes_namespace.vllm["vllm"].metadata[0].name  
-  }  
-    
-  depends_on = [helm_release.vllm_stack]  
+# Data source that only tries to read ingress if vLLM is enabled
+data "kubernetes_ingress_v1" "vllm_ingress" {
+  count = var.enable_vllm ? 1 : 0
+
+  metadata {
+    name      = "vllm-gpu-ingress-router"  # Adjust to match your actual ingress name
+    namespace = kubernetes_namespace.vllm["vllm"].metadata[0].name
+  }
+
+  depends_on = [helm_release.vllm_stack]
 }

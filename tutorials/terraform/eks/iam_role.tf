@@ -69,19 +69,19 @@ resource "aws_eks_access_entry" "developer" {
   depends_on = [aws_iam_role_policy_attachment.developer_eks_console_access]
 }
 
-# Kubernetes RBAC resources remain the same  
+# Kubernetes RBAC resources remain the same
 resource "kubectl_manifest" "cluster_role_reader" {
   count     = var.enable_iam_roles ? 1 : 0
   yaml_body = <<YAML
-apiVersion: rbac.authorization.k8s.io/v1  
-kind: ClusterRole  
-metadata:  
-  name: reader  
-rules:  
-- apiGroups: ["*"]  
-  resources: ["deployments", "configmaps", "pods", "secrets", "services"]  
-  verbs: ["get", "list", "watch"]  
-YAML  
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: reader
+rules:
+- apiGroups: ["*"]
+  resources: ["deployments", "configmaps", "pods", "secrets", "services"]
+  verbs: ["get", "list", "watch"]
+YAML
 
   depends_on = [aws_eks_access_entry.developer]
 }
@@ -89,19 +89,19 @@ YAML
 resource "kubectl_manifest" "cluster_role_binding_reader" {
   count     = var.enable_iam_roles ? 1 : 0
   yaml_body = <<YAML
-apiVersion: rbac.authorization.k8s.io/v1  
-kind: ClusterRoleBinding  
-metadata:  
-  name: reader  
-subjects:  
-- kind: Group  
-  name: reader  
-  apiGroup: rbac.authorization.k8s.io  
-roleRef:  
-  kind: ClusterRole  
-  name: reader  
-  apiGroup: rbac.authorization.k8s.io  
-YAML  
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: reader
+subjects:
+- kind: Group
+  name: reader
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: reader
+  apiGroup: rbac.authorization.k8s.io
+YAML
 
   depends_on = [kubectl_manifest.cluster_role_reader]
 }

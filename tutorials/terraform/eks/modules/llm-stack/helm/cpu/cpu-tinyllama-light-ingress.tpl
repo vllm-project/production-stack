@@ -1,13 +1,13 @@
 # This file is a Go template. Variables passed from Terraform are accessed with .VarName
 servingEngineSpec:
   enableEngine: true
-  runtimeClassName: "" # Use default runtime for CPU 
-  startupProbe:  
-    initialDelaySeconds: 60  
-    periodSeconds: 30  
-    failureThreshold: 120  
-    httpGet:   
-      path: /health  
+  runtimeClassName: "" # Use default runtime for CPU
+  startupProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    failureThreshold: 120
+    httpGet:
+      path: /health
       port: 8000
   nodeSelector:
     workload-type: cpu
@@ -46,7 +46,7 @@ servingEngineSpec:
           pip install --no-cache-dir --timeout=300 "huggingface_hub[cli]" &&
           huggingface-cli download TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
             --local-dir /data/models/tinyllama \
-            --local-dir-use-symlinks False 
+            --local-dir-use-symlinks False
       env:
         - name: HUGGING_FACE_HUB_TOKEN
           valueFrom:
@@ -80,13 +80,13 @@ routerSpec:
       kubernetes.io/ingress.class: alb
       alb.ingress.kubernetes.io/scheme: internet-facing
       alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'   # Remove HTTPS: 443  
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'   # Remove HTTPS: 443
       # remove alb.ingress.kubernetes.io/ssl-redirect: '443'
       # Health check configuration for vLLM
       alb.ingress.kubernetes.io/healthcheck-path: /health  # vLLM standard health endpoint
       alb.ingress.kubernetes.io/healthcheck-port: traffic-port #  router service port
       alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
-      alb.ingress.kubernetes.io/success-codes: "200-299" 
+      alb.ingress.kubernetes.io/success-codes: "200-299"
     hosts:
 #     - host:  vllm-api.com  # Replace with your domain
       - paths:
@@ -97,4 +97,4 @@ routerSpec:
   # tls:
   #   - secretName: vllm-tls-secret
   #     hosts:
-  #       - vllm-api.yourdomain.com      
+  #       - vllm-api.yourdomain.com

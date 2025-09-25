@@ -2,12 +2,12 @@
 servingEngineSpec:
   enableEngine: true
   runtimeClassName: ""
-  startupProbe:  
-    initialDelaySeconds: 60  
-    periodSeconds: 30  
-    failureThreshold: 120  
-    httpGet:   
-      path: /health  
+  startupProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    failureThreshold: 120
+    httpGet:
+      path: /health
       port: 8000
   nodeSelector:
     workload-type: cpu
@@ -46,7 +46,7 @@ servingEngineSpec:
           pip install --no-cache-dir --timeout=300 "huggingface_hub[cli]" &&
           huggingface-cli download TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
             --local-dir /data/models/tinyllama \
-            --local-dir-use-symlinks False 
+            --local-dir-use-symlinks False
       env:
         - name: HUGGING_FACE_HUB_TOKEN
           valueFrom:

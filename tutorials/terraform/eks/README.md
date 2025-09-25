@@ -1,17 +1,19 @@
-# 🧑🏼‍🚀 vLLM Production Stack on Amazon EKS with terraform 
-✍🏼 This terraform stack delivers a **production-ready vLLM serving environment** On Amazon EKS supporting both CPU/GPU inference with operational best practices embeded in [AWS Integration and Automation](https://github.com/aws-ia) (security, scalability, observability).
+# 🧑🏼‍🚀 vLLM Production Stack on Amazon EKS with terraform
+
+✍🏼 This terraform stack delivers a **production-ready vLLM serving environment** On Amazon EKS supporting both CPU/GPU inference with operational best practices embedded in [AWS Integration and Automation](https://github.com/aws-ia) (security, scalability, observability).
 
 |Project Item |Description|
 |---|---|
 | **Author** | [@cloudthrill](https://cloudthrill.ca) |
 | **Stack**  | Terraform ◦ AWS ◦ EKS ◦ Calico ◦ Helm ◦ vLLM |
-| **Module** | Highly customizable, lightweight EKS blueprint for deploying vLLM on enterprise-grade clusters 
-| **CNI**    | AWS VPC with full-overlay **Calico** network
-| **Inference hardware** | Either CPU or GPU through a switch flag
- 
+| **Module** | Highly customizable, lightweight EKS blueprint for deploying vLLM on enterprise-grade cluster|
+| **CNI**    | AWS VPC with full-overlay **Calico** networ|
+| **Inference hardware** | Either CPU or GPU through a switch fla|
+
+<!-- markdownlint-disable MD051 MD036 MD056 -->
 ## 📋 Table of Contents
 
-1. [Project structure](#-project-structure)  
+1. [Project structure](#-project-structure)
 2. [Prerequisites](#-prerequisites)
 3. [What Terraform Deploys](#%EF%B8%8F-what-terraform-deploys)
 4. [Hardware Options](#-hardware-options)
@@ -19,12 +21,15 @@
 6. [Quick start](#-quick-start)
 7. [Quick Test](#-quick-test)
 8. [Observability](#-observability)
-9. [Troubleshooting](#-troubleshooting)  
-11. [Cleanup Notes](#-cleanup-notes)
-12. [Additional Resources](#-additional-resources)
+9. [Troubleshooting](#-troubleshooting)
+10. [Cleanup Notes](#-cleanup-notes)
+11. [Additional Resources](#-additional-resources)
+
 ---
+
 ## 📂 Project Structure
-```nginx
+
+```bash
 ./
 ├── main.tf
 ├── network.tf
@@ -43,18 +48,20 @@
 │   │   └── aws-vpc/
 │   ├── aws-eks/
 │   ├── eks-blueprints-addons/
-|   ├── eks-data-addons/
+|   ├── eks-data-addons|
 │   └── llm-stack
-|       ├── helm/
-|           ├── cpu/
-|           └── gpu/  
+|       ├── helm|
+|           ├── cpu|
+|           └── gpu|
 ├── config/
 │   ├── calico-values.tpl
 │   └── kubeconfig.tpl
-└── README.md                          # ← you are here                  
+└── README.md                          # ← you are here
 
 ```
+
 ---
+
 ## ✅ Prerequisites
 
 | Tool | Version tested | Notes |
@@ -66,8 +73,8 @@
 | **jq** | optional | JSON helper |
 | **openssl / base64** | optional | secret helpers |
 
-<details> 
- <summary><b>Install tools (Ubuntu/Debian)</b></summary>
+<details>
+ <summary><b>Follow steps to Install tools (Ubuntu/Debian) below 👇🏼</b></summary>
 
  ```bash
 # Install tools
@@ -79,38 +86,46 @@ curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.
 curl -sLO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install kubectl /usr/local/bin/ && rm kubectl
 curl -s https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg >/dev/null && echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm.list && sudo apt update && sudo apt install -y helm
 ```
+
 </details>
 
 **Configure AWS**
-```nginx
+
+```bash
 aws configure --profile myprofile
 export AWS_PROFILE=myprofile        # ← If null Terraform exec auth will use the default profile
 ```
+
 ---
 
 ## 🏗️ What Terraform Deploys
+
 <div align="center">
- 
+
 | Layer | Component | CPU Mode | GPU Mode |
 |------|-----------|----------|----------|
 | **Infrastructure** | VPC + EKS + Calico CNI | ✅ Always deployed | ✅ Always deployed |
 | **Add-ons** | EBS, ALB, Prometheus stack | ✅ Always deployed | ✅ Always deployed |
 | **vLLM Stack** | Secrets + Helm chart | ✅ Deploy on CPU nodes | ✅ + GPU nodes + NVIDIA operator |
 | **Networking** | Load balancer + Ingress | ✅ ALB configuration | ✅ ALB configuration |
+
 </div>
 <div align="center">
 <img width="266" height="496" alt="image" src="https://github.com/user-attachments/assets/47123e7d-5d30-448d-9266-ba7082403d3b" />
 <p><em>Figure-1 dependency chain of the eks addon layer with vllm on cpu</em></p>
-</div>  
- 
-### 1.📶 Networking 
+</div>
+
+### 1.📶 Networking
+
 * Custom `/16` VPC with 3 public + 3 private subnets
 * Single NAT GW (cost-optimized)
 * **Calico overlay CNI** with VXLAN encapsulation (110+ pods/node vs 17 with VPC CNI)
-* AWS Load Balancer Controller for ingress exposure 
+* AWS Load Balancer Controller for ingress exposure
 * Kubernetes-friendly subnet tagging and IAM roles
-### 2. ☸️ EKS Cluster 
-*  Control plane v1.30 with two managed node-group Types
+
+### 2. ☸️ EKS Cluster
+
+* Control plane v1.30 with two managed node-group Types
 
 | Pool | Instance | Purpose |
 |------|----------|---------|
@@ -118,6 +133,7 @@ export AWS_PROFILE=myprofile        # ← If null Terraform exec auth will use t
 | `gpu_pool` *(optional)* | **g5.xlarge** (1 × A10 GPU) | heavy inference or training |
 
 ### 3. 📦 Add-ons (“Blueprints”)
+
 Core EKS add-ons via [terraform-aws-eks-**blueprints-addons**](https://github.com/aws-ia/terraform-aws-eks-blueprints-addons) along with gpu operator via [terraform-aws-eks-data-addons](https://github.com/aws-ia/terraform-aws-eks-data-addons).
 
 | Category      | Add-on |
@@ -129,18 +145,19 @@ Core EKS add-ons via [terraform-aws-eks-**blueprints-addons**](https://github.co
 | **Observability** | kube-prometheus-stack, CloudWatch metrics |
 | **Security**  | cert-manager, External-DNS / External-Secrets |
 | **Optional**  | NVIDIA Optional GPU operator toggle |
- 
-### 4. 🧠 vLLM Production Stack (CPU/GPU)
-- **Model serving**: (Default) Single TinyLlama-1.1B model replica 
-- **Load balancing**: Round-robin router service
-- **Hugging Face token**: stored as Kubernetes Secret
-- **LLM Storage**: Init container Persistent model caching under `/data/models/`
-- **Default Helm charts**: [cpu-tinyllama-light-ingress](./modules/llm-stack/helm/cpu/cpu-tinyllama-light-ingress-tpl) | [gpu-tinyllama-light-ingress](./modules/llm-stack/helm/gpu/gpu-tinyllama-light-ingress-tpl)
 
+### 4. 🧠 vLLM Production Stack (CPU/GPU)
+
+* **Model serving**: (Default) Single TinyLlama-1.1B model replica
+* **Load balancing**: Round-robin router service
+* **Hugging Face token**: stored as Kubernetes Secret
+* **LLM Storage**: Init container Persistent model caching under `/data/models/`
+* **Default Helm charts**: [cpu-tinyllama-light-ingress](./modules/llm-stack/helm/cpu/cpu-tinyllama-light-ingress-tpl) | [gpu-tinyllama-light-ingress](./modules/llm-stack/helm/gpu/gpu-tinyllama-light-ingress-tpl)
 
 ---
 
 ## 💡 Hardware Options
+
 You can choose to deploy VLLM production stack on either CPU or GPU using the `inference_hardware` parameter
 <div align="center">
 <img width="703" height="676"  alt="image" src="https://github.com/user-attachments/assets/20a719c9-7a7e-4689-8b15-acfd84448f21" />
@@ -148,18 +165,20 @@ You can choose to deploy VLLM production stack on either CPU or GPU using the `i
 </div>
 
 <div align="center">
- 
+
 | Mode | Setting | Resources |
 |------|---------|-----------|
 | **CPU** | `inference_hardware = "cpu"` | Uses existing CPU nodes (t3a.large) |
 | **GPU** | `inference_hardware = "gpu"` | Provisions GPU nodes (g5.xlarge + NVIDIA operator) |
+
 </div>
 
- # 🖥️ AWS GPU Instance Types Available
+## 🖥️ AWS GPU Instance Types Available
+
 (T4 · L4 · V100 · A10G · A100) . Read the full list of AWS GPU instance offering [here](https://instances.vantage.sh/?id=f7932a1aadf6b5f3810c902c0e155052f5095bbb).
 <details><summary><b> Available GPU instances</b></summary>
 <br>
- 
+
 | AWS EC2 Instance | vCPUs | Memory (GiB) | GPUs | GPU Memory (GiB) | Best For |
 |---|---|---|---|---|---|
 | **NVIDIA Tesla T4** |
@@ -185,9 +204,11 @@ You can choose to deploy VLLM production stack on either CPU or GPU using the `i
 | `g5.12xlarge` | 48 | 192 | 4 | 96 | Multi-GPU training |
 | `g5.24xlarge` | 96 | 384 | 4 | 96 | Ultra-large-scale training |
 | `g5.48xlarge` | 192| 768 | 8 | 192| Extreme-scale training |
+
 </details>
 
-### GPU Specifications  
+## GPU Specifications
+
 | GPU Type           |  Best For                         | Relative Cost |
 |--------------------|----------------------------------|---------------|
 | NVIDIA Tesla T4    | ML inference, small-scale training | $             |
@@ -196,8 +217,10 @@ You can choose to deploy VLLM production stack on either CPU or GPU using the `i
 | NVIDIA Tesla V100  | Large-scale ML training & inference | $$$           |
 | NVIDIA A100        | Cutting-edge AI workloads        | $$$$          |
 
-# 🛠️Configuration knobs 
+## 🛠️Configuration knobs
+
 This stack provides extensive customization options to tailor your deployment:
+
 | Variable               | Default        | Description                 |
 |------------------------|----------------|-----------------------------|
 | `region`               | `us-east-2`    | AWS Region                 |
@@ -206,24 +229,27 @@ This stack provides extensive customization options to tailor your deployment:
 | `enable_efs_csi_driver`| `true`         | Shared storage              |
 | `enable_vllm`          | `true`         | Deploy stack                |
 | `hf_token`             | **«secret»**   | HF model download token     |
-| `enable_prometheus`    |  true          |	prometheus-grafana stack    |
+| `enable_prometheus`    |  true          | prometheus-grafana stack    |
 | `cluster_version` | `1.30` | Kubernetes version |
 | `nvidia_setup` | `plugin` | GPU setup mode (plugin/operator) |
 
 ### 📋 Complete Configuration Options
 
 **This is just a subset of available variables.** For the full list of 20+ configurable options including:
-- **Node group** sizing (CPU/GPU pools)
-- **Storage drivers** (EBS/EFS) 
-- **Observability stack** (Prometheus/Grafana)
-- **Security settings** (cert-manager, external-secrets)
-- **Network configuration** (VPC CIDR, subnets)
+
+* **Node group** sizing (CPU/GPU pools)
+* **Storage drivers** (EBS/EFS)
+* **Observability stack** (Prometheus/Grafana)
+* **Security settings** (cert-manager, external-secrets)
+* **Network configuration** (VPC CIDR, subnets)
 
 **📓** See the complete configuration template:
-- **Environment variables**: [`env-vars.template`](./env-vars.template)
-- **Terraform variables tfvars**: [`terraform.tfvars.template`](./terraform.tfvars.template)
+
+* **Environment variables**: [`env-vars.template`](./env-vars.template)
+* **Terraform variables tfvars**: [`terraform.tfvars.template`](./terraform.tfvars.template)
 
 <details><summary><b> Full list of variables</b></summary>
+
 ## Requirements
 
 | Name | Version |
@@ -374,10 +400,15 @@ This stack provides extensive customization options to tailor your deployment:
 | <a name="output_vllm_ingress_hostname"></a> [vllm\_ingress\_hostname](#output\_vllm\_ingress\_hostname) | The hostname of the vLLM ingress load balancer (null if no ingress configured) |
 | <a name="output_vpc_cidr"></a> [vpc\_cidr](#output\_vpc\_cidr) | #### Network outputs ##### |
 | <a name="output_vpc_id"></a> [vpc\_id](#output\_vpc\_id) | n/a |
+
 </details>
+
 ---
+
 ## 🚀 Quick start
+
 ### ⚙️ Provisioning logic
+
 The deployment automatically provisions only the required infrastructure based on your hardware selection.
 
 | Phase | Component | Action | Condition |
@@ -395,26 +426,31 @@ The deployment automatically provisions only the required infrastructure based o
 | | Application | Deploy TinyLlama-1.1B Helm chart to `vllm` namespace | `enable_vllm = true` |
 | **3. Networking** | Load Balancer | Configure ALB and ingress for external access | `enable_vllm = true` |
 | **4. model storage** | loaded locally | Using init container | -> `/data/models` |
- 
+
 ---
+
 ## 🔵 Deployment Steps
 
 ### 1. Clone the repository
-```nginx
+
+```bash
 git clone https://github.com/vllm-project/production-stack
 cd production-stack/tutorials/terraform/eks/
 ```
+
 ### 2. Configure the Environment
-```nginx
+
+```bash
 cp env-vars.template env-vars
 vim env-vars  # Set HF token and customize deployment options
 source env-vars
 ```
+
 **Usage examples**
 
-- **Option 1: Throug Environment Variables**
-  
-  ```nginx
+* **Option 1: Through Environment Variables**
+
+  ```bash
   # Copy and customize
   $ cp env-vars.template env-vars
   $ vi env-vars
@@ -430,7 +466,7 @@ source env-vars
    #   • operator_no_driver -> GPU Operator (driver disabled)
    #   • operator_custom  -> GPU Operator with your YAML
    ################################################################################
-   export TF_VAR_nvidia_setup="plugin" # default: "plugin" 
+   export TF_VAR_nvidia_setup="plugin" # default: "plugin"
    ################################################################################
    # 🧠 LLM Inference Configuration
    ################################################################################
@@ -438,7 +474,7 @@ source env-vars
    export TF_VAR_hf_token=""                # default: "" - Hugging Face token for model download (if needed)
    export TF_VAR_inference_hardware="gpu"   # default: "cpu" - "cpu" or "gpu"
    ################################################################################
-   export TF_VAR_nvidia_setup="plugin" # default: "" 
+   export TF_VAR_nvidia_setup="plugin" # default: ""
    # Paths to Helm chart values templates for vLLM.
    # These paths are relative to the root of your Terraform project.
    export TF_VAR_gpu_vllm_helm_config="./modules/llm-stack/helm/gpu/gpu-tinyllama-light-ingress.tpl" # default: ""
@@ -457,22 +493,24 @@ source env-vars
    ...snip
    $ source env-vars
    ```
-- **Option 2: Through Terraform Variables**
+
+* **Option 2: Through Terraform Variables**
+
   ```bash
-   # Copy and customize  
+   # Copy and customize
    $ cp terraform.tfvars.example terraform.tfvars
    $ vim terraform.tfvars
   ```
 
 ### 3. Deploy Infrastructure
-```nginx
+
+```bash
 terraform init
 terraform plan
 terraform apply
 ```
+
 ---
-
-
 
 ## 🧪 Quick Test
 
@@ -480,19 +518,22 @@ terraform apply
 
 1.1 **Router Endpoint through port forwarding**
    run the following command:
-```nginx
-$ kubectl -n vllm port-forward svc/vllm-gpu-router-service 30080:80
+
+```bash
+kubectl -n vllm port-forward svc/vllm-gpu-router-service 30080:80
 
 ```
-1.2 **Extracting the Router URL via AWS ALB Ingress**
-If AWS load balancer Controler is enabled (`enable_lb_ctl=true`), The router endpoint ingress URL is displayed in the `vllm_ingress_hostname` output, or by running the following command:
 
-```nginx
+1.2 **Extracting the Router URL via AWS ALB Ingress**
+If AWS load balancer Controller is enabled (`enable_lb_ctl=true`), The router endpoint ingress URL is displayed in the `vllm_ingress_hostname` output, or by running the following command:
+
+```bash
 $ k get ingress -n vllm -o json| jq -r .items[0].status.loadBalancer.ingress[].hostname
 k8s-vllm-vllmingr-983dc8fd68-161738753.us-east-2.elb.amazonaws.com
 ```
 
 **2. List models**
+
 ```bash
 -- case 1 : Port forwarding
 export vllm_api_url=http://localhost:30080/v1
@@ -502,9 +543,11 @@ export vllm_api_url=http://k8s-vllm-vllmingr-983dc8fd68-161738753.us-east-2.elb.
 ---- check models
 curl -s ${vllm_api_url}/models | jq .
 ```
+
 **3. Completion**
-Aplicable for both ingress and port forwarding URLs
-```nginx
+Applicable for both ingress and port forwarding URLs
+
+```bash
 curl ${vllm_api_url}/completions     -H "Content-Type: application/json"     -d '{
         "model": "/data/models/tinyllama",
         "prompt": "Toronto is a",
@@ -520,49 +563,60 @@ curl ${vllm_api_url}/completions     -H "Content-Type: application/json"     -d 
 ```
 
 **5. vLLM model service**
-```
+
+```bash
 kubectl -n vllm get svc
 ```
+
 ## 🔬 Observability
-Grafana (if enabled) you can use port forwarding to access the dashboard. URL → "http://localhost:3000"
+
+Grafana (if enabled) you can use port forwarding to access the dashboard. URL → "<http://localhost:3000>"
+
  ```bash
  kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n kube-prometheus-stack
  ```
-- Login: admin
-- Run the below command to fetch the password
-```console
+
+* Login: admin
+* Run the below command to fetch the password
+
+```bash
 kubectl get secret -n kube-prometheus-stack kube-prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
 ```
+
 >[!note]
-> In this stack, the vLLM dashboard and service monitoring are automatically configured in Grafana. No manual setup needed. 
+> In this stack, the vLLM dashboard and service monitoring are automatically configured in Grafana. No manual setup needed.
 ><img width="3813" height="1643" alt="image" src="https://github.com/user-attachments/assets/2df312b6-3465-4049-90c8-c33540f5b6d3" />
 
 ---
- 
-# 🎯 Troubleshooting
+
+## 🎯 Troubleshooting
 
 **1. [Ordering issue with AWS Load Balancer Controller](https://github.com/aws-ia/terraform-aws-eks-blueprints-addons/issues/233)**
 
-With LBC ≥ 2.5.1 the chart enables a MutatingWebhook that intercepts every Service of type LoadBalancer: 
+With LBC ≥ 2.5.1 the chart enables a MutatingWebhook that intercepts every Service of type LoadBalancer:
 <img width="2162" height="433" alt="image" src="https://github.com/user-attachments/assets/10e00422-436b-4003-a6de-e1edee912da7" />
 
 As a result addons services (i.e cert manager) will timeout waiting for the webhook to be available.
+
 ```bash
 no endpoints available for service "aws-load-balancer-webhook-service"
 ```
+
 > **Fix Applied**
 >
 > We turned off the webhook as we don't use `serviceType: LoadBalancer`here.
-> ```nginx
+>
+> ```bash
 > # in your blueprints-addons block
 > aws_load_balancer_controller = {
 >  enable_service_mutator_webhook = false   # turns off the webhook
 >}
->```
->  **Note:** If you plan to use `serviceType: LoadBalancer`, deploy the LBC add-on first, then apply the rest of the stack.
-
+> ```
+>
+> **Note:** If you plan to use `serviceType: LoadBalancer`, deploy the LBC add-on first, then apply the rest of the stack.
 
 **2. Calico discovery commands**
+
 ```bash
 # Calico pods (overlay CNI)
 kubectl -n tigera-operator get pods
@@ -573,13 +627,15 @@ kubectl -n tigera-operator get pods
 ```
 
 ## 🔧 Cleanup Notes
+
 ### Optional Manual Cleanup
 
 In rare cases, you may need to manually clean up some AWS resources while running terraform destroy. Here are the most common scenarios:
 
-**1️⃣. load balancer blocking public subnets/igw deletion** 
+**1️⃣. load balancer blocking public subnets/igw deletion**
 
 When AWS LB controller ingress is enabled (`enable_lb_ctl=true`), you might encounter VPC deletion issues linked to LB dependency. Run the below cleanup commands:
+
 ```bash
 export PROFILE=profile_name  (ex: default)
 export region=<region>       (ex: "us-east-2")
@@ -590,18 +646,22 @@ alb_name=`aws elbv2 describe-load-balancers --query "LoadBalancers[*].LoadBalanc
   --query 'LoadBalancers[0].LoadBalancerArn' \
   --output text --region $region --profile $PROFILE)
 # delete :
-aws elbv2 delete-load-balancer --load-balancer-arn "$alb_arn" --region $region --profile $PROFILE 
+aws elbv2 delete-load-balancer --load-balancer-arn "$alb_arn" --region $region --profile $PROFILE
 ```
+
 **Re-Run terraform destroy**
+
 ``` bash
 terraform destroy
 ```
+
 >[!note]
 > Another solution is to disable AWS load balancer control creation altogether by setting the variable `enable_lb_ctl` to `false` see  [variables.tf](./variables.tf)
 
 **2️⃣. vllm namespace**
 
-When AWS LB controller ingress is enabled (`enable_lb_ctl=true`),the vLLM namespace can get stuck in "Terminating" state, you might need to patch some finalizers. 
+When AWS LB controller ingress is enabled (`enable_lb_ctl=true`),the vLLM namespace can get stuck in "Terminating" state, you might need to patch some finalizers.
+
 ```bash
 # Remove finalizers from AWS resources
 RESOURCE_NAME=$(kubectl get targetgroupbinding.elbv2.k8s.aws -n vllm -o jsonpath='{.items[0].metadata.name}')
@@ -611,9 +671,11 @@ kubectl delete targetgroupbinding.elbv2.k8s.aws $RESOURCE_NAME -n vllm --ignore-
 INGRESS_NAME=$(kubectl get ingress -n vllm -o jsonpath='{.items[0].metadata.name}')
 kubectl patch ingress $INGRESS_NAME -n vllm --type=merge -p '{"metadata":{"finalizers":[]}}'
 ```
+
 **3️⃣. Calico Cleanup Jobs**
 
 If encountering job conflicts during Calico removal (i.e: * jobs.batch "tigera-operator-uninstall" already exists) run the below commands
+
 ```bash
 # use the following commands to delete the jobs manually first:
 kubectl -n tigera-operator delete job tigera-operator-uninstall --ignore-not-found=true
@@ -623,15 +685,20 @@ kubectl delete ns tigera-operator --ignore-not-found=true
 
 **4️⃣. Clean up associated security groups**
 When AWS LB controller ingress is enabled (`enable_lb_ctl=true`), you might need to  delete orphan SGs (non-default) to destroy subnets:
+
 ```bash
 VPC_ID=$(aws ec2 describe-vpcs --query 'Vpcs[?Tags[?Key==`Name` && Value==`vllm-vpc`]].VpcId' --output text --profile $PROFILE)
 # Deletion
 aws ec2 describe-security-groups --filters Name=vpc-id,Values=${VPC_ID} --query "SecurityGroups[?starts_with(GroupName, 'k8s-') || contains(GroupName, 'vllm')].GroupId"    --output text    --profile ${PROFILE} |  tr -s '[:space:]' '\n' |  xargs -r -I{} aws ec2 delete-security-group --group-id {} --profile ${PROFILE}
 ```
-**Note:** These manual steps are only needed if terraform destroy encounters specific dependency issues. 
+
+**Note:** These manual steps are only needed if terraform destroy encounters specific dependency issues.
+
 ## 📚 Additional Resources
-- [vLLM Documentation](https://docs.vllm.ai/)
-- [terraform-aws-eks](https://github.com/terraform-aws-modules/terraform-aws-eks)
-- [EKS Blueprints](https://github.com/aws-ia/terraform-aws-eks-blueprints)
-- [Calico Documentation](https://docs.projectcalico.org/)
-- [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/)
+
+* [vLLM Documentation](https://docs.vllm.ai/)
+* [terraform-aws-eks](https://github.com/terraform-aws-modules/terraform-aws-eks)
+* [EKS Blueprints](https://github.com/aws-ia/terraform-aws-eks-blueprints)
+* [Calico Documentation](https://docs.projectcalico.org/)
+* [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/)
+<!-- markdownlint-disable MD051 MD036 MD056 -->

@@ -11,7 +11,7 @@ variable "region" {
 variable "aws_profile" {
   description = "AWS profile to use"
   type        = string
-  default     = "cloudthrill"  # Change to your profile name or leave as "default"
+  default     = "default"  # Change to your profile name or leave as "default"
 }
 #  variable "aws_access_key" {
 #   sensitive   = true
@@ -160,7 +160,7 @@ variable "enable_cluster_creator_admin_permissions" {
   default     = true
 }
 ################################################################################
-# 🔒  NETWORKING ADD‑ONS
+# 🔒  NETWORKING ADD‑OWNS
 ################################################################################
 
 variable "calico_version" {
@@ -303,7 +303,7 @@ variable "gpu_node_instance_types" {
 }
 
 variable "cpu_node_instance_types" {
-  type    = list(string)  
+  type    = list(string)
   default = ["t3.xlarge"] # t3.medium (2 vCPU, 4 GiB RAM), doesn't work with calico
 }
 

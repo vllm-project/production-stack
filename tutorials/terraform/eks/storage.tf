@@ -1,5 +1,5 @@
 
-# Create EFS file system and mount targets separately  
+# Create EFS file system and mount targets separately
 locals {
   enable_efs_storage = var.enable_efs_storage && var.enable_efs_csi_driver
 }
@@ -20,13 +20,13 @@ resource "aws_efs_file_system" "eks-efs" {
   }
 }
 
-# Create mount targets in each private subnet  
+# Create mount targets in each private subnet
 resource "aws_efs_mount_target" "eks-efs-mounts" {
   count = local.enable_efs_storage ? length(local.private_subnet_ids) : 0
   file_system_id  = aws_efs_file_system.eks-efs[0].id
   subnet_id       = local.private_subnet_ids[count.index]
   security_groups = [aws_security_group.efs-sg[0].id, module.eks.cluster_primary_security_group_id]
-  
+
   # being explicit helps Terraform order things correctly
   depends_on = [
     module.vpc,
@@ -35,7 +35,7 @@ resource "aws_efs_mount_target" "eks-efs-mounts" {
 }
 
 ###############################################################
-# Security group for EFS  
+# Security group for EFS
 ##############################################################
 resource "aws_security_group" "efs-sg" {
   count       = local.enable_efs_storage ? 1 : 0
