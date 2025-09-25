@@ -114,13 +114,13 @@ class MovingAverageMonitor:
         return sum(self.values)
 
 
+@dataclass
 class RequestStatsCacheInfo:
     """
     Cache information.
     """
-    def __init__(self):
-        self.num_prefix_tokens : int = 0
-        self.num_cached_tokens : int = 0
+    num_prefix_tokens : int = 0
+    num_cached_tokens : int = 0
 
 
 class RequestStatsMonitor(metaclass=SingletonMeta):

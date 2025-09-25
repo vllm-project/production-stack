@@ -24,6 +24,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import requests
 from fastapi import Request
+from future.backports.urllib.parse import urlparse
 
 try:
     from transformers import AutoTokenizer
@@ -271,10 +272,7 @@ class KvawareRouter(RoutingInterface):
             f"0.0.0.0:{self.lmcache_controller_port}"
         )
         self.req_id = 0
-        if instance_id_to_url is None:
-            self.instance_id_to_url = {}
-        else:
-            self.instance_id_to_url = instance_id_to_url
+        self.instance_id_to_url = instance_id_to_url or {}
         self.session_key = session_key
         self.hash_ring = HashRing()
         self.tokenizer_name = tokenizer_name
@@ -511,16 +509,12 @@ class TtftRouter(RoutingInterface):
         self.kv_manager = controller_manager.LMCacheControllerManager(
             f"0.0.0.0:{lmcache_controller_port}"
         )
-        if instance_id_to_url is None:
-            self.instance_id_to_url = {}
-        else:
-            self.instance_id_to_url = instance_id_to_url
+        self.instance_id_to_url = instance_id_to_url or {}
         self.session_key = session_key
         self.hash_ring = HashRing()
         self.tokenizer_name = tokenizer_name
         self.tokenizer = None
         self.enable_shared_cache = enable_shared_cache
-        self.cached_prefix_tokens = None
 
     def start_kv_manager(self):
         """
@@ -580,10 +574,8 @@ class TtftRouter(RoutingInterface):
                 await self._find_best_inst(endpoints, matched_infos,
                                            best_matched_info, request_stats,
                                            len(token_ids))
-            if best_matched_info:
-                cache_info.num_cached_tokens = num_cached_tokens
-            else:
-                return best_inst_url, cache_info
+            cache_info.num_cached_tokens = num_cached_tokens
+            return best_inst_url, cache_info
         except ValueError:
             logger.info("Fallback to QPS routing due to:")
             logger.info(traceback.format_exc())
@@ -651,7 +643,7 @@ class TtftRouter(RoutingInterface):
             num_cache_tokens = best_matched_info[1][-1][1]
         elif matched_info is not None:
             num_cache_tokens = matched_info[1][-1][1]
-        workload = (stats.prefill_todo_workload +
+        workload = ((stats.prefill_todo_workload is stats else 0) +
                     prefill_workload(num_prefix_tokens, num_cache_tokens))
         return workload, num_cache_tokens
 
@@ -662,9 +654,7 @@ class TtftRouter(RoutingInterface):
         for endpoint in endpoints:
             msg = QueryInstMsg(
                 event_id="",
-                ip=endpoint.url.split(f":{endpoint.url.split(":")[-1]}")[
-                    0
-                ].split("//")[1]
+                ip=urlparse(endpoint.url).hostname
             )
             ret_msg = await self.kv_manager.handle_orchestration_message(msg)
             self.instance_id_to_url[ret_msg.instance_id] = endpoint.url
