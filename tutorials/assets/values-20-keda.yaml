@@ -13,7 +13,7 @@ spec:
   # How often KEDA should check the metrics (in seconds)
   pollingInterval: 15
   # How long to wait before scaling down after scaling up (in seconds)
-  cooldownPeriod: 30
+  cooldownPeriod: 360
   # Scaling triggers configuration
   triggers:
     - type: prometheus

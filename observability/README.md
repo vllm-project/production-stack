@@ -19,7 +19,7 @@ Make sure to have:
 After that you can run:
 
 ```bash
-sudo bash install.sh
+bash install.sh
 ```
 
 After installing, the dashboard can be accessed through the service `service/kube-prom-stack-grafana` in the `monitoring` namespace.
@@ -40,7 +40,7 @@ kubectl --namespace monitoring port-forward prometheus-kube-prom-stack-kube-prom
 
 Open the webpage at `http://<IP of your node>:3000` to access the Grafana web page. The default user name is `admin` and the password can be configured in `kube-prom-stack.yaml` field `adminPassword` (default is `prom-operator`).
 
-Import the dashboard using the `vllm-dashboard.json` in this folder.
+To import the dashboard, click **+** in the top-right corner and then upload the `vllm-dashboard.json` file from this folder.
 
 ## Import LMCache Dashboard
 
@@ -113,5 +113,5 @@ The output should look like the following:
 ## Uninstall the observability stack
 
 ```bash
-sudo bash uninstall.sh
+bash uninstall.sh
 ```

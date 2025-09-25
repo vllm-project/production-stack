@@ -334,8 +334,12 @@ spec:
             value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
-          - name: LMCACHE_WORKER_PORT
+          - name: LMCACHE_LMCACHE_WORKER_PORT
             value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
+          {{-   end }}
+          {{-  if hasKey $modelSpec.lmcacheConfig "distributedUrl" }}
+          - name: LMCACHE_DISTRIBUTED_URL
+            value: {{ $modelSpec.lmcacheConfig.distributedUrl | quote }}
           {{-   end }}
           {{- end }}
           {{- if or .Values.servingEngineSpec.configs $modelSpec.envFromSecret }}
