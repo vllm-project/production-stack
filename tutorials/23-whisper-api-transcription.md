@@ -43,14 +43,17 @@ uv run python3 -m vllm_router.app \
     --service-discovery static \
     --static-backends "$2" \
     --static-models "openai/whisper-small" \
-    --static-model-labels "transcription" \
+    --static-model-types "transcription" \
     --routing-logic roundrobin \
     --log-stats \
-    --log-level debug \  # log level: "debug", "info", "warning", "error", "critical"
+    --log-level debug \
     --engine-stats-interval 10 \
-    --request-stats-window 10
-    --static-backend-health-checks # Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.
+    --request-stats-window 10 \
+    --static-backend-health-checks
 ```
+
+* `--log-level` options: "debug", "info", "warning", "error", "critical"
+* `--static-backend-health-checks`: Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.
 
 Example usage:
 
