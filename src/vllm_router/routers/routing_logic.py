@@ -269,7 +269,7 @@ class KvawareRouter(RoutingInterface):
             f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
         )
         self.kv_manager = controller_manager.LMCacheControllerManager(
-            {"pull" : f"0.0.0.0:{self.lmcache_controller_port}"}
+            {"pull" : f"0.0.0.0:{lmcache_controller_port}"}
         )
         self.req_id = 0
         self.instance_id_to_url = instance_id_to_url or {}
@@ -507,7 +507,7 @@ class TtftRouter(RoutingInterface):
             f"Initializing TtftRouter with lmcache addr: 0.0.0.0:{lmcache_controller_port}"
         )
         self.kv_manager = controller_manager.LMCacheControllerManager(
-            {"pull":f"0.0.0.0:{self.lmcache_controller_port}"}
+            {"pull":f"0.0.0.0:{lmcache_controller_port}"}
         )
         self.instance_id_to_url = instance_id_to_url or {}
         self.session_key = session_key
