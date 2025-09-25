@@ -643,7 +643,7 @@ class TtftRouter(RoutingInterface):
             num_cache_tokens = best_matched_info[1][-1][1]
         elif matched_info is not None:
             num_cache_tokens = matched_info[1][-1][1]
-        workload = ((stats.prefill_todo_workload is stats else 0) +
+        workload = ((stats.prefill_todo_workload if stats else 0) +
                     prefill_workload(num_prefix_tokens, num_cache_tokens))
         return workload, num_cache_tokens
 
