@@ -24,7 +24,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import requests
 from fastapi import Request
-from future.backports.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 try:
     from transformers import AutoTokenizer
