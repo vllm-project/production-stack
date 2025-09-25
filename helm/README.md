@@ -180,9 +180,22 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.resources.limits.cpu` | string | `"8"` | CPU limits for router |
 | `routerSpec.resources.limits.memory` | string | `"32G"` | Memory limits for router |
 | `routerSpec.labels` | map | `{environment: "router", release: "router"}` | Customized labels for the router deployment |
+| `routerSpec.affinity` | map | {} | Affinity configuration |
 | `routerSpec.nodeSelectorTerms` | list | `[]` | Node selector terms to match the nodes for the router pods |
 | `routerSpec.hf_token` | string | `""`| Hugging Face token for router |
 | `routerSpec.lmcacheControllerPort` | string |`"8000"`|LMCache controller port |
+| `routerSpec.livenessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's liveness probe |
+| `routerSpec.livenessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's liveness probe |
+| `routerSpec.livenessProbe.failureThreshold` | integer |`3`| Failure threshold for router's liveness probe |
+| `routerSpec.livenessProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's liveness probe will be testing |
+| `routerSpec.startupProbe.initialDelaySeconds` | integer |`5`| Initial delay in seconds for router's startup probe |
+| `routerSpec.startupProbe.periodSeconds` | integer |`5`| Interval in seconds for router's startup probe |
+| `routerSpec.startupProbe.failureThreshold` | integer |`3`| Failure threshold for router's startup probe |
+| `routerSpec.startupProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's startup probe will be testing |
+| `routerSpec.readinessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's readiness probe |
+| `routerSpec.readinessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's readiness probe |
+| `routerSpec.readinessProbe.failureThreshold` | integer |`3`| Failure threshold for router's readiness probe |
+| `routerSpec.readinessProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's readiness probe will be testing |
 
 #### Router Ingress Configuration
 
@@ -221,6 +234,7 @@ This table documents all available configuration values for the Production Stack
 | `cacheserverSpec.securityContext` | map | `{}` | Pod-level security context configuration |
 | `cacheserverSpec.containerSecurityContext` | map | `{runAsNonRoot: false}` | Container-level security context configuration |
 | `cacheserverSpec.priorityClassName` | string | - | Priority class for cache server |
+| `cacheserverSpec.affinity` | map | - | Affinity configuration |
 | `cacheserverSpec.nodeSelectorTerms` | list | - | Node selector terms |
 | `cacheserverSpec.serde` | string | - | Serialization/deserialization format |
 

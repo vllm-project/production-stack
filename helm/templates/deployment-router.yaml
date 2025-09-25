@@ -25,7 +25,10 @@ spec:
       {{- if .Values.routerSpec.priorityClassName }}
       priorityClassName: {{ .Values.routerSpec.priorityClassName | quote }}
       {{- end }}
-      {{- if .Values.routerSpec.nodeSelectorTerms }}
+      {{- if not (empty .Values.routerSpec.affinity) }}
+      affinity:
+        {{- toYaml .Values.routerSpec.affinity | nindent 8 }}
+      {{- else if .Values.routerSpec.nodeSelectorTerms }}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -136,17 +139,24 @@ spec:
           - name: "lmcache-port"
             containerPort: 9000
         livenessProbe:
-          initialDelaySeconds: 30
-          periodSeconds: 5
-          failureThreshold: 3
+          initialDelaySeconds: {{ default 30 .Values.routerSpec.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ default 5 .Values.routerSpec.livenessProbe.periodSeconds }}
+          failureThreshold: {{ default 3 .Values.routerSpec.livenessProbe.failureThreshold }}
           httpGet:
-            path: /health
+            path: {{ default "/health" .Values.routerSpec.livenessProbe.httpGet.path }}
             port: {{ .Values.routerSpec.containerPort }}
         startupProbe:
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          failureThreshold: 3
+          initialDelaySeconds: {{ default 5 .Values.routerSpec.startupProbe.initialDelaySeconds }}
+          periodSeconds: {{ default 5 .Values.routerSpec.startupProbe.periodSeconds }}
+          failureThreshold: {{ default 3 .Values.routerSpec.startupProbe.failureThreshold }}
           httpGet:
-            path: /health
+            path: {{ default "/health" .Values.routerSpec.startupProbe.httpGet.path }}
+            port: {{ .Values.routerSpec.containerPort }}
+        readinessProbe:
+          initialDelaySeconds: {{ default 30 .Values.routerSpec.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ default 5 .Values.routerSpec.readinessProbe.periodSeconds }}
+          failureThreshold: {{ default 3 .Values.routerSpec.readinessProbe.failureThreshold }}
+          httpGet:
+            path: {{ default "/health" .Values.routerSpec.readinessProbe.httpGet.path }}
             port: {{ .Values.routerSpec.containerPort }}
 {{- end }}
