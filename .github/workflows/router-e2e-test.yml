@@ -30,12 +30,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          activate-environment: true
+
       - name: Install dependencies
         run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
-          python -m pip install --upgrade pip
-          pip install -e .[semantic_cache,lmcache,test]
+          uv pip install --upgrade pip
+          uv pip install -e .[semantic_cache,lmcache,test]
 
       - name: Make scripts executable
         run: |
@@ -69,7 +72,7 @@ jobs:
 
       - name: Run E2E Tests with Coverage
         run: |
-          pip install coverage
+          uv pip install coverage
           coverage run --source=src/vllm_router -m pytest src/tests/test_*.py
           coverage report -m > coverage.txt
 
