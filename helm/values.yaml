@@ -459,34 +459,28 @@ routerSpec:
   # <probe>.httpGet.port will automatically be set to .Values.routerSpec.containerPort
 
   # Liveness probe configuration.
-  # Example:
-  # livenessProbe:
-  #   initialDelaySeconds: 30
-  #   periodSeconds: 5
-  #   failureThreshold: 3
-  #   httpGet:
-  #     path: /health
-  livenessProbe: {}
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    failureThreshold: 3
+    httpGet:
+      path: /health
 
   # Startup probe configuration.
-  # Example:
-  # startupProbe:
-  #   initialDelaySeconds: 5
-  #   periodSeconds: 5
-  #   failureThreshold: 3
-  #   httpGet:
-  #     path: /health
-  startupProbe: {}
+  startupProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+    httpGet:
+      path: /health
 
   # Readiness probe configuration.
-  # Example:
-  # readinessProbe:
-  #   initialDelaySeconds: 30
-  #   periodSeconds: 5
-  #   failureThreshold: 3
-  #   httpGet:
-  #     path: /health
-  readinessProbe: {}
+  readinessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    failureThreshold: 3
+    httpGet:
+      path: /health
 
   # -- TODO: Readiness probe configuration
   #startupProbe:
