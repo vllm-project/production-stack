@@ -35,9 +35,7 @@ jobs:
           source /usr/local/bin/conda-init
           conda activate llmstack
           python -m pip install --upgrade pip
-          pip install -r src/tests/requirements.txt
-          pip install -r requirements-test.txt
-          pip install -e .
+          pip install -e .[semantic_cache,lmcache,test]
 
       - name: Make scripts executable
         run: |
