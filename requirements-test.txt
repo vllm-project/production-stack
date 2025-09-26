@@ -1,6 +1,5 @@
 faiss-cpu>=1.7.4
 huggingface-hub==0.33.0
-openai==1.109.1
 pytest
 pytest-asyncio
 sentence-transformers>=2.2.2
