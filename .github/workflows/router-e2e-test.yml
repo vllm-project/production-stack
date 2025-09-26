@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv pip install --upgrade pip
-          uv pip install -e .[semantic_cache,lmcache,test]
+          uv pip install -e ".[semantic_cache,lmcache,test]"
 
       - name: Make scripts executable
         run: |
@@ -106,14 +106,6 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      - name: Install Python dependencies
-        run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
-          python -m pip install --upgrade pip
-          pip install -r benchmarks/multi-round-qa/requirements.txt
-          pip install -e .
-
       - name: Setup minikube environment
         env:
           DOCKER_BUILDKIT: 1
@@ -169,24 +161,18 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          activate-environment: true
+
       - name: Install Python dependencies
         run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
-          python -m pip install --upgrade pip
-          pip install -e .
-
-      - name: Install vLLM and lmcache
-        run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
-          pip install vllm
-          pip install lmcache
+          uv pip install --upgrade pip
+          uv pip install -e ".[semantic_cache,lmcache,test]"
 
       - name: Start 2 vLLM serve backends
         run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
           echo "🚀 Starting vLLM serve backend"
           mkdir -p "$LOG_DIR"
           CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
@@ -200,8 +186,6 @@ jobs:
 
       - name: Run All Static Discovery Routing Tests
         run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
           echo "🧪 Running all static discovery routing tests sequentially"
           chmod +x tests/e2e/run-static-discovery-routing-test.sh
           ./tests/e2e/run-static-discovery-routing-test.sh all \
