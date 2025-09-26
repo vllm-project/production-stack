@@ -1,0 +1,82 @@
+#!/bin/bash
+# This file sets environment variables for Terraform.
+# To use it, source it in your shell before running Terraform commands:
+# source ./.env-vars
+#
+# Remember to fill in sensitive values (like AWS keys, HF token)
+# and adjust defaults as needed for your environment.
+################################################################################
+# AWS Credentials and Region
+################################################################################
+export TF_VAR_aws_access_key=""  # default: "" - Fill your AWS Access Key ID
+export TF_VAR_aws_secret_key=""  # default: "" - Fill your AWS Secret Access Key
+export TF_VAR_aws_profile=""     # default: "" - Fill your AWS Profile name (e.g., default, cloudthrill)
+export TF_VAR_region="us-east-2" # default: "us-east-2" - AWS Region for your deployment
+################################################################################
+################################################################################
+# EKS Cluster Configuration
+################################################################################
+# ☸️ EKS cluster basics
+export TF_VAR_cluster_name="vllm-eks-prod" # default: "vllm-eks-prod"
+export TF_VAR_cluster_version="1.30"       # default: "1.30" - Kubernetes cluster version
+################################################################################
+# 🤖 NVIDIA setup selector
+#   • plugin           -> device-plugin only
+#   • operator_no_driver -> GPU Operator (driver disabled)
+#   • operator_custom  -> GPU Operator with your YAML
+################################################################################
+export TF_VAR_nvidia_setup="plugin" # default: "plugin"
+################################################################################
+# 🧠 LLM Inference Configuration
+################################################################################
+export TF_VAR_enable_vllm="true"         # default: "false" - Set to "true" to deploy vLLM
+export TF_VAR_hf_token=""                # default: "" - Hugging Face token for model download (if needed)
+################################################################################
+export TF_VAR_inference_hardware="gpu"   # default: "cpu" - "cpu" or "gpu"
+export TF_VAR_nvidia_setup="plugin" # default: ""
+# Paths to Helm chart values templates for vLLM.
+# These paths are relative to the root of your Terraform project.
+export TF_VAR_gpu_vllm_helm_config="./modules/llm-stack/helm/gpu/gpu-tinyllama-light-ingress.tpl" # default: ""
+export TF_VAR_cpu_vllm_helm_config="./modules/llm-stack/helm/cpu/cpu-tinyllama-light-ingress.tpl" # default: ""
+
+################################################################################
+# ⚙️ Node-group sizing
+################################################################################
+# CPU pool (always present)
+export TF_VAR_cpu_node_min_size="1"     # default: 1
+export TF_VAR_cpu_node_max_size="3"     # default: 3
+export TF_VAR_cpu_node_desired_size="2" # default: 2
+# export TF_VAR_cpu_node_instance_types='["t3.large", "t3.xlarge", "t3a.large", "t3a.xlarge"]'
+
+# GPU pool (ignored unless inference_hardware = "gpu")
+export TF_VAR_gpu_node_min_size="1"     # default: 1
+export TF_VAR_gpu_node_max_size="1"     # default: 1
+export TF_VAR_gpu_node_desired_size="1" # default: 1
+# export TF_VAR_gpu_node_instance_types='["g6.2xlarge"]'
+export TF_VAR_gpu_capacity_type="ON_DEMAND" # "SPOT" , default: "ON_DEMAND"
+################################################################################
+# 💾 Storage CSI drivers (Uncomment and set to "true" to enable)
+################################################################################
+# export TF_VAR_enable_efs_csi_driver="true" # default: "false"
+# export TF_VAR_enable_efs_storage="false"    # default: "false"
+# export TF_VAR_enable_iam_roles="false"      # default: "false" - For EFS CSI driver IAM roles
+################################################################################
+# 📈 Observability (Uncomment and set to "true" to enable)
+################################################################################
+# export TF_VAR_enable_cert_manager="true" # default: "true"
+# export TF_VAR_enable_prometheus="true"   # default: "true"
+# export TF_VAR_enable_grafana="true"      # default: "true"
+################################################################################
+################################################################################
+# 🌐 VPC (create new)
+################################################################################
+# Note: For list variables like public_subnet_cidrs and private_subnet_cidrs,
+# you would typically define them directly in a .tfvars file or pass them
+# as complex arguments. If you must use environment variables for lists,
+# you'll need to parse them within Terraform. For simplicity, they are
+# commented out here as they are often more complex to manage via env vars.
+# export TF_VAR_public_subnet_cidrs='["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]'
+# export TF_VAR_private_subnet_cidrs='["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]'
+export TF_VAR_vpc_cidr="10.20.0.0/16" # default: "10.20.0.0/16"
+# export TF_VAR_vpc_name="vllm-vpc-prod" # default: "vllm-vpc-prod"
+export TF_VAR_enable_lb_ctl="false" # to disable AWS Load Balancer Controller (default: "true")

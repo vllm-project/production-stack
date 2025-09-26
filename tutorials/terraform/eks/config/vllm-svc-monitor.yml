@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vllm-monitor
+  namespace: kube-prometheus-stack
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchExpressions:
+      - key: app.kubernetes.io/managed-by
+        operator: In
+        values: [Helm]
+      - key: release
+        operator: In
+        values: [test, router]  # Include both engine (test) and router
+      - key: environment
+        operator: In
+        values: [test, router]  # Include both test and router environments
+  namespaceSelector:
+    matchNames:
+    - vllm
+  endpoints:
+  - port: router-sport  # Router metrics port
+    path: /metrics
+  - port: service-port  # Engine metrics port
+    path: /metrics
