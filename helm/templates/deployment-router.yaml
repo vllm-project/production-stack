@@ -25,7 +25,10 @@ spec:
       {{- if .Values.routerSpec.priorityClassName }}
       priorityClassName: {{ .Values.routerSpec.priorityClassName | quote }}
       {{- end }}
-      {{- if .Values.routerSpec.nodeSelectorTerms }}
+      {{- if not (empty .Values.routerSpec.affinity) }}
+      affinity:
+        {{- toYaml .Values.routerSpec.affinity | nindent 8 }}
+      {{- else if .Values.routerSpec.nodeSelectorTerms }}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -136,17 +139,24 @@ spec:
           - name: "lmcache-port"
             containerPort: 9000
         livenessProbe:
-          initialDelaySeconds: 30
-          periodSeconds: 5
-          failureThreshold: 3
+          initialDelaySeconds: {{ .Values.routerSpec.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.routerSpec.livenessProbe.periodSeconds }}
+          failureThreshold: {{ .Values.routerSpec.livenessProbe.failureThreshold }}
           httpGet:
-            path: /health
+            path: {{ .Values.routerSpec.livenessProbe.httpGet.path }}
             port: {{ .Values.routerSpec.containerPort }}
         startupProbe:
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          failureThreshold: 3
+          initialDelaySeconds: {{ .Values.routerSpec.startupProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.routerSpec.startupProbe.periodSeconds }}
+          failureThreshold: {{ .Values.routerSpec.startupProbe.failureThreshold }}
           httpGet:
-            path: /health
+            path: {{ .Values.routerSpec.startupProbe.httpGet.path }}
+            port: {{ .Values.routerSpec.containerPort }}
+        readinessProbe:
+          initialDelaySeconds: {{ .Values.routerSpec.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.routerSpec.readinessProbe.periodSeconds }}
+          failureThreshold: {{ .Values.routerSpec.readinessProbe.failureThreshold }}
+          httpGet:
+            path: {{ .Values.routerSpec.readinessProbe.httpGet.path }}
             port: {{ .Values.routerSpec.containerPort }}
 {{- end }}

@@ -458,7 +458,11 @@ spec:
       {{- end }}
       {{- if $modelSpec.nodeName }}
       nodeName: {{ $modelSpec.nodeName }}
-      {{- else if $modelSpec.nodeSelectorTerms}}
+      {{- end }}
+      {{- if not (empty $modelSpec.affinity) }}
+      affinity:
+        {{- toYaml $modelSpec.affinity | nindent 8 }}
+      {{- else if and $modelSpec.nodeSelectorTerms (not $modelSpec.nodeName) }}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

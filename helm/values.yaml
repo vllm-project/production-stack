@@ -109,7 +109,8 @@ servingEngineSpec:
   #
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
-  # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes
+  # - affinity: (optional, map) Affinity configuration
+  # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes. When both affinity and nodeSelectorTerms are defined, nodeSelectorTerms will be ignored.
   # - nodeName: (optional) Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   # - enableLoRA: (optional, bool) Whether to enable LoRA, e.g., true
@@ -225,6 +226,21 @@ servingEngineSpec:
     failureThreshold: 3
     # -- How often (in seconds) to perform the liveness probe
     periodSeconds: 10
+    # -- Configuration of the Kubelet http request on the server
+    httpGet:
+      # -- Path to access on the HTTP server
+      path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: 8000
+
+  # -- Readiness probe configuration
+  readinessProbe:
+    # -- Number of seconds after the container has started before readiness probe is initiated
+    initialDelaySeconds: 15
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive
+    failureThreshold: 3
+    # -- How often (in seconds) to perform the readiness probe
+    periodSeconds: 5
     # -- Configuration of the Kubelet http request on the server
     httpGet:
       # -- Path to access on the HTTP server
@@ -426,7 +442,10 @@ routerSpec:
       ## Additional custom rules that can be added to the route
       additionalRules: []
 
-  # The node selector terms to match the nodes
+  # Affinity configuration
+  affinity: {}
+
+  # The node selector terms to match the nodes. Will be ignored if affinity is configured.
   # Example:
   #   nodeSelectorTerms:
   #     - matchExpressions:
@@ -435,6 +454,33 @@ routerSpec:
   #         values:
   #         - "NVIDIA-RTX-A6000"
   nodeSelectorTerms: []
+
+  # Router probes configuration
+  # <probe>.httpGet.port will automatically be set to .Values.routerSpec.containerPort
+
+  # Liveness probe configuration.
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    failureThreshold: 3
+    httpGet:
+      path: /health
+
+  # Startup probe configuration.
+  startupProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+    httpGet:
+      path: /health
+
+  # Readiness probe configuration.
+  readinessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    failureThreshold: 3
+    httpGet:
+      path: /health
 
   # -- TODO: Readiness probe configuration
   #startupProbe:
