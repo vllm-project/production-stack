@@ -324,7 +324,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
 
     async def initialize_client_sessions(self) -> None:
         """
-        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        Initialize httpx AsyncClient objects for prefill and decode endpoints.
         This must be called from an async context during app startup.
         """
         if (
@@ -334,14 +334,20 @@ class StaticServiceDiscovery(ServiceDiscovery):
             endpoint_infos = self.get_endpoint_info()
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
-                    self.app.state.prefill_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.prefill_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
                 elif endpoint_info.model_label in self.decode_model_labels:
-                    self.app.state.decode_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.decode_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
 
     def close(self):
@@ -704,6 +710,14 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                self.initialize_client_sessions(), self.app.state.event_loop
+            )
+            fut.result()
+        except Exception as e:
+            logger.error(f"Error initializing client sessions: {e}")
+
         # Track all models we've ever seen
         with self.known_models_lock:
             self.known_models.update(model_names)
@@ -784,7 +798,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
 
     async def initialize_client_sessions(self) -> None:
         """
-        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        Initialize httpx AsyncClient objects for prefill and decode endpoints.
         This must be called from an async context during app startup.
         """
         if (
@@ -794,12 +808,19 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             endpoint_infos = self.get_endpoint_info()
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
-                    self.app.state.prefill_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.prefill_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
+
                 elif endpoint_info.model_label in self.decode_model_labels:
-                    self.app.state.decode_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.decode_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
@@ -1136,6 +1157,14 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                self.initialize_client_sessions(), self.app.state.event_loop
+            )
+            fut.result()
+        except Exception as e:
+            logger.error(f"Error initializing client sessions: {e}")
+
     def _delete_engine(self, engine_name: str):
         logger.info(f"Serving engine {engine_name} is deleted")
         with self.available_engines_lock:
@@ -1211,7 +1240,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
 
     async def initialize_client_sessions(self) -> None:
         """
-        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        Initialize httpx AsyncClient objects for prefill and decode endpoints.
         This must be called from an async context during app startup.
         """
         if (
@@ -1221,14 +1250,20 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             endpoint_infos = self.get_endpoint_info()
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
-                    self.app.state.prefill_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.prefill_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
                 elif endpoint_info.model_label in self.decode_model_labels:
-                    self.app.state.decode_client = aiohttp.ClientSession(
+                    # Use httpx AsyncClient instead of aiohttp
+                    import httpx
+
+                    self.app.state.decode_client = httpx.AsyncClient(
                         base_url=endpoint_info.url,
-                        timeout=aiohttp.ClientTimeout(total=None),
+                        timeout=None,
                     )
 
 
