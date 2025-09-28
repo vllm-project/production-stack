@@ -803,11 +803,21 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             endpoint_infos = self.get_endpoint_info()
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
+                    if (
+                        hasattr(self.app.state, "prefill_client")
+                        and self.app.state.prefill_client is not None
+                    ):
+                        await self.app.state.prefill_client.close()
                     self.app.state.prefill_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
                 elif endpoint_info.model_label in self.decode_model_labels:
+                    if (
+                        hasattr(self.app.state, "decode_client")
+                        and self.app.state.decode_client is not None
+                    ):
+                        await self.app.state.decode_client.close()
                     self.app.state.decode_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
