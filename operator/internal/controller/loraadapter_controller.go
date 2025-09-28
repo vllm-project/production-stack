@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -30,11 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -85,30 +85,19 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	// Track if any adapters are waiting for pods
-	hasWaitingAdapters := false
-
 	logger.Info("Processing LoraAdapter", "namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 
 	// Check if the adapter is being deleted
 	if loraAdapter.DeletionTimestamp.IsZero() {
-		logger.Info("Adding finalizer", "namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 		if !controllerutil.ContainsFinalizer(&loraAdapter, loraAdapterFinalizer) {
+			logger.Info("Adding finalizer", "namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 			controllerutil.AddFinalizer(&loraAdapter, loraAdapterFinalizer)
 			if err := r.Update(ctx, &loraAdapter); err != nil {
 				logger.Error(err, "Failed to add finalizer",
 					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 				return ctrl.Result{}, err
 			}
-			// Get the latest version after update
-			if err := r.Get(ctx, types.NamespacedName{
-				Namespace: loraAdapter.Namespace,
-				Name:      loraAdapter.Name,
-			}, &loraAdapter); err != nil {
-				logger.Error(err, "Failed to get latest LoraAdapter after adding finalizer",
-					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-				return ctrl.Result{}, err
-			}
+			return ctrl.Result{Requeue: true}, nil
 		}
 	} else {
 		// Handle deletion
@@ -161,11 +150,7 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, err
 		}
 
-		// Mark that we have waiting adapters
-		hasWaitingAdapters = true
-
-		// Continue to next adapter
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: time.Second * 60}, nil
 	}
 
 	// Step 4: Compare current and desired state
@@ -223,53 +208,33 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Schedule periodic reconciliation based on whether we have waiting adapters
 	logger.Info("Reconciliation loop completed")
-	if hasWaitingAdapters {
-		// If we have adapters waiting for pods, requeue more frequently
-		logger.Info("Some adapters are waiting for pods, requeuing with shorter interval")
-		return ctrl.Result{RequeueAfter: time.Second * 300}, nil
-	}
-	return ctrl.Result{RequeueAfter: time.Second * 300}, nil
+	return ctrl.Result{RequeueAfter: time.Second * 60}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *LoraAdapterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&productionstackv1alpha1.LoraAdapter{}).
-		Watches(
-			&corev1.Pod{},
-			handler.EnqueueRequestsFromMapFunc(r.findLoraAdaptersForPod),
-			builder.WithPredicates(predicate.Funcs{
-				UpdateFunc: func(e event.UpdateEvent) bool {
-					oldPod := e.ObjectOld.(*corev1.Pod)
-					newPod := e.ObjectNew.(*corev1.Pod)
-					// Trigger if pod becomes ready
-					oldReady := false
-					for _, cond := range oldPod.Status.Conditions {
-						if cond.Type == corev1.PodReady {
-							oldReady = cond.Status == corev1.ConditionTrue
-							break
-						}
-					}
-					newReady := false
-					for _, cond := range newPod.Status.Conditions {
-						if cond.Type == corev1.PodReady {
-							newReady = cond.Status == corev1.ConditionTrue
-							break
-						}
-					}
-					return !oldReady && newReady
-				},
-				DeleteFunc: func(e event.DeleteEvent) bool {
-					return true // Always trigger on deletion
-				},
-				GenericFunc: func(e event.GenericEvent) bool {
-					return false // Don't trigger on generic events
-				},
-				CreateFunc: func(e event.CreateEvent) bool {
-					return false // Don't trigger on creation
-				},
-			}),
-		).
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				oldAdapter := e.ObjectOld.(*productionstackv1alpha1.LoraAdapter)
+				newAdapter := e.ObjectNew.(*productionstackv1alpha1.LoraAdapter)
+
+				// Always reconcile on deletion (when deletionTimestamp is set)
+				if !newAdapter.DeletionTimestamp.IsZero() {
+					return true
+				}
+
+				// Only reconcile on spec changes, not status changes
+				return !reflect.DeepEqual(oldAdapter.Spec, newAdapter.Spec)
+			},
+			CreateFunc: func(e event.CreateEvent) bool {
+				return true // Always reconcile on create
+			},
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				return true // Always reconcile on delete
+			},
+		}).
 		Named("loraadapter").
 		Complete(r)
 }
@@ -417,6 +382,11 @@ func (r *LoraAdapterReconciler) getOptimalPlacement(ctx context.Context, adapter
 	if len(validPods) == 0 {
 		return []PodPlacement{}, nil
 	}
+
+	// Sort validPods by their name
+	sort.Slice(validPods, func(i, j int) bool {
+		return validPods[i].Name < validPods[j].Name
+	})
 
 	// Determine number of pods to use
 	numPods := len(validPods)
@@ -703,6 +673,9 @@ func (r *LoraAdapterReconciler) getAdapterRegistrations(ctx context.Context, ada
 			if model.Parent == nil {
 				continue
 			}
+			if model.ID != adapter.Spec.AdapterSource.AdapterName {
+				continue
+			}
 
 			// This is a LoRA adapter
 			registrations = append(registrations, productionstackv1alpha1.LoadedAdapter{
@@ -775,6 +748,20 @@ func (r *LoraAdapterReconciler) updateStatusWithWaitingState(ctx context.Context
 			Name:      adapter.Name,
 		}, adapter); err != nil {
 			return fmt.Errorf("failed to get latest LoraAdapter: %w", err)
+		}
+
+		// Check if we already have the waiting condition with the same message
+		hasWaitingCondition := false
+		for _, condition := range adapter.Status.Conditions {
+			if condition.Type == "WaitingForPods" && condition.Status == "True" && condition.Message == message {
+				hasWaitingCondition = true
+				break
+			}
+		}
+
+		// Only update if we don't already have this condition
+		if hasWaitingCondition {
+			return nil // No update needed
 		}
 
 		// Update status to reflect waiting state
