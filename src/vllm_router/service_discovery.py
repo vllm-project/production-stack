@@ -704,6 +704,15 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                self.initialize_client_sessions(),
+                self.app.state.event_loop,
+            )
+            fut.result()
+        except Exception as e:
+            logger.error(f"Error initializing client sessions: {e}")
+
         # Track all models we've ever seen
         with self.known_models_lock:
             self.known_models.update(model_names)
