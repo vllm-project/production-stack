@@ -17,7 +17,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
-    resources: [ "service", "endpoints" ]
+    resources: [ "services", "endpoints" ]
     verbs: [ "get", "watch", "list", "patch" ]
 {{- end }}
 {{- end }}
