@@ -82,7 +82,7 @@ spec:
           - "--k8s-namespace"
           - "{{ .Release.Namespace }}"
           - "--k8s-service-discovery-type"
-          - "{{ default "pod-id" .Values.routerSpec.k8sServiceDiscoveryType }}"
+          - "{{ default "pod-ip" .Values.routerSpec.k8sServiceDiscoveryType }}"
           {{- if .Values.servingEngineSpec.enableEngine }}
           - "--k8s-label-selector"
           - {{ include "labels.toCommaSeparatedList" .Values.servingEngineSpec.labels }}
