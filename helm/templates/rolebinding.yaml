@@ -1,5 +1,5 @@
 {{- if .Values.routerSpec.enableRouter -}}
-{{- if .Values.routerSpec.serviceDiscoveryType | default "pod-ip" | eq "servic-name" }}
+{{- if .Values.routerSpec.serviceDiscoveryType | default "pod-ip" | eq "service-name" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
