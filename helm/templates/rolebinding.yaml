@@ -28,6 +28,7 @@ roleRef:
   name: {{ .Release.Name }}-service-reader
   apiGroup: rbac.authorization.k8s.io
 {{- end }}
+{{- end }}
 
 {{- if .Values.loraController.enableLoraController }}
 ---
