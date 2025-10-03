@@ -4,6 +4,12 @@
 # -- Serving engine configuratoon
 servingEngineSpec:
   enableEngine: true
+#  extraPorts:
+#  - name: "istio-sidecar-metrics"
+#    port: 15020
+#    targetPort: 15020
+#    protocol: TPC
+
   # -- Customized labels for the serving engine deployment
   labels:
     environment: "test"
@@ -187,8 +193,41 @@ servingEngineSpec:
   #    - name: cache-dir
   #      mountPath: /cache
   #      readOnly: false
-
-  modelSpec: []
+  modelSpec:
+  - name: "gpt-oss-20b"
+    repository: "docker-releases.bank.swissquote.ch/upstream/docker.io/vllm/vllm-openai"
+    tag: "v0.10.2"
+    modelURL: "/data/openai/gpt-oss-20b"
+    replicaCount: 1
+    requestCPU: 5
+    requestMemory: "32Gi"
+    requestGPU: 1
+    pvcStorage: "27Gi"
+    vllmConfig:
+      tensorParallelSize: 1
+      enableChunkedPrefill: "true"
+      enablePrefixCaching: "true"
+      gpuMemoryUtilization: 0.16
+      extraArgs:
+        - "--async-scheduling"
+        - "--served-model-name"
+        - "openai/gpt-oss-20b"
+        - "--enable-auto-tool-choice"
+        - "--tool-call-parser"
+        - "openai"
+    pvcAccessMode:
+      - ReadWriteOnce
+    storageClass: openebs-lvmpv
+    nodeSelectorTerms:
+      - matchExpressions:
+          - key: "nvidia.com/gpu.present"
+            operator: "In"
+            values: [ "true" ]
+    envFromSecret:
+      name: s3-vllm-fetcher
+    env:
+      - name: TIKTOKEN_ENCODINGS_BASE
+        value: "/data/openai/gpt-oss-20b/encodings/"
 
   # -- Container port
   containerPort: 8000
@@ -320,7 +359,8 @@ routerSpec:
 
   # -- Service discovery mode, supports "k8s" or "static". Defaults to "k8s" if not set.
   serviceDiscovery: "k8s"
-
+  # -- Service discovery mode type, supports "pod-ip" or "service-name". Defaults to "pod-ip" if not set.
+  k8sServiceDiscoveryType: "pod-ip"
   # -- If serviceDiscovery is set to "static", the comma-separated values below are required. There needs to be the same number of backends and models
   staticBackends: ""
   staticModels: ""
