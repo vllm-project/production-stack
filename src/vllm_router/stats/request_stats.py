@@ -14,11 +14,20 @@
 import time
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque, Dict, Tuple
+from numbers import Number
+from typing import Deque, Dict, Tuple, Set, List
 
 from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
+
+
+def prefill_workload(num_prefix_tokens, num_cached_tokens):
+    """Calculate prefill computation workload with trapezoid area formula"""
+    top = num_cached_tokens + 1
+    bottom = num_prefix_tokens
+    height = num_prefix_tokens - num_cached_tokens
+    return (top + bottom) * height // 2
 
 
 class SingletonMeta(type):
@@ -53,6 +62,8 @@ class RequestStats:
     avg_itl: float
     # Number of swapped requests (moved from GPU to CPU)
     num_swapped_requests: int
+    # Unfinished prefill computation workload
+    prefill_todo_workload: int
 
 
 class MovingAverageMonitor:
@@ -103,6 +114,15 @@ class MovingAverageMonitor:
         return sum(self.values)
 
 
+@dataclass
+class RequestStatsCacheInfo:
+    """
+    Cache information.
+    """
+    num_prefix_tokens : int = 0
+    num_cached_tokens : int = 0
+
+
 class RequestStatsMonitor(metaclass=SingletonMeta):
     """
     Monitors the request statistics of all serving engines.
@@ -127,6 +147,8 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         self.request_start_time: Dict[Tuple[str, str], float] = {}
         # Record time when first token is received: (engine_url, request_id) -> timestamp
         self.first_token_time: Dict[Tuple[str, str], float] = {}
+        # The number of cached prefix tokens
+        self.cache_infos: Dict[Tuple[str, str], RequestStatsCacheInfo] = {}
 
         # Number of requests in different stages (from the start of the router)
         self.in_prefill_requests: Dict[str, int] = {}
@@ -142,7 +164,10 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         self.first_query_time: float = None
         self._initialized = True
 
-    def on_new_request(self, engine_url: str, request_id: str, timestamp: float):
+    def on_new_request(self, engine_url: str,
+                       request_id: str,
+                       timestamp: float,
+                       cache_info: RequestStatsCacheInfo = None):
         """
         Tell the monitor that a new request has been created.
 
@@ -150,8 +175,12 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             engine_url: The URL of the serving engine
             request_id: The global request ID
             timestamp: the timestamp when the request was created
+            cache_info: The cache information
         """
         self.request_start_time[(engine_url, request_id)] = timestamp
+
+        if cache_info is not None:
+            self.cache_infos[(engine_url, request_id)] = cache_info
 
         if engine_url not in self.in_prefill_requests:
             self.in_prefill_requests[engine_url] = 0
@@ -197,7 +226,9 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
                 self.sliding_window_size
             )
         # Update TTFT as time from request start to first token
-        ttft = timestamp - self.request_start_time[(engine_url, request_id)]
+        # ttft = timestamp - self.request_start_time[(engine_url, request_id)]
+        start_time = self.request_start_time[(engine_url, request_id)]
+        ttft = timestamp - start_time
         self.ttft_monitors[engine_url].update(timestamp, ttft)
 
     def on_request_complete(self, engine_url: str, request_id: str, timestamp: float):
@@ -235,12 +266,13 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             self.swapped_requests[engine_url] = 0
         self.swapped_requests[engine_url] += 1
 
-    def get_request_stats(self, current_time: float) -> Dict[str, RequestStats]:
+    def get_request_stats(self, current_time: float, urls: List[str] = None) -> Dict[str, RequestStats]:
         """
         Get the request statistics for each serving engine
 
         Args:
             current_time: The current timestamp in seconds
+            urls: The URLs of engines
 
         Returns:
             A dictionary where the key is the serving engine URL and the value
@@ -248,10 +280,11 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             The TTFT and inter token latency will be -1 if there is no requests
             finished in the sliding window.
         """
+        if urls is None:
+            urls = set(self.in_prefill_requests.keys()).union(
+                set(self.in_decoding_requests.keys())
+            )
         ret = {}
-        urls = set(self.in_prefill_requests.keys()).union(
-            set(self.in_decoding_requests.keys())
-        )
         for engine_url in urls:
             if engine_url not in self.qps_monitors:
                 qps = -1
@@ -289,6 +322,8 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             else:
                 swapped = 0
 
+            prefill_todo_workload = self._get_prefill_todo_workload(engine_url)
+
             ret[engine_url] = RequestStats(
                 qps=qps,
                 ttft=ttft,
@@ -302,8 +337,18 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
                 avg_latency=avg_lat,
                 avg_itl=avg_itl_val,
                 num_swapped_requests=swapped,
+                prefill_todo_workload=prefill_todo_workload,
             )
         return ret
+
+    def _get_prefill_todo_workload(self, engine_url: str) -> int:
+        amount = 0
+        for (url, request_id), cache_info in self.cache_infos.items():
+            if url != engine_url or (url, request_id) in self.first_token_time:
+                continue
+            amount += prefill_workload(cache_info.num_prefix_tokens,
+                                       cache_info.num_cached_tokens)
+        return amount
 
 
 def initialize_request_stats_monitor(sliding_window_size: float):
