@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -89,6 +90,8 @@ async def lifespan(app: FastAPI):
     service_discovery = get_service_discovery()
     if hasattr(service_discovery, "initialize_client_sessions"):
         await service_discovery.initialize_client_sessions()
+
+    app.state.event_loop = asyncio.get_event_loop()
 
     yield
     await app.state.aiohttp_client_wrapper.stop()
