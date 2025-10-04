@@ -116,6 +116,26 @@ spec:
           - "--lmcache-controller-port"
           - "{{ .Values.routerSpec.lmcacheControllerPort }}"
           {{- end }}
+          {{- if .Values.routerSpec.nixlPeerHost }}
+          - "--nixl-peer-host"
+          - "{{ .Values.routerSpec.nixlPeerHost }}"
+          {{- end }}
+          {{- if .Values.routerSpec.nixlPeerInitPort }}
+          - "--nixl-peer-init-port"
+          - "{{ .Values.routerSpec.nixlPeerInitPort }}"
+          {{- end }}
+          {{- if .Values.routerSpec.nixlPeerAllocPort }}
+          - "--nixl-peer-alloc-port"
+          - "{{ .Values.routerSpec.nixlPeerAllocPort }}"
+          {{- end }}
+          {{- if .Values.routerSpec.nixlProxyHost }}
+          - "--nixl-proxy-host"
+          - "{{ .Values.routerSpec.nixlProxyHost }}"
+          {{- end }}
+          {{- if .Values.routerSpec.nixlProxyPort }}
+          - "--nixl-proxy-port"
+          - "{{ .Values.routerSpec.nixlProxyPort }}"
+          {{- end }}
         {{- if .Values.routerSpec.resources }}
         resources:
           {{- if .Values.routerSpec.resources.requests }}
@@ -138,6 +158,16 @@ spec:
             containerPort: {{ .Values.routerSpec.containerPort }}
           - name: "lmcache-port"
             containerPort: 9000
+          - name: pd-port-1
+            containerPort: 7100
+          - name: pd-port-2
+            containerPort: 7200
+          - name: pd-port-3
+            containerPort: 7300
+          - name: pd-port-4
+            containerPort: 7400
+          - name: pd-port-5
+            containerPort: 7500
         livenessProbe:
           initialDelaySeconds: {{ .Values.routerSpec.livenessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.routerSpec.livenessProbe.periodSeconds }}

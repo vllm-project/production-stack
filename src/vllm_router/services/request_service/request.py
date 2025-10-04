@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+
 # --- Request Processing & Routing ---
 import json
 import os
@@ -20,8 +22,18 @@ import uuid
 from typing import Optional
 
 import aiohttp
+import msgspec
+import zmq
+import zmq.asyncio
 from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
+
+try:
+    from lmcache.v1.storage_backend.connector.nixl_connector_v3 import (
+        NixlMsg,
+    )
+except ImportError:
+    pass
 from requests import JSONDecodeError
 
 from vllm_router.log import init_logger
@@ -50,6 +62,67 @@ except ImportError:
 from vllm_router.services.metrics_service import num_incoming_requests_total
 
 logger = init_logger(__name__)
+
+finished_reqs = set()
+run_proxy = True
+zmq_ctx = zmq.asyncio.Context()
+
+
+async def zmq_pull_server(proxy_host: str = "0.0.0.0", proxy_port: int = 7500):
+    try:
+        socket = zmq_ctx.socket(zmq.PULL)
+        proxy_url = f"{proxy_host}:{proxy_port}"
+        socket.bind(f"tcp://{proxy_url}")
+        logger.info(f"ZMQ proxy server started on {proxy_url}")
+    except Exception as e:
+        logger.error(f"Failed to bind ZMQ socket to {proxy_url}: {e}")
+        socket.close()
+        return
+
+    while run_proxy:
+        try:
+            msg_bytes = await socket.recv()
+            msg = msgspec.msgpack.decode(msg_bytes, type=NixlMsg)
+            req_id = msg.req_id
+            finished_reqs.add(req_id)
+            logger.info(f"Prefill of req {req_id} done.")
+        except zmq.Again:
+            await asyncio.sleep(0.01)  # Avoid busy loop
+        except Exception as e:
+            logger.error(f"ZMQ Error in message processing: {e}")
+            break
+
+    socket.close()
+    logger.info("ZMQ PULL server stopped.")
+
+
+# ZMQ task will be created in the FastAPI lifespan manager
+zmq_task = None
+
+
+async def start_zmq_task(proxy_host: str = "0.0.0.0", proxy_port: int = 7500):
+    """Start the ZMQ pull server task."""
+    global zmq_task
+    if zmq_task is None:
+        zmq_task = asyncio.create_task(zmq_pull_server(proxy_host, proxy_port))
+        logger.info("ZMQ task started")
+
+        # Add a small delay to allow the task to start and potentially log any errors
+        await asyncio.sleep(0.1)
+
+
+async def stop_zmq_task():
+    """Stop the ZMQ pull server task."""
+    global zmq_task, run_proxy
+    if zmq_task is not None:
+        run_proxy = False
+        zmq_task.cancel()
+        try:
+            await zmq_task
+        except asyncio.CancelledError:
+            pass
+        zmq_task = None
+        logger.info("ZMQ task stopped")
 
 
 # TODO: (Brian) check if request is json beforehand
@@ -165,7 +238,7 @@ async def route_general_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
-    request_json = json.loads(request_body)
+    request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
 
     if request.query_params:
         request_endpoint = request.query_params.get("id")
@@ -205,6 +278,7 @@ async def route_general_request(
                 status_code=400, detail="Request body is not JSON parsable."
             )
 
+    # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
 
@@ -322,10 +396,11 @@ async def route_general_request(
     )
 
 
+# TODO: Combine with send_request_to_tokenizer and send_request_to_decode
 async def send_request_to_prefiller(
-    client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
+    client, endpoint: str, req_data: dict, request_id: str
 ):
-    """Send a request to a prefiller service."""
+    """Send a request to a prefiller service using httpx."""
     req_data = req_data.copy()
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
@@ -336,24 +411,53 @@ async def send_request_to_prefiller(
         "X-Request-Id": request_id,
     }
 
-    async with client.post(endpoint, json=req_data, headers=headers) as response:
-        response.raise_for_status()
-        return await response.json()
+    response = await client.post(endpoint, json=req_data, headers=headers)
+    response.raise_for_status()
+    return response.json()
 
 
-async def send_request_to_decode(
-    client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
+async def send_request_to_tokenizer(
+    client, endpoint: str, req_data: dict, request_id: str
 ):
-    """Asynchronously stream the response from a service using a persistent client."""
+    """
+    Send a request to a tokenizer service using httpx.
+    """
     headers = {
         "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
         "X-Request-Id": request_id,
     }
 
-    async with client.post(endpoint, json=req_data, headers=headers) as response:
+    response = await client.post(endpoint, json=req_data, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+
+async def send_request_to_decode(
+    client, endpoint: str, req_data: dict, request_id: str
+):
+    """
+    Asynchronously stream the response from a service using a persistent client.
+    Uses httpx streaming like the reference implementation.
+    """
+    headers = {
+        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
+        "X-Request-Id": request_id,
+    }
+
+    # Use httpx streaming pattern from reference
+    async with client.stream(
+        "POST", endpoint, json=req_data, headers=headers
+    ) as response:
         response.raise_for_status()
-        async for chunk in response.content.iter_any():
+        async for chunk in response.aiter_bytes():
             yield chunk
+
+
+async def wait_decode_kv_ready(req_id: str):
+    while req_id not in finished_reqs:
+        await asyncio.sleep(0.0001)  # sleep for 0.1 ms
+    logger.debug(f"Prefill node signaled kv ready for req {req_id}")
+    finished_reqs.remove(req_id)
 
 
 async def route_disaggregated_prefill_request(
@@ -367,18 +471,101 @@ async def route_disaggregated_prefill_request(
     request_json = await request.json()
 
     orig_max_tokens = request_json.get("max_tokens", 0)
-    request_json["max_tokens"] = 1
+    stream_options = request_json.pop("stream_options", None)
+
+    # # Check if client sessions are initialized, if not, try to initialize them
+    # if not hasattr(request.app.state, 'prefill_client') or request.app.state.prefill_client is None:
+    #     logger.warning("prefill_client not initialized, attempting to initialize client sessions")
+    #     try:
+    #         from vllm_router.service_discovery import get_service_discovery
+    #         service_discovery = get_service_discovery()
+    #         if hasattr(service_discovery, '_reinitialize_client_sessions'):
+    #             logger.info("In route_disaggregated_prefill_request: Calling _reinitialize_client_sessions")
+    #             await service_discovery._reinitialize_client_sessions()
+    #             logger.info("Successfully initialized client sessions")
+    #         else:
+    #             logger.error("Service discovery does not have _reinitialize_client_sessions method")
+    #     except Exception as e:
+    #         logger.error(f"Failed to initialize client sessions: {e}")
+    #         return JSONResponse(
+    #             status_code=500,
+    #             content={
+    #                 "error": {
+    #                     "message": "Failed to initialize client sessions",
+    #                     "type": "initialization_error",
+    #                     "code": 500,
+    #                 }
+    #             },
+    #             headers={"X-Request-Id": request_id},
+    #         )
+
     st = time.time()
     try:
-        await send_request_to_prefiller(
-            request.app.state.prefill_client, endpoint, request_json, request_id
+        # Step 1: Tokenize the prompt
+        # request_json {'model': 'facebook/opt-125m', 'prompt': 'What date is today?', 'max_tokens': 20, 'temperature': 0.0}
+        # # print every key-value pair in prefill_client
+        # for key, value in request.app.state.prefill_client.__dict__.items():
+        #     print(f"{key}: {value}")
+
+        # Handle different tokenization formats for chat vs completions
+        if "messages" in request_json:
+            tokenize_payload = {"messages": request_json["messages"]}
+        else:
+            tokenize_payload = {"prompt": request_json["prompt"]}
+
+        tokenize_output = await send_request_to_tokenizer(
+            request.app.state.prefill_client,
+            "/tokenize",
+            tokenize_payload,
+            request_id,
+        )
+        # tokenize_output {'count': 6, 'max_model_len': 2048, 'tokens': [2, 2264, 1248, 16, 452, 116], 'token_strs': None}
+
+        # Update request with tokenized prompt
+        request_json["prompt"] = tokenize_output["tokens"]
+        request_json["max_tokens"] = 1
+
+        # Step 2: Create disagg_spec for KV transfer
+        disagg_spec = {
+            "req_id": request_id,
+            "receiver_host": request.app.state.args.nixl_peer_host,
+            "receiver_init_port": [request.app.state.args.nixl_peer_init_port],
+            "receiver_alloc_port": [request.app.state.args.nixl_peer_alloc_port],
+        }
+        # disagg_spec = {
+        #     "req_id": request_id,
+        #     "receiver_host": "0.0.0.0",
+        #     "receiver_init_port": [7300],
+        #     "receiver_alloc_port": [7400],
+        # }
+
+        request_json["kv_transfer_params"] = {
+            "ret_first_tok": True,
+            "disagg_spec": disagg_spec,
+        }
+        request_json["stream"] = False
+
+        # Step 3: Send to prefiller
+        prefill_output = await send_request_to_prefiller(
+            request.app.state.prefill_client,
+            "/v1/completions",
+            request_json,
+            request_id,
         )
         et = time.time()
         logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
         logger.info(
             f"Routing request {request_id} with session id None to {request.app.state.prefill_client._base_url} at {et}, process time = {et - in_router_time:.4f}"
         )
-        request_json["max_tokens"] = orig_max_tokens
+
+        # Step 4: Prepare decode request
+        request_json["max_tokens"] = orig_max_tokens - 1
+        request_json["prompt"].append(prefill_output["kv_transfer_params"]["first_tok"])
+        request_json.pop("kv_transfer_params")
+        request_json["stream"] = True
+        if stream_options is not None:
+            request_json["stream_options"] = stream_options
+
     except aiohttp.ClientResponseError as e:
         logger.error(f"HTTP error in prefiller: {e}", exc_info=True)
         return JSONResponse(
@@ -408,10 +595,167 @@ async def route_disaggregated_prefill_request(
 
     async def generate_stream():
         try:
+            # Check if this is for chat completions based on original request having messages
+            is_chat_completion = "messages" in request_json
+
+            if is_chat_completion:
+                # For chat completions, yield initial chunk with role
+                initial_chunk = {
+                    "id": prefill_output["id"],
+                    "object": "chat.completion.chunk",
+                    "created": prefill_output["created"],
+                    "model": prefill_output["model"],
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {"role": "assistant", "content": ""},
+                            "logprobs": None,
+                            "finish_reason": None,
+                        }
+                    ],
+                }
+                yield (
+                    "data: " + json.dumps(initial_chunk, separators=(",", ":")) + "\n\n"
+                ).encode()
+
+                # Then yield head chunk with content
+                head_chunk = {
+                    "id": prefill_output["id"],
+                    "object": "chat.completion.chunk",
+                    "created": prefill_output["created"],
+                    "model": prefill_output["model"],
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {"content": prefill_output["choices"][0]["text"]},
+                            "logprobs": None,
+                            "finish_reason": None,
+                        }
+                    ],
+                }
+            else:
+                # For completions, use original format (clean, without extra fields)
+                head_chunk = {
+                    "id": prefill_output["id"],
+                    "object": "text_completion",
+                    "created": prefill_output["created"],
+                    "model": prefill_output["model"],
+                    "choices": [
+                        {
+                            "index": 0,
+                            "text": prefill_output["choices"][0]["text"],
+                            "logprobs": None,
+                            "finish_reason": None,
+                            "stop_reason": None,
+                        }
+                    ],
+                    "usage": None,
+                }
+
+            yield (
+                "data: " + json.dumps(head_chunk, separators=(",", ":")) + "\n\n"
+            ).encode()
+
+            await wait_decode_kv_ready(request_id)
+
+            # Stream the rest from decode service
             async for chunk in send_request_to_decode(
-                request.app.state.decode_client, endpoint, request_json, request_id
+                request.app.state.decode_client,
+                "/v1/completions",
+                request_json,
+                request_id,
             ):
-                yield chunk
+                if is_chat_completion:
+                    # Convert completion chunks to chat completion format (same logic as reference)
+                    chunk_str = chunk.decode("utf-8")
+                    if chunk_str.startswith("data: ") and not chunk_str.startswith(
+                        "data: [DONE]"
+                    ):
+                        try:
+                            json_str = chunk_str[6:].strip()  # Remove 'data: ' prefix
+                            if json_str:
+                                completion_data = json.loads(json_str)
+                                chat_completion_data = {
+                                    "id": completion_data["id"],
+                                    "object": "chat.completion.chunk",
+                                    "created": completion_data["created"],
+                                    "model": completion_data["model"],
+                                    "choices": [
+                                        {
+                                            "index": 0,
+                                            "delta": {
+                                                "content": completion_data["choices"][
+                                                    0
+                                                ]["text"]
+                                            },
+                                            "logprobs": completion_data["choices"][
+                                                0
+                                            ].get("logprobs"),
+                                            "finish_reason": completion_data["choices"][
+                                                0
+                                            ].get("finish_reason"),
+                                        }
+                                    ],
+                                }
+                                converted_chunk = (
+                                    "data: "
+                                    + json.dumps(
+                                        chat_completion_data, separators=(",", ":")
+                                    )
+                                    + "\n\n"
+                                ).encode()
+                                yield converted_chunk
+                        except (json.JSONDecodeError, KeyError):
+                            yield chunk
+                    else:
+                        yield chunk
+                else:
+                    # For completions, filter out extra fields(prompt_token_ids, token_ids) from decode service
+                    chunk_str = chunk.decode("utf-8")
+                    if chunk_str.startswith("data: ") and not chunk_str.startswith(
+                        "data: [DONE]"
+                    ):
+                        try:
+                            json_str = chunk_str[6:].strip()  # Remove 'data: ' prefix
+                            if json_str:
+                                completion_data = json.loads(json_str)
+                                # Clean completion chunk without extra fields
+                                clean_completion_data = {
+                                    "id": completion_data["id"],
+                                    "object": "text_completion",
+                                    "created": completion_data["created"],
+                                    "model": completion_data["model"],
+                                    "choices": [
+                                        {
+                                            "index": 0,
+                                            "text": completion_data["choices"][0][
+                                                "text"
+                                            ],
+                                            "logprobs": completion_data["choices"][
+                                                0
+                                            ].get("logprobs"),
+                                            "finish_reason": completion_data["choices"][
+                                                0
+                                            ].get("finish_reason"),
+                                            "stop_reason": completion_data["choices"][
+                                                0
+                                            ].get("stop_reason"),
+                                        }
+                                    ],
+                                    "usage": completion_data.get("usage"),
+                                }
+                                cleaned_chunk = (
+                                    "data: "
+                                    + json.dumps(
+                                        clean_completion_data, separators=(",", ":")
+                                    )
+                                    + "\n\n"
+                                ).encode()
+                                yield cleaned_chunk
+                        except (json.JSONDecodeError, KeyError):
+                            yield chunk
+                    else:
+                        yield chunk
         except aiohttp.ClientResponseError as e:
             logger.error(f"HTTP error in decoder: {e}", exc_info=True)
             try:
