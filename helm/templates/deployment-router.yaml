@@ -84,6 +84,8 @@ spec:
           {{- if eq .Values.routerSpec.serviceDiscovery "k8s" }}
           - "--k8s-namespace"
           - "{{ .Release.Namespace }}"
+          - "--k8s-service-discovery-type"
+          - "{{ default "pod-ip" .Values.routerSpec.k8sServiceDiscoveryType }}"
           {{- if .Values.servingEngineSpec.enableEngine }}
           - "--k8s-label-selector"
           - {{ include "labels.toCommaSeparatedList" .Values.servingEngineSpec.labels }}
