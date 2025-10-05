@@ -73,7 +73,7 @@ Define additional ports
 
 
 {{/*
-Define liveness et readiness probes
+Define startup, liveness and readiness probes
 */}}
 {{- define "chart.probes" -}}
 {{-   if .Values.servingEngineSpec.startupProbe  }}
@@ -85,6 +85,12 @@ startupProbe:
 {{-   if .Values.servingEngineSpec.livenessProbe  }}
 livenessProbe:
 {{-     with .Values.servingEngineSpec.livenessProbe }}
+{{-       toYaml . | nindent 2 }}
+{{-     end }}
+{{-   end }}
+{{-   if .Values.servingEngineSpec.readinessProbe  }}
+readinessProbe:
+{{-     with .Values.servingEngineSpec.readinessProbe }}
 {{-       toYaml . | nindent 2 }}
 {{-     end }}
 {{-   end }}
