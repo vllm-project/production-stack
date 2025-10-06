@@ -20,6 +20,7 @@ spec:
       port: 9000
       targetPort: lmcache-port
       protocol: TCP
+  {{- include "chart.routerExtraPorts" $ | nindent 4 }}
   selector:
   {{- include "chart.routerLabels" . | nindent 4 }}
 {{- end }}

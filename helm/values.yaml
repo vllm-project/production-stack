@@ -8,11 +8,8 @@ servingEngineSpec:
   labels:
     environment: "test"
     release: "test"
-  # extraPorts:
-  # - name: "istio-sidecar-metrics"
-  #   port: 15020
-  #   targetPort: 15020
-  #   protocol: TCP
+  # -- Extra service ports for models
+    extraPorts: []
   # vllmApiKey: (optional) api key for securing the vLLM models. Can be either:
   #   - A string containing the token directly (will be stored in a generated secret)
   #   - An object referencing an existing secret:
@@ -338,6 +335,8 @@ routerSpec:
 
   # -- extra router commandline arguments
   extraArgs: []
+  # -- extra service ports
+  extraPorts: []
 
   # -- Interval in seconds to scrape the serving engine metrics
   engineScrapeInterval: 15
