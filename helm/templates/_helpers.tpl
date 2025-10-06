@@ -67,7 +67,7 @@ Define additional ports
 */}}
 {{- define "chart.extraPorts" }}
 {{-   with .Values.servingEngineSpec.extraPorts }}
-{{      toYaml . }}
+{{-     toYaml . }}
 {{-   end }}
 {{- end }}
 
