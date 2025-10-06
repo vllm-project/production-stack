@@ -12,7 +12,7 @@ servingEngineSpec:
   # - name: "istio-sidecar-metrics"
   #   port: 15020
   #   targetPort: 15020
-  #   protocol: TPC
+  #   protocol: TCP
   # vllmApiKey: (optional) api key for securing the vLLM models. Can be either:
   #   - A string containing the token directly (will be stored in a generated secret)
   #   - An object referencing an existing secret:
