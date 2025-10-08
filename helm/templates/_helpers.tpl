@@ -67,10 +67,18 @@ Define additional ports
 */}}
 {{- define "chart.extraPorts" }}
 {{-   with .Values.servingEngineSpec.extraPorts }}
-{{      toYaml . }}
+{{-     toYaml . }}
 {{-   end }}
 {{- end }}
 
+{{/*
+Define additional router ports
+*/}}
+{{- define "chart.routerExtraPorts" }}
+{{-   with .Values.routerSpec.extraPorts }}
+{{-     toYaml . }}
+{{-   end }}
+{{- end }}
 
 {{/*
 Define startup, liveness and readiness probes
