@@ -49,11 +49,14 @@ The router can be configured using command-line arguments. Below are the availab
 
 ### Dynamic Config Options
 
-- `--dynamic-config-json`: The path to the json file containing the dynamic configuration.
+- `--dynamic-config-yaml`: The path to the YAML file containing the dynamic configuration.
+- `--dynamic-config-json`: The path to the JSON file containing the dynamic configuration.
 
 ### Sentry Options
 
 - `--sentry-dsn`: The Sentry Data Source Name to use for error reporting.
+- `--sentry-traces-sample-rate`: The sample rate for Sentry traces (0.0 to 1.0). Default is 0.1 (10%).
+- `--sentry-profile-session-sample-rate`: The sample rate for Sentry profiling sessions (0.0 to 1.0). Default is 1.0 (100%).
 
 ## Build docker image
 
@@ -104,8 +107,9 @@ different endpoints for each model type.
 
 ## Dynamic Router Config
 
-The router can be configured dynamically using a json file when passing the `--dynamic-config-json` option.
-The router will watch the json file for changes and update the configuration accordingly (every 10 seconds).
+The router can be configured dynamically using a config file when passing the `--dynamic-config-yaml` or
+`--dynamic-config-json` options. Please note that these are two mutually exclusive options.
+The router will watch the config file for changes and update the configuration accordingly (every 10 seconds).
 
 Currently, the dynamic config supports the following fields:
 
@@ -116,21 +120,48 @@ Currently, the dynamic config supports the following fields:
 
 **Optional fields:**
 
+- `callbacks`: The path to the callback instance extending CustomCallbackHandler.
 - (When using `static` service discovery) `static_backends`: The URLs of static serving engines, separated by commas (e.g., `http://localhost:9001,http://localhost:9002,http://localhost:9003`).
 - (When using `static` service discovery) `static_models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
+- (When using `static` service discovery) `static_aliases`: The aliases of the models running in the static serving engines, separated by commas and associated using colons (e.g., `model_alias1:model,mode_alias2:model`).
+- (When using `static` service discovery and if you enable the `--static-backend-health-checks` flag) `static_model_types`: The model types running in the static serving engines, separated by commas (e.g., `chat,chat`).
 - (When using `k8s` service discovery) `k8s_port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
 - (When using `k8s` service discovery) `k8s_namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
 - (When using `k8s` service discovery) `k8s_label_selector`: The label selector to filter vLLM pods when using K8s service discovery.
 - `session_key`: The key (in the header) to identify a session when using session-based routing.
 
-Here is an example dynamic config file:
+Here is an example of a dynamic YAML config file:
+
+```yaml
+service_discovery: static
+routing_logic: roundrobin
+callbacks: module.custom.callback_handler
+static_models:
+    facebook/opt-125m:
+        static_backends:
+            - http://localhost:9001
+            - http://localhost:9003
+        static_model_type: completion
+    meta-llama/Llama-3.1-8B-Instruct:
+        static_backends:
+            - http://localhost:9002
+        static_model_type: chat
+static_aliases:
+    "my-alias": "facebook/opt-125m"
+    "my-other-alias": "meta-llama/Llama-3.1-8B-Instruct"
+```
+
+Here is an example of a dynamic JSON config file:
 
 ```json
 {
     "service_discovery": "static",
     "routing_logic": "roundrobin",
+    "callbacks": "module.custom.callback_handler",
     "static_backends": "http://localhost:9001,http://localhost:9002,http://localhost:9003",
-    "static_models": "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m"
+    "static_models": "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m",
+    "static_model_types": "completion,chat,completion",
+    "static_aliases": "my-alias:meta-llama/Llama-3.1-8B-Instruct,my-other-alias:meta-llama/Llama-3.1-8B-Instruct"
 }
 ```
 

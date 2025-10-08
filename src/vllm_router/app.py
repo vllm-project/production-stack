@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -19,13 +20,13 @@ import sentry_sdk
 import uvicorn
 from fastapi import FastAPI
 
+from vllm_router.aiohttp_client import AiohttpClientWrapper
 from vllm_router.dynamic_config import (
     DynamicRouterConfig,
     get_dynamic_config_watcher,
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
-from vllm_router.httpx_client import HTTPXClientWrapper
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
@@ -41,7 +42,7 @@ from vllm_router.service_discovery import (
     initialize_service_discovery,
 )
 from vllm_router.services.batch_service import initialize_batch_processor
-from vllm_router.services.callbacks_service.callbacks import initialize_custom_callbacks
+from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
@@ -82,11 +83,18 @@ logger = logging.getLogger("uvicorn")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.httpx_client_wrapper.start()
+    app.state.aiohttp_client_wrapper.start()
     if hasattr(app.state, "batch_processor"):
         await app.state.batch_processor.initialize()
+
+    service_discovery = get_service_discovery()
+    if hasattr(service_discovery, "initialize_client_sessions"):
+        await service_discovery.initialize_client_sessions()
+
+    app.state.event_loop = asyncio.get_event_loop()
+
     yield
-    await app.state.httpx_client_wrapper.stop()
+    await app.state.aiohttp_client_wrapper.stop()
 
     # Close the threaded-components
     logger.info("Closing engine stats scraper")
@@ -116,7 +124,13 @@ def initialize_all(app: FastAPI, args):
         ValueError: if the service discovery type is invalid
     """
     if sentry_dsn := args.sentry_dsn:
-        sentry_sdk.init(dsn=sentry_dsn, send_default_pii=True)
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            send_default_pii=True,
+            profile_lifecycle="trace",
+            traces_sample_rate=args.sentry_traces_sample_rate,
+            profile_session_sample_rate=args.sentry_profile_session_sample_rate,
+        )
 
     if args.service_discovery == "static":
         initialize_service_discovery(
@@ -153,6 +167,8 @@ def initialize_all(app: FastAPI, args):
             label_selector=args.k8s_label_selector,
             prefill_model_labels=args.prefill_model_labels,
             decode_model_labels=args.decode_model_labels,
+            watcher_timeout_seconds=args.k8s_watcher_timeout_seconds,
+            health_check_timeout_seconds=args.backend_health_check_timeout_seconds,
         )
 
     else:
@@ -172,14 +188,19 @@ def initialize_all(app: FastAPI, args):
         )
 
     # Initialize dynamic config watcher
-    if args.dynamic_config_json:
+    if args.dynamic_config_yaml or args.dynamic_config_json:
         init_config = DynamicRouterConfig.from_args(args)
-        initialize_dynamic_config_watcher(
-            args.dynamic_config_json, 10, init_config, app
-        )
+        if args.dynamic_config_yaml:
+            initialize_dynamic_config_watcher(
+                args.dynamic_config_yaml, "YAML", 10, init_config, app
+            )
+        elif args.dynamic_config_json:
+            initialize_dynamic_config_watcher(
+                args.dynamic_config_json, "JSON", 10, init_config, app
+            )
 
     if args.callbacks:
-        initialize_custom_callbacks(args.callbacks, app)
+        configure_custom_callbacks(args.callbacks, app)
 
     initialize_routing_logic(
         args.routing_logic,
@@ -259,7 +280,7 @@ app.include_router(main_router)
 app.include_router(files_router)
 app.include_router(batches_router)
 app.include_router(metrics_router)
-app.state.httpx_client_wrapper = HTTPXClientWrapper()
+app.state.aiohttp_client_wrapper = AiohttpClientWrapper()
 app.state.semantic_cache_available = semantic_cache_available
 
 

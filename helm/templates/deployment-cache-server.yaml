@@ -19,7 +19,10 @@ spec:
       {{- if .Values.cacheserverSpec.priorityClassName}}
       priorityClassName: {{ .Values.cacheserverSpec.priorityClassName | quote }}
       {{- end }}
-      {{- if .Values.cacheserverSpec.nodeSelectorTerms}}
+      {{- if not (empty .Values.cacheserverSpec.affinity) }}
+      affinity:
+        {{- toYaml .Values.cacheserverSpec.affinity | nindent 8 }}
+      {{- else if .Values.cacheserverSpec.nodeSelectorTerms}}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

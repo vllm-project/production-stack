@@ -57,6 +57,11 @@ spec:
           {{- if $container.args }}
           args: {{ toYaml $container.args | nindent 12 }}
           {{- end }}
+          {{- if $modelSpec.envFromSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ $modelSpec.envFromSecret.name }}
+          {{- end }}
           env:
             - name: RELEASE_NAME
               value: {{ $.Release.Name }}
@@ -70,10 +75,16 @@ spec:
           {{- if $container.resources }}
           resources: {{ toYaml $container.resources | nindent 12 }}
           {{- end }}
-          {{- if and (hasKey $container "mountPvcStorage") ($container.mountPvcStorage) (hasKey $modelSpec "pvcStorage") }}
+          {{- $pvcMountEnabled := and (hasKey $container "mountPvcStorage") $container.mountPvcStorage (hasKey $modelSpec "pvcStorage") }}
+          {{- if or $pvcMountEnabled $container.extraVolumeMounts }}
           volumeMounts:
+            {{- if $pvcMountEnabled }}
             - name: {{ .Release.Name }}-storage
               mountPath: /data
+            {{- end }}
+            {{- with $container.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
       {{- end }}
       {{- if .Values.servingEngineSpec.securityContext }}
@@ -323,14 +334,24 @@ spec:
             value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
-          - name: LMCACHE_WORKER_PORT
+          - name: LMCACHE_LMCACHE_WORKER_PORT
             value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
           {{-   end }}
+          {{-  if hasKey $modelSpec.lmcacheConfig "distributedUrl" }}
+          - name: LMCACHE_DISTRIBUTED_URL
+            value: {{ $modelSpec.lmcacheConfig.distributedUrl | quote }}
+          {{-   end }}
           {{- end }}
-          {{- if .Values.servingEngineSpec.configs }}
+          {{- if or .Values.servingEngineSpec.configs $modelSpec.envFromSecret }}
           envFrom:
+          {{- if .Values.servingEngineSpec.configs }}
             - configMapRef:
                 name: "{{ .Release.Name }}-configs"
+          {{- end }}
+          {{- if $modelSpec.envFromSecret }}
+            - secretRef:
+                name: {{ $modelSpec.envFromSecret.name }}
+          {{- end }}
           {{- end }}
           ports:
             - name: {{ include "chart.container-port-name" . }}
@@ -442,7 +463,11 @@ spec:
       {{- end }}
       {{- if $modelSpec.nodeName }}
       nodeName: {{ $modelSpec.nodeName }}
-      {{- else if $modelSpec.nodeSelectorTerms}}
+      {{- end }}
+      {{- if not (empty $modelSpec.affinity) }}
+      affinity:
+        {{- toYaml $modelSpec.affinity | nindent 8 }}
+      {{- else if and $modelSpec.nodeSelectorTerms (not $modelSpec.nodeName) }}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

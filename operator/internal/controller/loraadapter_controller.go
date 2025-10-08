@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -30,11 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -74,202 +74,167 @@ func (r *LoraAdapterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	logger := logf.FromContext(ctx)
 	logger.Info("Starting reconciliation loop")
 
-	// Get all LoraAdapter instances
-	loraAdapters := &productionstackv1alpha1.LoraAdapterList{}
-	if err := r.List(ctx, loraAdapters); err != nil {
-		logger.Error(err, "Failed to list LoraAdapter resources")
+	loraAdapter := productionstackv1alpha1.LoraAdapter{}
+	if err := r.Get(ctx, req.NamespacedName, &loraAdapter); err != nil {
+		if errors.IsNotFound(err) {
+			// Resource not found; it might have been deleted after the request was queued
+			logger.Info("LoraAdapter resource not found. Ignoring since object must be deleted", "namespace", req.Namespace, "name", req.Name)
+			return ctrl.Result{}, nil
+		}
+		logger.Error(err, "Failed to get LoraAdapter", "namespace", req.Namespace, "name", req.Name)
 		return ctrl.Result{}, err
 	}
-	logger.Info("Found LoraAdapter resources", "count", len(loraAdapters.Items))
 
-	// Track if any adapters are waiting for pods
-	hasWaitingAdapters := false
+	logger.Info("Processing LoraAdapter", "namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 
-	// Iterate through each LoraAdapter
-	for _, loraAdapter := range loraAdapters.Items {
-		logger.Info("Processing LoraAdapter", "namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-
-		// Check if the adapter is being deleted
-		if loraAdapter.DeletionTimestamp.IsZero() {
+	// Check if the adapter is being deleted
+	if loraAdapter.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&loraAdapter, loraAdapterFinalizer) {
 			logger.Info("Adding finalizer", "namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-			if !controllerutil.ContainsFinalizer(&loraAdapter, loraAdapterFinalizer) {
-				controllerutil.AddFinalizer(&loraAdapter, loraAdapterFinalizer)
-				if err := r.Update(ctx, &loraAdapter); err != nil {
-					logger.Error(err, "Failed to add finalizer",
-						"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-					return ctrl.Result{}, err
-				}
-				// Get the latest version after update
-				if err := r.Get(ctx, types.NamespacedName{
-					Namespace: loraAdapter.Namespace,
-					Name:      loraAdapter.Name,
-				}, &loraAdapter); err != nil {
-					logger.Error(err, "Failed to get latest LoraAdapter after adding finalizer",
-						"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-					return ctrl.Result{}, err
-				}
-			}
-		} else {
-			// Handle deletion
-			if err := r.handleDeletion(ctx, &loraAdapter); err != nil {
-				logger.Error(err, "Failed to handle deletion",
+			controllerutil.AddFinalizer(&loraAdapter, loraAdapterFinalizer)
+			if err := r.Update(ctx, &loraAdapter); err != nil {
+				logger.Error(err, "Failed to add finalizer",
 					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 				return ctrl.Result{}, err
 			}
-			continue
+			return ctrl.Result{Requeue: true}, nil
 		}
-
-		// Continue with normal reconciliation
-		// Step 1: Get current state (adapter registrations)
-		currentRegistrations, err := r.getAdapterRegistrations(ctx, &loraAdapter)
-		if err != nil {
-			logger.Error(err, "Failed to get current adapter registrations")
+	} else {
+		// Handle deletion
+		if err := r.handleDeletion(ctx, &loraAdapter); err != nil {
+			logger.Error(err, "Failed to handle deletion",
+				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 			return ctrl.Result{}, err
 		}
-		logger.Info("Current adapter registrations", "registrations", currentRegistrations,
+		return ctrl.Result{}, nil
+	}
+
+	// Continue with normal reconciliation
+	// Step 1: Get current state (adapter registrations)
+	currentRegistrations, err := r.getAdapterRegistrations(ctx, &loraAdapter)
+	if err != nil {
+		logger.Error(err, "Failed to get current adapter registrations")
+		return ctrl.Result{}, err
+	}
+	logger.Info("Current adapter registrations", "registrations", currentRegistrations,
+		"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+
+	// Step 2: Update status with current registrations for this adapter
+	if err := r.updateStatusWithRegistrations(ctx, &loraAdapter, currentRegistrations); err != nil {
+		logger.Error(err, "Failed to update status with current registrations",
+			"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+		return ctrl.Result{}, err
+	}
+	logger.Info("Updated status with current registrations",
+		"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+
+	// Step 3: Get desired state (optimal pod placements) for this adapter
+	desiredPlacements, err := r.getOptimalPlacement(ctx, &loraAdapter)
+	if err != nil {
+		logger.Error(err, "Failed to get optimal pod placements",
+			"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+		return ctrl.Result{}, err
+	}
+	logger.Info("Desired pod placements", "placements", desiredPlacements,
+		"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+
+	// Check if no pods are ready yet
+	if len(desiredPlacements) == 0 {
+		logger.Info("No pods are ready yet, waiting for pods to become ready",
 			"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 
-		// Step 2: Update status with current registrations for this adapter
-		if err := r.updateStatusWithRegistrations(ctx, &loraAdapter, currentRegistrations); err != nil {
-			logger.Error(err, "Failed to update status with current registrations",
+		// Update status to reflect waiting state
+		if err := r.updateStatusWithWaitingState(ctx, &loraAdapter, "Waiting for pods to become ready"); err != nil {
+			logger.Error(err, "Failed to update status with waiting state",
 				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-			continue // Continue with next adapter even if this one fails
+			return ctrl.Result{}, err
 		}
-		logger.Info("Updated status with current registrations",
+
+		return ctrl.Result{RequeueAfter: time.Second * 60}, nil
+	}
+
+	// Step 4: Compare current and desired state
+	if needsReconciliation, err := r.compareStates(currentRegistrations, desiredPlacements); err != nil {
+		logger.Error(err, "Failed to compare states",
+			"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+		return ctrl.Result{}, err
+	} else if needsReconciliation {
+		// Step 5: Reconcile to match desired state
+		if err := r.reconcileToDesiredState(ctx, &loraAdapter, currentRegistrations, desiredPlacements); err != nil {
+			logger.Error(err, "Failed to reconcile to desired state",
+				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+			return ctrl.Result{}, err
+		}
+		logger.Info("Reconciled to desired state",
 			"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 
-		// Step 3: Get desired state (optimal pod placements) for this adapter
-		desiredPlacements, err := r.getOptimalPlacement(ctx, &loraAdapter)
+		// After reconciliation, get the latest state for this adapter
+		if err := r.Get(ctx, types.NamespacedName{
+			Namespace: loraAdapter.Namespace,
+			Name:      loraAdapter.Name,
+		}, &loraAdapter); err != nil {
+			if errors.IsNotFound(err) {
+				logger.Info("LoraAdapter resource not found. Ignoring since object must be deleted",
+					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+				return ctrl.Result{}, nil
+			}
+			logger.Error(err, "Failed to get LoraAdapter",
+				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+			return ctrl.Result{}, err
+		}
+
+		// Get latest registrations after reconciliation
+		latestRegistrations, err := r.getAdapterRegistrations(ctx, &loraAdapter)
 		if err != nil {
-			logger.Error(err, "Failed to get optimal pod placements",
+			logger.Error(err, "Failed to get latest adapter registrations after reconciliation",
 				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-			continue // Continue with next adapter even if this one fails
+			return ctrl.Result{}, err
 		}
-		logger.Info("Desired pod placements", "placements", desiredPlacements,
+		logger.Info("Latest adapter registrations", "registrations", latestRegistrations,
 			"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 
-		// Check if no pods are ready yet
-		if len(desiredPlacements) == 0 {
-			logger.Info("No pods are ready yet, waiting for pods to become ready",
+		// Update status with latest registrations
+		if err := r.updateStatusWithRegistrations(ctx, &loraAdapter, latestRegistrations); err != nil {
+			logger.Error(err, "Failed to update status with latest registrations",
 				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-
-			// Update status to reflect waiting state
-			if err := r.updateStatusWithWaitingState(ctx, &loraAdapter, "Waiting for pods to become ready"); err != nil {
-				logger.Error(err, "Failed to update status with waiting state",
-					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-				continue
-			}
-
-			// Mark that we have waiting adapters
-			hasWaitingAdapters = true
-
-			// Continue to next adapter
-			continue
+			return ctrl.Result{}, err
 		}
-
-		// Step 4: Compare current and desired state
-		if needsReconciliation, err := r.compareStates(currentRegistrations, desiredPlacements); err != nil {
-			logger.Error(err, "Failed to compare states",
-				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-			continue // Continue with next adapter even if this one fails
-		} else if needsReconciliation {
-			// Step 5: Reconcile to match desired state
-			if err := r.reconcileToDesiredState(ctx, &loraAdapter, currentRegistrations, desiredPlacements); err != nil {
-				logger.Error(err, "Failed to reconcile to desired state",
-					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-				continue // Continue with next adapter even if this one fails
-			}
-			logger.Info("Reconciled to desired state",
-				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-
-			// After reconciliation, get the latest state for this adapter
-			if err := r.Get(ctx, types.NamespacedName{
-				Namespace: loraAdapter.Namespace,
-				Name:      loraAdapter.Name,
-			}, &loraAdapter); err != nil {
-				if errors.IsNotFound(err) {
-					logger.Info("LoraAdapter resource not found. Ignoring since object must be deleted",
-						"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-					continue
-				}
-				logger.Error(err, "Failed to get LoraAdapter",
-					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-				continue
-			}
-
-			// Get latest registrations after reconciliation
-			latestRegistrations, err := r.getAdapterRegistrations(ctx, &loraAdapter)
-			if err != nil {
-				logger.Error(err, "Failed to get latest adapter registrations after reconciliation",
-					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-				continue
-			}
-			logger.Info("Latest adapter registrations", "registrations", latestRegistrations,
-				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-
-			// Update status with latest registrations
-			if err := r.updateStatusWithRegistrations(ctx, &loraAdapter, latestRegistrations); err != nil {
-				logger.Error(err, "Failed to update status with latest registrations",
-					"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-				continue
-			}
-			logger.Info("Updated status with latest registrations",
-				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-		} else {
-			logger.Info("No reconciliation needed",
-				"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
-		}
+		logger.Info("Updated status with latest registrations",
+			"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
+	} else {
+		logger.Info("No reconciliation needed",
+			"namespace", loraAdapter.Namespace, "name", loraAdapter.Name)
 	}
 
 	// Schedule periodic reconciliation based on whether we have waiting adapters
 	logger.Info("Reconciliation loop completed")
-	if hasWaitingAdapters {
-		// If we have adapters waiting for pods, requeue more frequently
-		logger.Info("Some adapters are waiting for pods, requeuing with shorter interval")
-		return ctrl.Result{Requeue: true}, nil
-	}
-	return ctrl.Result{Requeue: true}, nil
+	return ctrl.Result{RequeueAfter: time.Second * 60}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *LoraAdapterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&productionstackv1alpha1.LoraAdapter{}).
-		Watches(
-			&corev1.Pod{},
-			handler.EnqueueRequestsFromMapFunc(r.findLoraAdaptersForPod),
-			builder.WithPredicates(predicate.Funcs{
-				UpdateFunc: func(e event.UpdateEvent) bool {
-					oldPod := e.ObjectOld.(*corev1.Pod)
-					newPod := e.ObjectNew.(*corev1.Pod)
-					// Trigger if pod becomes ready
-					oldReady := false
-					for _, cond := range oldPod.Status.Conditions {
-						if cond.Type == corev1.PodReady {
-							oldReady = cond.Status == corev1.ConditionTrue
-							break
-						}
-					}
-					newReady := false
-					for _, cond := range newPod.Status.Conditions {
-						if cond.Type == corev1.PodReady {
-							newReady = cond.Status == corev1.ConditionTrue
-							break
-						}
-					}
-					return !oldReady && newReady
-				},
-				DeleteFunc: func(e event.DeleteEvent) bool {
-					return true // Always trigger on deletion
-				},
-				GenericFunc: func(e event.GenericEvent) bool {
-					return false // Don't trigger on generic events
-				},
-				CreateFunc: func(e event.CreateEvent) bool {
-					return false // Don't trigger on creation
-				},
-			}),
-		).
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				oldAdapter := e.ObjectOld.(*productionstackv1alpha1.LoraAdapter)
+				newAdapter := e.ObjectNew.(*productionstackv1alpha1.LoraAdapter)
+
+				// Always reconcile on deletion (when deletionTimestamp is set)
+				if !newAdapter.DeletionTimestamp.IsZero() {
+					return true
+				}
+
+				// Only reconcile on spec changes, not status changes
+				return !reflect.DeepEqual(oldAdapter.Spec, newAdapter.Spec)
+			},
+			CreateFunc: func(e event.CreateEvent) bool {
+				return true // Always reconcile on create
+			},
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				return true // Always reconcile on delete
+			},
+		}).
 		Named("loraadapter").
 		Complete(r)
 }
@@ -417,6 +382,11 @@ func (r *LoraAdapterReconciler) getOptimalPlacement(ctx context.Context, adapter
 	if len(validPods) == 0 {
 		return []PodPlacement{}, nil
 	}
+
+	// Sort validPods by their name
+	sort.Slice(validPods, func(i, j int) bool {
+		return validPods[i].Name < validPods[j].Name
+	})
 
 	// Determine number of pods to use
 	numPods := len(validPods)
@@ -591,7 +561,12 @@ func (r *LoraAdapterReconciler) loadAdapter(ctx context.Context, podName, namesp
 	}
 
 	_, err = r.sendRequest(ctx, "POST", endpoint, payload, adapter)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Trigger pod modify event
+	return r.triggerPodEvent(ctx, podName, namespace)
 }
 
 // unloadAdapter unloads a LoRA adapter from a specific pod
@@ -606,7 +581,32 @@ func (r *LoraAdapterReconciler) unloadAdapter(ctx context.Context, podName, name
 	}
 
 	_, err = r.sendRequest(ctx, "POST", endpoint, payload, adapter)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Trigger pod modify event
+	return r.triggerPodEvent(ctx, podName, namespace)
+}
+
+// triggerPodEvent triggers a modify event for a pod
+func (r *LoraAdapterReconciler) triggerPodEvent(ctx context.Context, podName, namespace string) error {
+	pod := &corev1.Pod{}
+	if err := r.Get(ctx, types.NamespacedName{Name: podName, Namespace: namespace}, pod); err != nil {
+		logf.FromContext(ctx).Error(err, "Failed to get pod to trigger event", "pod", podName, "namespace", namespace)
+		return err
+	}
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations["lora-modified"] = time.Now().Format(time.RFC3339Nano)
+	logger := logf.FromContext(ctx)
+	logger.Info("Triggering pod event", "pod", podName, "namespace", namespace)
+	if err := r.Update(ctx, pod); err != nil {
+		logger.Error(err, "Failed to update pod", "pod", podName, "namespace", namespace)
+		return err
+	}
+	return nil
 }
 
 // getAdapterRegistrations gets the current adapter registrations from all pods
@@ -671,6 +671,9 @@ func (r *LoraAdapterReconciler) getAdapterRegistrations(ctx context.Context, ada
 		for _, model := range modelList.Data {
 			// Skip base models (those without a parent)
 			if model.Parent == nil {
+				continue
+			}
+			if model.ID != adapter.Spec.AdapterSource.AdapterName {
 				continue
 			}
 
@@ -745,6 +748,20 @@ func (r *LoraAdapterReconciler) updateStatusWithWaitingState(ctx context.Context
 			Name:      adapter.Name,
 		}, adapter); err != nil {
 			return fmt.Errorf("failed to get latest LoraAdapter: %w", err)
+		}
+
+		// Check if we already have the waiting condition with the same message
+		hasWaitingCondition := false
+		for _, condition := range adapter.Status.Conditions {
+			if condition.Type == "WaitingForPods" && condition.Status == "True" && condition.Message == message {
+				hasWaitingCondition = true
+				break
+			}
+		}
+
+		// Only update if we don't already have this condition
+		if hasWaitingCondition {
+			return nil // No update needed
 		}
 
 		// Update status to reflect waiting state
@@ -827,6 +844,9 @@ func (r *LoraAdapterReconciler) reconcileToDesiredState(ctx context.Context, ada
 	desiredMap := make(map[string]bool)
 
 	for _, reg := range currentRegistrations {
+		if reg.Name != adapter.Spec.AdapterSource.AdapterName {
+			continue
+		}
 		key := fmt.Sprintf("%s/%s", reg.PodAssignments.Namespace, reg.PodAssignments.PodName)
 		currentMap[key] = reg
 	}

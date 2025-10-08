@@ -20,7 +20,7 @@ from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 
-def initialize_custom_callbacks(callbacks_file_location: str, app: FastAPI):
+def configure_custom_callbacks(callbacks_file_location: str, app: FastAPI):
     # Split the path by dots to separate module from instance
     parts = callbacks_file_location.split(".")
 

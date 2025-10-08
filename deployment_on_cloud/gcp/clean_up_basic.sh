@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Set variables
-CLUSTER_NAME=$1
+CLUSTER_NAME="${1:-${CLUSTER_NAME:-production-stack}}"
 
 # Automatically get the zone for the GKE cluster
-ZONE=$(gcloud container clusters list --filter="name=$CLUSTER_NAME" --format="value(location)")
+ZONE="${ZONE:-$(gcloud container clusters list --filter="name=$CLUSTER_NAME" --format="value(location)")}"
 
 if [ -z "$ZONE" ]; then
-  echo "Cluster $CLUSTER_NAME not found."
+  echo "Cluster $CLUSTER_NAME not found or zone could not be determined."
   exit 1
 fi
 

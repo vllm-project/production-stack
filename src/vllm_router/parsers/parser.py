@@ -17,6 +17,9 @@ import logging
 import sys
 
 from vllm_router import utils
+from vllm_router.parsers.yaml_utils import (
+    read_and_process_yaml_config_file,
+)
 from vllm_router.version import __version__
 
 try:
@@ -41,14 +44,27 @@ def verify_required_args_provided(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-def load_initial_config_from_config_json_if_required(
+def load_initial_config_from_config_file_if_required(
     parser: argparse.ArgumentParser, args: argparse.Namespace
 ) -> argparse.Namespace:
-    if dynamic_config := args.dynamic_config_json:
-        logger.info(f"Initial loading of dynamic config file at {dynamic_config}")
-        with open(dynamic_config, encoding="utf-8") as f:
+    dynamic_config_yaml = args.dynamic_config_yaml
+    dynamic_config_json = args.dynamic_config_json
+
+    if dynamic_config_yaml:
+        logger.info(
+            f"Initial loading of dynamic YAML config file at {dynamic_config_yaml}"
+        )
+        yaml_config = read_and_process_yaml_config_file(dynamic_config_yaml)
+        parser.set_defaults(**yaml_config)
+        args = parser.parse_args()
+    elif dynamic_config_json:
+        logger.info(
+            f"Initial loading of dynamic JSON config file at {dynamic_config_json}"
+        )
+        with open(dynamic_config_json, encoding="utf-8") as f:
             parser.set_defaults(**json.load(f))
             args = parser.parse_args()
+
     return args
 
 
@@ -91,6 +107,12 @@ def validate_args(args):
         raise ValueError("Engine stats interval must be greater than 0.")
     if args.request_stats_window <= 0:
         raise ValueError("Request stats window must be greater than 0.")
+    if not (0.0 <= args.sentry_traces_sample_rate <= 1.0):
+        raise ValueError("Sentry traces sample rate must be between 0.0 and 1.0.")
+    if not (0.0 <= args.sentry_profile_session_sample_rate <= 1.0):
+        raise ValueError(
+            "Sentry profile session sample rate must be between 0.0 and 1.0."
+        )
 
 
 def parse_args():
@@ -165,6 +187,18 @@ def parse_args():
         type=str,
         default="",
         help="The label selector to filter vLLM pods when using K8s service discovery.",
+    )
+    parser.add_argument(
+        "--k8s-watcher-timeout-seconds",
+        type=int,
+        default=0,
+        help="Timeout in seconds for Kubernetes watcher streams (default: 0).",
+    )
+    parser.add_argument(
+        "--backend-health-check-timeout-seconds",
+        type=int,
+        default=10,
+        help="Timeout in seconds for backend health check requests (default: 10).",
     )
     parser.add_argument(
         "--routing-logic",
@@ -257,11 +291,23 @@ def parse_args():
         help="The interval in seconds to log statistics.",
     )
 
-    parser.add_argument(
+    # Config files
+    group = parser.add_argument_group(
+        "Dynamic config file",
+        "Only one dynamic config file (YAML or JSON) can be provided",
+    )
+    exclusive_group = group.add_mutually_exclusive_group()
+    exclusive_group.add_argument(
+        "--dynamic-config-yaml",
+        type=str,
+        default=None,
+        help="The path to the YAML file containing the dynamic configuration, cannot be used with --dynamic-config-json.",
+    )
+    exclusive_group.add_argument(
         "--dynamic-config-json",
         type=str,
         default=None,
-        help="The path to the json file containing the dynamic configuration.",
+        help="The path to the JSON file containing the dynamic configuration, cannot be used with --dynamic-config-yaml.",
     )
 
     # Add --version argument
@@ -299,6 +345,20 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--sentry-traces-sample-rate",
+        type=float,
+        default=0.1,
+        help="The sample rate for Sentry traces. Default is 0.1 (10%)",
+    )
+
+    parser.add_argument(
+        "--sentry-profile-session-sample-rate",
+        type=float,
+        default=1.0,
+        help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%)",
+    )
+
+    parser.add_argument(
         "--prefill-model-labels",
         type=str,
         default=None,
@@ -320,7 +380,7 @@ def parse_args():
     )
 
     args = parser.parse_args()
-    args = load_initial_config_from_config_json_if_required(parser, args)
+    args = load_initial_config_from_config_file_if_required(parser, args)
 
     validate_args(args)
     return args
