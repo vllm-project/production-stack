@@ -47,6 +47,7 @@ try:
 except ImportError:
     semantic_cache_available = False
 
+from vllm_router.services.metrics_service import num_incoming_requests_total
 
 logger = init_logger(__name__)
 
@@ -213,6 +214,11 @@ async def route_general_request(
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
 
+    # Check if model has ever been seen (even if currently scaled to zero)
+    model_ever_existed = False
+    if hasattr(service_discovery, "has_ever_seen_model"):
+        model_ever_existed = service_discovery.has_ever_seen_model(requested_model)
+
     if not request_endpoint:
         endpoints = list(
             filter(
@@ -234,13 +240,27 @@ async def route_general_request(
             )
         )
 
+    # Track all valid incoming requests
+    num_incoming_requests_total.labels(model=requested_model).inc()
+
     if not endpoints:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": f"Model {requested_model} not found or vLLM engine is sleeping."
-            },
-        )
+        if not model_ever_existed:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": f"Model '{requested_model}' not found. Available models can be listed at /v1/models."
+                },
+                headers={"X-Request-Id": request_id},
+            )
+        else:
+            # Model existed before but is now scaled to zero
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": f"Model '{requested_model}' is temporarily unavailable. Please try again later."
+                },
+                headers={"X-Request-Id": request_id},
+            )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
     if request_endpoint:
@@ -565,22 +585,12 @@ async def route_general_transcriptions(
 
     endpoints = service_discovery.get_endpoint_info()
 
-    logger.debug("==== Total endpoints ====")
-    logger.debug(endpoints)
-    logger.debug("==== Total endpoints ====")
-
-    # filter the endpoints url by model name and label for transcriptions
-    transcription_endpoints = [
-        ep
-        for ep in endpoints
-        if model == ep.model_name
-        and ep.model_label == "transcription"
-        and not ep.sleep  # Added ep.sleep == False
-    ]
-
-    logger.debug("====List of transcription endpoints====")
-    logger.debug(transcription_endpoints)
-    logger.debug("====List of transcription endpoints====")
+    # filter the endpoints url by model name
+    transcription_endpoints = []
+    for ep in endpoints:
+        for model_name in ep.model_names:
+            if model == model_name and not ep.sleep:
+                transcription_endpoints.append(ep)
 
     if not transcription_endpoints:
         logger.error("No transcription backend available for model %s", model)
@@ -619,10 +629,6 @@ async def route_general_transcriptions(
         data["temperature"] = str(temperature)
 
     logger.info("Proxying transcription request for model %s to %s", model, chosen_url)
-
-    logger.debug("==== data payload keys ====")
-    logger.debug(list(data.keys()))
-    logger.debug("==== data payload keys ====")
 
     try:
         client = request.app.state.aiohttp_client_wrapper()
@@ -686,4 +692,10 @@ async def route_general_transcriptions(
         return JSONResponse(
             status_code=503,
             content={"error": f"Failed to connect to backend: {str(client_error)}"},
+        )
+    except Exception as e:
+        logger.error(e)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error"},
         )

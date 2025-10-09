@@ -19,7 +19,7 @@ on:
 
 jobs:
   e2e-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     if: github.event.pull_request.draft == false
     permissions:
       contents: read
@@ -30,18 +30,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: pip
+          activate-environment: true
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r src/tests/requirements.txt
-          pip install -r requirements-test.txt
-          pip install -e .
+          uv pip install --upgrade pip
+          uv pip install -e ".[semantic_cache,lmcache,test]"
 
       - name: Make scripts executable
         run: |
@@ -75,7 +72,7 @@ jobs:
 
       - name: Run E2E Tests with Coverage
         run: |
-          pip install coverage
+          uv pip install coverage
           coverage run --source=src/vllm_router -m pytest src/tests/test_*.py
           coverage report -m > coverage.txt
 
@@ -108,14 +105,6 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
-
-      - name: Install Python dependencies
-        run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
-          python -m pip install --upgrade pip
-          pip install -r benchmarks/multi-round-qa/requirements.txt
-          pip install -e .
 
       - name: Setup minikube environment
         env:
@@ -172,24 +161,18 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          activate-environment: true
+
       - name: Install Python dependencies
         run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
-          python -m pip install --upgrade pip
-          pip install -e .
-
-      - name: Install vLLM and lmcache
-        run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
-          pip install vllm
-          pip install lmcache
+          uv pip install --upgrade pip
+          uv pip install -e ".[semantic_cache,lmcache,test]"
 
       - name: Start 2 vLLM serve backends
         run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
           echo "🚀 Starting vLLM serve backend"
           mkdir -p "$LOG_DIR"
           CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
@@ -203,8 +186,6 @@ jobs:
 
       - name: Run All Static Discovery Routing Tests
         run: |
-          source /usr/local/bin/conda-init
-          conda activate llmstack
           echo "🧪 Running all static discovery routing tests sequentially"
           chmod +x tests/e2e/run-static-discovery-routing-test.sh
           ./tests/e2e/run-static-discovery-routing-test.sh all \

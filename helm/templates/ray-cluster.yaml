@@ -31,6 +31,7 @@ spec:
         containers:
           - name: vllm-ray-head
             image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+            imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
             command:
               - >-
                 /bin/bash -c "
@@ -270,6 +271,7 @@ spec:
           containers:
             - name: vllm-ray-worker
               image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+              imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
               env:
                 - name: VLLM_HOST_IP
                   valueFrom:
