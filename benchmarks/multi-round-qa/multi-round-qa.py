@@ -40,6 +40,9 @@ class WorkloadConfig:
     # Whether to include user id in request header
     enable_user_id: bool
 
+    # Max number of unfinished queries allowed (None means no limit)
+    max_unfinished_queries: Optional[int]
+
 
 @dataclass
 class UserConfig:
@@ -419,6 +422,13 @@ class UserSessionManager:
         if self.start_time is None:
             self.start_time = timestamp
 
+        pending_queries = len([s for s in self.sessions if s.has_unfinished_request])
+        # Only check limit if max_unfinished_queries is set
+        if (self.workload_config.max_unfinished_queries is not None and 
+            pending_queries > self.workload_config.max_unfinished_queries):
+            logger.info(f"unfinished queries >{self.workload_config.max_unfinished_queries}, waiting")
+            return
+
         if timestamp - self.last_user_join > self.gap_between_users:
             self._create_user_session()
             self.last_user_join = timestamp
@@ -625,6 +635,12 @@ def parse_arguments() -> WorkloadConfig:
     parser.add_argument(
         "--sharegpt", action="store_true", help="Whether to use ShareGPT dataset"
     )
+    parser.add_argument(
+        "--max-unfinished-queries",
+        type=int,
+        default=None,
+        help="Maximum number of unfinished queries allowed (default: no limit)",
+    )
     args = parser.parse_args()
     return args
 
@@ -675,6 +691,7 @@ def main():
         qps=args.qps,
         model=args.model,
         enable_user_id=args.request_with_user_id,
+        max_unfinished_queries=args.max_unfinished_queries,
     )
 
     manager = UserSessionManager(
