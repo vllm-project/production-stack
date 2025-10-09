@@ -484,6 +484,16 @@
         "servicePort": {
           "type": "integer"
         },
+        "serviceDiscovery": {
+          "type": "string",
+          "description": "Service discovery mode. Available values: k8s or static.",
+          "enum": ["k8s", "static"]
+        },
+        "k8sServiceDiscoveryType": {
+          "type": "string",
+          "description": "Kubernetes service discovery type. Available values: pod-ip and service-name.",
+          "enum": ["pod-ip", "service-name"]
+        },
         "routingLogic": {
           "type": "string"
         },

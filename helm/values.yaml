@@ -338,7 +338,8 @@ routerSpec:
 
   # -- Service discovery mode, supports "k8s" or "static". Defaults to "k8s" if not set.
   serviceDiscovery: "k8s"
-
+  # -- Service discovery mode type, supports "pod-ip" or "service-name". Defaults to "pod-ip" if not set.
+  k8sServiceDiscoveryType: "pod-ip"
   # -- If serviceDiscovery is set to "static", the comma-separated values below are required. There needs to be the same number of backends and models
   staticBackends: ""
   staticModels: ""
