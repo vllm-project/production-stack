@@ -656,7 +656,13 @@ async def route_general_transcriptions(
         headers = {
             k: v
             for k, v in backend_response.headers.items()
-            if k.lower() not in ("content-encoding", "transfer-encoding", "connection")
+            if k.lower()
+            not in (
+                "content-length",
+                "content-encoding",
+                "transfer-encoding",
+                "connection",
+            )
         }
 
         headers["X-Request-Id"] = request_id
