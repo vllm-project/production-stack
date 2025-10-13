@@ -16,18 +16,19 @@ Before running this setup, ensure you have:
 
 Disclaimer: This script requires cloud resources and will incur costs. Please make sure all resources are shut down properly.
 
-Set the environment variables. Check that they meet the minimum requirements for your LLM model. Default values will be used for any unset variables. In this example, we use an A3 mega machine type to run the meta-llama/Llama-3.3-70B-Instruct model and use local SSD as the local disk backend through Kubernetes ephemeral storage(emptyDir).
+Set the environment variables. Check that they meet the minimum requirements for your LLM model. Default values will be used for any unset variables. In this example, we use an [A3 mega machine type](https://cloud.google.com/compute/docs/gpus#gpu-models) to run the meta-llama/Llama-3.3-70B-Instruct model and use local SSD as the local disk backend through Kubernetes ephemeral storage(emptyDir).
 
 ```bash
 export CLUSTER_NAME="my-vllm-cluster"
-export CLUSTER_VERSION="1.32.3-gke.1440000"
+export CLUSTER_VERSION="1.33.4-gke.1172000"
 export ZONE="us-central1-c"
 export ACCELERATOR_TYPE="nvidia-h100-mega-80gb"
 ```
 
-To run the service, go to "deployment_on_cloud/gcp" and run:
+To run the service, go to "[deployment_on_cloud/gcp](https://github.com/vllm-project/production-stack/tree/main/deployment_on_cloud/gcp)" and run:
 
 ```bash
+ cd ../../deployment_on_cloud/gcp/
  bash entry_point_basic.sh ../../tutorials/assets/gke-example/values-01-offload-kv-cache-local-disk.yaml
 ```
 
