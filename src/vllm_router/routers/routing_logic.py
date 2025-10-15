@@ -324,7 +324,11 @@ class KvawareRouter(RoutingInterface):
             or len(instance_id.layout_info) == 0
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
-            session_id = request.headers.get(self.session_key, None)
+            session_id = None
+            # Check if session_key is configured before attempting to access request headers
+            # This prevents AttributeError when session_key is None
+            if self.session_key is not None:
+                session_id = request.headers.get(self.session_key, None)
             logger.debug(f"Got session id: {session_id}")
             # Update the hash ring with the current list of endpoints
             self._update_hash_ring(endpoints)
