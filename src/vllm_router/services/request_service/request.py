@@ -29,6 +29,7 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillRouter,
     KvawareRouter,
     PrefixAwareRouter,
+    TtftRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
@@ -61,6 +62,7 @@ async def process_request(
     endpoint,
     background_tasks: BackgroundTasks,
     debug_request=None,
+    cache_info=None,
 ):
     """
     Process a request by sending it to the chosen backend.
@@ -73,7 +75,7 @@ async def process_request(
         endpoint: The endpoint to send the request to on the backend.
         debug_request: The original request object from the client, used for
             optional debug logging.
-
+        cache_info: Cache information.
     Yields:
         The response headers and status code, followed by the response content.
 
@@ -84,7 +86,7 @@ async def process_request(
     total_len = 0
     start_time = time.time()
     request.app.state.request_stats_monitor.on_new_request(
-        backend_url, request_id, start_time
+        backend_url, request_id, start_time, cache_info
     )
     # Check if this is a streaming request
     try:
@@ -228,7 +230,8 @@ async def route_general_request(
         )
         engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
         request_stats = request.app.state.request_stats_monitor.get_request_stats(
-            time.time()
+            time.time(),
+            [endpoint.url for endpoint in endpoints],
         )
     else:
         endpoints = list(
@@ -262,23 +265,30 @@ async def route_general_request(
                 headers={"X-Request-Id": request_id},
             )
 
+    route_result = None
+    cache_info = None
+
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
     if request_endpoint:
         server_url = endpoints[0].url
         logger.debug(
             f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
-
-    elif isinstance(request.app.state.router, KvawareRouter) or isinstance(
-        request.app.state.router, PrefixAwareRouter
-    ):
-        server_url = await request.app.state.router.route_request(
+    elif isinstance(request.app.state.router, (KvawareRouter, PrefixAwareRouter, TtftRouter)):
+        route_result = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
         )
     else:
-        server_url = request.app.state.router.route_request(
+        route_result = request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request
         )
+
+    if isinstance(route_result, (tuple, list)):
+        server_url = route_result[0]
+        if len(route_result) > 1:
+            cache_info = route_result[1]
+    elif isinstance(route_result, str):
+        server_url = route_result
 
     curr_time = time.time()
     # Extract actual session ID from request headers for logging
@@ -310,6 +320,7 @@ async def route_general_request(
         request_id,
         endpoint,
         background_tasks,
+        cache_info=cache_info,
     )
     headers, status = await anext(stream_generator)
     headers_dict = {key: value for key, value in headers.items()}

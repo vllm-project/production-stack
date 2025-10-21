@@ -112,6 +112,18 @@ async def lifespan(app: FastAPI):
         dyn_cfg_watcher.close()
 
 
+def create_instance_id_to_url(lmcache_instances, static_backends):
+    if lmcache_instances is None or static_backends is None:
+        return None
+    instance_ids = [s.strip() for s in lmcache_instances.split(',') if s.strip()]
+    urls = parse_static_urls(static_backends)
+    if not instance_ids or not urls:
+        return None
+    if len(instance_ids) != len(urls):
+        raise ValueError("length of lmcache-instances & static-backends mismatched")
+    return dict(zip(instance_ids, urls))
+
+
 def initialize_all(app: FastAPI, args):
     """
     Initialize all the components of the router with the given arguments.
@@ -209,6 +221,10 @@ def initialize_all(app: FastAPI, args):
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
         kv_aware_threshold=args.kv_aware_threshold,
+        tokenizer=args.tokenizer,
+        enable_shared_cache=args.enable_shared_cache,
+        instance_id_to_url=create_instance_id_to_url(args.lmcache_instances,
+                                                     args.static_backends),
     )
 
     # Initialize feature gates

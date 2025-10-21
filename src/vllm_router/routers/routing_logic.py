@@ -19,10 +19,12 @@ import math
 import random
 import threading
 import uuid
-from typing import Dict, List
+import traceback
+from typing import Dict, List, Optional, Tuple, Union
 
 import requests
 from fastapi import Request
+from urllib.parse import urlparse
 
 try:
     from transformers import AutoTokenizer
@@ -33,6 +35,7 @@ try:
     from lmcache.v1.cache_controller import controller_manager
     from lmcache.v1.cache_controller.message import (
         LookupMsg,
+        FullLookupMsg,
         QueryInstMsg,
     )
 except ImportError:
@@ -42,10 +45,36 @@ from uhashring import HashRing
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import EndpointInfo
 from vllm_router.stats.engine_stats import EngineStats
-from vllm_router.stats.request_stats import RequestStats
+from vllm_router.stats.request_stats import RequestStats, RequestStatsCacheInfo, prefill_workload
 from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)
+
+
+def extract_prompt(request_json: Dict):
+    """Extract prompt message from the request json object."""
+    if "messages" in request_json:
+        # Get the last message from the messages array
+        messages = request_json["messages"]
+        if messages:
+            # Concatenate all message content
+            prompt_parts = []
+            for message in messages:
+                content = message.get("content", "")
+                if isinstance(content, list):
+                    # Handle multimodal messages
+                    text_content = " ".join(
+                        part.get("text", "")
+                        for part in content
+                        if part.get("type") == "text"
+                    )
+                    prompt_parts.append(text_content)
+                elif content is not None:
+                    prompt_parts.append(content)
+            return "\n".join(prompt_parts)
+        return ""
+    # Handle regular completions
+    return request_json["prompt"]
 
 
 class RoutingLogic(str, enum.Enum):
@@ -54,6 +83,7 @@ class RoutingLogic(str, enum.Enum):
     KVAWARE = "kvaware"
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
+    TTFT = "ttft"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -110,7 +140,7 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
-    ) -> str:
+    ) -> Union[str, Tuple[str, RequestStatsCacheInfo]]:
         """
         Route the request to the appropriate engine URL
 
@@ -231,18 +261,21 @@ class KvawareRouter(RoutingInterface):
         lmcache_controller_port: int,
         session_key: str,
         kv_aware_threshold: int = 2000,
+        tokenizer_name: Optional[str] = None,
+        instance_id_to_url: Optional[Dict[str, str]] = None,
     ):
         self.lmcache_controller_port = lmcache_controller_port
         logger.info(
             f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
         )
         self.kv_manager = controller_manager.LMCacheControllerManager(
-            f"0.0.0.0:{self.lmcache_controller_port}"
+            {"pull" : f"0.0.0.0:{lmcache_controller_port}", "reply" : None}
         )
         self.req_id = 0
-        self.instance_id_to_ip = {}
+        self.instance_id_to_url = instance_id_to_url or {}
         self.session_key = session_key
         self.hash_ring = HashRing()
+        self.tokenizer_name = tokenizer_name
         self.tokenizer = None
         self.threshold = kv_aware_threshold
 
@@ -254,8 +287,10 @@ class KvawareRouter(RoutingInterface):
         self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
         self.thread.start()
         asyncio.run_coroutine_threadsafe(self.kv_manager.start_all(), self.loop)
+        if self.tokenizer_name is not None:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_name)
 
-    def query_manager(self, msg) -> str:
+    def query_manager(self, msg):
         """
         Get the instance id for the given message
         """
@@ -337,7 +372,7 @@ class KvawareRouter(RoutingInterface):
             return url
         else:
             queried_instance_ids = [info for info in instance_id.layout_info]
-            if queried_instance_ids[0] not in self.instance_id_to_ip:
+            if queried_instance_ids[0] not in self.instance_id_to_url:
                 for endpoint in endpoints:
                     event_id = "QueryInst" + str(uuid.uuid4())
                     logger.debug(f"QueryInst event id: {event_id}")
@@ -349,14 +384,14 @@ class KvawareRouter(RoutingInterface):
                     )
                     endpoint_instance_id = await self.query_manager(query_message)
 
-                    self.instance_id_to_ip[endpoint_instance_id.instance_id] = (
+                    self.instance_id_to_url[endpoint_instance_id.instance_id] = (
                         endpoint.url
                     )
-                logger.info(f"Instance id to ip: {self.instance_id_to_ip}")
+                logger.info(f"Instance id to ip: {self.instance_id_to_url}")
             logger.info(
                 f"Routing request to {queried_instance_ids[0]} found by kvaware router"
             )
-            return self.instance_id_to_ip[queried_instance_ids[0]]
+            return self.instance_id_to_url[queried_instance_ids[0]]
 
 
 class PrefixAwareRouter(RoutingInterface):
@@ -399,33 +434,7 @@ class PrefixAwareRouter(RoutingInterface):
             request_json (Dict): The request body (needed for finding the
             longest prefix match)
         """
-
-        # Handle chat completions
-        if "messages" in request_json:
-            # Get the last message from the messages array
-            messages = request_json["messages"]
-            if messages:
-                # Concatenate all message content
-                prompt_parts = []
-                for message in messages:
-                    content = message.get("content", "")
-                    if isinstance(content, list):
-                        # Handle multimodal messages
-                        text_content = " ".join(
-                            part.get("text", "")
-                            for part in content
-                            if part.get("type") == "text"
-                        )
-                        prompt_parts.append(text_content)
-                    elif content is not None:
-                        prompt_parts.append(content)
-                prompt = "\n".join(prompt_parts)
-            else:
-                prompt = ""
-        else:
-            # Handle regular completions
-            prompt = request_json["prompt"]
-
+        prompt = extract_prompt(request_json)
         available_endpoints = set(endpoint.url for endpoint in endpoints)
         _, matched_endpoint = await self.hashtrie.longest_prefix_match(
             prompt, available_endpoints
@@ -481,6 +490,196 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             return decoder_endpoints[0].url
 
 
+class TtftRouter(RoutingInterface):
+    """
+    Route the request to the qppropriate engine URL by the least estimated TTFT.
+    """
+
+    def __init__(
+        self,
+        lmcache_controller_port: int,
+        session_key: str,
+        tokenizer_name: Optional[str] = None,
+        enable_shared_cache : bool = False,
+        instance_id_to_url: Optional[Dict[str, str]] = None,
+    ):
+        logger.info(
+            f"Initializing TtftRouter with lmcache addr: 0.0.0.0:{lmcache_controller_port}"
+        )
+        self.kv_manager = controller_manager.LMCacheControllerManager(
+            {"pull":f"0.0.0.0:{lmcache_controller_port}", "reply" : None}
+        )
+        self.instance_id_to_url = instance_id_to_url or {}
+        self.session_key = session_key
+        self.hash_ring = HashRing()
+        self.tokenizer_name = tokenizer_name
+        self.tokenizer = None
+        self.enable_shared_cache = enable_shared_cache
+
+    def start_kv_manager(self):
+        """
+        Start the kv manager
+        """
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+        self.thread.start()
+        asyncio.run_coroutine_threadsafe(self.kv_manager.start_all(), self.loop)
+        if self.tokenizer_name is not None:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_name)
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> Tuple[str, RequestStatsCacheInfo]:
+        """
+        Route the request to the appropriate engine URL by where the KV cache
+        of the longest prefix match is found.
+        If there is no session id in the reqest header, it will pick a server
+        with round robin.
+
+        Args:
+            endpoints (List[EndpointInfo]): The list of engine URLs
+            engine_stats (Dict[str, EngineStats]): The engine stats indicating
+                the 'physical' load of each engine
+            request_stats (Dict[str, RequestStats]): The request stats
+                indicating the request-level performance of each engine
+            request (Request): The incoming request
+            request_json (Dist): The request body (needed for finding the
+            longest prefix match)
+        """
+        if self.tokenizer is None:
+            # fallback to use the model of the first endpoint as tokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(endpoints[0].model_names[0])
+
+        token_ids = self.tokenizer.encode(extract_prompt(request_json))
+        cache_info = RequestStatsCacheInfo()
+        cache_info.num_prefix_tokens = len(token_ids)
+        try:
+            if request_stats is None:
+                raise ValueError("no request stats was provided")
+            msg = FullLookupMsg(event_id="", tokens=token_ids)
+            ret_msg = await self.kv_manager.handle_orchestration_message(msg)
+            matched_infos = ret_msg.matched_info
+            if matched_infos is None:
+                matched_infos = []
+            if self.enable_shared_cache:
+                best_matched_info = self._find_best_matched(matched_infos)
+            else:
+                best_matched_info = None
+            best_inst_url, num_cached_tokens = \
+                await self._find_best_inst(endpoints, matched_infos,
+                                           best_matched_info, request_stats,
+                                           len(token_ids))
+            cache_info.num_cached_tokens = num_cached_tokens
+            return best_inst_url, cache_info
+        except ValueError:
+            logger.info("Fallback to QPS routing due to:")
+            logger.info(traceback.format_exc())
+        cache_info.num_cached_tokens = 0
+        return self._fallback_routing(endpoints, request_stats, request), cache_info
+
+    def _find_best_matched(self, matched_infos):
+        if not matched_infos:
+            return None
+        best_matched_info = None
+        for instance_info in matched_infos:
+            if best_matched_info is None or instance_info[1][-1][1] > best_matched_info[1][-1][1]:
+                best_matched_info = instance_info
+        if best_matched_info is None:
+            raise ValueError("no best matched instance was found")
+        return best_matched_info
+
+    async def _find_best_inst(self, endpoints, matched_infos, best_matched_info,
+                              request_stats, num_prefix_tokens):
+        matched_stats = []
+        matched_urls = []
+        for matched_info in matched_infos:
+            url = await self._get_instance_url(endpoints, matched_info[0])
+            stats = request_stats.get(url, None)
+            matched_urls.append(url)
+            matched_stats.append(stats)
+
+        # Assume the computation speed of all endpoints are equal
+        # comparing workload is equivalent to comparing TTFT
+
+        # cache matched pass
+        min_workload = math.inf
+        min_workload_url = None
+        min_workload_cached_tokens = 0
+        for i, matched_info in enumerate(matched_infos):
+            workload, cached_tokens = self._estimate_workload(matched_info, best_matched_info,
+                                                              matched_stats[i], num_prefix_tokens)
+            if min_workload_url is None or workload <= min_workload:
+                min_workload = workload
+                min_workload_url = matched_urls[i]
+                min_workload_cached_tokens = cached_tokens
+
+        # cache not matched pass
+        matched_url_set = set(matched_urls)
+        not_matched_endpoints = [endpoint for endpoint in endpoints
+                                 if endpoint.url not in matched_url_set]
+        for endpoint in not_matched_endpoints:
+            url = endpoint.url
+            stats = request_stats.get(url, None)
+            workload, cached_tokens = self._estimate_workload(None, best_matched_info,
+                                                              stats, num_prefix_tokens)
+            if min_workload_url is None or workload <= min_workload:
+                min_workload = workload
+                min_workload_url = url
+                min_workload_cached_tokens = cached_tokens
+
+        if min_workload_url is None:
+            raise ValueError(f"no best instance was found")
+        return min_workload_url, min_workload_cached_tokens
+
+    def _estimate_workload(self, matched_info, best_matched_info, stats, num_prefix_tokens):
+        """Estimate prefill workload."""
+        num_cache_tokens = 0
+        if best_matched_info is not None:
+            num_cache_tokens = best_matched_info[1][-1][1]
+        elif matched_info is not None:
+            num_cache_tokens = matched_info[1][-1][1]
+        workload = ((stats.prefill_todo_workload if stats else 0) +
+                    prefill_workload(num_prefix_tokens, num_cache_tokens))
+        return workload, num_cache_tokens
+
+    async def _get_instance_url(self, endpoints, instance_id):
+        url = self.instance_id_to_url.get(instance_id, None)
+        if url is not None:
+            return url
+        for endpoint in endpoints:
+            msg = QueryInstMsg(
+                event_id="",
+                ip=urlparse(endpoint.url).hostname
+            )
+            ret_msg = await self.kv_manager.handle_orchestration_message(msg)
+            self.instance_id_to_url[ret_msg.instance_id] = endpoint.url
+            if ret_msg.instance_id == instance_id:
+                url = endpoint.url
+        if url is None:
+            raise ValueError(f"cannot resolve URL for {instance_id}")
+        return url
+
+    def _fallback_routing(self, endpoints, request_stats, request):
+        session_id = request.headers.get(self.session_key, None)
+        logger.debug(f"Got session id: {session_id}")
+
+        # Update the hash ring with the current list of endpoints
+        self._update_hash_ring(endpoints)
+
+        if session_id is None:
+            # Route base on QPS if no session ID is present
+            url = self._qps_routing(endpoints, request_stats)
+        else:
+            # Use the hash ring to get the endpoint for the session ID
+            url = self.hash_ring.get_node(session_id)
+        return url
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -497,6 +696,8 @@ def initialize_routing_logic(
             kwargs.get("lmcache_controller_port"),
             kwargs.get("session_key"),
             kwargs.get("kv_aware_threshold"),
+            kwargs.get("tokenizer"),
+            kwargs.get("instance_id_to_url"),
         )
         router.start_kv_manager()
         return router
@@ -508,6 +709,17 @@ def initialize_routing_logic(
         return DisaggregatedPrefillRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
+    elif routing_logic == RoutingLogic.TTFT:
+        logger.info("Initializing ttft routing logic")
+        router = TtftRouter(
+            kwargs.get("lmcache_controller_port"),
+            kwargs.get("session_key"),
+            kwargs.get("tokenizer"),
+            kwargs.get("enable_shared_cache"),
+            kwargs.get("instance_id_to_url"),
+        )
+        router.start_kv_manager()
+        return router
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -535,6 +747,7 @@ def get_routing_logic() -> RoutingInterface:
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
+        TtftRouter,
     ):
         if cls in SingletonABCMeta._instances:
             return cls()
