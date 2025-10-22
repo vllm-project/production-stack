@@ -22,15 +22,30 @@ from fastapi.responses import JSONResponse, Response
 
 from vllm_router.dynamic_config import get_dynamic_config_watcher
 from vllm_router.log import init_logger
-from vllm_router.protocols import ModelCard, ModelList
+from vllm_router.protocols import (
+    ChatCompletionRequest,
+    CompletionRequest,
+    EmbeddingRequest,
+    ModelCard,
+    ModelList,
+)
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.request import (
     route_general_request,
-    route_general_transcriptions,
     route_sleep_wakeup_request,
 )
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
 from vllm_router.version import __version__
+
+try:
+    # Semantic cache integration
+    from vllm_router.services.request_service.request import (
+        route_general_transcriptions,
+    )
+
+    _route_general_transcriptions = True
+except ImportError:
+    _route_general_transcriptions = False
 
 try:
     # Semantic cache integration
@@ -48,30 +63,52 @@ logger = init_logger(__name__)
 
 
 @main_router.post("/v1/chat/completions")
-async def route_chat_completion(request: Request, background_tasks: BackgroundTasks):
+async def route_chat_completion(
+    request: ChatCompletionRequest,
+    raw_request: Request,
+    background_tasks: BackgroundTasks,
+):
     if semantic_cache_available:
         # Check if the request can be served from the semantic cache
         logger.debug("Received chat completion request, checking semantic cache")
-        cache_response = await check_semantic_cache(request=request)
+        cache_response = await check_semantic_cache(request=raw_request)
 
         if cache_response:
             logger.info("Serving response from semantic cache")
             return cache_response
 
     logger.debug("No cache hit, forwarding request to backend")
+
+    # Convert Pydantic model to JSON bytes for existing service
+    request_body = request.model_dump_json().encode("utf-8")
+
     return await route_general_request(
-        request, "/v1/chat/completions", background_tasks
+        raw_request, "/v1/chat/completions", background_tasks, request_body
     )
 
 
 @main_router.post("/v1/completions")
-async def route_completion(request: Request, background_tasks: BackgroundTasks):
-    return await route_general_request(request, "/v1/completions", background_tasks)
+async def route_completion(
+    request: CompletionRequest, raw_request: Request, background_tasks: BackgroundTasks
+):
+    # Convert Pydantic model to JSON bytes for existing service
+    request_body = request.model_dump_json().encode("utf-8")
+
+    return await route_general_request(
+        raw_request, "/v1/completions", background_tasks, request_body
+    )
 
 
 @main_router.post("/v1/embeddings")
-async def route_embeddings(request: Request, background_tasks: BackgroundTasks):
-    return await route_general_request(request, "/v1/embeddings", background_tasks)
+async def route_embeddings(
+    request: EmbeddingRequest, raw_request: Request, background_tasks: BackgroundTasks
+):
+    # Convert Pydantic model to JSON bytes for existing service
+    request_body = request.model_dump_json().encode("utf-8")
+
+    return await route_general_request(
+        raw_request, "/v1/embeddings", background_tasks, request_body
+    )
 
 
 @main_router.post("/tokenize")
@@ -236,11 +273,13 @@ async def health() -> Response:
         return JSONResponse(content={"status": "healthy"}, status_code=200)
 
 
-@main_router.post("/v1/audio/transcriptions")
-async def route_v1_audio_transcriptions(
-    request: Request, background_tasks: BackgroundTasks
-):
-    """Handles audio transcription requests."""
-    return await route_general_transcriptions(
-        request, "/v1/audio/transcriptions", background_tasks
-    )
+if _route_general_transcriptions:
+
+    @main_router.post("/v1/audio/transcriptions")
+    async def route_v1_audio_transcriptions(
+        request: Request, background_tasks: BackgroundTasks
+    ):
+        """Handles audio transcription requests."""
+        return await route_general_transcriptions(
+            request, "/v1/audio/transcriptions", background_tasks
+        )

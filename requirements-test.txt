@@ -1,4 +1,5 @@
 faiss-cpu>=1.7.4
+httpx==0.28.1
 huggingface-hub==0.33.0
 pytest
 pytest-asyncio
