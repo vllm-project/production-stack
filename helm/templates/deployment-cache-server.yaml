@@ -35,10 +35,23 @@ spec:
         - name: "lmcache-server"
           image: "{{ required "Required value 'cacheserverSpec.repository' must be defined !" .Values.cacheserverSpec.repository }}:{{ required "Required value 'cacheserverSpec.tag' must be defined !" .Values.cacheserverSpec.tag }}"
           command:
-          {{- if eq .Values.cacheserverSpec.tag "latest-nightly" }}
+          {{- $tag := .Values.cacheserverSpec.tag }}
+          {{- if or (eq $tag "latest") (eq $tag "latest-nightly") }}
           - "/opt/venv/bin/lmcache_server"
-          {{- else if eq .Values.cacheserverSpec.tag "latest" }}
-          - "/opt/venv/bin/lmcache_experimental_server"
+          {{- else if hasPrefix "nightly-" $tag }}
+          - "/opt/venv/bin/lmcache_server"
+          {{- else if or (eq $tag "test") (eq $tag "vllm-cpu-env") }}
+          - "lmcache_experimental_server"
+          {{- else if or (hasPrefix "v0.0" $tag) (hasPrefix "v0.1" $tag) (hasPrefix "v0.2" $tag) }}
+          - "lmcache_experimental_server"
+          {{- else if hasPrefix "v" $tag }}
+          - "/opt/venv/bin/lmcache_server"
+          {{- else if hasPrefix "2025-" $tag }}
+            {{- if ge $tag "2025-05-08" }}
+          - "/opt/venv/bin/lmcache_server"
+            {{- else }}
+          - "lmcache_experimental_server"
+            {{- end }}
           {{- else }}
           - "lmcache_experimental_server"
           {{- end }}
