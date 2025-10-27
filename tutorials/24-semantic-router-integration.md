@@ -49,12 +49,7 @@ Use your chart and the provided values file at `tutorials/assets/values-23-SR.ya
 
 ```bash
 helm repo add vllm-production-stack https://vllm-project.github.io/production-stack
-helm install vllm-stack vllm-production-stack/vllm-stack \
-  -f ./tutorials/assets/values-23-SR.yaml
-
-# Wait for pods
-kubectl get pods -n vllm-semantic-router-system
-kubectl get svc -n vllm-semantic-router-system
+helm install vllm-stack vllm-production-stack/vllm-stack -f ./tutorials/assets/values-23-SR.yaml
 ```
 
 For reference, the following is the sample value file:
