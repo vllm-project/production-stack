@@ -29,6 +29,7 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillRouter,
     KvawareRouter,
     PrefixAwareRouter,
+    SessionRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
@@ -165,7 +166,7 @@ async def route_general_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
-    request_json = json.loads(request_body)
+    request_json = json.loads(request_body) if request_body else {}
 
     if request.query_params:
         request_endpoint = request.query_params.get("id")
@@ -269,8 +270,8 @@ async def route_general_request(
             f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
 
-    elif isinstance(request.app.state.router, KvawareRouter) or isinstance(
-        request.app.state.router, PrefixAwareRouter
+    elif isinstance(
+        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
     ):
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
@@ -282,14 +283,8 @@ async def route_general_request(
 
     curr_time = time.time()
     # Extract actual session ID from request headers for logging
-    session_key = (
-        getattr(request.app.state.router, "session_key", None)
-        if hasattr(request.app.state.router, "session_key")
-        else None
-    )
-    session_id = (
-        request.headers.get(session_key, None) if session_key is not None else None
-    )
+    session_key = getattr(request.app.state.router, "session_key", None)
+    session_id = request.app.state.router.extract_session_id(request, request_json)
     session_id_display = session_id if session_id is not None else "None"
 
     # Debug logging to help troubleshoot session ID extraction
