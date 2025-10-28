@@ -52,6 +52,18 @@ from vllm_router.services.metrics_service import num_incoming_requests_total
 
 logger = init_logger(__name__)
 
+_HOP_BY_HOP_HEADERS = {
+    "host",
+    "connection",
+    "keep-alive",
+    "proxy-connection",
+    "transfer-encoding",
+    "content-length",
+    "upgrade",
+    "te",  # codespell:ignore
+    "trailer",
+}
+
 
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
@@ -95,13 +107,18 @@ async def process_request(
         # If we can't parse the body as JSON, assume it's not streaming
         raise HTTPException(status=400, detail="Request body is not JSON parsable.")
 
+    # sanitize the request headers
+    headers = {
+        k: v for k, v in request.headers.items() if k.lower() not in _HOP_BY_HOP_HEADERS
+    }
+
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
 
     async with request.app.state.aiohttp_client_wrapper().request(
         method=request.method,
         url=backend_url + endpoint,
-        headers=dict(request.headers),
+        headers=headers,
         data=body,
         timeout=aiohttp.ClientTimeout(total=None),
     ) as backend_response:
