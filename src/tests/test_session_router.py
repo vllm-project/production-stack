@@ -297,7 +297,7 @@ async def test_session_key_in_request_body():
         endpoints, None, request_stats, request, request.body
     )
     assert url == "http://engine1.com"
-    assert router._extract_session_id(request, request.body) == "abc123"
+    assert router.extract_session_id(request, request.body) == "abc123"
     url2 = await router.route_request(
         endpoints, None, request_stats, request, request.body
     )

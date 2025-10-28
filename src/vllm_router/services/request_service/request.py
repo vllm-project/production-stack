@@ -166,7 +166,7 @@ async def route_general_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
-    request_json = json.loads(request_body)
+    request_json = json.loads(request_body) if request_body else {}
 
     if request.query_params:
         request_endpoint = request.query_params.get("id")
@@ -284,7 +284,7 @@ async def route_general_request(
     curr_time = time.time()
     # Extract actual session ID from request headers for logging
     session_key = getattr(request.app.state.router, "session_key", None)
-    session_id = request.app.state.router._extract_session_id(request, request_json)
+    session_id = request.app.state.router.extract_session_id(request, request_json)
     session_id_display = session_id if session_id is not None else "None"
 
     # Debug logging to help troubleshoot session ID extraction

@@ -19,7 +19,7 @@ import math
 import random
 import threading
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import requests
 from fastapi import Request
@@ -103,7 +103,7 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         for node in new_nodes - current_nodes:
             self.hash_ring.add_node(node)
 
-    def _extract_session_id(self, request: Request, request_json: Dict) -> str:
+    def extract_session_id(self, request: Request, request_json: Dict) -> Optional[str]:
         """
         Extract the session id from the request headers or request body.
         """
@@ -216,7 +216,7 @@ class SessionRouter(RoutingInterface):
             request (Request): The incoming request
             request_json (Dict): The request body (needed for finding the session id)
         """
-        session_id = self._extract_session_id(request, request_json)
+        session_id = self.extract_session_id(request, request_json)
         logger.debug(f"Got session id: {session_id}")
 
         # Update the hash ring with the current list of endpoints
@@ -336,7 +336,7 @@ class KvawareRouter(RoutingInterface):
             or len(instance_id.layout_info) == 0
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
-            session_id = self._extract_session_id(request, request_json)
+            session_id = self.extract_session_id(request, request_json)
             logger.debug(f"Got session id: {session_id}")
             # Update the hash ring with the current list of endpoints
             self._update_hash_ring(endpoints)
