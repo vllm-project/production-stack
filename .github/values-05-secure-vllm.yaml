@@ -3,7 +3,7 @@ servingEngineSpec:
   vllmApiKey: "abc123XYZ987"
   modelSpec:
   - name: "opt125m"
-    repository: "vllm/vllm-openai"
+    repository: "zhuohangu/vllm-test"
     tag: "latest"
     modelURL: "facebook/opt-125m"
 
@@ -11,7 +11,7 @@ servingEngineSpec:
 
     requestCPU: 6
     requestMemory: "16Gi"
-    requestGPU: 1
+    requestGPU: 0
 
 routerSpec:
   repository: "localhost:5000/git-act-router"
