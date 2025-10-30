@@ -20,6 +20,10 @@ spec:
     metadata:
       labels:
       {{- include "chart.routerLabels" . | nindent 8 }}
+      {{- if .Values.routerSpec.podAnnotations }}
+      annotations:
+        {{- toYaml .Values.routerSpec.podAnnotations | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: {{ .Release.Name }}-router-service-account
       {{- if .Values.routerSpec.priorityClassName }}
