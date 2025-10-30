@@ -10,23 +10,8 @@ subjects:
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
-  name: {{ .Release.Name }}-pod-reader
+  name: {{ .Release.Name }}-reader
   apiGroup: rbac.authorization.k8s.io
-{{- if .Values.routerSpec.k8sServiceDiscoveryType | default "pod-ip" | eq "service-name" }}
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ .Release.Name }}-deployment-access-binding
-  namespace: {{ .Release.Namespace }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ .Release.Name }}-router-service-account
-    namespace: {{ .Release.Namespace }}
-roleRef:
-  kind: Role
-  name: {{ .Release.Name }}-service-reader
-  apiGroup: rbac.authorization.k8s.io
-{{- end }}
 {{- end }}
 
 {{- if .Values.loraController.enableLoraController }}
