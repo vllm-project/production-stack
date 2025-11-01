@@ -1,0 +1,133 @@
+nodeExporter:
+  hostRootfs: false
+  containerSecurityContext:
+    privileged: true
+
+prometheus:
+  prometheusSpec:
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: compute-csi-default-sc
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+  ingress:
+     enabled: false
+    # ingressClassName: nginx
+    # annotations:
+    #   cert-manager.io/cluster-issuer: letsencrypt-prod
+    # hosts:
+    #   - prometheus.${nginx_ip_hex}.nip.io
+
+grafana:
+  # Fix plugin signature issues by allowing unsigned plugins
+  plugins:
+    - grafana-kubernetes-app
+    - grafana-worldmap-panel
+    - grafana-piechart-panel
+
+  # Remove problematic unsigned plugin and add plugin configuration
+  env:
+    GF_INSTALL_PLUGINS: "grafana-kubernetes-app,grafana-worldmap-panel,grafana-piechart-panel"
+
+  # Remove custom datasource configuration - let the chart handle it automatically
+  # The kube-prometheus-stack chart automatically creates the Prometheus datasource
+
+  # Simplified dashboard configuration
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: 'Kubernetes'
+          type: file
+          disableDeletion: false
+          editable: true
+          allowUiUpdates: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  # Reduced dashboard list to avoid conflicts
+  dashboards:
+    default:
+      kubernetes-cluster-monitoring:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      kubernetes-pods:
+        gnetId: 6336
+        revision: 1
+        datasource: Prometheus
+      kubernetes-networking:
+        gnetId: 12658
+        revision: 1
+        datasource: Prometheus
+
+  sidecar:
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+      searchNamespace: ALL
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+      folder: /var/lib/grafana/dashboards
+      folderAnnotation: grafana_folder
+      provider:
+        allowUiUpdates: true
+        foldersFromFilesStructure: true
+
+  persistence:
+    enabled: true
+    storageClassName: compute-csi-default-sc
+    size: 5Gi
+    accessModes:
+      - ReadWriteOnce
+
+  # Add resource limits to prevent OOM issues
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+  # Security context fixes
+  securityContext:
+    runAsUser: 472
+    runAsGroup: 472
+    fsGroup: 472
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - grafana.${nginx_ip_hex}.nip.io # or Use nip.io for wildcard DNS resolution
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.${nginx_ip_hex}.nip.io
+
+  adminPassword: ${grafana_admin_password}
+
+  # Additional Grafana configuration
+  grafana.ini:
+    server:
+      domain: grafana.${nginx_ip_hex}.nip.io
+      root_url: https://grafana.${nginx_ip_hex}.nip.io # or Use nip.io for wildcard DNS resolution
+    security:
+      allow_embedding: true
+    plugins:
+      allow_loading_unsigned_plugins: "grafana-kubernetes-app,grafana-worldmap-panel,grafana-piechart-panel"
+    log:
+      level: info
