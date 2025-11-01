@@ -1,0 +1,59 @@
+## -----------------------------------------------------------------------------
+## NVIDIA GPU Operator – minimal values for Nebius MK8s
+## -----------------------------------------------------------------------------
+
+driver:
+  enabled: true           # ✅ Must install NVIDIA drivers
+  usePrecompiled: false   # ignored when driver.enabled = false
+#  version: "550.90.07"   # Specify stable driver version
+
+toolkit:
+  enabled: true                   # ✅ Must install container-toolkit
+  # version: "1.14.6"               # Specify toolkit version
+devicePlugin:
+  enabled: true
+  version: "v0.17.0"      # keep in sync with chart; change if you pin newer
+
+gfd:                      # GPU-Feature-Discovery (labels each node)
+  enabled: true
+# version: "v0.8.2"       # keep in sync with chart; change if you pin newer
+dcgmExporter:             # GPU telemetry → Prometheus
+  enabled: true
+  serviceMonitor:
+    enabled: true         # Enable Prometheus scraping
+
+# MIG (Multi-Instance GPU) manager - useful for A100/H100
+migManager:               # only useful on A100/Hopper; harmless to keep
+  enabled: true
+
+validator:                # sanity-checks that GPU pods can run | test GPU health
+  enabled: true
+  # version: "v0.5.5"
+  #  skip if cluster-wide PSPs/OPA block privileged pods
+
+nodeSelector: {}          # add “nvidia.com/gpu.present: true” if you run mixed nodes
+tolerations:
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+# Operator-wide settings
+operator:
+  defaultRuntime: "containerd"     # AKS uses containerd
+  runtimeClass: "nvidia"
+
+# Security context for Azure Linux
+securityContext:
+  privileged: true                 # Required for driver installation
+# Image pull secrets if you mirror NVIDIA containers to a private ECR
+imagePullSecrets: []
+# imagePullPolicy: "IfNotPresent"
+
+# Resource limits for operator pods
+# resources:
+#   limits:
+#     memory: "500Mi"
+#     cpu: "500m"
+#   requests:
+#     memory: "200Mi"
+#     cpu: "100m"

@@ -1,0 +1,73 @@
+###############################################
+# Nebius Project / Auth
+###############################################
+neb_project_id       = ""            # (required) - Fill your Nebius Project ID
+neb_profile          = "my_nebius_profile"  # (Required)  replace with your Nebius CLI profile
+
+###############################################
+# Cluster Settings
+###############################################
+cluster_name         = "vllm-neb-gpu"
+k8s_version          = "1.30"
+public_endpoint      = true
+
+###############################################
+# Networking
+###############################################
+vpc_name             = "vllm-vpc"
+vpc_cidr             = "10.20.0.0/16"
+service_cidr         = "10.96.0.0/16"
+
+# Optional subnet overrides (uncomment to use custom)
+# subnetwork_cidr      = "10.20.1.0/24"
+# subnetwork2_cidr     = "10.20.2.0/24"
+# subnetwork3_cidr     = "10.20.3.0/24"
+
+###############################################
+# GPU Node Group
+###############################################
+enable_vllm          = true
+gpu_node_min         = 0
+gpu_node_max         = 3
+gpu_platform         = "gpu-l40s-d"
+
+# Optional (leave default unless overriding)
+# cpu_disk_size_gb     = 128
+# gpu_disk_size_gb     = 128
+# cpu_disk_type        = "NETWORK_SSD"
+# gpu_disk_type        = "NETWORK_SSD"
+
+###############################################
+# vLLM Stack
+###############################################
+hf_token                      = ""  # required
+gpu_vllm_helm_config          = "config/llm-stack/helm/gpu/gpu-tinyllama-light-ingress-nebius.tpl"
+
+###############################################
+# Observability
+###############################################
+enable_cert_manager           = true
+grafana_admin_password        = "admin1234" # recommended to override
+letsencrypt_email             = "info@gmail.com"
+
+# Optional Prometheus settings
+# prometheus_scrape_interval   = "1m"
+# prometheus_retention         = "15d"
+# prometheus_pv_size           = "25Gi"
+
+###############################################
+# Optional tagging
+###############################################
+# tags = {
+#  project     = "vllm-production-stack"
+#  environment = "production"
+#  team        = "llmops"
+#  application = "ai-inference"
+#  costcenter  = "ai-1234"
+# }
+
+###############################################
+# Optional Shared FS (future use)
+###############################################
+# shared_fs_size_tb = 1
+# shared_fs_type    = "network-ssd"
