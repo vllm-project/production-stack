@@ -189,6 +189,18 @@ def parse_args():
         help="The label selector to filter vLLM pods when using K8s service discovery.",
     )
     parser.add_argument(
+        "--k8s-watcher-timeout-seconds",
+        type=int,
+        default=0,
+        help="Timeout in seconds for Kubernetes watcher streams (default: 0).",
+    )
+    parser.add_argument(
+        "--backend-health-check-timeout-seconds",
+        type=int,
+        default=10,
+        help="Timeout in seconds for backend health check requests (default: 10).",
+    )
+    parser.add_argument(
         "--routing-logic",
         type=str,
         choices=[

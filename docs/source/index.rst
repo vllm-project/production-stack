@@ -34,7 +34,7 @@ Welcome to production-stack!
 **vLLM Production Stack** project provides a reference implementation on how to build an inference stack on top of vLLM, which allows you to:
 
 - 🚀 Scale from single vLLM instance to distributed vLLM deployment without changing any application code
-- 💻 Monitor the  through a web dashboard
+- 💻 Monitor the metrics through a web dashboard
 - 😄 Enjoy the performance benefits brought by request routing and KV cache offloading
 - 📈 Easily deploy the stack on AWS, GCP, or any other cloud provider
 

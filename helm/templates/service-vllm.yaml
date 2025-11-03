@@ -23,6 +23,7 @@ spec:
       port: 9999
       targetPort: ucx-port
       protocol: TCP
+  {{- include "chart.extraPorts" $ | nindent 4 }}
   selector:
     model: "{{ $modelSpec.name }}"
     helm-release-name: "{{ $.Release.Name }}"

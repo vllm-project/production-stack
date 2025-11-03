@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -41,7 +42,7 @@ from vllm_router.service_discovery import (
     initialize_service_discovery,
 )
 from vllm_router.services.batch_service import initialize_batch_processor
-from vllm_router.services.callbacks_service.callbacks import initialize_custom_callbacks
+from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
@@ -89,6 +90,8 @@ async def lifespan(app: FastAPI):
     service_discovery = get_service_discovery()
     if hasattr(service_discovery, "initialize_client_sessions"):
         await service_discovery.initialize_client_sessions()
+
+    app.state.event_loop = asyncio.get_event_loop()
 
     yield
     await app.state.aiohttp_client_wrapper.stop()
@@ -164,6 +167,8 @@ def initialize_all(app: FastAPI, args):
             label_selector=args.k8s_label_selector,
             prefill_model_labels=args.prefill_model_labels,
             decode_model_labels=args.decode_model_labels,
+            watcher_timeout_seconds=args.k8s_watcher_timeout_seconds,
+            health_check_timeout_seconds=args.backend_health_check_timeout_seconds,
         )
 
     else:
@@ -195,7 +200,7 @@ def initialize_all(app: FastAPI, args):
             )
 
     if args.callbacks:
-        initialize_custom_callbacks(args.callbacks, app)
+        configure_custom_callbacks(args.callbacks, app)
 
     initialize_routing_logic(
         args.routing_logic,

@@ -20,7 +20,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import aiohttp
 import requests
@@ -226,6 +226,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.engines_id = [str(uuid.uuid4()) for i in range(0, len(urls))]
         self.added_timestamp = int(time.time())
         self.unhealthy_endpoint_hashes = []
+        self._running = True
         if static_backend_health_checks:
             self.start_health_check_task()
         self.prefill_model_labels = prefill_model_labels
@@ -250,10 +251,13 @@ class StaticServiceDiscovery(ServiceDiscovery):
         return unhealthy_endpoints
 
     async def check_model_health(self):
-        while True:
+        while self._running:
             try:
                 self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
-                time.sleep(60)
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                logger.debug("Health check task cancelled")
+                break
             except Exception as e:
                 logger.error(e)
 
@@ -340,6 +344,40 @@ class StaticServiceDiscovery(ServiceDiscovery):
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
 
+    def close(self):
+        """
+        Close the service discovery module and clean up health check resources.
+        """
+        self._running = False
+        if hasattr(self, "loop") and self.loop.is_running():
+            # Schedule a coroutine to gracefully shut down the event loop
+            async def shutdown():
+                tasks = [
+                    t
+                    for t in asyncio.all_tasks(self.loop)
+                    if t is not asyncio.current_task()
+                ]
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                self.loop.stop()
+
+            future = asyncio.run_coroutine_threadsafe(shutdown(), self.loop)
+            try:
+                future.result(timeout=15.0)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Timed out waiting for shutdown(loop might already be closed)"
+                )
+            except Exception as e:
+                logger.warning(f"Error during health check shutdown: {e}")
+
+        if hasattr(self, "thread") and self.thread.is_alive():
+            self.thread.join(timeout=5.0)
+
+        if hasattr(self, "loop") and not self.loop.is_closed():
+            self.loop.close()
+
 
 class K8sPodIPServiceDiscovery(ServiceDiscovery):
     def __init__(
@@ -350,6 +388,8 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         label_selector=None,
         prefill_model_labels: List[str] | None = None,
         decode_model_labels: List[str] | None = None,
+        watcher_timeout_seconds: int = 0,
+        health_check_timeout_seconds: int = 10,
     ):
         """
         Initialize the Kubernetes service discovery module. This module
@@ -363,13 +403,18 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             namespace: the namespace of the engine pods
             port: the port of the engines
             label_selector: the label selector of the engines
+            watcher_timeout_seconds: timeout in seconds for Kubernetes watcher streams (default: 0)
         """
         self.app = app
         self.namespace = namespace
         self.port = port
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
+        self.known_models: Set[str] = set()
+        self.known_models_lock = threading.Lock()
         self.label_selector = label_selector
+        self.watcher_timeout_seconds = watcher_timeout_seconds
+        self.health_check_timeout_seconds = health_check_timeout_seconds
 
         # Init kubernetes watcher
         try:
@@ -423,7 +468,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
                 logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            response = requests.get(url, headers=headers)
+            response = requests.get(
+                url, headers=headers, timeout=self.health_check_timeout_seconds
+            )
             response.raise_for_status()
             sleep = response.json()["is_sleeping"]
             return sleep
@@ -441,10 +488,12 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             )
             for container in pod.spec.containers:
                 if container.name == "vllm":
-                    for arg in container.command:
-                        if arg == "--enable-sleep-mode":
-                            enable_sleep_mode = True
-                            break
+                    if (
+                        not container.command
+                        or "--enable-sleep-mode" in container.command
+                    ):
+                        enable_sleep_mode = True
+                    break
             return enable_sleep_mode
         except client.rest.ApiException as e:
             logger.error(
@@ -505,7 +554,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
                 logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            response = requests.get(url, headers=headers)
+            response = requests.get(
+                url, headers=headers, timeout=self.health_check_timeout_seconds
+            )
             response.raise_for_status()
             models = response.json()["data"]
 
@@ -537,7 +588,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
                 logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            response = requests.get(url, headers=headers)
+            response = requests.get(
+                url, headers=headers, timeout=self.health_check_timeout_seconds
+            )
             response.raise_for_status()
             models = response.json()["data"]
             # Create a dictionary of model information
@@ -566,20 +619,23 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         return pod.metadata.labels.get("model")
 
     def _watch_engines(self):
-        # TODO (ApostaC): remove the hard-coded timeouts
-
         while self.running:
             try:
                 for event in self.k8s_watcher.stream(
                     self.k8s_api.list_namespaced_pod,
                     namespace=self.namespace,
                     label_selector=self.label_selector,
-                    timeout_seconds=30,
+                    timeout_seconds=self.watcher_timeout_seconds,
                 ):
                     pod = event["object"]
                     event_type = event["type"]
                     pod_name = pod.metadata.name
                     pod_ip = pod.status.pod_ip
+
+                    if event_type == "DELETED":
+                        if pod_name in self.available_engines:
+                            self._delete_engine(pod_name)
+                        continue
 
                     # Check if pod is terminating
                     is_pod_terminating = self._is_pod_terminating(pod)
@@ -647,6 +703,19 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
 
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
+
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                self.initialize_client_sessions(),
+                self.app.state.event_loop,
+            )
+            fut.result()
+        except Exception as e:
+            logger.error(f"Error initializing client sessions: {e}")
+
+        # Track all models we've ever seen
+        with self.known_models_lock:
+            self.known_models.update(model_names)
 
     def _delete_engine(self, engine_name: str):
         logger.info(f"Serving engine {engine_name} is deleted")
@@ -734,15 +803,35 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             endpoint_infos = self.get_endpoint_info()
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
+                    if (
+                        hasattr(self.app.state, "prefill_client")
+                        and self.app.state.prefill_client is not None
+                    ):
+                        await self.app.state.prefill_client.close()
                     self.app.state.prefill_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
                 elif endpoint_info.model_label in self.decode_model_labels:
+                    if (
+                        hasattr(self.app.state, "decode_client")
+                        and self.app.state.decode_client is not None
+                    ):
+                        await self.app.state.decode_client.close()
                     self.app.state.decode_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
+
+    def has_ever_seen_model(self, model_name: str) -> bool:
+        """Check if we've ever seen this model, even if currently scaled to zero."""
+        with self.known_models_lock:
+            return model_name in self.known_models
+
+    def get_known_models(self) -> Set[str]:
+        """Get all models that have ever been discovered."""
+        with self.known_models_lock:
+            return self.known_models.copy()
 
 
 class K8sServiceNameServiceDiscovery(ServiceDiscovery):
@@ -754,6 +843,8 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         label_selector=None,
         prefill_model_labels: List[str] | None = None,
         decode_model_labels: List[str] | None = None,
+        watcher_timeout_seconds: int = 0,
+        health_check_timeout_seconds: int = 10,
     ):
         """
         Initialize the Kubernetes service discovery module. This module
@@ -782,6 +873,8 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             namespace: the namespace of the engine services
             port: the port of the engines
             label_selector: the label selector of the engines
+            watcher_timeout_seconds: timeout in seconds for Kubernetes watcher streams (default: 0)
+            health_check_timeout_seconds: timeout in seconds for health check requests (default: 10)
         """
         self.app = app
         self.namespace = namespace
@@ -789,6 +882,8 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
         self.label_selector = label_selector
+        self.watcher_timeout_seconds = watcher_timeout_seconds
+        self.health_check_timeout_seconds = health_check_timeout_seconds
 
         # Init kubernetes watcher
         try:
@@ -833,7 +928,9 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
                 logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            response = requests.get(url, headers=headers)
+            response = requests.get(
+                url, headers=headers, timeout=self.health_check_timeout_seconds
+            )
             response.raise_for_status()
             sleep = response.json()["is_sleeping"]
             return sleep
@@ -927,7 +1024,9 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
                 logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            response = requests.get(url, headers=headers)
+            response = requests.get(
+                url, headers=headers, timeout=self.health_check_timeout_seconds
+            )
             response.raise_for_status()
             models = response.json()["data"]
 
@@ -959,7 +1058,9 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
                 logger.info("Using vllm server authentication")
                 headers = {"Authorization": f"Bearer {VLLM_API_KEY}"}
-            response = requests.get(url, headers=headers)
+            response = requests.get(
+                url, headers=headers, timeout=self.health_check_timeout_seconds
+            )
             response.raise_for_status()
             models = response.json()["data"]
             # Create a dictionary of model information
@@ -988,18 +1089,20 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         return service.spec.selector.get("model")
 
     def _watch_engines(self):
-        # TODO (ApostaC): remove the hard-coded timeouts
-
         while self.running:
             try:
                 for event in self.k8s_watcher.stream(
                     self.k8s_api.list_namespaced_service,
                     namespace=self.namespace,
                     label_selector=self.label_selector,
-                    timeout_seconds=30,
+                    timeout_seconds=self.watcher_timeout_seconds,
                 ):
                     service = event["object"]
                     event_type = event["type"]
+                    if event_type == "DELETED":
+                        if service.metadata.name in self.available_engines:
+                            self._delete_engine(service.metadata.name)
+                        continue
                     service_name = service.metadata.name
                     is_service_ready = self._check_service_ready(
                         service_name, self.namespace

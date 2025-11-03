@@ -17,9 +17,10 @@ import json
 import os
 import time
 import uuid
+from typing import Optional
 
 import aiohttp
-from fastapi import BackgroundTasks, HTTPException, Request
+from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from requests import JSONDecodeError
 
@@ -28,6 +29,7 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillRouter,
     KvawareRouter,
     PrefixAwareRouter,
+    SessionRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
@@ -46,8 +48,21 @@ try:
 except ImportError:
     semantic_cache_available = False
 
+from vllm_router.services.metrics_service import num_incoming_requests_total
 
 logger = init_logger(__name__)
+
+_HOP_BY_HOP_HEADERS = {
+    "host",
+    "connection",
+    "keep-alive",
+    "proxy-connection",
+    "transfer-encoding",
+    "content-length",
+    "upgrade",
+    "te",  # codespell:ignore
+    "trailer",
+}
 
 
 # TODO: (Brian) check if request is json beforehand
@@ -92,13 +107,18 @@ async def process_request(
         # If we can't parse the body as JSON, assume it's not streaming
         raise HTTPException(status=400, detail="Request body is not JSON parsable.")
 
+    # sanitize the request headers
+    headers = {
+        k: v for k, v in request.headers.items() if k.lower() not in _HOP_BY_HOP_HEADERS
+    }
+
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
 
     async with request.app.state.aiohttp_client_wrapper().request(
         method=request.method,
         url=backend_url + endpoint,
-        headers=dict(request.headers),
+        headers=headers,
         data=body,
         timeout=aiohttp.ClientTimeout(total=None),
     ) as backend_response:
@@ -130,7 +150,7 @@ async def process_request(
         await store_in_semantic_cache(
             endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
         )
-    if background_tasks and hasattr(request.app.state, "callbacks"):
+    if background_tasks and getattr(request.app.state, "callbacks", None):
         background_tasks.add_task(
             request.app.state.callbacks.post_request, request, full_response
         )
@@ -163,14 +183,14 @@ async def route_general_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
-    request_json = await request.json()  # TODO (ApostaC): merge two awaits into one
+    request_json = json.loads(request_body) if request_body else {}
 
     if request.query_params:
         request_endpoint = request.query_params.get("id")
     else:
         request_endpoint = None
 
-    if hasattr(request.app.state, "callbacks") and (
+    if getattr(request.app.state, "callbacks", None) and (
         response_overwrite := request.app.state.callbacks.pre_request(
             request, request_body, request_json
         )
@@ -203,7 +223,6 @@ async def route_general_request(
                 status_code=400, detail="Request body is not JSON parsable."
             )
 
-    # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
 
@@ -212,6 +231,11 @@ async def route_general_request(
         requested_model = aliases[requested_model]
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
+
+    # Check if model has ever been seen (even if currently scaled to zero)
+    model_ever_existed = False
+    if hasattr(service_discovery, "has_ever_seen_model"):
+        model_ever_existed = service_discovery.has_ever_seen_model(requested_model)
 
     if not request_endpoint:
         endpoints = list(
@@ -234,13 +258,27 @@ async def route_general_request(
             )
         )
 
+    # Track all valid incoming requests
+    num_incoming_requests_total.labels(model=requested_model).inc()
+
     if not endpoints:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": f"Model {requested_model} not found or vLLM engine is sleeping."
-            },
-        )
+        if not model_ever_existed:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": f"Model '{requested_model}' not found. Available models can be listed at /v1/models."
+                },
+                headers={"X-Request-Id": request_id},
+            )
+        else:
+            # Model existed before but is now scaled to zero
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": f"Model '{requested_model}' is temporarily unavailable. Please try again later."
+                },
+                headers={"X-Request-Id": request_id},
+            )
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
     if request_endpoint:
@@ -249,8 +287,8 @@ async def route_general_request(
             f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
 
-    elif isinstance(request.app.state.router, KvawareRouter) or isinstance(
-        request.app.state.router, PrefixAwareRouter
+    elif isinstance(
+        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
     ):
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
@@ -262,14 +300,8 @@ async def route_general_request(
 
     curr_time = time.time()
     # Extract actual session ID from request headers for logging
-    session_key = (
-        getattr(request.app.state.router, "session_key", None)
-        if hasattr(request.app.state.router, "session_key")
-        else None
-    )
-    session_id = (
-        request.headers.get(session_key, None) if session_key is not None else None
-    )
+    session_key = getattr(request.app.state.router, "session_key", None)
+    session_id = request.app.state.router.extract_session_id(request, request_json)
     session_id_display = session_id if session_id is not None else "None"
 
     # Debug logging to help troubleshoot session ID extraction
@@ -305,9 +337,7 @@ async def route_general_request(
 async def send_request_to_prefiller(
     client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
 ):
-    """
-    Send a request to a prefiller service.
-    """
+    """Send a request to a prefiller service."""
     req_data = req_data.copy()
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
@@ -326,9 +356,7 @@ async def send_request_to_prefiller(
 async def send_request_to_decode(
     client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
 ):
-    """
-    Asynchronously stream the response from a service using a persistent client.
-    """
+    """Asynchronously stream the response from a service using a persistent client."""
     headers = {
         "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
         "X-Request-Id": request_id,
@@ -512,3 +540,174 @@ async def route_sleep_wakeup_request(
                 content={"status": "success"},
                 headers={"X-Request-Id": request_id},
             )
+
+
+async def route_general_transcriptions(
+    request: Request,
+    endpoint: str,  # "/v1/audio/transcriptions"
+    background_tasks: BackgroundTasks,
+):
+    """Handles audio transcription requests by parsing form data and proxying to backend."""
+
+    request_id = request.headers.get("X-Request-Id", str(uuid.uuid4()))
+
+    # --- 1. Form parsing ---
+    try:
+        form = await request.form()
+
+        # Extract parameters from the form data
+        file: UploadFile = form["file"]
+        model: str = form["model"]
+        prompt: Optional[str] = form.get("prompt", None)
+        response_format: Optional[str] = form.get("response_format", "json")
+        temperature_str: Optional[str] = form.get("temperature", None)
+        temperature: Optional[float] = (
+            float(temperature_str) if temperature_str is not None else None
+        )
+        language: Optional[str] = form.get("language", "en")
+    except KeyError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Invalid request: missing '{e.args[0]}' in form data."},
+        )
+
+    logger.debug("==== Enter audio_transcriptions ====")
+    logger.debug("Received upload: %s (%s)", file.filename, file.content_type)
+    logger.debug(
+        "Params: model=%s prompt=%r response_format=%r temperature=%r language=%s",
+        model,
+        prompt,
+        response_format,
+        temperature,
+        language,
+    )
+
+    # --- 2. Service Discovery and Routing ---
+    # Access singletons via request.app.state for consistent style
+    service_discovery = (
+        get_service_discovery()
+    )  # This one is often still accessed directly via its get function
+    router = request.app.state.router  # Access router from app.state
+    engine_stats_scraper = (
+        request.app.state.engine_stats_scraper
+    )  # Access engine_stats_scraper from app.state
+    request_stats_monitor = (
+        request.app.state.request_stats_monitor
+    )  # Access request_stats_monitor from app.state
+
+    endpoints = service_discovery.get_endpoint_info()
+
+    # filter the endpoints url by model name
+    transcription_endpoints = []
+    for ep in endpoints:
+        for model_name in ep.model_names:
+            if model == model_name and not ep.sleep:
+                transcription_endpoints.append(ep)
+
+    if not transcription_endpoints:
+        logger.error("No transcription backend available for model %s", model)
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"No transcription backend for model {model}"},
+        )
+
+    # grab the current engine and request stats
+    engine_stats = engine_stats_scraper.get_engine_stats()
+    request_stats = request_stats_monitor.get_request_stats(time.time())
+
+    # pick one using the router's configured logic (roundrobin, least-loaded, etc.)
+    chosen_url = router.route_request(
+        transcription_endpoints,
+        engine_stats,
+        request_stats,
+        request,
+    )
+
+    logger.debug("Proxying transcription request to %s", chosen_url)
+
+    # --- 3. Prepare and Proxy the Request ---
+    payload_bytes = await file.read()
+    files = {"file": (file.filename, payload_bytes, file.content_type)}
+
+    data = {"model": model, "language": language}
+
+    if prompt:
+        data["prompt"] = prompt
+
+    if response_format:
+        data["response_format"] = response_format
+
+    if temperature is not None:
+        data["temperature"] = str(temperature)
+
+    logger.info("Proxying transcription request for model %s to %s", model, chosen_url)
+
+    try:
+        client = request.app.state.aiohttp_client_wrapper()
+
+        form_data = aiohttp.FormData()
+
+        # add file data
+        for key, (filename, content, content_type) in files.items():
+            form_data.add_field(
+                key, content, filename=filename, content_type=content_type
+            )
+
+        # add from data
+        for key, value in data.items():
+            form_data.add_field(key, value)
+
+        backend_response = await client.post(
+            f"{chosen_url}{endpoint}",
+            data=form_data,
+            timeout=aiohttp.ClientTimeout(total=300),
+        )
+
+        # --- 4. Return the response ---
+        response_content = await backend_response.json()
+        headers = {
+            k: v
+            for k, v in backend_response.headers.items()
+            if k.lower() not in ("content-encoding", "transfer-encoding", "connection")
+        }
+
+        headers["X-Request-Id"] = request_id
+
+        return JSONResponse(
+            content=response_content,
+            status_code=backend_response.status,
+            headers=headers,
+        )
+    except aiohttp.ClientResponseError as response_error:
+        if response_error.response is not None:
+            try:
+                error_content = await response_error.response.json()
+            except (
+                aiohttp.ContentTypeError,
+                json.JSONDecodeError,
+                aiohttp.ClientError,
+            ):
+                # If JSON parsing fails, get text content
+                try:
+                    text_content = await response_error.response.text()
+                    error_content = {"error": text_content}
+                except aiohttp.ClientError:
+                    error_content = {
+                        "error": f"HTTP {response_error.status}: {response_error.message}"
+                    }
+        else:
+            error_content = {
+                "error": f"HTTP {response_error.status}: {response_error.message}"
+            }
+        return JSONResponse(status_code=response_error.status, content=error_content)
+    except aiohttp.ClientError as client_error:
+        return JSONResponse(
+            status_code=503,
+            content={"error": f"Failed to connect to backend: {str(client_error)}"},
+        )
+    except Exception as e:
+        logger.error(e)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error"},
+        )

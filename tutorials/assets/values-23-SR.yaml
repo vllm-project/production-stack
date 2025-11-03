@@ -1,0 +1,32 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  strategy:
+    type: Recreate
+  modelSpec:
+  - name: "qwen3"
+    repository: "lmcache/vllm-openai"
+    tag: "v0.3.7"
+    modelURL: "Qwen/Qwen3-8B"
+    pvcStorage: "50Gi"
+    vllmConfig:
+      # maxModelLen: 131072
+      extraArgs: ["--served-model-name", "Qwen/Qwen3-8B", "qwen3"]
+
+    replicaCount: 2
+
+    requestCPU: 8
+    requestMemory: "16Gi"
+    requestGPU: 1
+
+routerSpec:
+  repository: lmcache/lmstack-router
+  tag: "latest"
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2G"
+    limits:
+      cpu: "1"
+      memory: "2G"
+  routingLogic: "roundrobin"
+  sessionKey: "x-user-id"

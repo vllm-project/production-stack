@@ -57,6 +57,11 @@ spec:
           {{- if $container.args }}
           args: {{ toYaml $container.args | nindent 12 }}
           {{- end }}
+          {{- if $modelSpec.envFromSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ $modelSpec.envFromSecret.name }}
+          {{- end }}
           env:
             - name: RELEASE_NAME
               value: {{ $.Release.Name }}
@@ -101,16 +106,7 @@ spec:
           securityContext:
             {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
           command:
-          {{- if or
-            (eq $modelSpec.tag "2025-05-27-v1")
-            (eq $modelSpec.tag "2025-05-17-v1")
-            (eq $modelSpec.tag "latest-nightly")
-            (hasPrefix "nightly-" $modelSpec.tag)
-            (and
-              (eq $modelSpec.tag "latest")
-              (eq $modelSpec.repository "lmcache/vllm-openai")
-            )
-          }}
+          {{- if eq $modelSpec.repository "lmcache/vllm-openai" }}
           - "/opt/venv/bin/vllm"
           {{- else }}
           - "vllm"
@@ -329,14 +325,24 @@ spec:
             value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
-          - name: LMCACHE_WORKER_PORT
+          - name: LMCACHE_LMCACHE_WORKER_PORT
             value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
           {{-   end }}
+          {{-  if hasKey $modelSpec.lmcacheConfig "distributedUrl" }}
+          - name: LMCACHE_DISTRIBUTED_URL
+            value: {{ $modelSpec.lmcacheConfig.distributedUrl | quote }}
+          {{-   end }}
           {{- end }}
-          {{- if .Values.servingEngineSpec.configs }}
+          {{- if or .Values.servingEngineSpec.configs $modelSpec.envFromSecret }}
           envFrom:
+          {{- if .Values.servingEngineSpec.configs }}
             - configMapRef:
                 name: "{{ .Release.Name }}-configs"
+          {{- end }}
+          {{- if $modelSpec.envFromSecret }}
+            - secretRef:
+                name: {{ $modelSpec.envFromSecret.name }}
+          {{- end }}
           {{- end }}
           ports:
             - name: {{ include "chart.container-port-name" . }}
@@ -398,8 +404,13 @@ spec:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
         - name: {{ .Release.Name }}-storage
+        {{- if and (kindIs "map" $modelSpec.pvcStorage) (hasKey $modelSpec.pvcStorage "emptyDir") }}
+          emptyDir:
+            {{- toYaml $modelSpec.pvcStorage.emptyDir | nindent 12 }}
+        {{- else if kindIs "string" $modelSpec.pvcStorage }}
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
+        {{- end }}
         {{- end }}
         {{- if hasKey $.Values "sharedPvcStorage" }}
         - name: {{ .Release.Name }}-shared-pvc-storage
@@ -443,7 +454,11 @@ spec:
       {{- end }}
       {{- if $modelSpec.nodeName }}
       nodeName: {{ $modelSpec.nodeName }}
-      {{- else if $modelSpec.nodeSelectorTerms}}
+      {{- end }}
+      {{- if not (empty $modelSpec.affinity) }}
+      affinity:
+        {{- toYaml $modelSpec.affinity | nindent 8 }}
+      {{- else if and $modelSpec.nodeSelectorTerms (not $modelSpec.nodeName) }}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

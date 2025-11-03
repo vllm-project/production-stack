@@ -18,8 +18,10 @@ import enum
 import math
 import random
 import threading
-from typing import Dict, List
+import uuid
+from typing import Dict, List, Optional
 
+import requests
 from fastapi import Request
 
 try:
@@ -101,6 +103,16 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         for node in new_nodes - current_nodes:
             self.hash_ring.add_node(node)
 
+    def extract_session_id(self, request: Request, request_json: Dict) -> Optional[str]:
+        """
+        Extract the session id from the request headers or request body.
+        """
+        session_key = getattr(self, "session_key", None)
+        if session_key is None:
+            return None
+        val = request.headers.get(session_key)
+        return val if val is not None else request_json.get(session_key, None)
+
     @abc.abstractmethod
     def route_request(
         self,
@@ -181,17 +193,18 @@ class SessionRouter(RoutingInterface):
         self.hash_ring = HashRing()
         self._initialized = True
 
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_json: Dict,
     ) -> str:
         """
         Route the request to the appropriate engine URL by the 'session id' in
-        the request headers.
-        If there is no session id in the request header, it will pick a server
+        the request headers or request body.
+        If there is no session id in the request header or request body, it will pick a server
         with lowest qps
 
         Args:
@@ -201,8 +214,9 @@ class SessionRouter(RoutingInterface):
             request_stats (Dict[str, RequestStats]): The request stats
                 indicating the request-level performance of each engine
             request (Request): The incoming request
+            request_json (Dict): The request body (needed for finding the session id)
         """
-        session_id = request.headers.get(self.session_key, None)
+        session_id = self.extract_session_id(request, request_json)
         logger.debug(f"Got session id: {session_id}")
 
         # Update the hash ring with the current list of endpoints
@@ -284,12 +298,31 @@ class KvawareRouter(RoutingInterface):
             request_json (Dict): The request body (needed for finding the
             longest prefix match)
         """
-        if self.tokenizer is None:
-            self.tokenizer = AutoTokenizer.from_pretrained(endpoints[0].model_names[0])
-        url = endpoints[0].url + "/tokenize"
+        token_ids = None
+        # Local-first tokenization, fall back to remote "/tokenize" API on failure
         # TODO (Yuhan): Handle chat completions
-        token_ids = self.tokenizer.encode(request_json["prompt"])
-        msg = LookupMsg(tokens=token_ids)
+        try:
+            if self.tokenizer is None:
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    endpoints[0].model_names[0]
+                )
+            token_ids = self.tokenizer.encode(request_json.get("prompt", ""))
+        except Exception:
+            # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
+            remote_url = endpoints[0].url + "/tokenize"
+            headers = {"Content-Type": "application/json"}
+            data = {
+                "model": endpoints[0].model_names[0],
+                "prompt": request_json.get("prompt", ""),
+            }
+            body = requests.post(
+                remote_url, headers=headers, json=data, timeout=10
+            ).json()
+            token_ids = body["tokens"]
+
+        event_id = "Lookup" + str(uuid.uuid4())
+        logger.debug(f"Lookup event id: {event_id}")
+        msg = LookupMsg(tokens=token_ids, event_id=event_id)
         instance_id = await self.query_manager(msg)
         matched_tokens = math.inf
         if len(list(instance_id.layout_info.keys())) > 0:
@@ -303,13 +336,10 @@ class KvawareRouter(RoutingInterface):
             or len(instance_id.layout_info) == 0
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
-
-            session_id = request.headers.get(self.session_key, None)
+            session_id = self.extract_session_id(request, request_json)
             logger.debug(f"Got session id: {session_id}")
-
             # Update the hash ring with the current list of endpoints
             self._update_hash_ring(endpoints)
-
             if session_id is None:
                 # Route based on QPS if no session ID is present
                 url = self._qps_routing(endpoints, request_stats)
@@ -321,10 +351,13 @@ class KvawareRouter(RoutingInterface):
             queried_instance_ids = [info for info in instance_id.layout_info]
             if queried_instance_ids[0] not in self.instance_id_to_ip:
                 for endpoint in endpoints:
+                    event_id = "QueryInst" + str(uuid.uuid4())
+                    logger.debug(f"QueryInst event id: {event_id}")
                     query_message = QueryInstMsg(
                         ip=endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
                             0
-                        ].split("//")[1]
+                        ].split("//")[1],
+                        event_id=event_id,
                     )
                     endpoint_instance_id = await self.query_manager(query_message)
 
