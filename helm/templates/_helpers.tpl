@@ -180,7 +180,6 @@ limits:
 {{-   end }}
 {{- end }}
 
-
 {{/*
   Define labels for cache server and its service
 */}}

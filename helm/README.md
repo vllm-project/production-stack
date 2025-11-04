@@ -153,51 +153,51 @@ This table documents all available configuration values for the Production Stack
 
 ### Router Configuration
 
-| Field | Type | Default | Description                                                                                      |
-|-------|------|---------|--------------------------------------------------------------------------------------------------|
-| `routerSpec.repository` | string | `"lmcache/lmstack-router"` | Docker image repository for the router                                                           |
-| `routerSpec.tag` | string | `"latest"` | Docker image tag for the router                                                                  |
-| `routerSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the router                                                                 |
-| `routerSpec.enableRouter` | boolean | `true` | Whether to enable the router service                                                             |
-| `routerSpec.replicaCount` | integer | `1` | Number of replicas for the router pod                                                            |
-| `routerSpec.priorityClassName` | string | `""` | Priority class for router                                                                        |
-| `routerSpec.containerPort` | integer | `8000` | Port the router container is listening on                                                        |
-| `routerSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the router                                                           |
-| `routerSpec.serviceAnnotations` | map | `{}` | Service annotations for LoadBalancer/NodePort                                                    |
-| `routerSpec.servicePort` | integer | `80` | Port the router service will listen on                                                           |
-| `routerSpec.serviceDiscovery` | string | `"k8s"` | Service discovery mode ("k8s" or "static")                                                       |
-| `routerSpec.k8sServiceDiscoveryType` | string | `"pod-ip"` | Service discovery Type ("pod-ip" or "service-name") if serviceDiscovery is "k8s"                 |
-| `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static"                        |
-| `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static"                              |
-| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic ("roundrobin" or "session")                                                        |
-| `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic                                                     |
-| `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router                                               |
-| `routerSpec.engineScrapeInterval` | integer | `15` | Interval in seconds to scrape metrics from the serving engine                                    |
-| `routerSpec.requestStatsWindow` | integer | `60` | Window size in seconds for calculating request statistics                                        |
-| `routerSpec.strategy` | map | `{}` | Deployment strategy for the router pods                                                          |
-| `routerSpec.vllmApiKey` | string/map | `null` | (Optional) API key for securing vLLM models                                                      |
-| `routerSpec.resources.requests.cpu` | string | `"4"` | CPU requests for router                                                                          |
-| `routerSpec.resources.requests.memory` | string | `"16G"` | Memory requests for router                                                                       |
-| `routerSpec.resources.limits.cpu` | string | `"8"` | CPU limits for router                                                                            |
-| `routerSpec.resources.limits.memory` | string | `"32G"` | Memory limits for router                                                                         |
-| `routerSpec.labels` | map | `{environment: "router", release: "router"}` | Customized labels for the router deployment                                                      |
-| `routerSpec.podAnnotations` | map | `{}` | (Optional) Annotations to add to the pod, e.g., {model: "opt125m"}                               |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `routerSpec.repository` | string | `"lmcache/lmstack-router"` | Docker image repository for the router |
+| `routerSpec.tag` | string | `"latest"` | Docker image tag for the router |
+| `routerSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the router |
+| `routerSpec.enableRouter` | boolean | `true` | Whether to enable the router service |
+| `routerSpec.replicaCount` | integer | `1` | Number of replicas for the router pod |
+| `routerSpec.priorityClassName` | string | `""` | Priority class for router |
+| `routerSpec.containerPort` | integer | `8000` | Port the router container is listening on |
+| `routerSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the router |
+| `routerSpec.serviceAnnotations` | map | `{}` | Service annotations for LoadBalancer/NodePort |
+| `routerSpec.servicePort` | integer | `80` | Port the router service will listen on |
+| `routerSpec.serviceDiscovery` | string | `"k8s"` | Service discovery mode ("k8s" or "static") |
+| `routerSpec.k8sServiceDiscoveryType` | string | `"pod-ip"` | Service discovery Type ("pod-ip" or "service-name") if serviceDiscovery is "k8s" |
+| `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static" |
+| `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
+| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic ("roundrobin" or "session") |
+| `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic |
+| `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router |
+| `routerSpec.engineScrapeInterval` | integer | `15` | Interval in seconds to scrape metrics from the serving engine |
+| `routerSpec.requestStatsWindow` | integer | `60` | Window size in seconds for calculating request statistics |
+| `routerSpec.strategy` | map | `{}` | Deployment strategy for the router pods |
+| `routerSpec.vllmApiKey` | string/map | `null` | (Optional) API key for securing vLLM models |
+| `routerSpec.resources.requests.cpu` | string | `"4"` | CPU requests for router |
+| `routerSpec.resources.requests.memory` | string | `"16G"` | Memory requests for router |
+| `routerSpec.resources.limits.cpu` | string | `"8"` | CPU limits for router |
+| `routerSpec.resources.limits.memory` | string | `"32G"` | Memory limits for router |
+| `routerSpec.labels` | map | `{environment: "router", release: "router"}` | Customized labels for the router deployment |
+| `routerSpec.podAnnotations` | map | `{}` | (Optional) Annotations to add to the pod, e.g., {model: "opt125m"} |
 | `routerSpec.affinity` | map | {} | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
-| `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified.                      |
-| `routerSpec.hf_token` | string | `""`| Hugging Face token for router                                                                    |
-| `routerSpec.lmcacheControllerPort` | string |`"8000"`| LMCache controller port                                                                          |
-| `routerSpec.livenessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's liveness probe                                             |
-| `routerSpec.livenessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's liveness probe                                                  |
-| `routerSpec.livenessProbe.failureThreshold` | integer |`3`| Failure threshold for router's liveness probe                                                    |
-| `routerSpec.livenessProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's liveness probe will be testing                                        |
-| `routerSpec.startupProbe.initialDelaySeconds` | integer |`5`| Initial delay in seconds for router's startup probe                                              |
-| `routerSpec.startupProbe.periodSeconds` | integer |`5`| Interval in seconds for router's startup probe                                                   |
-| `routerSpec.startupProbe.failureThreshold` | integer |`3`| Failure threshold for router's startup probe                                                     |
-| `routerSpec.startupProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's startup probe will be testing                                         |
-| `routerSpec.readinessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's readiness probe                                            |
-| `routerSpec.readinessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's readiness probe                                                 |
-| `routerSpec.readinessProbe.failureThreshold` | integer |`3`| Failure threshold for router's readiness probe                                                   |
-| `routerSpec.readinessProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's readiness probe will be testing                                       |
+| `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
+| `routerSpec.hf_token` | string | `""`| Hugging Face token for router |
+| `routerSpec.lmcacheControllerPort` | string |`"8000"`|LMCache controller port |
+| `routerSpec.livenessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's liveness probe |
+| `routerSpec.livenessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's liveness probe |
+| `routerSpec.livenessProbe.failureThreshold` | integer |`3`| Failure threshold for router's liveness probe |
+| `routerSpec.livenessProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's liveness probe will be testing |
+| `routerSpec.startupProbe.initialDelaySeconds` | integer |`5`| Initial delay in seconds for router's startup probe |
+| `routerSpec.startupProbe.periodSeconds` | integer |`5`| Interval in seconds for router's startup probe |
+| `routerSpec.startupProbe.failureThreshold` | integer |`3`| Failure threshold for router's startup probe |
+| `routerSpec.startupProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's startup probe will be testing |
+| `routerSpec.readinessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's readiness probe |
+| `routerSpec.readinessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's readiness probe |
+| `routerSpec.readinessProbe.failureThreshold` | integer |`3`| Failure threshold for router's readiness probe |
+| `routerSpec.readinessProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's readiness probe will be testing |
 
 #### Router Ingress Configuration
 
