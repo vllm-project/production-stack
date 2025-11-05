@@ -186,4 +186,3 @@ This integration provides a powerful combination of semantic intelligence and pr
 .. note::
 
    **Preview Version**: This guide is based on the preview version of vLLM Semantic Router integration. The deployment steps, configuration options, and API interfaces may change in future releases as the feature evolves. Please refer to the latest documentation for updates.
-
