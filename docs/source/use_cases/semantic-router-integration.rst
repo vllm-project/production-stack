@@ -56,7 +56,7 @@ Deploy the vLLM Production Stack using the provided Helm values file:
 .. code-block:: bash
 
    helm repo add vllm-production-stack https://vllm-project.github.io/production-stack
-   helm install vllm-stack vllm-production-stack/vllm-stack -f ./tutorials/assets/values-23-SR.yaml
+   helm install vllm-stack vllm-production-stack/vllm-stack -f https://github.com/vllm-project/production-stack/blob/main/tutorials/assets/values-23-SR.yaml
 
 The sample values file configures:
 
