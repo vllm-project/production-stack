@@ -1,7 +1,7 @@
 Intelligent Semantic Routing
 ============================
 
-This use case demonstrates how to integrate the vLLM Semantic Router with the vLLM Production Stack to create an intelligent Mixture-of-Models (MoM) system. The Semantic Router operates as an Envoy External Processor that semantically routes OpenAI API-compatible requests to the most suitable backend model using BERT-based/Decoder-Based LoRA classification, prompt guard, and semantic caching, improving both quality and cost efficiency.
+This use case demonstrates how to integrate the vLLM Semantic Router with the vLLM Production Stack to create an intelligent Mixture-of-Models (MoM) system. The Semantic Router operates as an Envoy External Processor that semantically routes OpenAI API-compatible requests to the most suitable backend model using BERT-based or decoder-only LoRA classification, prompt guard, and semantic caching, improving both quality and cost efficiency.
 
 What is vLLM Semantic Router?
 ------------------------------
@@ -76,64 +76,41 @@ Step 2: Deploy vLLM Semantic Router
 
 Follow the official `Install in Kubernetes <https://vllm-semantic-router.com/docs/installation/kubernetes>`_ guide with the updated configuration.
 
-Update the semantic router config to include your vLLM router service as an endpoint. Edit ``deploy/kubernetes/config.yaml`` and set ``vllm_endpoints``:
-
-.. code-block:: yaml
-
-   vllm_endpoints:
-     - name: "endpoint1"
-       address: <YOUR ROUTER SERVICE CLUSTERIP>
-       port: <YOUR ROUTER SERVICE PORT>
-       weight: 1
-
-Deploy the semantic router and required components:
-
 .. code-block:: bash
 
    # Deploy vLLM Semantic Router manifests
-   kubectl apply -k deploy/kubernetes/
+   kubectl apply -k deploy/kubernetes/ai-gateway/semantic-router
    kubectl wait --for=condition=Available deployment/semantic-router \
      -n vllm-semantic-router-system --timeout=600s
 
    # Install Envoy Gateway
-   helm upgrade -i eg oci://docker.io/envoyproxy/gateway-helm \
-     --version v0.0.0-latest \
-     --namespace envoy-gateway-system \
-     --create-namespace
-   kubectl wait --timeout=300s -n envoy-gateway-system \
-     deployment/envoy-gateway --for=condition=Available
+  helm upgrade -i eg oci://docker.io/envoyproxy/gateway-helm \
+    --version v0.0.0-latest \
+    --namespace envoy-gateway-system \
+    --create-namespace \
+    -f https://raw.githubusercontent.com/envoyproxy/ai-gateway/main/manifests/envoy-gateway-values.yaml
 
    # Install Envoy AI Gateway
    helm upgrade -i aieg oci://docker.io/envoyproxy/ai-gateway-helm \
      --version v0.0.0-latest \
      --namespace envoy-ai-gateway-system \
      --create-namespace
+
+   # Install Envoy AI Gateway CRDs
+   helm upgrade -i aieg-crd oci://docker.io/envoyproxy/ai-gateway-crds-helm --version v0.0.0-latest --namespace envoy-ai-gateway-system
+
+   # Wait for AI Gateway to be ready
    kubectl wait --timeout=300s -n envoy-ai-gateway-system \
      deployment/ai-gateway-controller --for=condition=Available
 
-   # Install Gateway API Inference Extension CRDs
-   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v1.0.1/manifests.yaml
-   kubectl get crd | grep inference
-
-Apply AI Gateway configuration and create the inference pool:
+Create LLM Demo Backends and AI Gateway Routes:
 
 .. code-block:: bash
 
-   # Apply AI Gateway configuration
-   kubectl apply -f deploy/kubernetes/ai-gateway/configuration
-
-   # Restart controllers to pick up new config
-   kubectl rollout restart -n envoy-gateway-system deployment/envoy-gateway
-   kubectl rollout restart -n envoy-ai-gateway-system deployment/ai-gateway-controller
-   kubectl wait --timeout=120s -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
-   kubectl wait --timeout=120s -n envoy-ai-gateway-system deployment/ai-gateway-controller --for=condition=Available
-
-   # Create inference pool
-   kubectl apply -f deploy/kubernetes/ai-gateway/inference-pool
-   sleep 30
-
-   # Verify inference pool
-   kubectl get inferencepool vllm-semantic-router -n vllm-semantic-router-system -o yaml
+   # Apply LLM demo backends
+   kubectl apply -f deploy/kubernetes/ai-gateway/aigw-resources/base-model.yaml
+   # Apply AI Gateway routes
+   kubectl apply -f deploy/kubernetes/ai-gateway/aigw-resources/gwapi-resources.yaml
 
 Step 3: Test the Deployment
 ----------------------------
@@ -142,24 +119,24 @@ Port-forward to the Envoy service:
 
 .. code-block:: bash
 
-   export GATEWAY_IP="localhost:8080"
-   export ENVOY_SERVICE=$(kubectl get svc -n envoy-gateway-system \
-     --selector=gateway.envoyproxy.io/owning-gateway-namespace=vllm-semantic-router-system,gateway.envoyproxy.io/owning-gateway-name=vllm-semantic-router \
-     -o jsonpath='{.items[0].metadata.name}')
-   kubectl port-forward -n envoy-gateway-system svc/$ENVOY_SERVICE 8080:80
+  export ENVOY_SERVICE=$(kubectl get svc -n envoy-gateway-system \
+    --selector=gateway.envoyproxy.io/owning-gateway-namespace=default,gateway.envoyproxy.io/owning-gateway-name=semantic-router \
+    -o jsonpath='{.items[0].metadata.name}')
+
+  kubectl port-forward -n envoy-gateway-system svc/$ENVOY_SERVICE 8080:80
 
 Send a chat completions request:
 
 .. code-block:: bash
 
-   curl -i -X POST http://localhost:8080/v1/chat/completions \
-     -H "Content-Type: application/json" \
-     -d '{
-       "model": "MoM",
-       "messages": [
-         {"role": "user", "content": "What is the derivative of f(x) = x^3 + 2x^2 - 5x + 7?"}
-       ]
-     }'
+  curl -i -X POST http://localhost:8080/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "MoM",
+      "messages": [
+        {"role": "user", "content": "What is the derivative of f(x) = x^3?"}
+      ]
+    }'
 
 The semantic router will analyze the request, identify it as a math query, and route it to the appropriate model through the vLLM Production Stack router.
 
@@ -167,7 +144,6 @@ Troubleshooting
 ---------------
 
 - **Gateway not accessible**: Check the Gateway and Envoy service status
-- **Inference pool not ready**: Run ``kubectl describe inferencepool`` and check controller logs
 - **Semantic router not responding**: Check pod status and logs with ``kubectl logs -n vllm-semantic-router-system``
 - **Error codes returned**: Check the production stack router logs with ``kubectl logs``
 
