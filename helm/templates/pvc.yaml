@@ -8,6 +8,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
   namespace: {{ .Release.Namespace }}
+  labels:
+  {{- include "chart.modelPvcLabels" $ | nindent 4 }}
 spec:
   accessModes:
     {{- if $modelSpec.pvcAccessMode }}

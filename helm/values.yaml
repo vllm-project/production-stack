@@ -137,6 +137,8 @@ servingEngineSpec:
   #   requestGPU: 1
   #
   #   pvcStorage: "50Gi"
+  #   pvcLabels:
+  #     label_excluded_from_alerts: "true"
   #   pvcAccessMode:
   #     - ReadWriteOnce
   #   pvcMatchLabels:
