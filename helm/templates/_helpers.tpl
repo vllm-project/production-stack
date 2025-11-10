@@ -162,15 +162,6 @@ limits:
 {{- end }}
 
 {{/*
-  Define labels for persistent volume claims
-*/}}
-{{- define "chart.modelPvcLabels" -}}
-{{-   with .Values.modelSpec.pvcLabels -}}
-{{      toYaml . }}
-{{-   end }}
-{{- end }}
-
-{{/*
   Define labels for serving engine and its service
 */}}
 {{- define "chart.engineLabels" -}}
