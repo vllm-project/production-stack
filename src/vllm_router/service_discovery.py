@@ -787,7 +787,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         """
         Close the service discovery module.
         """
-        self._running = False
+        self.running = False
         self.k8s_watcher.stop()
         self.watcher_thread.join()
 
