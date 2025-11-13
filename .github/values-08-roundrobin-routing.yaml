@@ -21,10 +21,10 @@ servingEngineSpec:
         enabled: true
         cpuOffloadingBufferSize: "10"
         enableController: true
-        instanceId: "default1"
         controllerPort: 9000
-        workerPort: 8001
-        distributedUrl: "localhost:30081"
+        workerPorts: "8001"
+        p2pHost: "localhost"
+        p2pInitPorts: "30081"
       env:
         - name: LMCACHE_LOG_LEVEL
           value: "DEBUG"
@@ -51,10 +51,10 @@ servingEngineSpec:
         enabled: true
         cpuOffloadingBufferSize: "10"
         enableController: true
-        instanceId: "default2"
         controllerPort: 9000
-        workerPort: 8002
-        distributedUrl: "localhost:30082"
+        workerPorts: "8002"
+        p2pHost: "localhost"
+        p2pInitPorts: "30082"
       env:
         - name: LMCACHE_LOG_LEVEL
           value: "DEBUG"
