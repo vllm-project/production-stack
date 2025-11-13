@@ -60,6 +60,9 @@ write_to = "src/vllm_router/_version.py"
 [tool.isort]
 profile = "black"
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
 [dependency-groups]
 lint = [
     "pre-commit>=4.1.0",
