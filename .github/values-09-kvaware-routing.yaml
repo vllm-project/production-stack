@@ -3,12 +3,11 @@ servingEngineSpec:
     type: Recreate
   runtimeClassName: ""
   modelSpec:
-    # Prefill node configuration
-    - name: "opt125m-1"
+    - name: "opt125m"
       repository: "lmcache/vllm-openai"
       tag: "v0.3.9post2"
       modelURL: "facebook/opt-125m"
-      replicaCount: 1
+      replicaCount: 2
       requestCPU: 6
       requestMemory: "30Gi"
       requestGPU: 1
@@ -25,36 +24,6 @@ servingEngineSpec:
         workerPorts: "8001"
         p2pHost: "localhost"
         p2pInitPorts: "30081"
-      env:
-        - name: LMCACHE_LOG_LEVEL
-          value: "DEBUG"
-      chatTemplate: "chat.jinja2"
-      chatTemplateConfigMap: |-
-        {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
-        {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
-    # Decode node configuration
-    - name: "opt125m-2"
-      repository: "lmcache/vllm-openai"
-      tag: "v0.3.9post2"
-      modelURL: "facebook/opt-125m"
-      replicaCount: 1
-      requestCPU: 6
-      requestMemory: "30Gi"
-      requestGPU: 1
-      pvcStorage: "50Gi"
-      vllmConfig:
-        enablePrefixCaching: true
-        maxModelLen: 1024
-        v1: 1
-        gpuMemoryUtilization: 0.6
-      lmcacheConfig:
-        enabled: true
-        cpuOffloadingBufferSize: "10"
-        enableController: true
-        controllerPort: 9000
-        workerPorts: "8002"
-        p2pHost: "localhost"
-        p2pInitPorts: "30082"
       env:
         - name: LMCACHE_LOG_LEVEL
           value: "DEBUG"

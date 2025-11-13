@@ -9,10 +9,10 @@ servingEngineSpec:
     # Prefill node configuration
     - name: "opt125m-prefill"
       repository: "lmcache/vllm-openai"
-      tag: "latest"
+      tag: "2025-05-27-v1"
       modelURL: "facebook/opt-125m"
       replicaCount: 1
-      requestCPU: 6
+      requestCPU: 8
       requestMemory: "30Gi"
       # requestGPU: 1
       pvcStorage: "50Gi"
@@ -34,10 +34,6 @@ servingEngineSpec:
         nixlEnableGc: true
         enablePD: true
         cpuOffloadingBufferSize: 0
-        enableController: true
-        controllerPort: 9000
-        workerPort: 8001
-        distributedUrl: "localhost:30081"
       labels:
         model: "opt125m-prefill"
       chatTemplate: "chat.jinja2"
@@ -47,10 +43,10 @@ servingEngineSpec:
     # Decode node configuration
     - name: "opt125m-decode"
       repository: "lmcache/vllm-openai"
-      tag: "latest"
+      tag: "2025-05-27-v1"
       modelURL: "facebook/opt-125m"
       replicaCount: 1
-      requestCPU: 6
+      requestCPU: 8
       requestMemory: "30Gi"
       # requestGPU: 1
       pvcStorage: "50Gi"
@@ -70,10 +66,6 @@ servingEngineSpec:
         nixlBufferDevice: "cuda"
         nixlEnableGc: true
         enablePD: true
-        enableController: true
-        controllerPort: 9000
-        workerPort: 8002
-        distributedUrl: "localhost:30082"
       labels:
         model: "opt125m-decode"
       chatTemplate: "chat.jinja2"
@@ -98,7 +90,6 @@ routerSpec:
   engineScrapeInterval: 15
   requestStatsWindow: 60
   enablePD: true
-  lmcacheControllerPort: 9000
   resources:
     requests:
       cpu: "4"
