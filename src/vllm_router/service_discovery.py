@@ -226,7 +226,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.engines_id = [str(uuid.uuid4()) for i in range(0, len(urls))]
         self.added_timestamp = int(time.time())
         self.unhealthy_endpoint_hashes = []
-        self.running = True
+        self._running = True
         if static_backend_health_checks:
             self.start_health_check_task()
         self.prefill_model_labels = prefill_model_labels
@@ -251,13 +251,15 @@ class StaticServiceDiscovery(ServiceDiscovery):
         return unhealthy_endpoints
 
     async def check_model_health(self):
-        while self.running:
+        while self._running:
             try:
                 self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
                 await asyncio.sleep(60)
             except asyncio.CancelledError:
                 logger.debug("Health check task cancelled")
                 break
+            except Exception as e:
+                logger.error(e)
 
     def start_health_check_task(self) -> None:
         self.loop = asyncio.new_event_loop()
@@ -785,7 +787,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         """
         Close the service discovery module.
         """
-        self.running = False
+        self._running = False
         self.k8s_watcher.stop()
         self.watcher_thread.join()
 
