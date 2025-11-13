@@ -41,10 +41,18 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
+      {{- if $.Values.servingEngineSpec.securityContext }}
+      securityContext:
+        {{- toYaml $.Values.servingEngineSpec.securityContext | nindent 8 }}
+      {{- end }}
       containers:
       - name: router-container
         image: "{{ .Values.routerSpec.repository | default "lmcache/lmstack-router" }}:{{ .Values.routerSpec.tag | default "latest" }}"
         imagePullPolicy: "{{ .Values.routerSpec.imagePullPolicy | default "Always" }}"
+        {{- if $.Values.servingEngineSpec.containerSecurityContext }}
+        securityContext:
+          {{- toYaml $.Values.servingEngineSpec.containerSecurityContext | nindent 10 }}
+        {{- end }}
         env:
           {{- if .Values.routerSpec.hf_token }}
           - name: HF_TOKEN
