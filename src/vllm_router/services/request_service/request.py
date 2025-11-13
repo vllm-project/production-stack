@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+
 # --- Request Processing & Routing ---
 import json
 import os
@@ -32,6 +34,7 @@ from vllm_router.routers.routing_logic import (
     SessionRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
+from vllm_router.services.queue_service.queue import get_queue_manager
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
     is_request_rewriter_initialized,
@@ -74,6 +77,7 @@ async def process_request(
     endpoint,
     background_tasks: BackgroundTasks,
     debug_request=None,
+    condition: asyncio.Condition = None,
 ):
     """
     Process a request by sending it to the chosen backend.
@@ -140,7 +144,11 @@ async def process_request(
     request.app.state.request_stats_monitor.on_request_complete(
         backend_url, request_id, time.time()
     )
-
+    if (
+        condition
+    ):  # lets scheduler know that an endpoint-specific request has completed, can perhaps dispatch new
+        async with condition:
+            condition.notify()
     # if debug_request:
     #    logger.debug(f"Finished the request with request id: {debug_request.headers.get('x-request-id', None)} at {time.time()}")
     # Store in semantic cache if applicable
@@ -174,6 +182,9 @@ async def route_general_request(
     Returns:
         StreamingResponse: A response object that streams data from the backend server to the client.
     """
+    # if queue enabled?
+    queue_manager = get_queue_manager()
+
     if isinstance(request.app.state.router, DisaggregatedPrefillRouter):
         response = await route_disaggregated_prefill_request(
             request, endpoint, background_tasks
@@ -312,9 +323,34 @@ async def route_general_request(
     logger.debug(f"Debug session extraction - Request headers: {dict(request.headers)}")
     logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
 
+    await queue_manager.register_endpoint(server_url)  # if queue does not already exist
+    # Enqueue if endpoint load is too high
+    if queue_manager.enable_queue and not queue_manager._endpoint_is_free(server_url):
+
+        response_future = asyncio.get_event_loop().create_future()
+
+        await queue_manager.enqueue(
+            server_url,
+            {
+                "request": request,
+                "request_id": request_id,
+                "body": request_body,
+                "endpoint": endpoint,
+                "background_tasks": background_tasks,
+                "result_future": response_future,
+            },
+            priority=queue_manager.calculate_request_priority(request),
+        )
+
+        return await response_future
+
     logger.info(
         f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
     )
+    condition = None
+    if queue_manager.enable_queue:
+        condition = queue_manager.conditions[server_url]
+
     stream_generator = process_request(
         request,
         request_body,
@@ -322,6 +358,7 @@ async def route_general_request(
         request_id,
         endpoint,
         background_tasks,
+        condition=condition,
     )
     headers, status = await anext(stream_generator)
     headers_dict = {key: value for key, value in headers.items()}

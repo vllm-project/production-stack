@@ -44,6 +44,10 @@ from vllm_router.service_discovery import (
 from vllm_router.services.batch_service import initialize_batch_processor
 from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
+from vllm_router.services.queue_service.queue import (
+    get_queue_manager,
+    initialize_queue_manager,
+)
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
 )
@@ -111,6 +115,16 @@ async def lifespan(app: FastAPI):
         logger.info("Closing dynamic config watcher")
         dyn_cfg_watcher.close()
 
+    # Close the queue manager
+    try:
+        queue_manager = get_queue_manager()
+        if queue_manager is not None:
+            logger.info("Closing per endpoint queues and tasks")
+            await queue_manager.close()
+    except ValueError:
+        # Queue manager was not initialized
+        pass
+
 
 def initialize_all(app: FastAPI, args):
     """
@@ -177,6 +191,14 @@ def initialize_all(app: FastAPI, args):
     # Initialize singletons via custom functions.
     initialize_engine_stats_scraper(args.engine_stats_interval)
     initialize_request_stats_monitor(args.request_stats_window)
+
+    # Initialize queue
+    initialize_queue_manager(
+        args.enable_queue,
+        args.max_wait_time,
+        args.max_running_requests,
+        args.max_gpu_perc,
+    )
 
     if args.enable_batch_api:
         logger.info("Initializing batch API")
