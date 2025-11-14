@@ -19,7 +19,7 @@ import math
 import random
 import threading
 import uuid
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import requests
 from fastapi import Request
@@ -103,6 +103,16 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         for node in new_nodes - current_nodes:
             self.hash_ring.add_node(node)
 
+    def extract_session_id(self, request: Request, request_json: Dict) -> Optional[str]:
+        """
+        Extract the session id from the request headers or request body.
+        """
+        session_key = getattr(self, "session_key", None)
+        if session_key is None:
+            return None
+        val = request.headers.get(session_key)
+        return val if val is not None else request_json.get(session_key, None)
+
     @abc.abstractmethod
     def route_request(
         self,
@@ -183,17 +193,18 @@ class SessionRouter(RoutingInterface):
         self.hash_ring = HashRing()
         self._initialized = True
 
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_json: Dict,
     ) -> str:
         """
         Route the request to the appropriate engine URL by the 'session id' in
-        the request headers.
-        If there is no session id in the request header, it will pick a server
+        the request headers or request body.
+        If there is no session id in the request header or request body, it will pick a server
         with lowest qps
 
         Args:
@@ -203,8 +214,9 @@ class SessionRouter(RoutingInterface):
             request_stats (Dict[str, RequestStats]): The request stats
                 indicating the request-level performance of each engine
             request (Request): The incoming request
+            request_json (Dict): The request body (needed for finding the session id)
         """
-        session_id = request.headers.get(self.session_key, None)
+        session_id = self.extract_session_id(request, request_json)
         logger.debug(f"Got session id: {session_id}")
 
         # Update the hash ring with the current list of endpoints
@@ -324,7 +336,7 @@ class KvawareRouter(RoutingInterface):
             or len(instance_id.layout_info) == 0
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
-            session_id = request.headers.get(self.session_key, None)
+            session_id = self.extract_session_id(request, request_json)
             logger.debug(f"Got session id: {session_id}")
             # Update the hash ring with the current list of endpoints
             self._update_hash_ring(endpoints)
