@@ -181,6 +181,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.resources.limits.cpu` | string | `"8"` | CPU limits for router |
 | `routerSpec.resources.limits.memory` | string | `"32G"` | Memory limits for router |
 | `routerSpec.labels` | map | `{environment: "router", release: "router"}` | Customized labels for the router deployment |
+| `routerSpec.podAnnotations` | map | `{}` | (Optional) Annotations to add to the pod, e.g., {model: "opt125m"} |
 | `routerSpec.affinity` | map | {} | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
 | `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
 | `routerSpec.hf_token` | string | `""`| Hugging Face token for router |

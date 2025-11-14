@@ -537,6 +537,12 @@
               "type": "string"
             }
           }
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     }
