@@ -112,6 +112,12 @@
               "pvcStorage": {
                 "type": "string"
               },
+              "pvcLabels": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
               "pvcMatchLabels": {
                 "type": "object",
                 "additionalProperties": {
