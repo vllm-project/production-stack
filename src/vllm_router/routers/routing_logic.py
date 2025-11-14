@@ -14,6 +14,7 @@
 
 import abc
 import asyncio
+import concurrent.futures
 import enum
 import math
 import random
@@ -249,7 +250,10 @@ class KvawareRouter(RoutingInterface):
             f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
         )
         self.kv_manager = controller_manager.LMCacheControllerManager(
-            f"0.0.0.0:{self.lmcache_controller_port}"
+            {
+                "pull": f"0.0.0.0:{self.lmcache_controller_port}",
+                "reply": None,
+            }
         )
         self.req_id = 0
         self.instance_id_to_ip = {}
@@ -265,7 +269,9 @@ class KvawareRouter(RoutingInterface):
         self.loop = asyncio.new_event_loop()
         self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
         self.thread.start()
-        asyncio.run_coroutine_threadsafe(self.kv_manager.start_all(), self.loop)
+        self.lmcache_cluster_monitor_task = asyncio.run_coroutine_threadsafe(
+            self.kv_manager.start_all(), self.loop
+        )
 
     def query_manager(self, msg) -> str:
         """
@@ -273,6 +279,20 @@ class KvawareRouter(RoutingInterface):
         """
         instance_id = self.kv_manager.handle_orchestration_message(msg)
         return instance_id
+
+    def close(self):
+        """Gracefully shutdown the lmcache cluster monitor task."""
+        if (
+            hasattr(self, "lmcache_cluster_monitor_task")
+            and self.lmcache_cluster_monitor_task
+        ):
+            logger.info("Shutting down lmcache cluster monitor task")
+            self.lmcache_cluster_monitor_task.cancel()
+            try:
+                self.lmcache_cluster_monitor_task.result()
+            except concurrent.futures.CancelledError:
+                pass
+            self.lmcache_cluster_monitor_task = None
 
     async def route_request(
         self,
@@ -321,10 +341,10 @@ class KvawareRouter(RoutingInterface):
             token_ids = body["tokens"]
 
         event_id = "Lookup" + str(uuid.uuid4())
-        logger.debug(f"Lookup event id: {event_id}")
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
         instance_id = await self.query_manager(msg)
         matched_tokens = math.inf
+        logger.debug(f"Lookup return message: {instance_id}")
         if len(list(instance_id.layout_info.keys())) > 0:
             matched_instance_id = list(instance_id.layout_info.keys())[
                 0
@@ -337,7 +357,7 @@ class KvawareRouter(RoutingInterface):
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
             session_id = self.extract_session_id(request, request_json)
-            logger.debug(f"Got session id: {session_id}")
+            logger.debug(f"Fallback to using session id: {session_id}")
             # Update the hash ring with the current list of endpoints
             self._update_hash_ring(endpoints)
             if session_id is None:
@@ -352,19 +372,21 @@ class KvawareRouter(RoutingInterface):
             if queried_instance_ids[0] not in self.instance_id_to_ip:
                 for endpoint in endpoints:
                     event_id = "QueryInst" + str(uuid.uuid4())
-                    logger.debug(f"QueryInst event id: {event_id}")
+                    query_ip = endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
+                        0
+                    ].split("//")[1]
                     query_message = QueryInstMsg(
-                        ip=endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
-                            0
-                        ].split("//")[1],
+                        ip=query_ip,
                         event_id=event_id,
                     )
                     endpoint_instance_id = await self.query_manager(query_message)
-
+                    logger.debug(
+                        f"Query ip: {query_ip}, return instance id: {endpoint_instance_id}"
+                    )
                     self.instance_id_to_ip[endpoint_instance_id.instance_id] = (
                         endpoint.url
                     )
-                logger.info(f"Instance id to ip: {self.instance_id_to_ip}")
+                logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
             logger.info(
                 f"Routing request to {queried_instance_ids[0]} found by kvaware router"
             )
@@ -528,14 +550,7 @@ def reconfigure_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
     # Remove the existing routers from the singleton registry
-    for cls in (
-        SessionRouter,
-        RoundRobinRouter,
-        KvawareRouter,
-        DisaggregatedPrefillRouter,
-    ):
-        if cls in SingletonABCMeta._instances:
-            del SingletonABCMeta._instances[cls]
+    cleanup_routing_logic()
     return initialize_routing_logic(routing_logic, *args, **kwargs)
 
 
@@ -551,3 +566,19 @@ def get_routing_logic() -> RoutingInterface:
         if cls in SingletonABCMeta._instances:
             return cls()
     raise ValueError("The global router has not been initialized")
+
+
+def cleanup_routing_logic():
+    """Clean up all routing logic instances."""
+    for cls in (
+        SessionRouter,
+        RoundRobinRouter,
+        KvawareRouter,
+        PrefixAwareRouter,
+        DisaggregatedPrefillRouter,
+    ):
+        if cls in SingletonABCMeta._instances:
+            instance = cls()
+            if hasattr(instance, "close"):
+                instance.close()
+            del SingletonABCMeta._instances[cls]

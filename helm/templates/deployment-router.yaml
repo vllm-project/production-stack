@@ -50,6 +50,8 @@ spec:
           - name: HF_TOKEN
             value: "{{ .Values.routerSpec.hf_token }}"
           {{- end }}
+          - name: PYTHONHASHSEED
+            value: "123"
           - name: LMCACHE_LOG_LEVEL
             value: "DEBUG"
           {{- if .Values.servingEngineSpec.enableEngine -}}
