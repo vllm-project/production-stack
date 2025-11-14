@@ -341,12 +341,10 @@ class KvawareRouter(RoutingInterface):
             token_ids = body["tokens"]
 
         event_id = "Lookup" + str(uuid.uuid4())
-        logger.debug(f"Lookup event id: {event_id}")
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
-        logger.debug(f"Lookup message: {msg}")
         instance_id = await self.query_manager(msg)
         matched_tokens = math.inf
-        logger.debug(f"Instance id: {instance_id}")
+        logger.debug(f"Lookup return message: {instance_id}")
         if len(list(instance_id.layout_info.keys())) > 0:
             matched_instance_id = list(instance_id.layout_info.keys())[
                 0
@@ -359,7 +357,7 @@ class KvawareRouter(RoutingInterface):
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
             session_id = self.extract_session_id(request, request_json)
-            logger.debug(f"Got session id: {session_id}")
+            logger.debug(f"Fallback to using session id: {session_id}")
             # Update the hash ring with the current list of endpoints
             self._update_hash_ring(endpoints)
             if session_id is None:
@@ -374,20 +372,21 @@ class KvawareRouter(RoutingInterface):
             if queried_instance_ids[0] not in self.instance_id_to_ip:
                 for endpoint in endpoints:
                     event_id = "QueryInst" + str(uuid.uuid4())
-                    logger.debug(f"QueryInst event id: {event_id}")
+                    query_ip = endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
+                        0
+                    ].split("//")[1]
                     query_message = QueryInstMsg(
-                        ip=endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
-                            0
-                        ].split("//")[1],
+                        ip=query_ip,
                         event_id=event_id,
                     )
-                    logger.debug(f"QueryInst message: {query_message}")
                     endpoint_instance_id = await self.query_manager(query_message)
-                    logger.debug(f"Endpoint instance id: {endpoint_instance_id}")
+                    logger.debug(
+                        f"Query ip: {query_ip}, return instance id: {endpoint_instance_id}"
+                    )
                     self.instance_id_to_ip[endpoint_instance_id.instance_id] = (
                         endpoint.url
                     )
-                logger.info(f"Instance id to ip: {self.instance_id_to_ip}")
+                logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
             logger.info(
                 f"Routing request to {queried_instance_ids[0]} found by kvaware router"
             )
