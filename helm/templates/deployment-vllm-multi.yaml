@@ -190,6 +190,8 @@ spec:
           {{- end }}
           imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
           env:
+          - name: PYTHONHASHSEED
+            value: "123"
           - name: HF_HOME
             {{- if hasKey $modelSpec "pvcStorage" }}
             value: /data
@@ -319,18 +321,31 @@ spec:
           {{-   if hasKey $modelSpec.lmcacheConfig "instanceId" }}
           - name: LMCACHE_LMCACHE_INSTANCE_ID
             value: {{ $modelSpec.lmcacheConfig.instanceId | quote }}
+          {{- else }}
+          - name: LMCACHE_LMCACHE_INSTANCE_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "controllerPort" }}
-          - name: LMCACHE_CONTROLLER_URL
+          - name: LMCACHE_CONTROLLER_PULL_URL
             value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
           {{-   end }}
-          {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
-          - name: LMCACHE_LMCACHE_WORKER_PORT
-            value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "workerPorts" }}
+          - name: LMCACHE_LMCACHE_WORKER_PORTS
+            value: {{ $modelSpec.lmcacheConfig.workerPorts | quote }}
           {{-   end }}
-          {{-  if hasKey $modelSpec.lmcacheConfig "distributedUrl" }}
-          - name: LMCACHE_DISTRIBUTED_URL
-            value: {{ $modelSpec.lmcacheConfig.distributedUrl | quote }}
+          {{-  if hasKey $modelSpec.lmcacheConfig "p2pHost" }}
+          - name: LMCACHE_P2P_HOST
+            value: {{ $modelSpec.lmcacheConfig.p2pHost | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "p2pInitPorts" }}
+          - name: LMCACHE_P2P_INIT_PORTS
+            value: {{ $modelSpec.lmcacheConfig.p2pInitPorts | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "workerHeartbeatTime" }}
+          - name: LMCACHE_LMCACHE_WORKER_HEARTBEAT_TIME
+            value: {{ $modelSpec.lmcacheConfig.workerHeartbeatTime | quote }}
           {{-   end }}
           {{- end }}
           {{- if or .Values.servingEngineSpec.configs $modelSpec.envFromSecret }}
