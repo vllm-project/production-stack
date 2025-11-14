@@ -19,9 +19,12 @@ ARG INSTALL_OPTIONAL_DEP=semantic_cache,lmcache
 ENV INSTALL_OPTIONAL_DEP=${INSTALL_OPTIONAL_DEP}
 
 # Install dependencies (use cache, and delete after install, to speed up the build)
-RUN pip install --upgrade --no-cache-dir pip setuptools_scm && \
-    pip install --no-cache-dir .[$INSTALL_OPTIONAL_DEP]
+RUN pip install --no-cache-dir uv && \
+    uv venv /opt/venv && \
+    . /opt/venv/bin/activate && \
+    uv pip install --upgrade --no-cache-dir pip setuptools_scm && \
+    uv pip install --no-cache-dir .[$INSTALL_OPTIONAL_DEP]
 
 # Set the entrypoint
-ENTRYPOINT ["vllm-router"]
+ENTRYPOINT ["/opt/venv/bin/vllm-router"]
 CMD []
