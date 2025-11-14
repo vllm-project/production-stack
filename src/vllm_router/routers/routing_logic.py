@@ -250,7 +250,10 @@ class KvawareRouter(RoutingInterface):
             f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
         )
         self.kv_manager = controller_manager.LMCacheControllerManager(
-            f"0.0.0.0:{self.lmcache_controller_port}"
+            {
+                "pull": f"0.0.0.0:{self.lmcache_controller_port}",
+                "reply": None,
+            }
         )
         self.req_id = 0
         self.instance_id_to_ip = {}
