@@ -54,3 +54,7 @@ routerSpec:
     - "--log-level"
     - "info"
   lmcacheControllerPort: 9000
+  startupProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    failureThreshold: 3

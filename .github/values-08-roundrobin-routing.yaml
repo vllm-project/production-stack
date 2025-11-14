@@ -54,3 +54,7 @@ routerSpec:
       cpu: "1"
       memory: "2G"
   lmcacheControllerPort: 9000
+  startupProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    failureThreshold: 3

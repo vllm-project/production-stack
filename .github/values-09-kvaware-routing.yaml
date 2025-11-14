@@ -48,6 +48,10 @@ routerSpec:
     limits:
       cpu: "1"
       memory: "2G"
+  startupProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    failureThreshold: 3
   enableRouter: true
   routingLogic: "kvaware"
   extraArgs:

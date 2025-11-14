@@ -55,3 +55,7 @@ routerSpec:
   extraArgs:
     - "--log-level"
     - "info"
+  startupProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    failureThreshold: 3
