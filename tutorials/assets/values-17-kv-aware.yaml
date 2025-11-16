@@ -1,111 +1,38 @@
 servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
-  - name: "llama1"
+  - name: "gpt-oss-20b"
     repository: "lmcache/vllm-openai"
-    tag: "2025-05-17-v1"
-    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
-    replicaCount: 1
-    requestCPU: 6
-    requestMemory: "70Gi"
+    tag: "v0.3.9post2"
+    modelURL: "openai/gpt-oss-20b"
+    replicaCount: 2
+    requestCPU: 8
+    requestMemory: "128Gi"
     requestGPU: 1
-    pvcStorage: "50Gi"
+    pvcStorage: "256Gi"
     vllmConfig:
       enablePrefixCaching: true
-      maxModelLen: 32000
+      maxModelLen: 8000
+      gpuMemoryUtilization: "0.9"
 
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "60"
       enableController: true
-      instanceId: "default1"
-      controllerPort: "9000"
-      workerPort: 8001
-      distributedUrl: "localhost:8201"
+
+      controllerPort: 9000
+      workerPorts: "8001"
+      p2pHost: "localhost"
+      p2pInitPorts: "30081"
+      workerHeartbeatTime: "30"
 
     env:
       - name: LMCACHE_LOG_LEVEL
         value: "DEBUG"
-    hf_token: <HF_TOKEN>
-  - name: "llama2"
-    repository: "lmcache/vllm-openai"
-    tag: "2025-05-17-v1"
-    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
-    replicaCount: 1
-    requestCPU: 6
-    requestMemory: "30Gi"
-    requestGPU: 1
-    pvcStorage: "50Gi"
-    vllmConfig:
-      enablePrefixCaching: true
-      maxModelLen: 32000
-
-    lmcacheConfig:
-      enabled: true
-      cpuOffloadingBufferSize: "60"
-      enableController: true
-      instanceId: "default2"
-      controllerPort: "9000"
-      workerPort: 8002
-      distributedUrl: "localhost:8202"
-
-    env:
-      - name: LMCACHE_LOG_LEVEL
+      - name: VLLM_LOGGING_LEVEL
         value: "DEBUG"
-    hf_token: <HF_TOKEN>
-
-  - name: "llama3"
-    repository: "lmcache/vllm-openai"
-    tag: "2025-05-17-v1"
-    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
-    replicaCount: 1
-    requestCPU: 6
-    requestMemory: "70Gi"
-    requestGPU: 1
-    pvcStorage: "50Gi"
-    vllmConfig:
-      enablePrefixCaching: true
-      maxModelLen: 32000
-
-    lmcacheConfig:
-      enabled: true
-      cpuOffloadingBufferSize: "60"
-      enableController: true
-      instanceId: "default3"
-      controllerPort: "9000"
-      workerPort: 8003
-      distributedUrl: "localhost:8203"
-
-    env:
-      - name: LMCACHE_LOG_LEVEL
-        value: "DEBUG"
-    hf_token: <HF_TOKEN>
-  - name: "llama4"
-    repository: "lmcache/vllm-openai"
-    tag: "2025-05-17-v1"
-    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
-    replicaCount: 1
-    requestCPU: 6
-    requestMemory: "70Gi"
-    requestGPU: 1
-    pvcStorage: "50Gi"
-    vllmConfig:
-      enablePrefixCaching: true
-      maxModelLen: 32000
-
-    lmcacheConfig:
-      enabled: true
-      cpuOffloadingBufferSize: "60"
-      enableController: true
-      instanceId: "default4"
-      controllerPort: "9000"
-      workerPort: 8004
-      distributedUrl: "localhost:8204"
-
-    env:
-      - name: LMCACHE_LOG_LEVEL
-        value: "DEBUG"
-    hf_token: <HF_TOKEN>
+      - name: HF_HOME
+        value: "/data"
 
 routerSpec:
   repository: "lmcache/lmstack-router"
@@ -119,5 +46,4 @@ routerSpec:
       memory: "2G"
   routingLogic: "kvaware"
   lmcacheControllerPort: 9000
-  hf_token: <HF_TOKEN>
   sessionKey: "x-user-id"

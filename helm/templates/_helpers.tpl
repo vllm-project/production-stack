@@ -161,7 +161,6 @@ limits:
 {{- end }}
 {{- end }}
 
-
 {{/*
   Define labels for serving engine and its service
 */}}
