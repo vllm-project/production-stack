@@ -48,6 +48,7 @@ servingEngineSpec:
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
   # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
+  # - pvcLabels: (Optional, map} The labels to add to the PVC, e.g., {label_excluded_from_alerts: "true"}
   # - extraVolumes: (Optional, list) Additional volumes to add to the pod, in Kubernetes volume format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volume-v1-core
   #   Example for an emptyDir volume:
   #   extraVolumes:
@@ -137,6 +138,8 @@ servingEngineSpec:
   #   requestGPU: 1
   #
   #   pvcStorage: "50Gi"
+  #   pvcLabels:
+  #     label_excluded_from_alerts: "true"
   #   pvcAccessMode:
   #     - ReadWriteOnce
   #   pvcMatchLabels:
