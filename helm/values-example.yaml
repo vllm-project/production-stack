@@ -1,9 +1,14 @@
 servingEngineSpec:
+  # Global runtime class for all models (can be overridden per model)
+  runtimeClassName: "nvidia"
+
   modelSpec:
   - name: "opt125m"
     repository: "lmcache/vllm-openai"
     tag: "latest"
     modelURL: "facebook/opt-125m"
+    # Override global runtimeClassName for this specific model
+    runtimeClassName: "custom-runtime"
 
     replicaCount: 1
 

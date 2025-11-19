@@ -21,6 +21,7 @@ servingEngineSpec:
   # - annotations: (Optional, map) The annotations to add to the deployment, e.g., {model: "opt125m"}
   # - serviceAccountName: (Optional, string) The name of the service account to use for the deployment, e.g., "vllm-service-account"
   # - priorityClassName: (Optional, string) The name of the priority class name for the deployment, e.g., "high-priority"
+  # - runtimeClassName: (Optional, string) Runtime class for the pod, e.g., "nvidia". If not specified, falls back to servingEngineSpec.runtimeClassName
   # - podAnnotations: (Optional, map) The annotations to add to the pod, e.g., {model: "opt125m"}
   # - name: (string) The name of the model, e.g., "example-model"
   # - repository: (string) The repository of the model, e.g., "vllm/vllm-openai"

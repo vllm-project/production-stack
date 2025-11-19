@@ -465,8 +465,8 @@ spec:
       {{-   end }}
       {{- end }}
 
-      {{- if .Values.servingEngineSpec.runtimeClassName }}
-      runtimeClassName: {{ .Values.servingEngineSpec.runtimeClassName }}
+      {{- with (ternary $modelSpec.runtimeClassName .Values.servingEngineSpec.runtimeClassName (hasKey $modelSpec "runtimeClassName")) }}
+      runtimeClassName: {{ . }}
       {{- end }}
       {{- if .Values.servingEngineSpec.schedulerName }}
       schedulerName: {{ .Values.servingEngineSpec.schedulerName }}

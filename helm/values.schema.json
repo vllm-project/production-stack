@@ -109,6 +109,9 @@
               "priorityClassName": {
                 "type": "string"
               },
+              "runtimeClassName": {
+                "type": "string"
+              },
               "pvcStorage": {
                 "type": "string"
               },
