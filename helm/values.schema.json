@@ -109,8 +109,17 @@
               "priorityClassName": {
                 "type": "string"
               },
+              "runtimeClassName": {
+                "type": "string"
+              },
               "pvcStorage": {
                 "type": "string"
+              },
+              "pvcLabels": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
               },
               "pvcMatchLabels": {
                 "type": "object",
@@ -481,6 +490,17 @@
         "containerPort": {
           "type": "integer"
         },
+        "securityContext": {
+          "type": "object",
+          "description": "Pod-level security context configuration",
+          "additionalProperties": true
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level security context configuration",
+          "additionalProperties": true
+        },
+
         "servicePort": {
           "type": "integer"
         },

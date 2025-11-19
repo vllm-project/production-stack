@@ -21,6 +21,7 @@ servingEngineSpec:
   # - annotations: (Optional, map) The annotations to add to the deployment, e.g., {model: "opt125m"}
   # - serviceAccountName: (Optional, string) The name of the service account to use for the deployment, e.g., "vllm-service-account"
   # - priorityClassName: (Optional, string) The name of the priority class name for the deployment, e.g., "high-priority"
+  # - runtimeClassName: (Optional, string) Runtime class for the pod, e.g., "nvidia". If not specified, falls back to servingEngineSpec.runtimeClassName
   # - podAnnotations: (Optional, map) The annotations to add to the pod, e.g., {model: "opt125m"}
   # - name: (string) The name of the model, e.g., "example-model"
   # - repository: (string) The repository of the model, e.g., "vllm/vllm-openai"
@@ -48,6 +49,7 @@ servingEngineSpec:
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
   # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
+  # - pvcLabels: (Optional, map} The labels to add to the PVC, e.g., {label_excluded_from_alerts: "true"}
   # - extraVolumes: (Optional, list) Additional volumes to add to the pod, in Kubernetes volume format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volume-v1-core
   #   Example for an emptyDir volume:
   #   extraVolumes:
@@ -137,6 +139,8 @@ servingEngineSpec:
   #   requestGPU: 1
   #
   #   pvcStorage: "50Gi"
+  #   pvcLabels:
+  #     label_excluded_from_alerts: "true"
   #   pvcAccessMode:
   #     - ReadWriteOnce
   #   pvcMatchLabels:
@@ -308,6 +312,12 @@ routerSpec:
   repository: "lmcache/lmstack-router"
   tag: "latest"
   imagePullPolicy: "Always"
+
+  # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
+  securityContext: {}
+
+  # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
+  containerSecurityContext: {}
 
   # -- Whether to enable the router service
   enableRouter: true

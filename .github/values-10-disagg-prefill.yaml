@@ -105,3 +105,7 @@ routerSpec:
     - "opt125m-prefill"
     - "--decode-model-labels"
     - "opt125m-decode"
+  startupProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    failureThreshold: 3
