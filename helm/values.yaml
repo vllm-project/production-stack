@@ -312,6 +312,12 @@ routerSpec:
   tag: "latest"
   imagePullPolicy: "Always"
 
+  # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
+  securityContext: {}
+
+  # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
+  containerSecurityContext: {}
+
   # -- Whether to enable the router service
   enableRouter: true
 
