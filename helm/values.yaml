@@ -8,6 +8,8 @@ servingEngineSpec:
   labels:
     environment: "test"
     release: "test"
+  # -- Extra service ports for models
+  extraPorts: []
   # vllmApiKey: (optional) api key for securing the vLLM models. Can be either:
   #   - A string containing the token directly (will be stored in a generated secret)
   #   - An object referencing an existing secret:
@@ -19,6 +21,7 @@ servingEngineSpec:
   # - annotations: (Optional, map) The annotations to add to the deployment, e.g., {model: "opt125m"}
   # - serviceAccountName: (Optional, string) The name of the service account to use for the deployment, e.g., "vllm-service-account"
   # - priorityClassName: (Optional, string) The name of the priority class name for the deployment, e.g., "high-priority"
+  # - runtimeClassName: (Optional, string) Runtime class for the pod, e.g., "nvidia". If not specified, falls back to servingEngineSpec.runtimeClassName
   # - podAnnotations: (Optional, map) The annotations to add to the pod, e.g., {model: "opt125m"}
   # - name: (string) The name of the model, e.g., "example-model"
   # - repository: (string) The repository of the model, e.g., "vllm/vllm-openai"
@@ -46,6 +49,7 @@ servingEngineSpec:
   # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
   # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
+  # - pvcLabels: (Optional, map} The labels to add to the PVC, e.g., {label_excluded_from_alerts: "true"}
   # - extraVolumes: (Optional, list) Additional volumes to add to the pod, in Kubernetes volume format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volume-v1-core
   #   Example for an emptyDir volume:
   #   extraVolumes:
@@ -109,7 +113,8 @@ servingEngineSpec:
   #
   # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
   #
-  # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes
+  # - affinity: (optional, map) Affinity configuration
+  # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes. When both affinity and nodeSelectorTerms are defined, nodeSelectorTerms will be ignored.
   # - nodeName: (optional) Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   # - enableLoRA: (optional, bool) Whether to enable LoRA, e.g., true
@@ -134,6 +139,8 @@ servingEngineSpec:
   #   requestGPU: 1
   #
   #   pvcStorage: "50Gi"
+  #   pvcLabels:
+  #     label_excluded_from_alerts: "true"
   #   pvcAccessMode:
   #     - ReadWriteOnce
   #   pvcMatchLabels:
@@ -232,6 +239,21 @@ servingEngineSpec:
       # -- Name or number of the port to access on the container, on which the server is listening
       port: 8000
 
+  # -- Readiness probe configuration
+  readinessProbe:
+    # -- Number of seconds after the container has started before readiness probe is initiated
+    initialDelaySeconds: 15
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive
+    failureThreshold: 3
+    # -- How often (in seconds) to perform the readiness probe
+    periodSeconds: 5
+    # -- Configuration of the Kubelet http request on the server
+    httpGet:
+      # -- Path to access on the HTTP server
+      path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: 8000
+
   # -- Disruption Budget Configuration
   maxUnavailablePodDisruptionBudget: ""
 
@@ -291,6 +313,12 @@ routerSpec:
   tag: "latest"
   imagePullPolicy: "Always"
 
+  # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
+  securityContext: {}
+
+  # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
+  containerSecurityContext: {}
+
   # -- Whether to enable the router service
   enableRouter: true
 
@@ -320,7 +348,8 @@ routerSpec:
 
   # -- Service discovery mode, supports "k8s" or "static". Defaults to "k8s" if not set.
   serviceDiscovery: "k8s"
-
+  # -- Service discovery mode type, supports "pod-ip" or "service-name". Defaults to "pod-ip" if not set.
+  k8sServiceDiscoveryType: "pod-ip"
   # -- If serviceDiscovery is set to "static", the comma-separated values below are required. There needs to be the same number of backends and models
   staticBackends: ""
   staticModels: ""
@@ -333,6 +362,8 @@ routerSpec:
 
   # -- extra router commandline arguments
   extraArgs: []
+  # -- extra service ports
+  extraPorts: []
 
   # -- Interval in seconds to scrape the serving engine metrics
   engineScrapeInterval: 15
@@ -359,6 +390,9 @@ routerSpec:
   labels:
     environment: "router"
     release: "router"
+
+  # -- Customized pod annotations for the router pods
+  podAnnotations: {}
 
   ingress:
     # -- Enable ingress controller resource
@@ -426,7 +460,10 @@ routerSpec:
       ## Additional custom rules that can be added to the route
       additionalRules: []
 
-  # The node selector terms to match the nodes
+  # Affinity configuration
+  affinity: {}
+
+  # The node selector terms to match the nodes. Will be ignored if affinity is configured.
   # Example:
   #   nodeSelectorTerms:
   #     - matchExpressions:
@@ -435,6 +472,33 @@ routerSpec:
   #         values:
   #         - "NVIDIA-RTX-A6000"
   nodeSelectorTerms: []
+
+  # Router probes configuration
+  # <probe>.httpGet.port will automatically be set to .Values.routerSpec.containerPort
+
+  # Liveness probe configuration.
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    failureThreshold: 3
+    httpGet:
+      path: /health
+
+  # Startup probe configuration.
+  startupProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+    httpGet:
+      path: /health
+
+  # Readiness probe configuration.
+  readinessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    failureThreshold: 3
+    httpGet:
+      path: /health
 
   # -- TODO: Readiness probe configuration
   #startupProbe:

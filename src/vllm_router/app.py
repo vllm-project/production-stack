@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import asyncio
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -32,6 +33,7 @@ from vllm_router.routers.files_router import files_router
 from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
 from vllm_router.routers.routing_logic import (
+    cleanup_routing_logic,
     get_routing_logic,
     initialize_routing_logic,
 )
@@ -90,6 +92,8 @@ async def lifespan(app: FastAPI):
     if hasattr(service_discovery, "initialize_client_sessions"):
         await service_discovery.initialize_client_sessions()
 
+    app.state.event_loop = asyncio.get_event_loop()
+
     yield
     await app.state.aiohttp_client_wrapper.stop()
 
@@ -107,6 +111,10 @@ async def lifespan(app: FastAPI):
     if dyn_cfg_watcher is not None:
         logger.info("Closing dynamic config watcher")
         dyn_cfg_watcher.close()
+
+    # Close routing logic instances
+    logger.info("Closing routing logic instances")
+    cleanup_routing_logic()
 
 
 def initialize_all(app: FastAPI, args):

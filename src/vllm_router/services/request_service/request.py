@@ -29,6 +29,7 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillRouter,
     KvawareRouter,
     PrefixAwareRouter,
+    SessionRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
@@ -50,6 +51,18 @@ except ImportError:
 from vllm_router.services.metrics_service import num_incoming_requests_total
 
 logger = init_logger(__name__)
+
+_HOP_BY_HOP_HEADERS = {
+    "host",
+    "connection",
+    "keep-alive",
+    "proxy-connection",
+    "transfer-encoding",
+    "content-length",
+    "upgrade",
+    "te",  # codespell:ignore
+    "trailer",
+}
 
 
 # TODO: (Brian) check if request is json beforehand
@@ -94,13 +107,18 @@ async def process_request(
         # If we can't parse the body as JSON, assume it's not streaming
         raise HTTPException(status=400, detail="Request body is not JSON parsable.")
 
+    # sanitize the request headers
+    headers = {
+        k: v for k, v in request.headers.items() if k.lower() not in _HOP_BY_HOP_HEADERS
+    }
+
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
 
     async with request.app.state.aiohttp_client_wrapper().request(
         method=request.method,
         url=backend_url + endpoint,
-        headers=dict(request.headers),
+        headers=headers,
         data=body,
         timeout=aiohttp.ClientTimeout(total=None),
     ) as backend_response:
@@ -165,7 +183,7 @@ async def route_general_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
-    request_json = json.loads(request_body)
+    request_json = json.loads(request_body) if request_body else {}
 
     if request.query_params:
         request_endpoint = request.query_params.get("id")
@@ -269,8 +287,8 @@ async def route_general_request(
             f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
 
-    elif isinstance(request.app.state.router, KvawareRouter) or isinstance(
-        request.app.state.router, PrefixAwareRouter
+    elif isinstance(
+        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
     ):
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
@@ -282,14 +300,8 @@ async def route_general_request(
 
     curr_time = time.time()
     # Extract actual session ID from request headers for logging
-    session_key = (
-        getattr(request.app.state.router, "session_key", None)
-        if hasattr(request.app.state.router, "session_key")
-        else None
-    )
-    session_id = (
-        request.headers.get(session_key, None) if session_key is not None else None
-    )
+    session_key = getattr(request.app.state.router, "session_key", None)
+    session_id = request.app.state.router.extract_session_id(request, request_json)
     session_id_display = session_id if session_id is not None else "None"
 
     # Debug logging to help troubleshoot session ID extraction

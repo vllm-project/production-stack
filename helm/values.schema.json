@@ -109,8 +109,17 @@
               "priorityClassName": {
                 "type": "string"
               },
+              "runtimeClassName": {
+                "type": "string"
+              },
               "pvcStorage": {
                 "type": "string"
+              },
+              "pvcLabels": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
               },
               "pvcMatchLabels": {
                 "type": "object",
@@ -407,6 +416,59 @@
           "type": "object",
           "description": "Container-level security context configuration",
           "additionalProperties": true
+        },
+        "extraPorts": {
+          "type": "array",
+          "description": "List of additional ports to expose from the serving engine container.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "appProtocol": {
+                "type": "string",
+                "description": "Application protocol for this port (e.g., 'http', 'https', 'grpc'). Used as a hint for implementations to offer richer behavior."
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the port. Must be unique within the service and conform to DNS label standards."
+              },
+              "nodePort": {
+                "type": "integer",
+                "description": "Port to expose on each node in a cluster."
+              },
+              "port": {
+                "type": "integer",
+                "description": "The port that will be exposed by this service.",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "TCP",
+                  "UDP",
+                  "SCTP"
+                ],
+                "description": "Protocol for the port. Must be TCP, UDP, or SCTP. Defaults to TCP."
+              },
+              "targetPort": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "description": "Port number or name on the container to forward traffic to. If not specified, defaults to the value of 'port'."
+              }
+            },
+            "required": [
+              "port"
+            ],
+            "additionalProperties": false
+          }
         }
       }
     },
@@ -428,8 +490,29 @@
         "containerPort": {
           "type": "integer"
         },
+        "securityContext": {
+          "type": "object",
+          "description": "Pod-level security context configuration",
+          "additionalProperties": true
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level security context configuration",
+          "additionalProperties": true
+        },
+
         "servicePort": {
           "type": "integer"
+        },
+        "serviceDiscovery": {
+          "type": "string",
+          "description": "Service discovery mode. Available values: k8s or static.",
+          "enum": ["k8s", "static"]
+        },
+        "k8sServiceDiscoveryType": {
+          "type": "string",
+          "description": "Kubernetes service discovery type. Available values: pod-ip and service-name.",
+          "enum": ["pod-ip", "service-name"]
         },
         "routingLogic": {
           "type": "string"
@@ -473,6 +556,12 @@
             "release": {
               "type": "string"
             }
+          }
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
           }
         }
       }

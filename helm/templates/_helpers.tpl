@@ -67,13 +67,21 @@ Define additional ports
 */}}
 {{- define "chart.extraPorts" }}
 {{-   with .Values.servingEngineSpec.extraPorts }}
-{{      toYaml . }}
+{{-     toYaml . }}
 {{-   end }}
 {{- end }}
 
+{{/*
+Define additional router ports
+*/}}
+{{- define "chart.routerExtraPorts" }}
+{{-   with .Values.routerSpec.extraPorts }}
+{{-     toYaml . }}
+{{-   end }}
+{{- end }}
 
 {{/*
-Define liveness et readiness probes
+Define startup, liveness and readiness probes
 */}}
 {{- define "chart.probes" -}}
 {{-   if .Values.servingEngineSpec.startupProbe  }}
@@ -85,6 +93,12 @@ startupProbe:
 {{-   if .Values.servingEngineSpec.livenessProbe  }}
 livenessProbe:
 {{-     with .Values.servingEngineSpec.livenessProbe }}
+{{-       toYaml . | nindent 2 }}
+{{-     end }}
+{{-   end }}
+{{-   if .Values.servingEngineSpec.readinessProbe  }}
+readinessProbe:
+{{-     with .Values.servingEngineSpec.readinessProbe }}
 {{-       toYaml . | nindent 2 }}
 {{-     end }}
 {{-   end }}
@@ -146,7 +160,6 @@ limits:
   {{- end }}
 {{- end }}
 {{- end }}
-
 
 {{/*
   Define labels for serving engine and its service

@@ -154,13 +154,7 @@ spec:
             livenessProbe:
               exec:
                 command: ["/bin/bash", "-c", "echo TBD"]
-            resources:
-              limits:
-                cpu: {{ default "2" $modelSpec.raySpec.headNode.requestCPU }}
-                memory: {{ default "8Gi" $modelSpec.raySpec.headNode.requestMemory }}
-                {{- if hasKey $modelSpec.raySpec.headNode "requestGPU" }}
-                nvidia.com/gpu: {{ $modelSpec.raySpec.headNode.requestGPU }}
-                {{- end }}
+            resources: {{- include "chart.resources" $modelSpec.raySpec.headNode | nindent 14 }}
             startupProbe:
               exec:
                 command: ["/bin/bash", "-c", "python3 /scripts/wait_for_ray.py"]
@@ -237,8 +231,8 @@ spec:
           {{-   toYaml . | nindent 10 }}
         {{-   end }}
         {{- end }}
-        {{- if .Values.servingEngineSpec.runtimeClassName }}
-        runtimeClassName: {{ .Values.servingEngineSpec.runtimeClassName }}
+        {{- with (ternary $modelSpec.runtimeClassName .Values.servingEngineSpec.runtimeClassName (hasKey $modelSpec "runtimeClassName")) }}
+        runtimeClassName: {{ . }}
         {{- end }}
         {{- if .Values.servingEngineSpec.schedulerName }}
         schedulerName: {{ .Values.servingEngineSpec.schedulerName }}
@@ -447,8 +441,8 @@ spec:
           {{-   end }}
           {{- end }}
 
-          {{- if .Values.servingEngineSpec.runtimeClassName }}
-          runtimeClassName: {{ .Values.servingEngineSpec.runtimeClassName }}
+          {{- with (ternary $modelSpec.runtimeClassName .Values.servingEngineSpec.runtimeClassName (hasKey $modelSpec "runtimeClassName")) }}
+          runtimeClassName: {{ . }}
           {{- end }}
           {{- if .Values.servingEngineSpec.schedulerName }}
           schedulerName: {{ .Values.servingEngineSpec.schedulerName }}
