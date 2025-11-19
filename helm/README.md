@@ -97,6 +97,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].pvcAccessMode` | list | `[]` | (Optional) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"] |
 | `servingEngineSpec.modelSpec[].storageClass` | string | `""` | (Optional) The storage class of the PVC |
 | `servingEngineSpec.modelSpec[].pvcMatchLabels` | map | `{}` | (Optional) The labels to match the PVC, e.g., {model: "opt125m"} |
+| `servingEngineSpec.modelSpec[].pvcLabels` | map | `{}` | (Optional) The labels to add to the PVC, e.g., {label_excluded_from_alerts: "true"} |
 | `servingEngineSpec.modelSpec[].extraVolumes` | list | `[]` | (Optional) Additional volumes to add to the pod, in Kubernetes volume format |
 | `servingEngineSpec.modelSpec[].extraVolumeMounts` | list | `[]` | (Optional) Additional volume mounts to add to the container, in Kubernetes volumeMount format |
 | `servingEngineSpec.modelSpec[].serviceAccountName` | string | `""` | (Optional) The name of the service account to use for the deployment |
