@@ -1,0 +1,136 @@
+suite: test runtimeClassName configuration
+templates:
+  - deployment-vllm-multi.yaml
+  - ray-cluster.yaml
+tests:
+  - it: should use global runtimeClassName when no model override is set
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        runtimeClassName: "nvidia"
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+    asserts:
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.runtimeClassName
+          value: "nvidia"
+
+  - it: should use model-specific runtimeClassName when set
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        runtimeClassName: "nvidia"
+        modelSpec:
+          - name: "test-model-custom"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            runtimeClassName: "custom-runtime"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+    asserts:
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.runtimeClassName
+          value: "custom-runtime"
+
+  - it: should use model-specific runtimeClassName in Ray cluster head and worker nodes
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        runtimeClassName: "nvidia"
+        modelSpec:
+          - name: "ray-model-custom"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            runtimeClassName: "custom-ray"
+            replicaCount: 2
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.headGroupSpec.template.spec.runtimeClassName
+          value: "custom-ray"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.workerGroupSpecs[0].template.spec.runtimeClassName
+          value: "custom-ray"
+
+  - it: should default to nvidia if runtimeClassName is not provided
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model-no-runtime"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+    asserts:
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.runtimeClassName
+          value: "nvidia"
+
+  - it: should use model-specific runtimeClassName when no global is set
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model-only-model-runtime"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            runtimeClassName: "model-only-runtime"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+    asserts:
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.runtimeClassName
+          value: "model-only-runtime"
+
+  - it: should not set runtimeClassName when global is explicitly set to empty string
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        runtimeClassName: ""
+        modelSpec:
+          - name: "test-model-empty-runtime"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+    asserts:
+      - template: deployment-vllm-multi.yaml
+        notExists:
+          path: spec.template.spec.runtimeClassName
