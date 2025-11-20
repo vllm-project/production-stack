@@ -31,6 +31,10 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
+      {{- with .Values.cacheserverSpec.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: "lmcache-server"
           image: "{{ required "Required value 'cacheserverSpec.repository' must be defined !" .Values.cacheserverSpec.repository }}:{{ required "Required value 'cacheserverSpec.tag' must be defined !" .Values.cacheserverSpec.tag }}"

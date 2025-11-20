@@ -64,6 +64,10 @@
               "tag": {
                 "type": "string"
               },
+              "imagePullSecret": {
+                "type": "string",
+                "description": "Name of secret with credentials to private container repository"
+              },
               "modelURL": {
                 "type": "string"
               },
@@ -477,6 +481,19 @@
       "properties": {
         "replicaCount": {
           "type": "integer"
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "description": "Image pull secrets for private container registries",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["name"]
+          }
         },
         "autoscaling": {
           "type": "object",
