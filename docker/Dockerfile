@@ -25,6 +25,9 @@ RUN pip install --no-cache-dir uv && \
     uv pip install --upgrade --no-cache-dir pip setuptools_scm && \
     uv pip install --no-cache-dir .[$INSTALL_OPTIONAL_DEP]
 
+# Set environment variable for workers (can be overridden)
+ENV VLLM_ROUTER_WORKERS=1
+
 # Set the entrypoint
 ENTRYPOINT ["/opt/venv/bin/vllm-router"]
 CMD []
