@@ -73,6 +73,7 @@ class ModelType(enum.Enum):
     score = "score"
     transcription = "transcription"
     vision = "vision"
+    messages = "messages"
 
     @staticmethod
     def get_url(model_type: str):
@@ -89,6 +90,8 @@ class ModelType(enum.Enum):
                 return "/v1/score"
             case ModelType.transcription:
                 return "/v1/audio/transcriptions"
+            case ModelType.messages:
+                return "/v1/messages"
 
     @staticmethod
     def get_test_payload(model_type: str):
@@ -112,6 +115,17 @@ class ModelType(enum.Enum):
                 return {"query": "Hello", "documents": ["Test"]}
             case ModelType.score:
                 return {"encoding_format": "float", "text_1": "Test", "text_2": "Test2"}
+            case ModelType.messages:
+                return {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": "Hello",
+                        }
+                    ],
+                    "temperature": 0.0,
+                    "max_tokens": 3,
+                }
             case ModelType.transcription:
                 if _SILENT_WAV_BYTES is not None:
                     logger.debug("=====Silent WAV Bytes is being used=====")
