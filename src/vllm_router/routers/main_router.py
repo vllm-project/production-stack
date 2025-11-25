@@ -244,3 +244,8 @@ async def route_v1_audio_transcriptions(
     return await route_general_transcriptions(
         request, "/v1/audio/transcriptions", background_tasks
     )
+
+
+@main_router.post("/v1/responses")
+async def route_v1_responses(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/responses", background_tasks)
