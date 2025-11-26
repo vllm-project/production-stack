@@ -10,7 +10,7 @@ subjects:
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
-  name: {{ .Release.Name }}-pod-reader
+  name: {{ .Release.Name }}-reader
   apiGroup: rbac.authorization.k8s.io
 {{- end }}
 

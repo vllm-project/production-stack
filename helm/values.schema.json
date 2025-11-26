@@ -64,6 +64,10 @@
               "tag": {
                 "type": "string"
               },
+              "imagePullSecret": {
+                "type": "string",
+                "description": "Name of secret with credentials to private container repository"
+              },
               "modelURL": {
                 "type": "string"
               },
@@ -109,8 +113,17 @@
               "priorityClassName": {
                 "type": "string"
               },
+              "runtimeClassName": {
+                "type": "string"
+              },
               "pvcStorage": {
                 "type": "string"
+              },
+              "pvcLabels": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
               },
               "pvcMatchLabels": {
                 "type": "object",
@@ -469,6 +482,19 @@
         "replicaCount": {
           "type": "integer"
         },
+        "imagePullSecrets": {
+          "type": "array",
+          "description": "Image pull secrets for private container registries",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["name"]
+          }
+        },
         "autoscaling": {
           "type": "object",
           "properties": {
@@ -481,8 +507,29 @@
         "containerPort": {
           "type": "integer"
         },
+        "securityContext": {
+          "type": "object",
+          "description": "Pod-level security context configuration",
+          "additionalProperties": true
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level security context configuration",
+          "additionalProperties": true
+        },
+
         "servicePort": {
           "type": "integer"
+        },
+        "serviceDiscovery": {
+          "type": "string",
+          "description": "Service discovery mode. Available values: k8s or static.",
+          "enum": ["k8s", "static"]
+        },
+        "k8sServiceDiscoveryType": {
+          "type": "string",
+          "description": "Kubernetes service discovery type. Available values: pod-ip and service-name.",
+          "enum": ["pod-ip", "service-name"]
         },
         "routingLogic": {
           "type": "string"
@@ -526,6 +573,12 @@
             "release": {
               "type": "string"
             }
+          }
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
           }
         }
       }

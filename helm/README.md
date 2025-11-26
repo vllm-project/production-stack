@@ -97,6 +97,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].pvcAccessMode` | list | `[]` | (Optional) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"] |
 | `servingEngineSpec.modelSpec[].storageClass` | string | `""` | (Optional) The storage class of the PVC |
 | `servingEngineSpec.modelSpec[].pvcMatchLabels` | map | `{}` | (Optional) The labels to match the PVC, e.g., {model: "opt125m"} |
+| `servingEngineSpec.modelSpec[].pvcLabels` | map | `{}` | (Optional) The labels to add to the PVC, e.g., {label_excluded_from_alerts: "true"} |
 | `servingEngineSpec.modelSpec[].extraVolumes` | list | `[]` | (Optional) Additional volumes to add to the pod, in Kubernetes volume format |
 | `servingEngineSpec.modelSpec[].extraVolumeMounts` | list | `[]` | (Optional) Additional volume mounts to add to the container, in Kubernetes volumeMount format |
 | `servingEngineSpec.modelSpec[].serviceAccountName` | string | `""` | (Optional) The name of the service account to use for the deployment |
@@ -158,6 +159,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.repository` | string | `"lmcache/lmstack-router"` | Docker image repository for the router |
 | `routerSpec.tag` | string | `"latest"` | Docker image tag for the router |
 | `routerSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the router |
+| `routerSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
 | `routerSpec.enableRouter` | boolean | `true` | Whether to enable the router service |
 | `routerSpec.replicaCount` | integer | `1` | Number of replicas for the router pod |
 | `routerSpec.priorityClassName` | string | `""` | Priority class for router |
@@ -166,6 +168,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.serviceAnnotations` | map | `{}` | Service annotations for LoadBalancer/NodePort |
 | `routerSpec.servicePort` | integer | `80` | Port the router service will listen on |
 | `routerSpec.serviceDiscovery` | string | `"k8s"` | Service discovery mode ("k8s" or "static") |
+| `routerSpec.k8sServiceDiscoveryType` | string | `"pod-ip"` | Service discovery Type ("pod-ip" or "service-name") if serviceDiscovery is "k8s" |
 | `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static" |
 | `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
 | `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic ("roundrobin" or "session") |
@@ -180,6 +183,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.resources.limits.cpu` | string | `"8"` | CPU limits for router |
 | `routerSpec.resources.limits.memory` | string | `"32G"` | Memory limits for router |
 | `routerSpec.labels` | map | `{environment: "router", release: "router"}` | Customized labels for the router deployment |
+| `routerSpec.podAnnotations` | map | `{}` | (Optional) Annotations to add to the pod, e.g., {model: "opt125m"} |
 | `routerSpec.affinity` | map | {} | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
 | `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
 | `routerSpec.hf_token` | string | `""`| Hugging Face token for router |
@@ -215,6 +219,7 @@ This table documents all available configuration values for the Production Stack
 | `cacheserverSpec.image.repository` | string | `"lmcache/lmstack-cache-server"` | Docker image repository for the cache server |
 | `cacheserverSpec.image.tag` | string | `"latest"` | Docker image tag for the cache server |
 | `cacheserverSpec.image.pullPolicy` | string | `"Always"` | Image pull policy for the cache server |
+| `cacheserverSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
 | `cacheserverSpec.replicaCount` | integer | `1` | Number of replicas for the cache server pod |
 | `cacheserverSpec.containerPort` | integer | `8000` | Port the cache server container is listening on |
 | `cacheserverSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the cache server |

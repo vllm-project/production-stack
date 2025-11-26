@@ -75,6 +75,7 @@ Documentation
    use_cases/pipeline-parallelism-kuberay
    use_cases/sleep-wakeup-mode
    use_cases/autoscaling-keda
+   use_cases/semantic-router-integration
 
 .. toctree::
    :maxdepth: 2
