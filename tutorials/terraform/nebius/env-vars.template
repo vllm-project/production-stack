@@ -1,0 +1,69 @@
+#!/bin/bash
+################################################################################
+# Notes
+################################################################################
+# This file is an Env template that sets environment variables for the Nebius deployment
+# copy and customize the values accordingly (hf_token, grafana_admin_password, neb_project_id,..etc)
+# 1.  cp ./env-vars.template env-vars
+# 2.  vi env-vars -- adjust the values as needed and
+# 3. source ./env-vars
+################################################################################
+# Nebius Project Credentials and Region
+################################################################################
+export TF_VAR_neb_project_id=""  # (required) - Fill your Nebius Project ID
+export TF_VAR_neb_profile="my_nebius_profile" # (Required) replace with your Nebius CLI profile
+# export TF_VAR_region="eu-north1"  # (not used) default depends on your Nebius project region
+# export TF_VAR_zone="eu-north1-a" # (not used) -
+# export TF_VAR_tenant_name=""  # (not used) default depends on your Nebius project tenant
+################################################################################
+# Nebius Cluster Configuration
+################################################################################
+# ☸️ Nebius cluster basics
+export TF_VAR_cluster_name="vllm-eks-prod" # default: "vllm-eks-prod"
+export TF_VAR_cluster_version="1.30"       # default: "1.30" - Kubernetes cluster version
+################################################################################
+# Cluster / Networking
+################################################################################
+export TF_VAR_public_endpoint="true"   # "true" or "false"
+export TF_VAR_vpc_name="vllm-vpc"
+export TF_VAR_vpc_cidr="10.20.0.0/16"
+# export TF_VAR_subnetwork_cidr="10.20.1.0/24"
+# export TF_VAR_subnetwork2_cidr="10.20.2.0/24"
+# export TF_VAR_subnetwork3_cidr="10.20.3.0/24"
+# export TF_VAR_service_cidr="10.96.0.0/16"
+################################################################################
+#  🧠 vLLM  Inference Configuration
+################################################################################
+export TF_VAR_enable_vllm="true"
+export TF_VAR_hf_token=""   # Hugging Face token (sensitive)
+export TF_VAR_gpu_vllm_helm_config="config/llm-stack/helm/gpu/gpu-tinyllama-light-ingress-nebius.tpl"
+################################################################################
+# ⚙️ GPU / Nodegroup settings
+################################################################################
+export TF_VAR_gpu_node_min="0"
+export TF_VAR_gpu_node_max="3"
+export TF_VAR_gpu_platform="gpu-l40s-d"
+# export TF_VAR_gpu_preset="1gpu-8vcpu-32gb" (not used - preset is derived from var.gpu_platform)
+# export TF_VAR_cpu_disk_size_gb="128" # default
+# export TF_VAR_gpu_disk_size_gb="128" # default
+# export TF_VAR_cpu_disk_type="NETWORK_SSD" # default
+# export TF_VAR_gpu_disk_type="NETWORK_SSD" # default
+# export TF_VAR_gpu_preset="1gpu-8vcpu-32gb"
+################################################################################
+# Addons / Observability
+################################################################################
+export TF_VAR_enable_cert_manager="true" # default: true
+# Grafana admin password is sensitive; override via CI secret or tfvars
+export TF_VAR_grafana_admin_password="admin1234"  # change or leave blank for secret injection
+export TF_VAR_letsencrypt_email="info@gmail.com" # Replace with your email don't use example.com
+# export TF_VAR_prometheus_scrape_interval="1m"
+# export TF_VAR_prometheus_retention="15d"
+# export TF_VAR_prometheus_pv_size="25Gi"
+################################################################################
+# Optional tags (JSON map)
+# export TF_VAR_tags='{"project":"vllm-production-stack","environment":"production","team":"llmops","application":"ai-inference","costcenter":"ai-1234"}'
+################################################################################
+# Shared filesystem
+################################################################################
+# export TF_VAR_shared_fs_size_tb="1"     # not yet used
+# export TF_VAR_shared_fs_type="network-ssd" # not yet used

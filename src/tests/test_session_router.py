@@ -1,4 +1,6 @@
-from typing import Dict
+from typing import Any, Dict
+
+import pytest
 
 from vllm_router.routers.routing_logic import SessionRouter
 
@@ -14,14 +16,16 @@ class RequestStats:
 
 
 class Request:
-    def __init__(self, headers: Dict[str, str]):
+    def __init__(self, headers: Dict[str, str], body: Dict[str, Any] = None):
         self.headers = headers
+        self.body = body
 
 
 # Test cases
 
 
-def test_route_request_with_session_id():
+@pytest.mark.asyncio
+async def test_route_request_with_session_id():
     """
     Test routing when a session ID is present in the request headers.
     """
@@ -36,13 +40,16 @@ def test_route_request_with_session_id():
     request = Request(headers={"session_id": "abc123"})
 
     router = SessionRouter(session_key="session_id")
-    url = router.route_request(endpoints, None, request_stats, request)
+    url = await router.route_request(endpoints, None, request_stats, request, {})
 
     # Ensure the same session ID always maps to the same endpoint
-    assert url == router.route_request(endpoints, None, request_stats, request)
+    assert url == await router.route_request(
+        endpoints, None, request_stats, request, {}
+    )
 
 
-def test_route_request_without_session_id():
+@pytest.mark.asyncio
+async def test_route_request_without_session_id():
     """
     Test routing when no session ID is present in the request headers.
     """
@@ -57,13 +64,14 @@ def test_route_request_without_session_id():
     request = Request(headers={})  # No session ID
 
     router = SessionRouter(session_key="session_id")
-    url = router.route_request(endpoints, None, request_stats, request)
+    url = await router.route_request(endpoints, None, request_stats, request, {})
 
     # Ensure the endpoint with the lowest QPS is selected
     assert url == "http://engine2.com"
 
 
-def test_route_request_with_dynamic_endpoints():
+@pytest.mark.asyncio
+async def test_route_request_with_dynamic_endpoints():
     """
     Test routing when the list of endpoints changes dynamically.
     """
@@ -78,18 +86,19 @@ def test_route_request_with_dynamic_endpoints():
     request = Request(headers={"session_id": "abc123"})
 
     router = SessionRouter(session_key="session_id")
-    router.route_request(endpoints, None, request_stats, request)
+    await router.route_request(endpoints, None, request_stats, request, {})
 
     # Add a new endpoint
     endpoints.append(EndpointInfo(url="http://engine3.com"))
     request_stats["http://engine3.com"] = RequestStats(qps=2)
-    url2 = router.route_request(endpoints, None, request_stats, request)
+    url2 = await router.route_request(endpoints, None, request_stats, request, {})
 
     # Ensure the session ID is still mapped to a valid endpoint
     assert url2 in [endpoint.url for endpoint in endpoints]
 
 
-def test_consistent_hashing_remove_node_multiple_sessions():
+@pytest.mark.asyncio
+async def test_consistent_hashing_remove_node_multiple_sessions():
     """
     Test consistent hashing behavior with multiple session IDs when a node is removed.
     """
@@ -110,7 +119,8 @@ def test_consistent_hashing_remove_node_multiple_sessions():
 
     # Route with initial endpoints
     urls_before = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        await router.route_request(endpoints, None, request_stats, req, {})
+        for req in requests
     ]
 
     # Remove an endpoint
@@ -119,7 +129,8 @@ def test_consistent_hashing_remove_node_multiple_sessions():
 
     # Route with the updated endpoints
     urls_after = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        await router.route_request(endpoints, None, request_stats, req, {})
+        for req in requests
     ]
 
     # Ensure all session IDs are still mapped to valid endpoints
@@ -135,7 +146,8 @@ def test_consistent_hashing_remove_node_multiple_sessions():
     assert remapped_count < len(session_ids)
 
 
-def test_consistent_hashing_add_node_multiple_sessions():
+@pytest.mark.asyncio
+async def test_consistent_hashing_add_node_multiple_sessions():
     """
     Test consistent hashing behavior with multiple session IDs when a node is added.
     """
@@ -155,7 +167,8 @@ def test_consistent_hashing_add_node_multiple_sessions():
 
     # Route with initial endpoints
     urls_before = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        await router.route_request(endpoints, None, request_stats, req, {})
+        for req in requests
     ]
 
     # Add a new endpoint
@@ -165,7 +178,8 @@ def test_consistent_hashing_add_node_multiple_sessions():
 
     # Route with the updated endpoints
     urls_after = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        await router.route_request(endpoints, None, request_stats, req, {})
+        for req in requests
     ]
 
     # Ensure all session IDs are still mapped to valid endpoints
@@ -181,7 +195,8 @@ def test_consistent_hashing_add_node_multiple_sessions():
     assert remapped_count < len(session_ids)
 
 
-def test_consistent_hashing_add_then_remove_node():
+@pytest.mark.asyncio
+async def test_consistent_hashing_add_then_remove_node():
     """
     Test consistent hashing behavior when a node is added and then removed.
     """
@@ -201,7 +216,8 @@ def test_consistent_hashing_add_then_remove_node():
 
     # Route with initial endpoints
     urls_before_add = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        await router.route_request(endpoints, None, request_stats, req, {})
+        for req in requests
     ]
 
     # Add a new endpoint
@@ -211,7 +227,8 @@ def test_consistent_hashing_add_then_remove_node():
 
     # Route with the updated endpoints (after adding)
     urls_after_add = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        await router.route_request(endpoints, None, request_stats, req, {})
+        for req in requests
     ]
 
     # Ensure all session IDs are still mapped to valid endpoints
@@ -233,7 +250,8 @@ def test_consistent_hashing_add_then_remove_node():
 
     # Route with the updated endpoints (after removing)
     urls_after_remove = [
-        router.route_request(endpoints, None, request_stats, req) for req in requests
+        await router.route_request(endpoints, None, request_stats, req, {})
+        for req in requests
     ]
 
     # Ensure all session IDs are still mapped to valid endpoints
@@ -258,3 +276,29 @@ def test_consistent_hashing_add_then_remove_node():
     print(
         f"{unaffected_count} out of {len(session_ids)} session IDs were unaffected by adding and removing a node."
     )
+
+
+@pytest.mark.asyncio
+async def test_session_key_in_request_body():
+    """
+    Test routing when a session ID is present in the request body.
+    """
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+    request_stats = {
+        "http://engine1.com": RequestStats(qps=10),
+        "http://engine2.com": RequestStats(qps=5),
+    }
+    request = Request(headers={}, body={"session_id": "abc123"})
+    router = SessionRouter(session_key="session_id")
+    url = await router.route_request(
+        endpoints, None, request_stats, request, request.body
+    )
+    assert url == "http://engine1.com"
+    assert router.extract_session_id(request, request.body) == "abc123"
+    url2 = await router.route_request(
+        endpoints, None, request_stats, request, request.body
+    )
+    assert url2 == "http://engine1.com"
