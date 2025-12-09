@@ -54,7 +54,7 @@ First, send a request to the router:
 curl http://localhost:30080/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "model": "openai/gpt-oss-20b",
     "prompt": "What is the capital of France?",
     "max_tokens": 100
   }'
@@ -66,7 +66,7 @@ Then, send another request with the same prompt prefix:
 curl http://localhost:30080/v1/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "model": "openai/gpt-oss-20b",
     "prompt": "What is the capital of France? And what is its population?",
     "max_tokens": 100
   }'
