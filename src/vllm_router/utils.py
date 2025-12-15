@@ -111,7 +111,7 @@ class ModelType(enum.Enum):
             case ModelType.rerank:
                 return {"query": "Hello", "documents": ["Test"]}
             case ModelType.score:
-                return {"encoding_format": "float", "text_1": "Test", "test_2": "Test2"}
+                return {"encoding_format": "float", "text_1": "Test", "text_2": "Test2"}
             case ModelType.transcription:
                 if _SILENT_WAV_BYTES is not None:
                     logger.debug("=====Silent WAV Bytes is being used=====")
