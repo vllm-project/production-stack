@@ -79,6 +79,12 @@ def test_get_test_payload_returns_values_for_known_types() -> None:
         assert isinstance(utils.ModelType.get_test_payload(model_type.name), dict)
 
 
+def test_get_test_payload_score_contains_required_fields() -> None:
+    payload = utils.ModelType.get_test_payload(utils.ModelType.score.name)
+    assert payload["text_1"] == "Test"
+    assert payload["text_2"] == "Test2"
+
+
 def test_get_all_fields_returns_list_of_strings() -> None:
     fields = utils.ModelType.get_all_fields()
     assert isinstance(fields, list)
