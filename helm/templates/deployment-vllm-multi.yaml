@@ -371,7 +371,11 @@ spec:
             - name: ucx-port
               containerPort: 9999
           {{- include "chart.probes" . | indent 10 }}
+          {{- if $modelSpec.resources }}
+          resources: {{ toYaml $modelSpec.resources | nindent 12 }}
+          {{- else }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
+          {{- end }}
           {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
           volumeMounts:
           {{- end }}
