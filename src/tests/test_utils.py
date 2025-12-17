@@ -81,8 +81,8 @@ def test_get_test_payload_returns_values_for_known_types() -> None:
 
 def test_get_test_payload_score_contains_required_fields() -> None:
     payload = utils.ModelType.get_test_payload(utils.ModelType.score.name)
-    assert payload["text_1"] == "Test"
-    assert payload["text_2"] == "Test2"
+    expected_payload = {"encoding_format": "float", "text_1": "Test", "text_2": "Test2"}
+    assert expected_payload.items() <= payload.items()
 
 
 def test_get_all_fields_returns_list_of_strings() -> None:
