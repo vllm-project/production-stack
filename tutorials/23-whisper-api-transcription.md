@@ -29,6 +29,8 @@ vllm serve \
 
 Create and run a router connected to the Whisper backend:
 
+run-router.sh:
+
 ```bash
 #!/bin/bash
 if [[ $# -ne 2 ]]; then
@@ -37,21 +39,26 @@ if [[ $# -ne 2 ]]; then
 fi
 
 uv run python3 -m vllm_router.app \
-  --host 0.0.0.0 --port "$1" \
-  --service-discovery static \
-  --static-backends "$2" \
-  --static-models "openai/whisper-small" \
-  --static-model-types "transcription" \
-  --routing-logic roundrobin \
-  --log-stats \
-  --engine-stats-interval 10 \
-  --request-stats-window 10
+    --host 0.0.0.0 --port "$1" \
+    --service-discovery static \
+    --static-backends "$2" \
+    --static-models "openai/whisper-small" \
+    --static-model-types "transcription" \
+    --routing-logic roundrobin \
+    --log-stats \
+    --log-level debug \
+    --engine-stats-interval 10 \
+    --request-stats-window 10 \
+    --static-backend-health-checks
 ```
+
+* `--log-level` options: "debug", "info", "warning", "error", "critical"
+* `--static-backend-health-checks`: Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.
 
 Example usage:
 
 ```bash
-./run-router.sh 8000 http://localhost:8002
+./run-router.sh 8000 http://0.0.0.0:8002
 ```
 
 ## 3. Sending a Transcription Request
