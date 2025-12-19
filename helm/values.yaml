@@ -319,6 +319,12 @@ routerSpec:
   # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
   containerSecurityContext: {}
 
+  # -- Image pull secrets for private container registries
+  # Example:
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+  imagePullSecrets: []
+
   # -- Whether to enable the router service
   enableRouter: true
 
