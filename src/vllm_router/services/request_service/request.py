@@ -564,7 +564,7 @@ async def route_general_transcriptions(
         temperature: Optional[float] = (
             float(temperature_str) if temperature_str is not None else None
         )
-        language: Optional[str] = form.get("language", "de")
+        language: Optional[str] = form.get("language", "en")
     except KeyError as e:
         return JSONResponse(
             status_code=400,
