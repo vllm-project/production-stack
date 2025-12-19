@@ -27,7 +27,9 @@ class AiohttpClientWrapper:
         # To fully leverage the router's concurrency capabilities,
         # we set the maximum number of connections to be unlimited.
         connector = aiohttp.TCPConnector(limit=0)
-        self.async_client = aiohttp.ClientSession(connector=connector, connector_owner=True)
+        self.async_client = aiohttp.ClientSession(
+            connector=connector, connector_owner=True
+        )
         logger.info(f"aiohttp ClientSession instantiated. Id {id(self.async_client)}")
 
     async def stop(self):
