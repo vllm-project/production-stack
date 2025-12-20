@@ -201,6 +201,14 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.readinessProbe.failureThreshold` | integer |`3`| Failure threshold for router's readiness probe |
 | `routerSpec.readinessProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's readiness probe will be testing |
 
+#### Router OpenTelemetry Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `routerSpec.otel.endpoint` | string | `""` | OTLP endpoint for tracing (e.g., "otel-collector:4317"). Tracing is enabled when this is set. |
+| `routerSpec.otel.serviceName` | string | `"vllm-router"` | Service name for OpenTelemetry traces |
+| `routerSpec.otel.secure` | boolean | `false` | Use secure (TLS) connection for OTLP exporter |
+
 #### Router Ingress Configuration
 
 | Field | Type | Default | Description |
