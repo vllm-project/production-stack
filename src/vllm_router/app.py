@@ -81,9 +81,52 @@ except ImportError:
 
 logger = logging.getLogger("uvicorn")
 
+# Global variable to store parsed arguments for multi-worker mode
+_global_args: object | None = None
+
+
+def set_global_args(args):
+    """Set global arguments for multi-worker mode.
+
+    This function should be called before importing the app module
+    in multi-worker scenarios.
+    """
+    global _global_args
+    _global_args = args
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize all components for this worker process
+    # This ensures each worker has its own properly initialized state
+    args = getattr(app.state, "args", None)
+    if args is None:
+        # Fallback: use global args or parse args if not available
+        global _global_args
+        if _global_args is not None:
+            args = _global_args
+        else:
+            # This should only happen in single-worker mode
+            args = parse_args()
+
+    # Initialize all components
+    initialize_all(app, args)
+
+    # Start log stats thread if enabled
+    # Note: In multi-worker mode, each worker will have its own log stats thread
+    # This is actually fine as each worker can log its own stats independently
+    if args.log_stats and not getattr(app.state, "log_stats_started", False):
+        threading.Thread(
+            target=log_stats,
+            args=(
+                app,
+                args.log_stats_interval,
+            ),
+            daemon=True,
+        ).start()
+        app.state.log_stats_started = True
+
+    # Start aiohttp client wrapper
     app.state.aiohttp_client_wrapper.start()
     if hasattr(app.state, "batch_processor"):
         await app.state.batch_processor.initialize()
@@ -285,32 +328,52 @@ def initialize_all(app: FastAPI, args):
     app.state.request_rewriter = get_request_rewriter()
 
 
-app = FastAPI(lifespan=lifespan)
-app.include_router(main_router)
-app.include_router(files_router)
-app.include_router(batches_router)
-app.include_router(metrics_router)
-app.state.aiohttp_client_wrapper = AiohttpClientWrapper()
-app.state.semantic_cache_available = semantic_cache_available
+def create_app():
+    """Create and configure the FastAPI application."""
+    app = FastAPI(lifespan=lifespan)
+    app.include_router(main_router)
+    app.include_router(files_router)
+    app.include_router(batches_router)
+    app.include_router(metrics_router)
+    app.state.aiohttp_client_wrapper = AiohttpClientWrapper()
+    app.state.semantic_cache_available = semantic_cache_available
+    return app
+
+
+def setup_app_with_args(app: FastAPI, args):
+    """Set up the application with parsed arguments.
+
+    This function is called to store args in app.state so they can be
+    accessed by the lifespan context manager in each worker process.
+    """
+    app.state.args = args
+
+
+# Create the app instance
+app = create_app()
 
 
 def main():
     args = parse_args()
-    initialize_all(app, args)
-    if args.log_stats:
-        threading.Thread(
-            target=log_stats,
-            args=(
-                app,
-                args.log_stats_interval,
-            ),
-            daemon=True,
-        ).start()
+
+    # Set up the app with arguments (for single-worker mode)
+    setup_app_with_args(app, args)
+
+    # Set global args for multi-worker mode
+    set_global_args(args)
 
     # Workaround to avoid footguns where uvicorn drops requests with too
     # many concurrent requests active.
     set_ulimit()
-    uvicorn.run(app, host=args.host, port=args.port)
+
+    # Use import string for multi-worker support
+    uvicorn.run(
+        "vllm_router.app:app",
+        host=args.host,
+        port=args.port,
+        workers=args.workers,
+        log_level=args.log_level,
+    )
 
 
 if __name__ == "__main__":
