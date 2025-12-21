@@ -3,12 +3,21 @@
 ## Introduction
 
 This tutorial guides you through the basic configurations required to collect
-traces, metrics, and logs from a vLLM serving engine in a Kubernetes environment
-with GPU support. You will learn how to use OpenTelemetry tooling along with
-the Jaeger distributed tracing observability platform to monitor running vLLM
-instances. You will learn how to specify the tracing configuration with
-necessary environment variables (like `OTEL_SERVICE_NAME`,
-`OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_RESOURCE_ATTRIBUTES`).
+traces, metrics, and logs from a vLLM serving engine and router in a Kubernetes
+environment with GPU support. You will learn how to use OpenTelemetry tooling
+along with the Jaeger distributed tracing observability platform to monitor
+running vLLM instances.
+
+The vLLM production stack supports distributed tracing at two levels:
+
+- **vLLM Engine**: Uses environment variables (`OTEL_SERVICE_NAME`,
+  `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES`) for built-in
+  OpenTelemetry support.
+- **vLLM Router**: Uses Helm configuration (`routerSpec.otel`) to enable
+  tracing of routing decisions and request forwarding.
+
+When both are enabled, you get end-to-end distributed traces showing the
+complete request flow: `client → router → engine`.
 
 ## Table of Contents
 
@@ -58,12 +67,36 @@ from within the cluster.
 
 ## Step 3: Configuring Model and Monitoring
 
-1. Feel free to inspect the `values-12-otel-vllm.yaml` file. Note that the
-   `OTEL_EXPORTER_OTLP_ENDPOINT` specification enables metrics, traces, and
-   logs to be collected. Further configurations can be explored
-   [here](https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/).
+### Engine Tracing Configuration
 
-   Run the following from the `tutorials/assets` directory:
+The vLLM engine has built-in OpenTelemetry support configured via environment
+variables. Inspect the `values-12-otel-vllm.yaml` file to see the
+`OTEL_EXPORTER_OTLP_ENDPOINT` specification that enables metrics, traces, and
+logs to be collected. Further configurations can be explored
+[here](https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/).
+
+### Router Tracing Configuration
+
+The vLLM router can also emit traces for routing decisions and request
+forwarding. To enable router tracing, add the following to your Helm values:
+
+```yaml
+routerSpec:
+  otel:
+    # OTLP endpoint (e.g., "otel-collector:4317")
+    endpoint: "otel-collector:4317"
+    # Service name for traces (default: "vllm-router")
+    serviceName: "vllm-router"
+    # Use secure (TLS) connection (default: false, i.e., insecure)
+    secure: false
+```
+
+The router propagates W3C Trace Context headers (`traceparent`, `tracestate`)
+to the backend engine, enabling end-to-end distributed tracing.
+
+### Deploying with Tracing
+
+1. Run the following from the `tutorials/assets` directory:
 
    ```bash
    sudo kubectl apply -f otel-example/jaeger.yaml
