@@ -55,6 +55,7 @@ class RoutingLogic(str, enum.Enum):
     KVAWARE = "kvaware"
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
+    DISAGGREGATED_PREFILL_ORCHESTRATED = "disaggregated_prefill_orchestrated"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -519,6 +520,195 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             return decoder_endpoints[0].url
 
 
+class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
+    """
+    Orchestrates disaggregated inference in a single request by chaining Prefill → Decode.
+    
+    Unlike DisaggregatedPrefillRouter (which requires 2 separate client requests),
+    this router handles the entire flow internally:
+    1. Receives request from client
+    2. Forwards to Prefill endpoint
+    3. Gets prefill response with KV cache metadata
+    4. Adds disagg_prefill_resp to request and forwards to Decode
+    5. Streams decode response back to client
+    
+    This is designed for NxDI (Neuronx Distributed Inference) on AWS Trainium,
+    similar to NxDI's toy_proxy_server.py pattern.
+    
+    Load balancing: Uses round-robin across available prefill and decode pods.
+    """
+
+    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
+        if hasattr(self, "_initialized"):
+            return
+        self.prefill_model_labels = prefill_model_labels or []
+        self.decode_model_labels = decode_model_labels or []
+        # Round-robin counters for load balancing across xPyD pods
+        self.prefill_idx = 0
+        self.decode_idx = 0
+        self._initialized = True
+        logger.info(
+            f"Initialized DisaggregatedPrefillOrchestratedRouter with "
+            f"prefill_labels={self.prefill_model_labels}, "
+            f"decode_labels={self.decode_model_labels}"
+        )
+
+    def _find_endpoints(self, endpoints: List[EndpointInfo]):
+        """Find prefill and decode endpoints based on model labels."""
+        prefiller_endpoints = [
+            e for e in endpoints if e.model_label in self.prefill_model_labels
+        ]
+        decoder_endpoints = [
+            e for e in endpoints if e.model_label in self.decode_model_labels
+        ]
+        
+        if not prefiller_endpoints:
+            raise ValueError(
+                f"No prefill endpoints found with labels {self.prefill_model_labels}. "
+                f"Available endpoints: {[(e.url, e.model_label) for e in endpoints]}"
+            )
+        if not decoder_endpoints:
+            raise ValueError(
+                f"No decode endpoints found with labels {self.decode_model_labels}. "
+                f"Available endpoints: {[(e.url, e.model_label) for e in endpoints]}"
+            )
+        
+        return prefiller_endpoints, decoder_endpoints
+
+    def select_prefill_endpoint(self, prefiller_endpoints: List[EndpointInfo]) -> EndpointInfo:
+        """Select prefill endpoint using round-robin load balancing."""
+        if not prefiller_endpoints:
+            raise ValueError("No prefill endpoints available")
+        # Sort for consistency across requests
+        sorted_endpoints = sorted(prefiller_endpoints, key=lambda e: e.url)
+        selected = sorted_endpoints[self.prefill_idx % len(sorted_endpoints)]
+        self.prefill_idx += 1
+        return selected
+
+    def select_decode_endpoint(self, decoder_endpoints: List[EndpointInfo]) -> EndpointInfo:
+        """Select decode endpoint using round-robin load balancing."""
+        if not decoder_endpoints:
+            raise ValueError("No decode endpoints available")
+        # Sort for consistency across requests
+        sorted_endpoints = sorted(decoder_endpoints, key=lambda e: e.url)
+        selected = sorted_endpoints[self.decode_idx % len(sorted_endpoints)]
+        self.decode_idx += 1
+        return selected
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        """
+        This method is called by the router framework but for orchestrated routing,
+        we need to handle the full flow differently. This returns the prefill URL
+        as a placeholder - the actual orchestration happens in handle_orchestrated_request.
+        """
+        prefiller_endpoints, _ = self._find_endpoints(endpoints)
+        # Return prefill URL - but actual orchestration is done via handle_orchestrated_request
+        return prefiller_endpoints[0].url
+
+    async def handle_orchestrated_request(
+        self,
+        endpoints: List[EndpointInfo],
+        request_json: Dict,
+        request_path: str,
+        aiohttp_client,
+    ):
+        """
+        Orchestrate the full Prefill → Decode flow.
+        
+        Args:
+            endpoints: List of available endpoints
+            request_json: The original request body
+            request_path: The API path (e.g., /v1/chat/completions)
+            aiohttp_client: The aiohttp client session for making HTTP requests
+            
+        Returns:
+            An async generator that yields the streaming response from decode
+        """
+        import aiohttp
+        import json
+        
+        prefiller_endpoints, decoder_endpoints = self._find_endpoints(endpoints)
+        
+        # Select endpoints (simple first-available for now, can add load balancing later)
+        prefill_url = prefiller_endpoints[0].url
+        decode_url = decoder_endpoints[0].url
+        
+        request_id = str(uuid.uuid4())
+        logger.info(f"[{request_id}] Starting orchestrated disaggregated inference")
+        logger.info(f"[{request_id}] Prefill endpoint: {prefill_url}")
+        logger.info(f"[{request_id}] Decode endpoint: {decode_url}")
+        
+        # Step 1: Send request to Prefill
+        prefill_api_url = f"{prefill_url}{request_path}"
+        logger.info(f"[{request_id}] Sending prefill request to {prefill_api_url}")
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Call Prefill
+                async with session.post(
+                    prefill_api_url,
+                    json=request_json,
+                    headers={"Content-Type": "application/json", "X-Request-ID": request_id},
+                    timeout=aiohttp.ClientTimeout(total=300)  # 5 min timeout for prefill
+                ) as prefill_resp:
+                    if prefill_resp.status != 200:
+                        error_text = await prefill_resp.text()
+                        logger.error(f"[{request_id}] Prefill failed with status {prefill_resp.status}: {error_text}")
+                        yield json.dumps({"error": f"Prefill failed: {error_text}"}).encode()
+                        return
+                    
+                    prefill_data = await prefill_resp.json()
+                    logger.info(f"[{request_id}] Prefill completed successfully")
+                    logger.debug(f"[{request_id}] Prefill response: {prefill_data}")
+                
+                # Step 2: Add prefill metadata and send to Decode
+                decode_request = request_json.copy()
+                decode_request["disagg_prefill_resp"] = prefill_data
+                
+                decode_api_url = f"{decode_url}{request_path}"
+                logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
+                
+                # Check if streaming is requested
+                is_streaming = request_json.get("stream", False)
+                
+                async with session.post(
+                    decode_api_url,
+                    json=decode_request,
+                    headers={"Content-Type": "application/json", "X-Request-ID": request_id},
+                    timeout=aiohttp.ClientTimeout(total=600)  # 10 min timeout for decode
+                ) as decode_resp:
+                    if decode_resp.status != 200:
+                        error_text = await decode_resp.text()
+                        logger.error(f"[{request_id}] Decode failed with status {decode_resp.status}: {error_text}")
+                        yield json.dumps({"error": f"Decode failed: {error_text}"}).encode()
+                        return
+                    
+                    # Stream the decode response back to client
+                    if is_streaming:
+                        async for chunk in decode_resp.content.iter_any():
+                            if chunk:
+                                yield chunk
+                    else:
+                        response_data = await decode_resp.read()
+                        yield response_data
+                    
+                    logger.info(f"[{request_id}] Decode completed successfully")
+                    
+        except aiohttp.ClientError as e:
+            logger.error(f"[{request_id}] HTTP error during orchestrated request: {e}")
+            yield json.dumps({"error": f"HTTP error: {str(e)}"}).encode()
+        except Exception as e:
+            logger.error(f"[{request_id}] Unexpected error during orchestrated request: {e}")
+            yield json.dumps({"error": f"Unexpected error: {str(e)}"}).encode()
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -547,6 +737,11 @@ def initialize_routing_logic(
         router = DisaggregatedPrefillRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
+    elif routing_logic == RoutingLogic.DISAGGREGATED_PREFILL_ORCHESTRATED:
+        logger.info("Initializing disaggregated prefill orchestrated routing logic (NxDI)")
+        return DisaggregatedPrefillOrchestratedRouter(
+            kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
+        )
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -572,6 +767,7 @@ def get_routing_logic() -> RoutingInterface:
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
+        DisaggregatedPrefillOrchestratedRouter,
     ):
         if cls in SingletonABCMeta._instances:
             return cls()
@@ -586,6 +782,7 @@ def cleanup_routing_logic():
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
+        DisaggregatedPrefillOrchestratedRouter,
     ):
         if cls in SingletonABCMeta._instances:
             instance = cls()
