@@ -3,7 +3,7 @@ name = "vllm-router"
 dynamic = ["version"]
 description = "The router for vLLM"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 classifiers = [
     "Operating System :: OS Independent",
