@@ -411,7 +411,7 @@ async def route_general_request(
         )
 
     elif isinstance(
-        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter, DisaggregatedPrefillOrchestratedRouter)
+        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
     ):
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
@@ -569,7 +569,7 @@ async def route_orchestrated_disaggregated_request(
     Orchestrated disaggregated inference following NxDI's toy_proxy_server pattern.
     
     Flow:
-    1. Send request to Prefill endpoint
+    1. Send request to Prefill endpoint (with max_tokens=1)
     2. Get response with KV cache metadata
     3. Add disagg_prefill_resp to request
     4. Send to Decode endpoint
@@ -585,27 +585,15 @@ async def route_orchestrated_disaggregated_request(
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
     
-    # Get prefill and decode endpoints from router
+    # Use router's _find_endpoints method to get prefill and decode endpoints
     router = request.app.state.router
-    prefill_labels = router.prefill_model_labels
-    decode_labels = router.decode_model_labels
-    
-    prefiller_endpoints = [e for e in endpoints if e.model_label in prefill_labels]
-    decoder_endpoints = [e for e in endpoints if e.model_label in decode_labels]
-    
-    if not prefiller_endpoints:
-        logger.error(f"[{request_id}] No prefill endpoints found with labels {prefill_labels}")
+    try:
+        prefiller_endpoints, decoder_endpoints = router._find_endpoints(endpoints)
+    except ValueError as e:
+        logger.error(f"[{request_id}] Endpoint discovery failed: {e}")
         return JSONResponse(
             status_code=503,
-            content={"error": f"No prefill endpoints available with labels {prefill_labels}"},
-            headers={"X-Request-Id": request_id},
-        )
-    
-    if not decoder_endpoints:
-        logger.error(f"[{request_id}] No decode endpoints found with labels {decode_labels}")
-        return JSONResponse(
-            status_code=503,
-            content={"error": f"No decode endpoints available with labels {decode_labels}"},
+            content={"error": str(e)},
             headers={"X-Request-Id": request_id},
         )
     
@@ -618,106 +606,103 @@ async def route_orchestrated_disaggregated_request(
     logger.info(f"[{request_id}] Prefill endpoint: {prefill_url}")
     logger.info(f"[{request_id}] Decode endpoint: {decode_url}")
     
-    # Step 1: Send to Prefill
+    # Step 1: Send to Prefill with max_tokens=1
     prefill_api_url = f"{prefill_url}{endpoint}"
     logger.info(f"[{request_id}] Sending prefill request to {prefill_api_url}")
     
+    # Create prefill request with max_tokens=1 to optimize prefill step
+    prefill_request_json = request_json.copy()
+    prefill_request_json["max_tokens"] = 1
+    if "max_completion_tokens" in prefill_request_json:
+        prefill_request_json["max_completion_tokens"] = 1
+    
     st = time.time()
+    is_streaming = request_json.get("stream", False)
+    
     try:
-        async with aiohttp.ClientSession() as session:
-            # Send to Prefill
-            async with session.post(
-                prefill_api_url,
-                json=request_json,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Request-Id": request_id,
-                },
-                timeout=aiohttp.ClientTimeout(total=300)
-            ) as prefill_resp:
-                if prefill_resp.status != 200:
-                    error_text = await prefill_resp.text()
-                    logger.error(f"[{request_id}] Prefill failed with status {prefill_resp.status}: {error_text}")
-                    return JSONResponse(
-                        status_code=prefill_resp.status,
-                        content={"error": f"Prefill failed: {error_text}"},
-                        headers={"X-Request-Id": request_id},
-                    )
+        # Use the shared aiohttp client from app state
+        client = request.app.state.aiohttp_client_wrapper()
+        
+        # Send to Prefill
+        async with client.post(
+            prefill_api_url,
+            json=prefill_request_json,
+            headers={
+                "Content-Type": "application/json",
+                "X-Request-Id": request_id,
+            },
+            timeout=aiohttp.ClientTimeout(total=300)
+        ) as prefill_resp:
+            if prefill_resp.status != 200:
+                error_text = await prefill_resp.text()
+                logger.error(f"[{request_id}] Prefill failed with status {prefill_resp.status}: {error_text}")
+                return JSONResponse(
+                    status_code=prefill_resp.status,
+                    content={"error": f"Prefill failed: {error_text}"},
+                    headers={"X-Request-Id": request_id},
+                )
+            
+            prefill_data = await prefill_resp.json()
+            et = time.time()
+            logger.info(f"[{request_id}] Prefill completed in {et - st:.4f}s (TTFT)")
+            logger.debug(f"[{request_id}] Prefill response keys: {prefill_data.keys() if isinstance(prefill_data, dict) else 'not a dict'}")
+        
+        # Step 2: Add prefill metadata and send to Decode
+        decode_request = request_json.copy()
+        decode_request["disagg_prefill_resp"] = prefill_data
+        
+        decode_api_url = f"{decode_url}{endpoint}"
+        logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
+        
+        async with client.post(
+            decode_api_url,
+            json=decode_request,
+            headers={
+                "Content-Type": "application/json",
+                "X-Request-Id": request_id,
+            },
+            timeout=aiohttp.ClientTimeout(total=600)
+        ) as decode_resp:
+            if decode_resp.status != 200:
+                error_text = await decode_resp.text()
+                logger.error(f"[{request_id}] Decode failed with status {decode_resp.status}: {error_text}")
+                return JSONResponse(
+                    status_code=decode_resp.status,
+                    content={"error": f"Decode failed: {error_text}"},
+                    headers={"X-Request-Id": request_id},
+                )
+            
+            if is_streaming:
+                # For streaming, yield chunks as they arrive (true streaming)
+                async def generate_stream():
+                    try:
+                        async for chunk in decode_resp.content.iter_any():
+                            if chunk:
+                                yield chunk
+                    finally:
+                        curr_time = time.time()
+                        logger.info(
+                            f"[{request_id}] Orchestrated streaming request completed, total time = {curr_time - in_router_time:.4f}s"
+                        )
                 
-                prefill_data = await prefill_resp.json()
-                et = time.time()
-                logger.info(f"[{request_id}] Prefill completed in {et - st:.4f}s (TTFT)")
-                logger.debug(f"[{request_id}] Prefill response keys: {prefill_data.keys() if isinstance(prefill_data, dict) else 'not a dict'}")
-            
-            # Step 2: Add prefill metadata and send to Decode
-            decode_request = request_json.copy()
-            decode_request["disagg_prefill_resp"] = prefill_data
-            
-            decode_api_url = f"{decode_url}{endpoint}"
-            logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
-            
-            is_streaming = request_json.get("stream", False)
-            
-            async with session.post(
-                decode_api_url,
-                json=decode_request,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Request-Id": request_id,
-                },
-                timeout=aiohttp.ClientTimeout(total=600)
-            ) as decode_resp:
-                if decode_resp.status != 200:
-                    error_text = await decode_resp.text()
-                    logger.error(f"[{request_id}] Decode failed with status {decode_resp.status}: {error_text}")
-                    return JSONResponse(
-                        status_code=decode_resp.status,
-                        content={"error": f"Decode failed: {error_text}"},
-                        headers={"X-Request-Id": request_id},
-                    )
+                return StreamingResponse(
+                    generate_stream(),
+                    media_type="text/event-stream",
+                    headers={"X-Request-Id": request_id},
+                )
+            else:
+                # For non-streaming, read full response
+                response_data = await decode_resp.read()
                 
-                # Read all response data while still inside the context
-                # This ensures the connection stays open until we have all data
-                if is_streaming:
-                    # For streaming, collect all chunks first, then yield
-                    chunks = []
-                    async for chunk in decode_resp.content.iter_any():
-                        if chunk:
-                            chunks.append(chunk)
-                    
-                    logger.info(f"[{request_id}] Decode streaming completed, collected {len(chunks)} chunks")
-                    
-                    async def generate_stream():
-                        for chunk in chunks:
-                            yield chunk
-                    
-                    curr_time = time.time()
-                    logger.info(
-                        f"[{request_id}] Orchestrated request completed, total time = {curr_time - in_router_time:.4f}s"
-                    )
-                    
-                    return StreamingResponse(
-                        generate_stream(),
-                        media_type="text/event-stream",
-                        headers={"X-Request-Id": request_id},
-                    )
-                else:
-                    # For non-streaming, read full response
-                    response_data = await decode_resp.read()
-                    
-                    curr_time = time.time()
-                    logger.info(
-                        f"[{request_id}] Orchestrated request completed, total time = {curr_time - in_router_time:.4f}s"
-                    )
-                    
-                    async def generate_response():
-                        yield response_data
-                    
-                    return StreamingResponse(
-                        generate_response(),
-                        media_type="application/json",
-                        headers={"X-Request-Id": request_id},
-                    )
+                curr_time = time.time()
+                logger.info(
+                    f"[{request_id}] Orchestrated request completed, total time = {curr_time - in_router_time:.4f}s"
+                )
+                
+                return JSONResponse(
+                    content=json.loads(response_data),
+                    headers={"X-Request-Id": request_id},
+                )
                 
     except aiohttp.ClientError as e:
         logger.error(f"[{request_id}] HTTP error during orchestrated request: {e}", exc_info=True)
