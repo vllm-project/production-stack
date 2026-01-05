@@ -606,107 +606,11 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         """
         This method is called by the router framework but for orchestrated routing,
         we need to handle the full flow differently. This returns the prefill URL
-        as a placeholder - the actual orchestration happens in handle_orchestrated_request.
+        as a placeholder - the actual orchestration happens in route_orchestrated_disaggregated_request.
         """
         prefiller_endpoints, _ = self._find_endpoints(endpoints)
-        # Return prefill URL - but actual orchestration is done via handle_orchestrated_request
+        # Return prefill URL - actual orchestration is done in request.py
         return prefiller_endpoints[0].url
-
-    async def handle_orchestrated_request(
-        self,
-        endpoints: List[EndpointInfo],
-        request_json: Dict,
-        request_path: str,
-        aiohttp_client,
-    ):
-        """
-        Orchestrate the full Prefill → Decode flow.
-        
-        Args:
-            endpoints: List of available endpoints
-            request_json: The original request body
-            request_path: The API path (e.g., /v1/chat/completions)
-            aiohttp_client: The aiohttp client session for making HTTP requests
-            
-        Returns:
-            An async generator that yields the streaming response from decode
-        """
-        import aiohttp
-        import json
-        
-        prefiller_endpoints, decoder_endpoints = self._find_endpoints(endpoints)
-        
-        # Select endpoints (simple first-available for now, can add load balancing later)
-        prefill_url = prefiller_endpoints[0].url
-        decode_url = decoder_endpoints[0].url
-        
-        request_id = str(uuid.uuid4())
-        logger.info(f"[{request_id}] Starting orchestrated disaggregated inference")
-        logger.info(f"[{request_id}] Prefill endpoint: {prefill_url}")
-        logger.info(f"[{request_id}] Decode endpoint: {decode_url}")
-        
-        # Step 1: Send request to Prefill
-        prefill_api_url = f"{prefill_url}{request_path}"
-        logger.info(f"[{request_id}] Sending prefill request to {prefill_api_url}")
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                # Call Prefill
-                async with session.post(
-                    prefill_api_url,
-                    json=request_json,
-                    headers={"Content-Type": "application/json", "X-Request-ID": request_id},
-                    timeout=aiohttp.ClientTimeout(total=300)  # 5 min timeout for prefill
-                ) as prefill_resp:
-                    if prefill_resp.status != 200:
-                        error_text = await prefill_resp.text()
-                        logger.error(f"[{request_id}] Prefill failed with status {prefill_resp.status}: {error_text}")
-                        yield json.dumps({"error": f"Prefill failed: {error_text}"}).encode()
-                        return
-                    
-                    prefill_data = await prefill_resp.json()
-                    logger.info(f"[{request_id}] Prefill completed successfully")
-                    logger.debug(f"[{request_id}] Prefill response: {prefill_data}")
-                
-                # Step 2: Add prefill metadata and send to Decode
-                decode_request = request_json.copy()
-                decode_request["disagg_prefill_resp"] = prefill_data
-                
-                decode_api_url = f"{decode_url}{request_path}"
-                logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
-                
-                # Check if streaming is requested
-                is_streaming = request_json.get("stream", False)
-                
-                async with session.post(
-                    decode_api_url,
-                    json=decode_request,
-                    headers={"Content-Type": "application/json", "X-Request-ID": request_id},
-                    timeout=aiohttp.ClientTimeout(total=600)  # 10 min timeout for decode
-                ) as decode_resp:
-                    if decode_resp.status != 200:
-                        error_text = await decode_resp.text()
-                        logger.error(f"[{request_id}] Decode failed with status {decode_resp.status}: {error_text}")
-                        yield json.dumps({"error": f"Decode failed: {error_text}"}).encode()
-                        return
-                    
-                    # Stream the decode response back to client
-                    if is_streaming:
-                        async for chunk in decode_resp.content.iter_any():
-                            if chunk:
-                                yield chunk
-                    else:
-                        response_data = await decode_resp.read()
-                        yield response_data
-                    
-                    logger.info(f"[{request_id}] Decode completed successfully")
-                    
-        except aiohttp.ClientError as e:
-            logger.error(f"[{request_id}] HTTP error during orchestrated request: {e}")
-            yield json.dumps({"error": f"HTTP error: {str(e)}"}).encode()
-        except Exception as e:
-            logger.error(f"[{request_id}] Unexpected error during orchestrated request: {e}")
-            yield json.dumps({"error": f"Unexpected error: {str(e)}"}).encode()
 
 
 # Instead of managing a global _global_router, we can define the initialization functions as:
