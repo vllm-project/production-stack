@@ -1,6 +1,6 @@
 aiofiles==24.1.0
 aiohttp[speedups]==3.13.0
-fastapi==0.115.8
+fastapi==0.128.0
 kubernetes==32.0.0
 numpy==1.26.4
 
