@@ -122,6 +122,9 @@ type ModelSpec struct {
 
 	// Maximum number of sequences
 	MaxNumSeqs int32 `json:"maxNumSeqs,omitempty"`
+
+	// Chat template
+	ChatTemplate string `json:"chatTemplate,omitempty"`
 }
 
 // LMCacheConfig defines the LM Cache configuration

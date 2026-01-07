@@ -143,6 +143,70 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
+	if vllmRuntime.Spec.Model.ChatTemplate != "" {
+		foundCM := &corev1.ConfigMap{}
+		err := r.Get(ctx, types.NamespacedName{
+			Name:      vllmRuntime.Name + "-chat-template",
+			Namespace: vllmRuntime.Namespace,
+		}, foundCM)
+
+		if err != nil {
+			if errors.IsNotFound(err) {
+				ct := r.configMapForVLLMRuntime(vllmRuntime)
+				log.Info(
+					"Creating a new ConfigMap",
+					"ConfigMap.Namespace",
+					ct.Namespace,
+					"ConfigMap.Name",
+					ct.Name,
+				)
+
+				if err := r.Create(ctx, ct); err != nil {
+					log.Error(
+						err,
+						"failed to create new ConfigMap",
+						"ConfigMap.Namespace",
+						ct.Namespace,
+						"ConfigMap.Name",
+						ct.Name,
+					)
+
+					return ctrl.Result{}, err
+				} else {
+					return ctrl.Result{Requeue: true}, nil
+				}
+			}
+
+			return ctrl.Result{}, err
+		}
+
+		if r.configMapNeedsUpdate(foundCM, vllmRuntime) {
+			log.Info(
+				"Updating ConfigMap",
+				"ConfigMap.Namespace",
+				foundCM.Namespace,
+				"ConfigMap.Name",
+				foundCM.Name,
+			)
+
+			newCT := r.configMapForVLLMRuntime(vllmRuntime)
+			if err := r.Update(ctx, newCT); err != nil {
+				log.Error(
+					err,
+					"failed to update ConfigMap",
+					"cm.Namespace",
+					foundCM.Namespace,
+					"cm.Name",
+					foundCM.Name,
+				)
+
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{Requeue: true}, nil
+		}
+	}
+
 	// Check if the deployment already exists, if not create a new one
 	found := &appsv1.Deployment{}
 	err = r.Get(ctx, types.NamespacedName{Name: vllmRuntime.Name, Namespace: vllmRuntime.Namespace}, found)
@@ -297,6 +361,10 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 
 	if vllmRuntime.Spec.VLLMConfig.ExtraArgs != nil {
 		args = append(args, vllmRuntime.Spec.VLLMConfig.ExtraArgs...)
+	}
+
+	if vllmRuntime.Spec.Model.ChatTemplate != "" {
+		args = append(args, "--chat-template", "/etc/chat-template.json")
 	}
 
 	// Build environment variables
@@ -477,6 +545,34 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      volumeName,
 			MountPath: mountPath,
+		})
+	}
+
+	if vllmRuntime.Spec.Model.ChatTemplate != "" {
+		volumeName := "chat-template"
+		mountPath := "/etc/chat-template.json"
+
+		volumes = append(volumes, corev1.Volume{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: vllmRuntime.Name + "-" + volumeName,
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "chatTemplate",
+							Path: "chat_template.json",
+						},
+					},
+				},
+			},
+		})
+
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      volumeName,
+			MountPath: mountPath,
+			SubPath:   "chat_template.json",
 		})
 	}
 
@@ -784,11 +880,8 @@ func (r *VLLMRuntimeReconciler) serviceNeedsUpdate(svc *corev1.Service, vr *prod
 	// Compare target port
 	expectedTargetPort := int(vr.Spec.VLLMConfig.Port)
 	actualTargetPort := svc.Spec.Ports[0].TargetPort.IntValue()
-	if expectedTargetPort != actualTargetPort {
-		return true
-	}
 
-	return false
+	return expectedTargetPort != actualTargetPort
 }
 
 // pvcForVLLMRuntime returns a VLLMRuntime PVC object
@@ -850,11 +943,35 @@ func (r *VLLMRuntimeReconciler) pvcNeedsUpdate(pvc *corev1.PersistentVolumeClaim
 		expectedSize = vr.Spec.StorageConfig.Size
 	}
 	actualSize := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
-	if expectedSize != actualSize.String() {
-		return true
+
+	return expectedSize != actualSize.String()
+}
+
+func (r *VLLMRuntimeReconciler) configMapForVLLMRuntime(
+	vr *productionstackv1alpha1.VLLMRuntime,
+) *corev1.ConfigMap {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      vr.Name + "-chat-template",
+			Namespace: vr.Namespace,
+		},
+		Data: map[string]string{
+			"chatTemplate": vr.Spec.Model.ChatTemplate,
+		},
 	}
 
-	return false
+	ctrl.SetControllerReference(vr, cm, r.Scheme)
+	return cm
+}
+
+func (r *VLLMRuntimeReconciler) configMapNeedsUpdate(
+	cm *corev1.ConfigMap,
+	vr *productionstackv1alpha1.VLLMRuntime,
+) bool {
+	actualData := cm.Data["chatTemplate"]
+	currentData := vr.Spec.Model.ChatTemplate
+
+	return actualData != currentData
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -864,5 +981,6 @@ func (r *VLLMRuntimeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
