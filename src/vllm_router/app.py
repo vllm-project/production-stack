@@ -28,6 +28,7 @@ from vllm_router.dynamic_config import (
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
 from vllm_router.parsers.parser import parse_args
+from vllm_router.routers.anthropic_router import anthropic_router
 from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
 from vllm_router.routers.main_router import main_router
@@ -321,6 +322,7 @@ def initialize_all(app: FastAPI, args):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(main_router)
+app.include_router(anthropic_router)
 app.include_router(files_router)
 app.include_router(batches_router)
 app.include_router(metrics_router)
