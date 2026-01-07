@@ -79,6 +79,18 @@ try:
 except ImportError:
     semantic_cache_available = False
 
+try:
+    # OpenTelemetry tracing integration
+    from vllm_router.experimental.otel import (
+        initialize_tracing,
+        is_tracing_enabled,
+        shutdown_tracing,
+    )
+
+    otel_available = True
+except ImportError:
+    otel_available = False
+
 logger = logging.getLogger("uvicorn")
 
 
@@ -121,6 +133,11 @@ async def lifespan(app: FastAPI):
     logger.info("Closing routing logic instances")
     cleanup_routing_logic()
 
+    # Shutdown OpenTelemetry tracing if enabled
+    if otel_available and app.state.otel_enabled:
+        logger.info("Shutting down OpenTelemetry tracing")
+        shutdown_tracing()
+
 
 def initialize_all(app: FastAPI, args):
     """
@@ -140,6 +157,23 @@ def initialize_all(app: FastAPI, args):
             profile_lifecycle="trace",
             traces_sample_rate=args.sentry_traces_sample_rate,
             profile_session_sample_rate=args.sentry_profile_session_sample_rate,
+        )
+
+    if otel_available and args.otel_endpoint:
+        initialize_tracing(
+            service_name=args.otel_service_name,
+            otlp_endpoint=args.otel_endpoint,
+            insecure=not args.otel_secure,
+        )
+        app.state.otel_enabled = is_tracing_enabled()
+        if app.state.otel_enabled:
+            logger.info(
+                f"OpenTelemetry tracing enabled, exporting to {args.otel_endpoint}"
+            )
+    elif args.otel_endpoint and not otel_available:
+        logger.warning(
+            "OpenTelemetry endpoint specified but OpenTelemetry packages not installed. "
+            "Install with: pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp"
         )
 
     if args.service_discovery == "static":
@@ -292,6 +326,7 @@ app.include_router(batches_router)
 app.include_router(metrics_router)
 app.state.aiohttp_client_wrapper = AiohttpClientWrapper()
 app.state.semantic_cache_available = semantic_cache_available
+app.state.otel_enabled = False
 
 
 def main():
