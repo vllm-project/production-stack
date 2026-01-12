@@ -217,6 +217,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         decode_model_labels: List[str] | None = None,
     ):
         self.app = app
+        self.client = self.app.state.aiohttp_client_wrapper()
         assert len(urls) == len(models), "URLs and models should have the same length"
         self.urls = urls
         self.models = models
@@ -232,13 +233,13 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.prefill_model_labels = prefill_model_labels
         self.decode_model_labels = decode_model_labels
 
-    def get_unhealthy_endpoint_hashes(self) -> list[str]:
+    async def get_unhealthy_endpoint_hashes(self) -> list[str]:
         unhealthy_endpoints = []
         try:
             for url, model, model_type in zip(
                 self.urls, self.models, self.model_types, strict=True
             ):
-                if utils.is_model_healthy(url, model, model_type):
+                if await utils.is_model_healthy(self.client, url, model, model_type):
                     logger.debug(f"{model} at {url} is healthy")
                 else:
                     logger.warning(f"{model} at {url} not healthy!")
@@ -253,7 +254,9 @@ class StaticServiceDiscovery(ServiceDiscovery):
     async def check_model_health(self):
         while self._running:
             try:
-                self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
+                self.unhealthy_endpoint_hashes = (
+                    await self.get_unhealthy_endpoint_hashes()
+                )
                 await asyncio.sleep(60)
             except asyncio.CancelledError:
                 logger.debug("Health check task cancelled")
