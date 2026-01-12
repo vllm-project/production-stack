@@ -181,6 +181,9 @@ spec:
               model:
                 description: Model configuration
                 properties:
+                  chatTemplate:
+                    description: Chat template
+                    type: string
                   dtype:
                     description: Data type
                     type: string
