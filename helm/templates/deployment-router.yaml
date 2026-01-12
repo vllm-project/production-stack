@@ -136,6 +136,15 @@ spec:
           - "--lmcache-controller-port"
           - "{{ .Values.routerSpec.lmcacheControllerPort }}"
           {{- end }}
+          {{- if .Values.routerSpec.otel.endpoint }}
+          - "--otel-endpoint"
+          - "{{ .Values.routerSpec.otel.endpoint }}"
+          - "--otel-service-name"
+          - "{{ .Values.routerSpec.otel.serviceName | default "vllm-router" }}"
+          {{- if .Values.routerSpec.otel.secure }}
+          - "--otel-secure"
+          {{- end }}
+          {{- end }}
         {{- if .Values.routerSpec.resources }}
         resources:
           {{- if .Values.routerSpec.resources.requests }}

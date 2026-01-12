@@ -358,6 +358,26 @@ def parse_args():
         help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%)",
     )
 
+    # OpenTelemetry tracing arguments
+    parser.add_argument(
+        "--otel-endpoint",
+        type=str,
+        default=None,
+        help="OTLP endpoint for tracing (e.g., localhost:4317). Enables tracing when set.",
+    )
+    parser.add_argument(
+        "--otel-service-name",
+        type=str,
+        default="vllm-router",
+        help="Service name for OpenTelemetry tracing. Default is 'vllm-router'.",
+    )
+    parser.add_argument(
+        "--otel-secure",
+        action="store_true",
+        default=False,
+        help="Use secure (TLS) connection for OTLP exporter. Default is insecure.",
+    )
+
     parser.add_argument(
         "--prefill-model-labels",
         type=str,

@@ -26,6 +26,9 @@ dependencies = [
     "xxhash==3.5.0",
     "psutil==7.0.0",
     "pyyaml>=6.0.2",
+    "opentelemetry-api>=1.28.0",
+    "opentelemetry-sdk>=1.28.0",
+    "opentelemetry-exporter-otlp>=1.28.0",
 ]
 
 [project.scripts]

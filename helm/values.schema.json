@@ -580,6 +580,26 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "otel": {
+          "type": "object",
+          "description": "OpenTelemetry tracing configuration for the router",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "description": "OTLP endpoint for tracing (e.g., 'otel-collector:4317'). Tracing is enabled when this is set."
+            },
+            "serviceName": {
+              "type": "string",
+              "description": "Service name for OpenTelemetry traces",
+              "default": "vllm-router"
+            },
+            "secure": {
+              "type": "boolean",
+              "description": "Use secure (TLS) connection for OTLP exporter",
+              "default": false
+            }
+          }
         }
       }
     }

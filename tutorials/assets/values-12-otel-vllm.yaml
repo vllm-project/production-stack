@@ -12,11 +12,18 @@ servingEngineSpec:
     requestMemory: "8Gi"
     requestGPU: 1
 
-  # environment variables for OpenTelemetry (using gRPC)
-  env:
-    - name: OTEL_SERVICE_NAME
-      value: "vllm-router"
-    - name: OTEL_EXPORTER_OTLP_ENDPOINT
-      value: "http://otel-collector:4317"
-    - name: OTEL_RESOURCE_ATTRIBUTES
-      value: "service.name=vllm-router,deployment.environment=test"
+    # OpenTelemetry tracing configuration for the engine
+    env:
+      - name: OTEL_SERVICE_NAME
+        value: "vllm-engine"
+      - name: OTEL_EXPORTER_OTLP_ENDPOINT
+        value: "http://otel-collector:4317"
+      - name: OTEL_RESOURCE_ATTRIBUTES
+        value: "service.name=vllm-engine,deployment.environment=test"
+
+routerSpec:
+  # OpenTelemetry tracing configuration for the router
+  otel:
+    endpoint: "otel-collector:4317"
+    serviceName: "vllm-router"
+    secure: false
