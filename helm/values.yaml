@@ -377,6 +377,16 @@ routerSpec:
   # -- Window size in seconds to calculate the request statistics
   requestStatsWindow: 60
 
+  # -- OpenTelemetry tracing configuration
+  # When otelEndpoint is set, tracing is automatically enabled
+  otel:
+    # -- OTLP endpoint for tracing (e.g., "localhost:4317" or "otel-collector:4317")
+    endpoint: ""
+    # -- Service name for traces (default: "vllm-router")
+    serviceName: "vllm-router"
+    # -- Use secure (TLS) connection for OTLP exporter (default: false, i.e., insecure)
+    secure: false
+
   # -- deployment strategy
   strategy: {}
 
