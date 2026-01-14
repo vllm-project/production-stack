@@ -14,7 +14,7 @@ classifiers = [
 dependencies = [
     "aiofiles==24.1.0",
     "black>=25.1.0",
-    "fastapi==0.115.8",
+    "fastapi==0.128.0",
     "aiohttp[speedups]==3.13.0",
     "kubernetes==32.0.0",
     "numpy==1.26.4",
@@ -45,13 +45,13 @@ semantic_cache = [
     "huggingface-hub==0.34.0",
 ]
 lmcache = [
-    "lmcache==0.3.9post2",
-    "vllm==0.11.0",
+    "lmcache==0.3.11",
+    "vllm==0.13.0",
 ]
 test = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.3",
-    "vllm==0.11.0"
+    "vllm==0.13.0"
 ]
 
 [build-system]
