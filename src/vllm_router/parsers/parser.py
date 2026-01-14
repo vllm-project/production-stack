@@ -399,6 +399,20 @@ def parse_args():
         help="The threshold for kv-aware routing.",
     )
 
+    parser.add_argument(
+        "--lmcache-health-check-interval",
+        type=float,
+        default=5.0,
+        help="Health check interval for LMCache worker (seconds)",
+    )
+
+    parser.add_argument(
+        "--lmcache-worker-timeout",
+        type=float,
+        default=30.0,
+        help="Timeout for LMCache worker (seconds)",
+    )
+
     args = parser.parse_args()
     args = load_initial_config_from_config_file_if_required(parser, args)
 
