@@ -54,7 +54,10 @@ type VLLMRuntimeReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *VLLMRuntimeReconciler) Reconcile(
+	ctx context.Context,
+	req ctrl.Request,
+) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
 	// Fetch the VLLMRuntime instance
@@ -74,14 +77,31 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Check if the service already exists, if not create a new one
 	foundService := &corev1.Service{}
-	err = r.Get(ctx, types.NamespacedName{Name: vllmRuntime.Name, Namespace: vllmRuntime.Namespace}, foundService)
+	err = r.Get(
+		ctx,
+		types.NamespacedName{Name: vllmRuntime.Name, Namespace: vllmRuntime.Namespace},
+		foundService,
+	)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new service
 		svc := r.serviceForVLLMRuntime(vllmRuntime)
-		log.Info("Creating a new Service", "Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
+		log.Info(
+			"Creating a new Service",
+			"Service.Namespace",
+			svc.Namespace,
+			"Service.Name",
+			svc.Name,
+		)
 		err = r.Create(ctx, svc)
 		if err != nil {
-			log.Error(err, "Failed to create new Service", "Service.Namespace", svc.Namespace, "Service.Name", svc.Name)
+			log.Error(
+				err,
+				"Failed to create new Service",
+				"Service.Namespace",
+				svc.Namespace,
+				"Service.Name",
+				svc.Name,
+			)
 			return ctrl.Result{}, err
 		}
 		// Service created successfully - return and requeue
@@ -93,13 +113,26 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Update the service if needed
 	if r.serviceNeedsUpdate(foundService, vllmRuntime) {
-		log.Info("Updating Service", "Service.Namespace", foundService.Namespace, "Service.Name", foundService.Name)
+		log.Info(
+			"Updating Service",
+			"Service.Namespace",
+			foundService.Namespace,
+			"Service.Name",
+			foundService.Name,
+		)
 		// Create new service spec
 		newSvc := r.serviceForVLLMRuntime(vllmRuntime)
 
 		err = r.Update(ctx, newSvc)
 		if err != nil {
-			log.Error(err, "Failed to update Service", "Service.Namespace", foundService.Namespace, "Service.Name", foundService.Name)
+			log.Error(
+				err,
+				"Failed to update Service",
+				"Service.Namespace",
+				foundService.Namespace,
+				"Service.Name",
+				foundService.Name,
+			)
 			return ctrl.Result{}, err
 		}
 		// Service updated successfully - return and requeue
@@ -110,14 +143,25 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if vllmRuntime.Spec.StorageConfig.Enabled {
 		// Check if the PVC already exists, if not create a new one
 		foundPVC := &corev1.PersistentVolumeClaim{}
-		err = r.Get(ctx, types.NamespacedName{Name: vllmRuntime.Name, Namespace: vllmRuntime.Namespace}, foundPVC)
+		err = r.Get(
+			ctx,
+			types.NamespacedName{Name: vllmRuntime.Name, Namespace: vllmRuntime.Namespace},
+			foundPVC,
+		)
 		if err != nil && errors.IsNotFound(err) {
 			// Define a new PVC
 			pvc := r.pvcForVLLMRuntime(vllmRuntime)
 			log.Info("Creating a new PVC", "PVC.Namespace", pvc.Namespace, "PVC.Name", pvc.Name)
 			err = r.Create(ctx, pvc)
 			if err != nil {
-				log.Error(err, "Failed to create new PVC", "PVC.Namespace", pvc.Namespace, "PVC.Name", pvc.Name)
+				log.Error(
+					err,
+					"Failed to create new PVC",
+					"PVC.Namespace",
+					pvc.Namespace,
+					"PVC.Name",
+					pvc.Name,
+				)
 				return ctrl.Result{}, err
 			}
 			// PVC created successfully - return and requeue
@@ -135,7 +179,14 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 			err = r.Update(ctx, newPVC)
 			if err != nil {
-				log.Error(err, "Failed to update PVC", "PVC.Namespace", foundPVC.Namespace, "PVC.Name", foundPVC.Name)
+				log.Error(
+					err,
+					"Failed to update PVC",
+					"PVC.Namespace",
+					foundPVC.Namespace,
+					"PVC.Name",
+					foundPVC.Name,
+				)
 				return ctrl.Result{}, err
 			}
 			// PVC updated successfully - return and requeue
@@ -209,14 +260,31 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Check if the deployment already exists, if not create a new one
 	found := &appsv1.Deployment{}
-	err = r.Get(ctx, types.NamespacedName{Name: vllmRuntime.Name, Namespace: vllmRuntime.Namespace}, found)
+	err = r.Get(
+		ctx,
+		types.NamespacedName{Name: vllmRuntime.Name, Namespace: vllmRuntime.Namespace},
+		found,
+	)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new deployment
 		dep := r.deploymentForVLLMRuntime(vllmRuntime)
-		log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		log.Info(
+			"Creating a new Deployment",
+			"Deployment.Namespace",
+			dep.Namespace,
+			"Deployment.Name",
+			dep.Name,
+		)
 		err = r.Create(ctx, dep)
 		if err != nil {
-			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+			log.Error(
+				err,
+				"Failed to create new Deployment",
+				"Deployment.Namespace",
+				dep.Namespace,
+				"Deployment.Name",
+				dep.Name,
+			)
 			return ctrl.Result{}, err
 		}
 		// Deployment created successfully - return and requeue
@@ -228,13 +296,26 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Update the deployment if needed
 	if r.deploymentNeedsUpdate(ctx, found, vllmRuntime) {
-		log.Info("Updating Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+		log.Info(
+			"Updating Deployment",
+			"Deployment.Namespace",
+			found.Namespace,
+			"Deployment.Name",
+			found.Name,
+		)
 		// Create new deployment spec
 		newDep := r.deploymentForVLLMRuntime(vllmRuntime)
 
 		err = r.Update(ctx, newDep)
 		if err != nil {
-			log.Error(err, "Failed to update Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+			log.Error(
+				err,
+				"Failed to update Deployment",
+				"Deployment.Namespace",
+				found.Namespace,
+				"Deployment.Name",
+				found.Name,
+			)
 			return ctrl.Result{}, err
 		}
 		// Deployment updated successfully - return and requeue
@@ -251,7 +332,9 @@ func (r *VLLMRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // deploymentForVLLMRuntime returns a VLLMRuntime Deployment object
-func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *productionstackv1alpha1.VLLMRuntime) *appsv1.Deployment {
+func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
+	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
+) *appsv1.Deployment {
 	labels := map[string]string{"app": vllmRuntime.Name}
 	for k, v := range vllmRuntime.Labels {
 		labels[k] = v
@@ -336,7 +419,11 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 	}
 
 	if vllmRuntime.Spec.Model.MaxModelLen > 0 {
-		args = append(args, "--max-model-len", fmt.Sprintf("%d", vllmRuntime.Spec.Model.MaxModelLen))
+		args = append(
+			args,
+			"--max-model-len",
+			fmt.Sprintf("%d", vllmRuntime.Spec.Model.MaxModelLen),
+		)
 	}
 
 	if vllmRuntime.Spec.Model.DType != "" {
@@ -344,7 +431,11 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 	}
 
 	if vllmRuntime.Spec.VLLMConfig.TensorParallelSize > 0 {
-		args = append(args, "--tensor-parallel-size", fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.TensorParallelSize))
+		args = append(
+			args,
+			"--tensor-parallel-size",
+			fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.TensorParallelSize),
+		)
 	}
 
 	if vllmRuntime.Spec.Model.MaxNumSeqs > 0 {
@@ -352,7 +443,11 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 	}
 
 	if vllmRuntime.Spec.VLLMConfig.GpuMemoryUtilization != "" {
-		args = append(args, "--gpu_memory_utilization", vllmRuntime.Spec.VLLMConfig.GpuMemoryUtilization)
+		args = append(
+			args,
+			"--gpu_memory_utilization",
+			vllmRuntime.Spec.VLLMConfig.GpuMemoryUtilization,
+		)
 	}
 
 	if vllmRuntime.Spec.VLLMConfig.MaxLoras > 0 {
@@ -473,13 +568,21 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 	}
 
 	if vllmRuntime.Spec.DeploymentConfig.Resources.CPU != "" {
-		resources.Requests[corev1.ResourceCPU] = resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.CPU)
-		resources.Limits[corev1.ResourceCPU] = resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.CPU)
+		resources.Requests[corev1.ResourceCPU] = resource.MustParse(
+			vllmRuntime.Spec.DeploymentConfig.Resources.CPU,
+		)
+		resources.Limits[corev1.ResourceCPU] = resource.MustParse(
+			vllmRuntime.Spec.DeploymentConfig.Resources.CPU,
+		)
 	}
 
 	if vllmRuntime.Spec.DeploymentConfig.Resources.Memory != "" {
-		resources.Requests[corev1.ResourceMemory] = resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.Memory)
-		resources.Limits[corev1.ResourceMemory] = resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.Memory)
+		resources.Requests[corev1.ResourceMemory] = resource.MustParse(
+			vllmRuntime.Spec.DeploymentConfig.Resources.Memory,
+		)
+		resources.Limits[corev1.ResourceMemory] = resource.MustParse(
+			vllmRuntime.Spec.DeploymentConfig.Resources.Memory,
+		)
 	}
 
 	if vllmRuntime.Spec.DeploymentConfig.Resources.GPU != "" {
@@ -576,6 +679,18 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 		})
 	}
 
+	var affinity *corev1.Affinity
+
+	if vllmRuntime.Spec.DeploymentConfig.NodeSelectorTerms != nil {
+		affinity = &corev1.Affinity{
+			NodeAffinity: &corev1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+					NodeSelectorTerms: vllmRuntime.Spec.DeploymentConfig.NodeSelectorTerms,
+				},
+			},
+		}
+	}
+
 	containers := []corev1.Container{
 		{
 			Name:            "vllm",
@@ -610,7 +725,9 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &vllmRuntime.Spec.DeploymentConfig.Replicas,
 			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.DeploymentStrategyType(vllmRuntime.Spec.DeploymentConfig.DeployStrategy),
+				Type: appsv1.DeploymentStrategyType(
+					vllmRuntime.Spec.DeploymentConfig.DeployStrategy,
+				),
 			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
@@ -620,6 +737,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					Affinity:         affinity,
 					ImagePullSecrets: imagePullSecrets,
 					Volumes:          volumes,
 					Containers:       containers,
@@ -634,7 +752,9 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(vllmRuntime *production
 }
 
 // buildSidecarContainer builds the sidecar container configuration
-func (r *VLLMRuntimeReconciler) buildSidecarContainer(vllmRuntime *productionstackv1alpha1.VLLMRuntime) corev1.Container {
+func (r *VLLMRuntimeReconciler) buildSidecarContainer(
+	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
+) corev1.Container {
 	sidecarConfig := vllmRuntime.Spec.DeploymentConfig.SidecarConfig
 
 	// Build sidecar volume mounts
@@ -683,16 +803,24 @@ func (r *VLLMRuntimeReconciler) buildSidecarContainer(vllmRuntime *productionsta
 	}
 
 	if sidecarConfig.Resources.CPU != "" {
-		sidecarResources.Requests[corev1.ResourceCPU] = resource.MustParse(sidecarConfig.Resources.CPU)
-		sidecarResources.Limits[corev1.ResourceCPU] = resource.MustParse(sidecarConfig.Resources.CPU)
+		sidecarResources.Requests[corev1.ResourceCPU] = resource.MustParse(
+			sidecarConfig.Resources.CPU,
+		)
+		sidecarResources.Limits[corev1.ResourceCPU] = resource.MustParse(
+			sidecarConfig.Resources.CPU,
+		)
 	} else {
 		sidecarResources.Requests[corev1.ResourceCPU] = resource.MustParse("0.5")
 		sidecarResources.Limits[corev1.ResourceCPU] = resource.MustParse("0.5")
 	}
 
 	if sidecarConfig.Resources.Memory != "" {
-		sidecarResources.Requests[corev1.ResourceMemory] = resource.MustParse(sidecarConfig.Resources.Memory)
-		sidecarResources.Limits[corev1.ResourceMemory] = resource.MustParse(sidecarConfig.Resources.Memory)
+		sidecarResources.Requests[corev1.ResourceMemory] = resource.MustParse(
+			sidecarConfig.Resources.Memory,
+		)
+		sidecarResources.Limits[corev1.ResourceMemory] = resource.MustParse(
+			sidecarConfig.Resources.Memory,
+		)
 	} else {
 		sidecarResources.Requests[corev1.ResourceMemory] = resource.MustParse("128Mi")
 		sidecarResources.Limits[corev1.ResourceMemory] = resource.MustParse("128Mi")
@@ -732,7 +860,11 @@ func (r *VLLMRuntimeReconciler) buildSidecarContainer(vllmRuntime *productionsta
 }
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
-func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(ctx context.Context, dep *appsv1.Deployment, vr *productionstackv1alpha1.VLLMRuntime) bool {
+func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
+	ctx context.Context,
+	dep *appsv1.Deployment,
+	vr *productionstackv1alpha1.VLLMRuntime,
+) bool {
 
 	log := log.FromContext(ctx)
 	// Generate the expected deployment
@@ -765,7 +897,13 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(ctx context.Context, dep *
 
 	// Compare image
 	if expectedDep.Spec.Template.Spec.Containers[0].Image != dep.Spec.Template.Spec.Containers[0].Image {
-		log.Info("Image mismatch", "expected", expectedDep.Spec.Template.Spec.Containers[0].Image, "actual", dep.Spec.Template.Spec.Containers[0].Image)
+		log.Info(
+			"Image mismatch",
+			"expected",
+			expectedDep.Spec.Template.Spec.Containers[0].Image,
+			"actual",
+			dep.Spec.Template.Spec.Containers[0].Image,
+		)
 		return true
 	}
 
@@ -809,7 +947,26 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(ctx context.Context, dep *
 		expectedLMCacheConfig.DiskOffloadingBufferSize != actualDiskOffloadingBufferSize ||
 		expectedLMCacheConfig.RemoteURL != actualRemoteURL ||
 		expectedLMCacheConfig.RemoteSerde != actualRemoteSerde {
-		log.Info("LM Cache configuration mismatch", "expected", expectedLMCacheConfig, "actual", actualLMCacheConfig)
+		log.Info(
+			"LM Cache configuration mismatch",
+			"expected",
+			expectedLMCacheConfig,
+			"actual",
+			actualLMCacheConfig,
+		)
+		return true
+	}
+
+	actualAdditionalArgs := dep.Spec.Template.Spec.Affinity.NodeAffinity
+	expectedAdditionalArgs := expectedDep.Spec.Template.Spec.Affinity.NodeAffinity
+	if !reflect.DeepEqual(expectedAdditionalArgs, actualAdditionalArgs) {
+		log.Info(
+			"Node affinity mismatch",
+			"expected",
+			expectedAdditionalArgs,
+			"actual",
+			actualAdditionalArgs,
+		)
 		return true
 	}
 
@@ -817,7 +974,11 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(ctx context.Context, dep *
 }
 
 // updateStatus updates the status of the VLLMRuntime
-func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *productionstackv1alpha1.VLLMRuntime, dep *appsv1.Deployment) error {
+func (r *VLLMRuntimeReconciler) updateStatus(
+	ctx context.Context,
+	vr *productionstackv1alpha1.VLLMRuntime,
+	dep *appsv1.Deployment,
+) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Get the latest version of the VLLMRuntime
 		latestVR := &productionstackv1alpha1.VLLMRuntime{}
@@ -829,7 +990,8 @@ func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *production
 		latestVR.Status.LastUpdated = metav1.Now()
 
 		// Update model status based on deployment status
-		if dep.Status.AvailableReplicas == *dep.Spec.Replicas && dep.Status.UnavailableReplicas == 0 {
+		if dep.Status.AvailableReplicas == *dep.Spec.Replicas &&
+			dep.Status.UnavailableReplicas == 0 {
 			latestVR.Status.ModelStatus = "Ready"
 		} else if dep.Status.UpdatedReplicas > 0 && dep.Status.AvailableReplicas != *dep.Spec.Replicas && dep.Status.UnavailableReplicas > 0 {
 			// If we have updated replicas but they're not yet available, mark as updating
@@ -845,7 +1007,9 @@ func (r *VLLMRuntimeReconciler) updateStatus(ctx context.Context, vr *production
 }
 
 // serviceForVLLMRuntime returns a VLLMRuntime Service object
-func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *productionstackv1alpha1.VLLMRuntime) *corev1.Service {
+func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(
+	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
+) *corev1.Service {
 	labels := map[string]string{"app": vllmRuntime.Name}
 	for k, v := range vllmRuntime.Labels {
 		labels[k] = v
@@ -876,7 +1040,10 @@ func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(vllmRuntime *productionsta
 }
 
 // serviceNeedsUpdate checks if the service needs to be updated
-func (r *VLLMRuntimeReconciler) serviceNeedsUpdate(svc *corev1.Service, vr *productionstackv1alpha1.VLLMRuntime) bool {
+func (r *VLLMRuntimeReconciler) serviceNeedsUpdate(
+	svc *corev1.Service,
+	vr *productionstackv1alpha1.VLLMRuntime,
+) bool {
 	// Compare target port
 	expectedTargetPort := int(vr.Spec.VLLMConfig.Port)
 	actualTargetPort := svc.Spec.Ports[0].TargetPort.IntValue()
@@ -885,7 +1052,9 @@ func (r *VLLMRuntimeReconciler) serviceNeedsUpdate(svc *corev1.Service, vr *prod
 }
 
 // pvcForVLLMRuntime returns a VLLMRuntime PVC object
-func (r *VLLMRuntimeReconciler) pvcForVLLMRuntime(vllmRuntime *productionstackv1alpha1.VLLMRuntime) *corev1.PersistentVolumeClaim {
+func (r *VLLMRuntimeReconciler) pvcForVLLMRuntime(
+	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
+) *corev1.PersistentVolumeClaim {
 	labels := map[string]string{"app": vllmRuntime.Name}
 	for k, v := range vllmRuntime.Labels {
 		labels[k] = v
@@ -936,7 +1105,10 @@ func (r *VLLMRuntimeReconciler) pvcForVLLMRuntime(vllmRuntime *productionstackv1
 }
 
 // pvcNeedsUpdate checks if the PVC needs to be updated
-func (r *VLLMRuntimeReconciler) pvcNeedsUpdate(pvc *corev1.PersistentVolumeClaim, vr *productionstackv1alpha1.VLLMRuntime) bool {
+func (r *VLLMRuntimeReconciler) pvcNeedsUpdate(
+	pvc *corev1.PersistentVolumeClaim,
+	vr *productionstackv1alpha1.VLLMRuntime,
+) bool {
 	// Compare storage size
 	expectedSize := "10Gi"
 	if vr.Spec.StorageConfig.Size != "" {
