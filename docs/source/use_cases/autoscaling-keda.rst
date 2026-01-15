@@ -1,7 +1,7 @@
 Autoscaling with KEDA
 =====================
 
-This tutorial shows you how to automatically scale a vLLM deployment using `KEDA <https://keda.sh/>`_ and Prometheus-based metrics. You'll configure KEDA to monitor queue length and dynamically adjust the number of replicas based on load.
+This tutorial shows you how to automatically scale a vLLM deployment using `KEDA <https://keda.sh/>`_ and Prometheus-based metrics. With the vLLM Production Stack Helm chart (v0.1.9+), KEDA autoscaling is integrated directly into the chart, allowing you to enable it through simple ``values.yaml`` configuration.
 
 Table of Contents
 -----------------
@@ -9,12 +9,12 @@ Table of Contents
 - Prerequisites_
 - Steps_
 
-  - `1. Install the vLLM Production Stack`_
+  - `1. Install KEDA`_
   - `2. Deploy the Observability Stack`_
-  - `3. Install KEDA`_
-  - `4. Verify Metric Export`_
-  - `5. Configure the ScaledObject`_
-  - `6. Test Autoscaling`_
+  - `3. Configure and Deploy vLLM with KEDA`_
+  - `4. Verify KEDA ScaledObject Creation`_
+  - `5. Test Autoscaling`_
+  - `6. Advanced Configuration`_
   - `7. Cleanup`_
 
 - `Additional Resources`_
@@ -22,31 +22,17 @@ Table of Contents
 Prerequisites
 -------------
 
-- A working vLLM deployment on Kubernetes (see :doc:`../getting_started/quickstart`)
 - Access to a Kubernetes cluster with at least 2 GPUs
-- ``kubectl`` and ``helm`` installed
+- ``kubectl`` and ``helm`` installed (v3.0+)
 - Basic understanding of Kubernetes and Prometheus metrics
 
 Steps
 -----
 
-1. Install the vLLM Production Stack
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Install the production stack using a single pod by following the instructions in :doc:`../deployment/helm`.
-
-2. Deploy the Observability Stack
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-This stack includes Prometheus, Grafana, and necessary exporters.
-
-.. code-block:: bash
-
-   cd observability
-   bash install.sh
-
-3. Install KEDA
+1. Install KEDA
 ~~~~~~~~~~~~~~~
+
+KEDA must be installed in your cluster before enabling autoscaling in the vLLM chart.
 
 .. code-block:: bash
 
@@ -55,10 +41,23 @@ This stack includes Prometheus, Grafana, and necessary exporters.
    helm repo update
    helm install keda kedacore/keda --namespace keda
 
-4. Verify Metric Export
-~~~~~~~~~~~~~~~~~~~~~~~
+Verify KEDA is running:
 
-Check that Prometheus is scraping the queue length metric ``vllm:num_requests_waiting``.
+.. code-block:: bash
+
+   kubectl get pods -n keda
+
+2. Deploy the Observability Stack
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The observability stack (Prometheus, Grafana) is required for KEDA to query metrics.
+
+.. code-block:: bash
+
+   cd observability
+   bash install.sh
+
+Verify Prometheus is scraping the queue length metric ``vllm:num_requests_waiting``:
 
 .. code-block:: bash
 
@@ -70,115 +69,198 @@ In a separate terminal:
 
    curl -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=vllm:num_requests_waiting'
 
-Example output:
+3. Configure and Deploy vLLM with KEDA
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: json
-
-   {
-     "status": "success",
-     "data": {
-       "result": [
-         {
-           "metric": {
-             "__name__": "vllm:num_requests_waiting",
-             "pod": "vllm-llama3-deployment-vllm-xxxxx"
-           },
-           "value": [ 1749077215.034, "0" ]
-         }
-       ]
-     }
-   }
-
-This means that at the given timestamp, there were 0 pending requests in the queue.
-
-5. Configure the ScaledObject
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The following ``ScaledObject`` configuration is provided in ``tutorials/assets/values-19-keda.yaml``. Review its contents:
+Create a ``values.yaml`` file with KEDA autoscaling enabled for your model:
 
 .. code-block:: yaml
 
-   apiVersion: keda.sh/v1alpha1
-   kind: ScaledObject
-   metadata:
-     name: vllm-scaledobject
-     namespace: default
-   spec:
-     scaleTargetRef:
-       name: vllm-llama3-deployment-vllm
-     minReplicaCount: 1
-     maxReplicaCount: 2
-     pollingInterval: 15
-     cooldownPeriod: 30
+   servingEngineSpec:
+     enableEngine: true
+     modelSpec:
+       - name: "llama3"
+         repository: "lmcache/vllm-openai"
+         tag: "latest"
+         modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+         replicaCount: 1
+         requestCPU: 10
+         requestMemory: "64Gi"
+         requestGPU: 1
+         
+         # Enable KEDA autoscaling
+         keda:
+           enabled: true
+           minReplicaCount: 1
+           maxReplicaCount: 3
+           pollingInterval: 15
+           cooldownPeriod: 360
+           triggers:
+             - type: prometheus
+               metadata:
+                 serverAddress: http://prometheus-operated.monitoring.svc:9090
+                 metricName: vllm:num_requests_waiting
+                 query: vllm:num_requests_waiting
+                 threshold: '5'
+
+Deploy or upgrade the chart:
+
+.. code-block:: bash
+
+   helm upgrade --install vllm vllm/vllm-stack -f values.yaml
+
+This configuration tells KEDA to:
+
+- Monitor the ``vllm:num_requests_waiting`` metric from Prometheus
+- Maintain between 1 and 3 replicas
+- Scale up when the queue exceeds 5 pending requests
+- Check metrics every 15 seconds
+- Wait 360 seconds before scaling down after scaling up
+
+4. Verify KEDA ScaledObject Creation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Check that the Helm chart created the ScaledObject resource:
+
+.. code-block:: bash
+
+   kubectl get scaledobjects
+
+You should see:
+
+.. code-block:: text
+
+   NAME                        SCALETARGETKIND      SCALETARGETNAME                  MIN   MAX   TRIGGERS     AUTHENTICATION   READY   ACTIVE   FALLBACK   PAUSED    AGE
+   vllm-llama3-scaledobject   apps/v1.Deployment   vllm-llama3-deployment-vllm      1     3     prometheus                    True    False    Unknown    Unknown   30s
+
+View the created HPA:
+
+.. code-block:: bash
+
+   kubectl get hpa
+
+Expected output:
+
+.. code-block:: text
+
+   NAME                            REFERENCE                                TARGETS     MINPODS   MAXPODS   REPLICAS
+   keda-hpa-vllm-llama3-scaledobject   Deployment/vllm-llama3-deployment-vllm   0/5 (avg)   1         3         1
+
+5. Test Autoscaling
+~~~~~~~~~~~~~~~~~~~
+
+Watch the HPA in real-time:
+
+.. code-block:: bash
+
+   kubectl get hpa -n default -w
+
+Generate load to trigger autoscaling. Port-forward to the router service:
+
+.. code-block:: bash
+
+   kubectl port-forward svc/vllm-router-service 30080:80
+
+In a separate terminal, run a load generator:
+
+.. code-block:: bash
+
+   python3 tutorials/assets/example-10-load-generator.py --num-requests 100 --prompt-len 3000
+
+Within a few minutes, you should see the ``REPLICAS`` value increase as KEDA scales up to handle the load.
+
+6. Advanced Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Scale-to-Zero
+^^^^^^^^^^^^^
+
+Enable scale-to-zero by setting ``minReplicaCount: 0`` and adding a traffic-based keepalive trigger:
+
+.. code-block:: yaml
+
+   keda:
+     enabled: true
+     minReplicaCount: 0  # Allow scaling to zero
+     maxReplicaCount: 5
      triggers:
+       # Queue-based scaling
        - type: prometheus
          metadata:
            serverAddress: http://prometheus-operated.monitoring.svc:9090
            metricName: vllm:num_requests_waiting
            query: vllm:num_requests_waiting
            threshold: '5'
+       # Traffic-based keepalive (prevents scale-to-zero when traffic exists)
+       - type: prometheus
+         metadata:
+           serverAddress: http://prometheus-operated.monitoring.svc:9090
+           metricName: vllm:incoming_keepalive
+           query: sum(rate(vllm:num_incoming_requests_total[1m]) > bool 0)
+           threshold: "1"
 
-Apply the ScaledObject:
+Custom HPA Behavior
+^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: bash
+Control scaling behavior with custom HPA policies:
 
-   cd ../tutorials
-   kubectl apply -f assets/values-19-keda.yaml
+.. code-block:: yaml
 
-This tells KEDA to:
+   keda:
+     enabled: true
+     minReplicaCount: 1
+     maxReplicaCount: 5
+     advanced:
+       horizontalPodAutoscalerConfig:
+         behavior:
+           scaleDown:
+             stabilizationWindowSeconds: 300
+             policies:
+               - type: Percent
+                 value: 50
+                 periodSeconds: 60
 
-- Monitor ``vllm:num_requests_waiting``
-- Scale between 1 and 2 replicas
-- Scale up when the queue exceeds 5 requests
+Fallback Configuration
+^^^^^^^^^^^^^^^^^^^^^^
 
-6. Test Autoscaling
-~~~~~~~~~~~~~~~~~~~
+Configure fallback behavior when metrics are unavailable:
 
-Watch the deployment:
+.. code-block:: yaml
 
-.. code-block:: bash
+   keda:
+     enabled: true
+     fallback:
+       failureThreshold: 3
+       replicas: 2
 
-   kubectl get hpa -n default -w
-
-You should initially see:
-
-.. code-block:: text
-
-   NAME                         REFERENCE                                TARGETS     MINPODS   MAXPODS   REPLICAS
-   keda-hpa-vllm-scaledobject   Deployment/vllm-llama3-deployment-vllm   0/5 (avg)   1         2         1
-
-``TARGETS`` shows the current metric value vs. the target threshold.
-``0/5 (avg)`` means the current value of ``vllm:num_requests_waiting`` is 0, and the threshold is 5.
-
-Generate load:
-
-.. code-block:: bash
-
-   kubectl port-forward svc/vllm-router-service 30080:80
-
-In a separate terminal:
-
-.. code-block:: bash
-
-   python3 assets/example-10-load-generator.py --num-requests 100 --prompt-len 3000
-
-Within a few minutes, the ``REPLICAS`` value should increase to 2.
+For more configuration options, see the `Helm chart README <https://github.com/vllm-project/production-stack/blob/main/helm/README.md#keda-autoscaling-configuration>`_.
 
 7. Cleanup
 ~~~~~~~~~~
 
-To remove KEDA configuration and observability components:
+To disable KEDA autoscaling, update your ``values.yaml`` to set ``keda.enabled: false`` and upgrade:
 
 .. code-block:: bash
 
-   kubectl delete -f assets/values-19-keda.yaml
+   helm upgrade vllm vllm/vllm-stack -f values.yaml
+
+To completely remove KEDA from the cluster:
+
+.. code-block:: bash
+
    helm uninstall keda -n keda
    kubectl delete namespace keda
 
-   cd ../observability
+To remove the observability stack:
+
+.. code-block:: bash
+
+   cd observability
    bash uninstall.sh
 
 Additional Resources
 --------------------
 
 - `KEDA Documentation <https://keda.sh/docs/>`_
+- `KEDA ScaledObject Specification <https://keda.sh/docs/2.18/reference/scaledobject-spec/>`_
+- `Helm Chart KEDA Configuration <https://github.com/vllm-project/production-stack/blob/main/helm/README.md#keda-autoscaling-configuration>`_
