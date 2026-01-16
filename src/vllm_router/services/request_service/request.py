@@ -568,12 +568,14 @@ async def route_orchestrated_disaggregated_request(
     """
     Orchestrated disaggregated inference following NxDI's toy_proxy_server pattern.
     
-    Flow:
-    1. Send request to Prefill endpoint (with max_tokens=1)
-    2. Get response with KV cache metadata
-    3. Add disagg_prefill_resp to request
-    4. Send to Decode endpoint
-    5. Stream response back to client
+    Flow (matches NxDI toy_proxy_server.py):
+    1. Send request to Prefill endpoint with kv_transfer_params and max_tokens=1
+    2. Get response containing kv_transfer_params with KV cache metadata
+    3. Extract kv_transfer_params, set remote_host to prefill endpoint
+    4. Forward kv_transfer_params to Decode endpoint
+    5. Stream decode response back to client
+    
+    Reference: NxDI/examples/vllm/disaggregated_inference/toy_proxy_server.py
     """
     in_router_time = time.time()
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
@@ -611,10 +613,25 @@ async def route_orchestrated_disaggregated_request(
     logger.info(f"[{request_id}] Sending prefill request to {prefill_api_url}")
     
     # Create prefill request with max_tokens=1 to optimize prefill step
+    # Also add kv_transfer_params to enable disaggregated mode on prefill
+    # Reference: NxDI toy_proxy_server.py
     prefill_request_json = request_json.copy()
     prefill_request_json["max_tokens"] = 1
     if "max_completion_tokens" in prefill_request_json:
         prefill_request_json["max_completion_tokens"] = 1
+    # Enable disaggregated inference mode - prefill will return kv_transfer_params
+    prefill_request_json["kv_transfer_params"] = {
+        "do_remote_decode": True,
+        "do_remote_prefill": False,
+        "remote_engine_id": None,
+        "remote_block_ids": None,
+        "remote_host": None,
+        "remote_port": None
+    }
+    # Disable streaming for prefill to get full response with kv_transfer_params
+    prefill_request_json["stream"] = False
+    if "stream_options" in prefill_request_json:
+        del prefill_request_json["stream_options"]
     
     st = time.time()
     is_streaming = request_json.get("stream", False)
@@ -647,9 +664,17 @@ async def route_orchestrated_disaggregated_request(
             logger.info(f"[{request_id}] Prefill completed in {et - st:.4f}s (TTFT)")
             logger.debug(f"[{request_id}] Prefill response keys: {prefill_data.keys() if isinstance(prefill_data, dict) else 'not a dict'}")
         
-        # Step 2: Add prefill metadata and send to Decode
+        # Step 2: Extract kv_transfer_params and send to Decode
+        # kv_transfer_params is the vLLM/NxDI-supported field for KV cache handoff
+        # Reference: NxDI toy_proxy_server.py
         decode_request = request_json.copy()
-        decode_request["disagg_prefill_resp"] = prefill_data
+        kv_transfer_params = prefill_data.get("kv_transfer_params", {})
+        if kv_transfer_params:
+            # Set remote_host to prefill endpoint for KV cache retrieval
+            kv_transfer_params["remote_host"] = prefill_url.split("://")[1].split(":")[0]
+            decode_request["kv_transfer_params"] = kv_transfer_params
+        else:
+            logger.warning(f"[{request_id}] Prefill response did not contain kv_transfer_params")
         
         decode_api_url = f"{decode_url}{endpoint}"
         logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
