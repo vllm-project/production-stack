@@ -527,13 +527,15 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
     Unlike DisaggregatedPrefillRouter (which requires 2 separate client requests),
     this router handles the entire flow internally:
     1. Receives request from client
-    2. Forwards to Prefill endpoint
-    3. Gets prefill response with KV cache metadata
-    4. Adds disagg_prefill_resp to request and forwards to Decode
+    2. Forwards to Prefill endpoint with kv_transfer_params to enable disaggregated mode
+    3. Gets prefill response with kv_transfer_params containing KV cache metadata
+    4. Extracts kv_transfer_params, sets remote_host, and forwards to Decode
     5. Streams decode response back to client
     
     This is designed for NxDI (Neuronx Distributed Inference) on AWS Trainium,
-    similar to NxDI's toy_proxy_server.py pattern.
+    following NxDI's toy_proxy_server.py pattern.
+    
+    Reference: NxDI/examples/vllm/disaggregated_inference/toy_proxy_server.py
     
     Load balancing: Uses round-robin across available prefill and decode pods.
     """
