@@ -20,8 +20,9 @@ Before running this setup, ensure you have:
 To run the service, go into the `deployment_on_cloud/oci` folder and run:
 
 ```bash
+cd deployment_on_cloud/oci
 export OCI_COMPARTMENT_ID="ocid1.compartment.oc1..xxxxx"
-./entry_point.sh setup production_stack_specification.yaml
+./entry_point.sh setup ./production_stack_specification.yaml
 ```
 
 Clean up the service with:
@@ -90,6 +91,7 @@ RT_ID=$(oci network route-table create \
 Create an OKE cluster with the OCI CLI:
 
 ```bash
+# Check OCI documentation for supported Kubernetes versions
 CLUSTER_ID=$(oci ce cluster create \
     --compartment-id "${OCI_COMPARTMENT_ID}" \
     --name "${CLUSTER_NAME}" \

@@ -103,10 +103,11 @@ def parse_args():
         help="Delete existing deployment with same name",
     )
     parser.add_argument(
-        "--wait",
-        action="store_true",
+        "--no-wait",
+        action="store_false",
+        dest="wait",
         default=True,
-        help="Wait for deployment to complete",
+        help="Do not wait for deployment to complete",
     )
 
     return parser.parse_args()
@@ -136,8 +137,8 @@ def create_deployment(args) -> ModelDeployment:
 
     # Get HuggingFace token
     hf_token = os.environ.get("HF_TOKEN", "")
-    if not hf_token and "llama" in args.model_name.lower():
-        print("Warning: HF_TOKEN not set. Llama models require authentication.")
+    if not hf_token and "/" in args.model_name:
+        print("Warning: HF_TOKEN not set. Hugging Face models may require authentication.")
 
     # Configure container runtime
     container_runtime = ModelDeploymentContainerRuntime()

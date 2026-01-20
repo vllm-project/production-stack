@@ -26,10 +26,10 @@ cd deployment_on_cloud/oci/
 ./entry_point.sh setup
 ```
 
-Or with a custom Helm values file:
+Or with a custom Helm values file (run from the `deployment_on_cloud/oci/` directory):
 
 ```bash
-./entry_point.sh setup production_stack_specification.yaml
+./entry_point.sh setup ./production_stack_specification.yaml
 ```
 
 ### Clean up
