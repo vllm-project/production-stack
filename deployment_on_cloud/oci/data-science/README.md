@@ -122,6 +122,8 @@ RUN pip install oci oracle-ads
 COPY score.py /opt/ds/model/deployed_model/score.py
 
 # Set entrypoint for Model Deployment
+# Note: This ENTRYPOINT is for the vLLM OpenAI-compatible API server.
+# If using score.py for ADS SDK deployments, the entry point is handled by the ADS runtime.
 ENTRYPOINT ["python", "-m", "vllm.entrypoints.openai.api_server"]
 ```
 
@@ -156,7 +158,8 @@ container_runtime.server_port = 8000
 container_runtime.health_check_port = 8000
 container_runtime.env = {
     "MODEL_NAME": "meta-llama/Llama-3.1-8B-Instruct",
-    "HF_TOKEN": "your-huggingface-token",
+    # Note: For production, use OCI Vault secrets instead of hardcoding tokens
+    "HF_TOKEN": "your-huggingface-token",  # Replace with actual token
     "VLLM_MAX_MODEL_LEN": "4096",
 }
 

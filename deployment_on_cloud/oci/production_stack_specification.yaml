@@ -16,6 +16,7 @@ servingEngineSpec:
     requestGPU: 1
 
     # Get token from https://huggingface.co/settings/tokens
+    # Replace with your actual Hugging Face token or use a Kubernetes Secret for production
     hf_token: "YOUR_HUGGINGFACE_TOKEN"
 
     # Storage configuration for OCI Block Volumes

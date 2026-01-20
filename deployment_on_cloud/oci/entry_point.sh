@@ -242,7 +242,7 @@ get_gpu_image() {
     fi
 
     # Get Oracle Linux GPU image for OKE
-    oci compute image list \
+    oci_cmd compute image list \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
         --operating-system "Oracle Linux" \
         --shape "${GPU_SHAPE}" \
@@ -441,6 +441,27 @@ configure_kubectl() {
             --token-version 2.0.0 \
             --kube-endpoint PRIVATE_ENDPOINT
 
+        # Fix kubeconfig for non-DEFAULT profiles
+        if [[ "${OCI_PROFILE}" != "DEFAULT" ]]; then
+            echo "Updating kubeconfig to use OCI profile: ${OCI_PROFILE}"
+            KUBE_USER=$(kubectl config view -o jsonpath="{.contexts[?(@.name=='$(kubectl config current-context)')].context.user}" 2>/dev/null || echo "")
+            if [[ -n "${KUBE_USER}" ]]; then
+                # Add --profile argument to OCI exec auth
+                kubectl config set-credentials "${KUBE_USER}" \
+                    --exec-api-version=client.authentication.k8s.io/v1beta1 \
+                    --exec-command=oci \
+                    --exec-arg="--profile" \
+                    --exec-arg="${OCI_PROFILE}" \
+                    --exec-arg="ce" \
+                    --exec-arg="cluster" \
+                    --exec-arg="generate-token" \
+                    --exec-arg="--cluster-id" \
+                    --exec-arg="${CLUSTER_ID}" \
+                    --exec-arg="--region" \
+                    --exec-arg="${OCI_REGION}"
+            fi
+        fi
+
         # Get the private endpoint
         PRIVATE_ENDPOINT=$(oci_cmd ce cluster get --cluster-id "${CLUSTER_ID}" \
             --query "data.endpoints.\"private-endpoint\"" --raw-output)
@@ -477,6 +498,26 @@ configure_kubectl() {
             --file "${HOME}/.kube/config" \
             --token-version 2.0.0 \
             --kube-endpoint PUBLIC_ENDPOINT
+
+        # Fix kubeconfig for non-DEFAULT profiles
+        if [[ "${OCI_PROFILE}" != "DEFAULT" ]]; then
+            echo "Updating kubeconfig to use OCI profile: ${OCI_PROFILE}"
+            KUBE_USER=$(kubectl config view -o jsonpath="{.contexts[?(@.name=='$(kubectl config current-context)')].context.user}" 2>/dev/null || echo "")
+            if [[ -n "${KUBE_USER}" ]]; then
+                kubectl config set-credentials "${KUBE_USER}" \
+                    --exec-api-version=client.authentication.k8s.io/v1beta1 \
+                    --exec-command=oci \
+                    --exec-arg="--profile" \
+                    --exec-arg="${OCI_PROFILE}" \
+                    --exec-arg="ce" \
+                    --exec-arg="cluster" \
+                    --exec-arg="generate-token" \
+                    --exec-arg="--cluster-id" \
+                    --exec-arg="${CLUSTER_ID}" \
+                    --exec-arg="--region" \
+                    --exec-arg="${OCI_REGION}"
+            fi
+        fi
 
         echo "Waiting for nodes to be ready..."
         kubectl wait --for=condition=Ready nodes --all --timeout=600s || true
@@ -576,14 +617,35 @@ cleanup() {
 
         # Wait for node pools to be deleted
         echo "Waiting for node pools to be deleted..."
-        sleep 120
+        for i in {1..20}; do
+            REMAINING=$(oci_cmd ce node-pool list \
+                --compartment-id "${OCI_COMPARTMENT_ID}" \
+                --cluster-id "${CLUSTER_ID}" \
+                --query "length(data)" --raw-output 2>/dev/null || echo "0")
+            if [[ "${REMAINING}" == "0" || -z "${REMAINING}" ]]; then
+                echo "All node pools deleted."
+                break
+            fi
+            echo "  Waiting for ${REMAINING} node pool(s) to be deleted..."
+            sleep 30
+        done
 
         # Delete cluster
         echo "Deleting OKE cluster: ${CLUSTER_ID}"
         oci_cmd ce cluster delete --cluster-id "${CLUSTER_ID}" --force 2>/dev/null || true
 
+        # Poll for cluster deletion instead of fixed sleep
         echo "Waiting for cluster to be deleted..."
-        sleep 180
+        for i in {1..40}; do
+            STATE=$(oci_cmd ce cluster get --cluster-id "${CLUSTER_ID}" \
+                --query "data.\"lifecycle-state\"" --raw-output 2>/dev/null || echo "DELETED")
+            if [[ "${STATE}" == "DELETED" || "${STATE}" == "null" || -z "${STATE}" ]]; then
+                echo "Cluster deleted."
+                break
+            fi
+            echo "  Cluster state: ${STATE} (waiting...)"
+            sleep 30
+        done
     else
         echo "No active cluster found."
     fi
@@ -598,22 +660,31 @@ cleanup() {
     if [[ -n "${VCN_ID}" && "${VCN_ID}" != "null" ]]; then
         echo "Cleaning up VCN resources: ${VCN_ID}"
 
-        # Delete subnets first
+        # Delete subnets first (with retry logic for dependencies)
         echo "Deleting subnets..."
-        SUBNETS_JSON=$(oci_cmd network subnet list \
-            --compartment-id "${OCI_COMPARTMENT_ID}" \
-            --vcn-id "${VCN_ID}" \
-            --query "data[*].id" 2>/dev/null || echo "[]")
+        for attempt in {1..5}; do
+            SUBNETS_JSON=$(oci_cmd network subnet list \
+                --compartment-id "${OCI_COMPARTMENT_ID}" \
+                --vcn-id "${VCN_ID}" \
+                --query "data[*].id" 2>/dev/null || echo "[]")
 
-        echo "${SUBNETS_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r SUBNET_ID; do
-            if [[ -n "${SUBNET_ID}" ]]; then
-                echo "Deleting subnet: ${SUBNET_ID}"
-                oci_cmd network subnet delete --subnet-id "${SUBNET_ID}" --force 2>/dev/null || true
+            SUBNET_COUNT=$(echo "${SUBNETS_JSON}" | jq -r '.[]?' 2>/dev/null | wc -l | tr -d ' ')
+            if [[ "${SUBNET_COUNT}" == "0" ]]; then
+                echo "All subnets deleted."
+                break
             fi
-        done
 
-        echo "Waiting for subnets to be deleted..."
-        sleep 30
+            echo "  Attempt ${attempt}/5: Deleting ${SUBNET_COUNT} subnet(s)..."
+            echo "${SUBNETS_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r SUBNET_ID; do
+                if [[ -n "${SUBNET_ID}" ]]; then
+                    echo "    Deleting subnet: ${SUBNET_ID}"
+                    oci_cmd network subnet delete --subnet-id "${SUBNET_ID}" --force 2>/dev/null || true
+                fi
+            done
+
+            echo "  Waiting for subnets to be deleted..."
+            sleep 30
+        done
 
         # Clear route table rules before deleting gateways
         echo "Clearing route table rules..."

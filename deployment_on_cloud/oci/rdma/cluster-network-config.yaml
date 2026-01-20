@@ -19,6 +19,7 @@ servingEngineSpec:
     requestMemory: "512Gi"
     requestGPU: 8
 
+    # Replace with your actual Hugging Face token or use a Kubernetes Secret for production
     hf_token: "YOUR_HUGGINGFACE_TOKEN"
 
     pvcStorage: "1000Gi"

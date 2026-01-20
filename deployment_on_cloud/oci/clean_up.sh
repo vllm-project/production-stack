@@ -18,20 +18,36 @@ fi
 echo "Starting cleanup for cluster: ${CLUSTER_NAME}"
 
 # Uninstall Helm release
-echo "Uninstalling vLLM Helm release..."
-helm uninstall vllm 2>/dev/null || echo "No Helm release found"
+if helm status vllm &>/dev/null; then
+    echo "Uninstalling vLLM Helm release..."
+    helm uninstall vllm
+else
+    echo "No Helm release found to uninstall."
+fi
 
 # Delete all PVCs
-echo "Deleting PVCs..."
-kubectl delete pvc --all 2>/dev/null || echo "No PVCs found"
+if kubectl get pvc --all-namespaces -o name 2>/dev/null | grep -q .; then
+    echo "Deleting PVCs..."
+    kubectl delete pvc --all
+else
+    echo "No PVCs found to delete."
+fi
 
 # Delete all PVs
-echo "Deleting PVs..."
-kubectl delete pv --all 2>/dev/null || echo "No PVs found"
+if kubectl get pv -o name 2>/dev/null | grep -q .; then
+    echo "Deleting PVs..."
+    kubectl delete pv --all
+else
+    echo "No PVs found to delete."
+fi
 
 # Delete custom resources
-echo "Deleting custom resources..."
-kubectl delete deployments,services,configmaps,secrets -l app.kubernetes.io/name=vllm --all 2>/dev/null || true
+if kubectl get deployments,services,configmaps,secrets -l app.kubernetes.io/name=vllm --all-namespaces -o name 2>/dev/null | grep -q .; then
+    echo "Deleting custom resources..."
+    kubectl delete deployments,services,configmaps,secrets -l app.kubernetes.io/name=vllm --all
+else
+    echo "No custom vLLM resources found to delete."
+fi
 
 echo ""
 echo "Kubernetes resources cleaned up."
