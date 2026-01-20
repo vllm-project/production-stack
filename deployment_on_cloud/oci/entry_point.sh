@@ -775,13 +775,31 @@ setup)
     deploy_oke
     add_gpu_nodepool
     configure_kubectl
-    install_nvidia_device_plugin
-    apply_storage_class
-    deploy_vllm_stack "${2:-}"
-    echo ""
-    echo "Setup complete! Your vLLM stack is ready."
-    echo "Check pods with: kubectl get pods"
-    echo "Get service endpoint: kubectl get svc"
+    if [[ "${PRIVATE_CLUSTER}" == "true" ]]; then
+        echo ""
+        echo "=============================================="
+        echo "PRIVATE CLUSTER SETUP COMPLETE"
+        echo "=============================================="
+        echo ""
+        echo "Infrastructure created successfully!"
+        echo "To complete the deployment, establish SSH tunnel first, then run:"
+        echo ""
+        echo "  # After SSH tunnel is active:"
+        echo "  kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.1/nvidia-device-plugin.yml"
+        echo "  kubectl apply -f ${SCRIPT_DIR}/oci-block-storage-sc.yaml"
+        echo "  helm repo add vllm https://vllm-project.github.io/production-stack"
+        echo "  helm repo update"
+        echo "  helm upgrade -i --wait vllm vllm/vllm-stack -f ${2:-${SCRIPT_DIR}/production_stack_specification.yaml}"
+        echo ""
+    else
+        install_nvidia_device_plugin
+        apply_storage_class
+        deploy_vllm_stack "${2:-}"
+        echo ""
+        echo "Setup complete! Your vLLM stack is ready."
+        echo "Check pods with: kubectl get pods"
+        echo "Get service endpoint: kubectl get svc"
+    fi
     ;;
 cleanup)
     validate_env
