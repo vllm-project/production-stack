@@ -247,6 +247,8 @@ class KvawareRouter(RoutingInterface):
         health_check_interval: float = 5.0,
         lmcache_worker_timeout: float = 30.0,
     ):
+        if session_key is None:
+            raise ValueError("KvawareRouter must be initialized with a session_key")
         self.lmcache_controller_port = lmcache_controller_port
         logger.info(
             f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
