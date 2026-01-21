@@ -244,8 +244,8 @@ class KvawareRouter(RoutingInterface):
         lmcache_controller_port: int,
         session_key: str,
         kv_aware_threshold: int = 2000,
-        health_check_interval: float = 5.0,
-        lmcache_worker_timeout: float = 30.0,
+        health_check_interval: int = 5,
+        lmcache_worker_timeout: int = 30,
     ):
         self.lmcache_controller_port = lmcache_controller_port
         logger.info(
