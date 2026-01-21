@@ -139,14 +139,21 @@ get_or_create_network() {
             PUBLIC_RT_ID="${RT_ID}"
         fi
 
-        # Create Security List
+        # Create Security List with OKE-required rules
+        # Includes: SSH, VCN CIDR, Kubernetes pods CIDR, services CIDR, and ICMP for path MTU
         echo "Creating Security List..."
         SL_ID=$(oci_cmd network security-list create \
             --compartment-id "${OCI_COMPARTMENT_ID}" \
             --vcn-id "${VCN_ID}" \
             --display-name "${CLUSTER_NAME}-sl" \
             --egress-security-rules '[{"destination": "0.0.0.0/0", "protocol": "all", "isStateless": false}]' \
-            --ingress-security-rules '[{"source": "0.0.0.0/0", "protocol": "6", "isStateless": false, "tcpOptions": {"destinationPortRange": {"min": 22, "max": 22}}}, {"source": "10.0.0.0/16", "protocol": "all", "isStateless": false}]' \
+            --ingress-security-rules '[
+                {"source": "0.0.0.0/0", "protocol": "6", "isStateless": false, "tcpOptions": {"destinationPortRange": {"min": 22, "max": 22}}, "description": "SSH access"},
+                {"source": "10.0.0.0/16", "protocol": "all", "isStateless": false, "description": "VCN internal traffic"},
+                {"source": "10.244.0.0/16", "protocol": "all", "isStateless": false, "description": "Kubernetes pods CIDR"},
+                {"source": "10.96.0.0/16", "protocol": "all", "isStateless": false, "description": "Kubernetes services CIDR"},
+                {"source": "0.0.0.0/0", "protocol": "1", "isStateless": false, "icmpOptions": {"type": 3, "code": 4}, "description": "Path MTU discovery"}
+            ]' \
             --query "data.id" \
             --raw-output)
 
