@@ -9,7 +9,10 @@ OCI_PROFILE="${OCI_PROFILE:-DEFAULT}"
 OCI_COMPARTMENT_ID="${OCI_COMPARTMENT_ID:-}"
 OCI_REGION="${OCI_REGION:-us-ashburn-1}"
 CLUSTER_NAME="${CLUSTER_NAME:-production-stack}"
-KUBERNETES_VERSION="${KUBERNETES_VERSION:-v1.31.1}"
+# Note: Check OCI documentation for currently supported Kubernetes versions
+# OKE GPU images have specific K8s version requirements (e.g., OKE-1.31.10)
+# See: https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengaboutk8sversions.htm
+KUBERNETES_VERSION="${KUBERNETES_VERSION:-v1.31.10}"
 
 GPU_NODE_POOL_NAME="${GPU_NODE_POOL_NAME:-gpu-pool}"
 GPU_NODE_COUNT="${GPU_NODE_COUNT:-1}"
@@ -95,6 +98,14 @@ get_or_create_network() {
             --query "data.id" \
             --raw-output)
 
+        # Get the service CIDR for Oracle Services Network (needed for security list egress rules)
+        SERVICE_ID=$(oci_cmd network service list \
+            --query "data[?contains(\"cidr-block\", 'all') && contains(\"cidr-block\", 'services')].id | [0]" \
+            --raw-output)
+        SERVICE_CIDR=$(oci_cmd network service list \
+            --query "data[?contains(\"cidr-block\", 'all') && contains(\"cidr-block\", 'services')].\"cidr-block\" | [0]" \
+            --raw-output)
+
         if [[ "${PRIVATE_CLUSTER}" == "true" ]]; then
             # Create NAT Gateway for private subnets
             echo "Creating NAT Gateway (for private cluster)..."
@@ -105,13 +116,24 @@ get_or_create_network() {
                 --query "data.id" \
                 --raw-output)
 
-            # Create private route table (uses NAT Gateway)
+            # Create Service Gateway for Oracle Services Network access
+            # This is required for OKE nodes to access OCIR, Object Storage, and other OCI services
+            echo "Creating Service Gateway..."
+            SGW_ID=$(oci_cmd network service-gateway create \
+                --compartment-id "${OCI_COMPARTMENT_ID}" \
+                --vcn-id "${VCN_ID}" \
+                --display-name "${CLUSTER_NAME}-sgw" \
+                --services "[{\"serviceId\": \"${SERVICE_ID}\"}]" \
+                --query "data.id" \
+                --raw-output)
+
+            # Create private route table (uses NAT Gateway + Service Gateway)
             echo "Creating Private Route Table..."
             PRIVATE_RT_ID=$(oci_cmd network route-table create \
                 --compartment-id "${OCI_COMPARTMENT_ID}" \
                 --vcn-id "${VCN_ID}" \
                 --display-name "${CLUSTER_NAME}-private-rt" \
-                --route-rules "[{\"cidrBlock\": \"0.0.0.0/0\", \"networkEntityId\": \"${NAT_ID}\"}]" \
+                --route-rules "[{\"cidrBlock\": \"0.0.0.0/0\", \"networkEntityId\": \"${NAT_ID}\"}, {\"destination\": \"${SERVICE_CIDR}\", \"destinationType\": \"SERVICE_CIDR_BLOCK\", \"networkEntityId\": \"${SGW_ID}\"}]" \
                 --query "data.id" \
                 --raw-output)
 
@@ -141,14 +163,15 @@ get_or_create_network() {
 
         # Create Security List with OKE-required rules
         # Includes: SSH, VCN CIDR, Kubernetes pods CIDR, services CIDR, and ICMP for path MTU
+        # Egress includes Oracle Services Network for OKE node registration
         echo "Creating Security List..."
         SL_ID=$(oci_cmd network security-list create \
             --compartment-id "${OCI_COMPARTMENT_ID}" \
             --vcn-id "${VCN_ID}" \
             --display-name "${CLUSTER_NAME}-sl" \
-            --egress-security-rules '[{"destination": "0.0.0.0/0", "protocol": "all", "isStateless": false}]' \
+            --egress-security-rules "[{\"destination\": \"0.0.0.0/0\", \"protocol\": \"all\", \"isStateless\": false, \"description\": \"Internet via NAT\"}, {\"destination\": \"${SERVICE_CIDR}\", \"destinationType\": \"SERVICE_CIDR_BLOCK\", \"protocol\": \"6\", \"isStateless\": false, \"description\": \"Oracle Services via Service Gateway\"}]" \
             --ingress-security-rules '[
-                {"source": "0.0.0.0/0", "protocol": "6", "isStateless": false, "tcpOptions": {"destinationPortRange": {"min": 22, "max": 22}}, "description": "SSH access"},
+                {"source": "10.0.0.0/16", "protocol": "6", "isStateless": false, "tcpOptions": {"destinationPortRange": {"min": 22, "max": 22}}, "description": "SSH access from VCN only"},
                 {"source": "10.0.0.0/16", "protocol": "all", "isStateless": false, "description": "VCN internal traffic"},
                 {"source": "10.244.0.0/16", "protocol": "all", "isStateless": false, "description": "Kubernetes pods CIDR"},
                 {"source": "10.96.0.0/16", "protocol": "all", "isStateless": false, "description": "Kubernetes services CIDR"},
@@ -241,14 +264,66 @@ get_or_create_network() {
     fi
 }
 
-# Get GPU-compatible image
+# Get GPU-compatible OKE image
+# IMPORTANT: Must use OKE-specific images (contain "OKE" in name) which have kubelet pre-installed
+# Regular GPU images don't have OKE components and nodes will fail to register
 get_gpu_image() {
     if [[ -n "${GPU_IMAGE_ID}" ]]; then
         echo "${GPU_IMAGE_ID}"
         return
     fi
 
-    # Get Oracle Linux GPU image for OKE
+    # Extract full version without 'v' prefix (e.g., "v1.31.10" -> "1.31.10")
+    local K8S_VERSION
+    K8S_VERSION=$(echo "${KUBERNETES_VERSION}" | sed 's/^v//')
+
+    # Get OKE-specific GPU image from node-pool-options API
+    # These images have kubelet and OKE node registration components pre-installed
+    # Search for exact version match (e.g., OKE-1.31.10)
+    local IMAGE_ID
+    IMAGE_ID=$(oci_cmd ce node-pool-options get \
+        --node-pool-option-id all \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --query "data.sources[?contains(\"source-name\", 'GPU') && contains(\"source-name\", 'OKE-${K8S_VERSION}') && !contains(\"source-name\", 'aarch64')].\"image-id\" | [0]" \
+        --raw-output 2>/dev/null)
+
+    if [[ -n "${IMAGE_ID}" && "${IMAGE_ID}" != "null" ]]; then
+        echo "${IMAGE_ID}"
+        return
+    fi
+
+    # Fallback: try major.minor version match (e.g., OKE-1.31)
+    local K8S_MAJOR_MINOR
+    K8S_MAJOR_MINOR=$(echo "${K8S_VERSION}" | cut -d. -f1,2)
+    IMAGE_ID=$(oci_cmd ce node-pool-options get \
+        --node-pool-option-id all \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --query "data.sources[?contains(\"source-name\", 'GPU') && contains(\"source-name\", 'OKE-${K8S_MAJOR_MINOR}') && !contains(\"source-name\", 'aarch64')].\"image-id\" | [0]" \
+        --raw-output 2>/dev/null)
+
+    if [[ -n "${IMAGE_ID}" && "${IMAGE_ID}" != "null" ]]; then
+        # Warn that we're using a different patch version
+        echo "WARNING: No OKE GPU image found for K8s ${K8S_VERSION}, using closest match" >&2
+        echo "${IMAGE_ID}"
+        return
+    fi
+
+    # Last fallback: try any OKE GPU image
+    IMAGE_ID=$(oci_cmd ce node-pool-options get \
+        --node-pool-option-id all \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --query "data.sources[?contains(\"source-name\", 'GPU') && contains(\"source-name\", 'OKE') && !contains(\"source-name\", 'aarch64')].\"image-id\" | [0]" \
+        --raw-output 2>/dev/null)
+
+    if [[ -n "${IMAGE_ID}" && "${IMAGE_ID}" != "null" ]]; then
+        echo "WARNING: No OKE GPU image found for K8s ${K8S_MAJOR_MINOR}.x, using available image" >&2
+        echo "${IMAGE_ID}"
+        return
+    fi
+
+    # Last resort: use compute image list (will likely fail for OKE registration)
+    echo "ERROR: No OKE-specific GPU image found. Node registration will likely fail." >&2
+    echo "Please check available OKE images with: oci ce node-pool-options get --node-pool-option-id all" >&2
     oci_cmd compute image list \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
         --operating-system "Oracle Linux" \
@@ -393,6 +468,101 @@ create_bastion() {
     fi
 }
 
+# Get CPU-compatible OKE image
+get_cpu_image() {
+    # Get OKE image for CPU nodes (non-GPU, non-ARM)
+    local K8S_VERSION
+    K8S_VERSION=$(echo "${KUBERNETES_VERSION}" | sed 's/^v//')
+
+    local IMAGE_ID
+    IMAGE_ID=$(oci_cmd ce node-pool-options get \
+        --node-pool-option-id all \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --query "data.sources[?contains(\"source-name\", 'OKE-${K8S_VERSION}') && !contains(\"source-name\", 'GPU') && !contains(\"source-name\", 'aarch64') && !contains(\"source-name\", 'Gen2')].\"image-id\" | [0]" \
+        --raw-output 2>/dev/null)
+
+    if [[ -n "${IMAGE_ID}" && "${IMAGE_ID}" != "null" ]]; then
+        echo "${IMAGE_ID}"
+        return
+    fi
+
+    # Fallback to any non-GPU OKE image
+    oci_cmd ce node-pool-options get \
+        --node-pool-option-id all \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --query "data.sources[?contains(\"source-name\", 'OKE') && !contains(\"source-name\", 'GPU') && !contains(\"source-name\", 'aarch64')].\"image-id\" | [0]" \
+        --raw-output 2>/dev/null
+}
+
+# Add CPU node pool (required before GPU nodes for kube-system workloads)
+# GPU nodes require CPU nodes to be active first for cluster bootstrapping
+add_cpu_nodepool() {
+    echo "Adding CPU node pool for kube-system workloads..."
+
+    # Check if CPU node pool already exists
+    EXISTING_CPU_POOL=$(oci_cmd ce node-pool list \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --cluster-id "${CLUSTER_ID}" \
+        --name "cpu-pool" \
+        --query "data[0].id" \
+        --raw-output 2>/dev/null || echo "")
+
+    if [[ -n "${EXISTING_CPU_POOL}" && "${EXISTING_CPU_POOL}" != "null" ]]; then
+        echo "CPU node pool already exists: ${EXISTING_CPU_POOL}"
+        return
+    fi
+
+    # Get availability domain
+    AD=$(oci_cmd iam availability-domain list \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --query "data[0].name" \
+        --raw-output)
+
+    # Get CPU image
+    CPU_IMAGE=$(get_cpu_image)
+    echo "Using CPU image: ${CPU_IMAGE}"
+
+    echo "Creating CPU node pool with shape: VM.Standard.E5.Flex"
+    oci_cmd ce node-pool create \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --cluster-id "${CLUSTER_ID}" \
+        --name "cpu-pool" \
+        --kubernetes-version "${KUBERNETES_VERSION}" \
+        --node-shape "VM.Standard.E5.Flex" \
+        --node-shape-config '{"memoryInGBs": 16, "ocpus": 2}' \
+        --node-image-id "${CPU_IMAGE}" \
+        --size 1 \
+        --placement-configs "[{\"availabilityDomain\": \"${AD}\", \"subnetId\": \"${WORKER_SUBNET_ID}\"}]"
+
+    echo "Waiting for CPU node pool to become ACTIVE..."
+    local CPU_POOL_ID
+    CPU_POOL_ID=$(oci_cmd ce node-pool list \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --cluster-id "${CLUSTER_ID}" \
+        --name "cpu-pool" \
+        --query "data[0].id" \
+        --raw-output 2>/dev/null)
+
+    local MAX_WAIT=20
+    for i in $(seq 1 $MAX_WAIT); do
+        NODE_STATE=$(oci_cmd ce node-pool get \
+            --node-pool-id "${CPU_POOL_ID}" \
+            --query 'data.nodes[0]."lifecycle-state"' \
+            --raw-output 2>/dev/null || echo "UNKNOWN")
+
+        echo "  CPU node state: ${NODE_STATE} (${i}/${MAX_WAIT})"
+
+        if [[ "${NODE_STATE}" == "ACTIVE" ]]; then
+            echo "CPU node pool is ready!"
+            echo "Waiting 60 seconds for kube-system pods to initialize before creating GPU pool..."
+            sleep 60
+            return
+        fi
+        sleep 30
+    done
+    echo "Warning: CPU node pool did not become ACTIVE within expected time"
+}
+
 # Add GPU node pool
 add_gpu_nodepool() {
     echo "Adding GPU node pool: ${GPU_NODE_POOL_NAME}"
@@ -429,7 +599,6 @@ add_gpu_nodepool() {
         --node-image-id "${GPU_IMAGE}" \
         --size "${GPU_NODE_COUNT}" \
         --placement-configs "[{\"availabilityDomain\": \"${AD}\", \"subnetId\": \"${WORKER_SUBNET_ID}\"}]" \
-        --node-metadata '{"user_data": ""}' \
         --initial-node-labels '[{"key": "app", "value": "gpu"}, {"key": "nvidia.com/gpu", "value": "true"}]'
 
     echo "Waiting for node pool to become ACTIVE..."
@@ -578,11 +747,19 @@ cleanup() {
 
     # Uninstall Helm release
     echo "Uninstalling vLLM Helm release..."
-    helm uninstall vllm 2>/dev/null || true
+    if helm status vllm &>/dev/null; then
+        helm uninstall vllm
+    else
+        echo "No Helm release found to uninstall."
+    fi
 
     # Delete PVCs
     echo "Deleting PVCs..."
-    kubectl delete pvc --all 2>/dev/null || true
+    if kubectl get pvc -o name 2>/dev/null | grep -q .; then
+        kubectl delete pvc --all
+    else
+        echo "No PVCs found to delete."
+    fi
 
     # Delete Bastions first
     echo "Deleting Bastions..."
@@ -618,7 +795,9 @@ cleanup() {
         echo "${NODE_POOLS_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r POOL_ID; do
             if [[ -n "${POOL_ID}" ]]; then
                 echo "Deleting node pool: ${POOL_ID}"
-                oci_cmd ce node-pool delete --node-pool-id "${POOL_ID}" --force 2>/dev/null || true
+                if ! oci_cmd ce node-pool delete --node-pool-id "${POOL_ID}" --force; then
+                    echo "Warning: Failed to delete node pool: ${POOL_ID}"
+                fi
             fi
         done
 
@@ -685,7 +864,9 @@ cleanup() {
             echo "${SUBNETS_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r SUBNET_ID; do
                 if [[ -n "${SUBNET_ID}" ]]; then
                     echo "    Deleting subnet: ${SUBNET_ID}"
-                    oci_cmd network subnet delete --subnet-id "${SUBNET_ID}" --force 2>/dev/null || true
+                    if ! oci_cmd network subnet delete --subnet-id "${SUBNET_ID}" --force; then
+                        echo "    Warning: Failed to delete subnet: ${SUBNET_ID}"
+                    fi
                 fi
             done
 
@@ -703,11 +884,29 @@ cleanup() {
         echo "${RT_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r RT_ID; do
             if [[ -n "${RT_ID}" ]]; then
                 echo "Clearing rules from route table: ${RT_ID}"
-                oci_cmd network route-table update --rt-id "${RT_ID}" --route-rules '[]' --force 2>/dev/null || true
+                if ! oci_cmd network route-table update --rt-id "${RT_ID}" --route-rules '[]' --force; then
+                    echo "Warning: Failed to clear rules from route table: ${RT_ID}"
+                fi
             fi
         done
 
         sleep 10
+
+        # Delete Service Gateway
+        echo "Deleting Service Gateway..."
+        SGW_JSON=$(oci_cmd network service-gateway list \
+            --compartment-id "${OCI_COMPARTMENT_ID}" \
+            --vcn-id "${VCN_ID}" \
+            --query "data[*].id" 2>/dev/null || echo "[]")
+
+        echo "${SGW_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r SGW_ID; do
+            if [[ -n "${SGW_ID}" ]]; then
+                echo "Deleting service gateway: ${SGW_ID}"
+                if ! oci_cmd network service-gateway delete --service-gateway-id "${SGW_ID}" --force; then
+                    echo "Warning: Failed to delete service gateway: ${SGW_ID}"
+                fi
+            fi
+        done
 
         # Delete NAT Gateway
         echo "Deleting NAT Gateway..."
@@ -719,7 +918,9 @@ cleanup() {
         echo "${NAT_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r NAT_ID; do
             if [[ -n "${NAT_ID}" ]]; then
                 echo "Deleting NAT gateway: ${NAT_ID}"
-                oci_cmd network nat-gateway delete --nat-gateway-id "${NAT_ID}" --force 2>/dev/null || true
+                if ! oci_cmd network nat-gateway delete --nat-gateway-id "${NAT_ID}" --force; then
+                    echo "Warning: Failed to delete NAT gateway: ${NAT_ID}"
+                fi
             fi
         done
 
@@ -733,7 +934,9 @@ cleanup() {
         echo "${IGW_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r IGW_ID; do
             if [[ -n "${IGW_ID}" ]]; then
                 echo "Deleting internet gateway: ${IGW_ID}"
-                oci_cmd network internet-gateway delete --ig-id "${IGW_ID}" --force 2>/dev/null || true
+                if ! oci_cmd network internet-gateway delete --ig-id "${IGW_ID}" --force; then
+                    echo "Warning: Failed to delete internet gateway: ${IGW_ID}"
+                fi
             fi
         done
 
@@ -744,7 +947,9 @@ cleanup() {
         echo "${RT_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r RT_ID; do
             if [[ -n "${RT_ID}" ]]; then
                 echo "Deleting route table: ${RT_ID}"
-                oci_cmd network route-table delete --rt-id "${RT_ID}" --force 2>/dev/null || true
+                if ! oci_cmd network route-table delete --rt-id "${RT_ID}" --force; then
+                    echo "Warning: Failed to delete route table: ${RT_ID}"
+                fi
             fi
         done
 
@@ -758,7 +963,9 @@ cleanup() {
         echo "${SL_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r SL_ID; do
             if [[ -n "${SL_ID}" ]]; then
                 echo "Deleting security list: ${SL_ID}"
-                oci_cmd network security-list delete --security-list-id "${SL_ID}" --force 2>/dev/null || true
+                if ! oci_cmd network security-list delete --security-list-id "${SL_ID}" --force; then
+                    echo "Warning: Failed to delete security list: ${SL_ID}"
+                fi
             fi
         done
 
@@ -780,6 +987,7 @@ case $PARAM in
 setup)
     validate_env
     deploy_oke
+    add_cpu_nodepool  # Must be created before GPU nodes for kube-system workloads
     add_gpu_nodepool
     configure_kubectl
     if [[ "${PRIVATE_CLUSTER}" == "true" ]]; then
