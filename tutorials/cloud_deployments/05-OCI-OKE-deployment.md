@@ -305,7 +305,7 @@ Remove the Helm release:
 
 ```bash
 helm uninstall vllm
-kubectl delete pvc --all
+kubectl delete pvc -l app.kubernetes.io/instance=vllm
 ```
 
 Delete all OCI resources:

@@ -54,6 +54,7 @@ To clean up the service, run the following command:
 | `GPU_NODE_POOL_NAME` | `gpu-pool` | GPU node pool name |
 | `GPU_NODE_COUNT` | `1` | Number of GPU nodes |
 | `GPU_SHAPE` | `VM.GPU.A10.1` | GPU compute shape |
+| `BASTION_CLIENT_CIDR` | `0.0.0.0/0` | Allowed CIDR for bastion access (set to your IP for security) |
 
 ### GPU Shapes
 
@@ -125,11 +126,3 @@ export GPU_SHAPE="BM.GPU.H100.8"
 ```
 
 See `production_stack_specification.yaml` for tensor parallelism configuration.
-
-### RDMA Multi-Node
-
-For multi-node pipeline parallelism with RDMA, see the `rdma/` directory.
-
-### OCI Data Science
-
-For managed model deployment using OCI Data Science, see the `data-science/` directory.
