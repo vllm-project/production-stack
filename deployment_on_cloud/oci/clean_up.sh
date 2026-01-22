@@ -25,20 +25,21 @@ else
     echo "No Helm release found to uninstall."
 fi
 
-# Delete all PVCs
-if kubectl get pvc --all-namespaces -o name 2>/dev/null | grep -q .; then
-    echo "Deleting PVCs..."
-    kubectl delete pvc --all
+# Delete vLLM PVCs only (scoped by label to avoid affecting other applications)
+if kubectl get pvc --all-namespaces -l app.kubernetes.io/instance=vllm -o name 2>/dev/null | grep -q .; then
+    echo "Deleting vLLM PVCs..."
+    kubectl delete pvc --all-namespaces -l app.kubernetes.io/instance=vllm
 else
-    echo "No PVCs found to delete."
+    echo "No vLLM PVCs found to delete."
 fi
 
-# Delete all PVs
-if kubectl get pv -o name 2>/dev/null | grep -q .; then
-    echo "Deleting PVs..."
-    kubectl delete pv --all
+# Note: PVCs with ReclaimPolicy:Delete will automatically remove associated PVs.
+# Only delete PVs that are labeled for vLLM if they exist
+if kubectl get pv -l app.kubernetes.io/instance=vllm -o name 2>/dev/null | grep -q .; then
+    echo "Deleting vLLM PVs..."
+    kubectl delete pv -l app.kubernetes.io/instance=vllm
 else
-    echo "No PVs found to delete."
+    echo "No vLLM PVs found to delete."
 fi
 
 # Delete custom resources

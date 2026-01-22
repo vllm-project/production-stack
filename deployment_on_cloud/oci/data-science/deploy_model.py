@@ -124,11 +124,12 @@ def setup_auth(auth_method: str):
 
 
 def get_existing_deployment(compartment_id: str, display_name: str):
-    """Find existing deployment by name."""
-    deployments = ModelDeployment.list(compartment_id=compartment_id)
-    for dep in deployments:
-        if dep.display_name == display_name:
-            return dep
+    """Find existing deployment by name using server-side filtering."""
+    deployments = ModelDeployment.list(
+        compartment_id=compartment_id, display_name=display_name
+    )
+    if deployments:
+        return deployments[0]
     return None
 
 

@@ -96,7 +96,7 @@ CLUSTER_ID=$(oci ce cluster create \
     --compartment-id "${OCI_COMPARTMENT_ID}" \
     --name "${CLUSTER_NAME}" \
     --vcn-id "${VCN_ID}" \
-    --kubernetes-version "v1.30.1" \
+    --kubernetes-version "v1.31.10" \
     --endpoint-subnet-id "${API_SUBNET_ID}" \
     --service-lb-subnet-ids "[\"${LB_SUBNET_ID}\"]" \
     --endpoint-public-ip-enabled true \
@@ -116,7 +116,7 @@ oci ce node-pool create \
     --compartment-id "${OCI_COMPARTMENT_ID}" \
     --cluster-id "${CLUSTER_ID}" \
     --name "gpu-pool" \
-    --kubernetes-version "v1.30.1" \
+    --kubernetes-version "v1.31.10" \
     --node-shape "VM.GPU.A10.1" \
     --size 1 \
     --placement-configs "[{\"availabilityDomain\": \"${AD}\", \"subnetId\": \"${WORKER_SUBNET_ID}\"}]" \
@@ -153,7 +153,7 @@ Expected output:
 
 ```plaintext
 NAME          STATUS   ROLES   AGE   VERSION
-10.0.10.2     Ready    node    5m    v1.30.1
+10.0.10.2     Ready    node    5m    v1.31.10
 ```
 
 ### Step 6: Install NVIDIA Device Plugin
@@ -164,7 +164,7 @@ Deploy the NVIDIA device plugin to expose GPUs to Kubernetes:
 kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.1/nvidia-device-plugin.yml
 
 # Verify GPUs are detected
-kubectl get nodes -o=custom-columns=NAME:.metadata.name,GPUs:.status.capacity.'nvidia\.com/gpu'
+kubectl get nodes -o="custom-columns=NAME:.metadata.name,GPUs:.status.capacity.nvidia\.com/gpu"
 ```
 
 Expected output:
@@ -226,7 +226,10 @@ servingEngineSpec:
     requestMemory: "16Gi"
     requestGPU: 1
 
-    hf_token: "YOUR_HUGGINGFACE_TOKEN"
+    # Create a secret: kubectl create secret generic hf-token-secret --from-literal=token=YOUR_HUGGINGFACE_TOKEN
+    hf_token:
+      secretName: "hf-token-secret"
+      secretKey: "token"
 
     pvcStorage: "100Gi"
     pvcAccessMode:

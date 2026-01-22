@@ -22,6 +22,11 @@ GPU_IMAGE_ID="${GPU_IMAGE_ID:-}"  # Will be auto-detected if not set
 # Private cluster mode (uses NAT Gateway + Bastion instead of public IPs)
 PRIVATE_CLUSTER="${PRIVATE_CLUSTER:-true}"
 
+# Bastion client CIDR - restricts who can connect to the bastion
+# SECURITY: Set this to your IP/CIDR (e.g., "YOUR_IP/32" or "CORP_NETWORK/24")
+# Default 0.0.0.0/0 allows any IP but is less secure
+BASTION_CLIENT_CIDR="${BASTION_CLIENT_CIDR:-0.0.0.0/0}"
+
 # OCI CLI wrapper function to include profile and region
 oci_cmd() {
     oci --profile "${OCI_PROFILE}" --region "${OCI_REGION}" "$@"
@@ -442,12 +447,18 @@ create_bastion() {
         echo "Bastion already exists: ${EXISTING_BASTION}"
         BASTION_ID="${EXISTING_BASTION}"
     else
+        # Warn if using insecure default
+        if [[ "${BASTION_CLIENT_CIDR}" == "0.0.0.0/0" ]]; then
+            echo "WARNING: Bastion is configured to allow connections from any IP (0.0.0.0/0)"
+            echo "         For production, set BASTION_CLIENT_CIDR to your IP/CIDR (e.g., 'x.x.x.x/32')"
+        fi
+
         BASTION_ID=$(oci_cmd bastion bastion create \
             --compartment-id "${OCI_COMPARTMENT_ID}" \
             --bastion-type STANDARD \
             --target-subnet-id "${BASTION_SUBNET_ID}" \
             --name "${CLUSTER_NAME}-bastion" \
-            --client-cidr-list '["0.0.0.0/0"]' \
+            --client-cidr-list "[\"${BASTION_CLIENT_CIDR}\"]" \
             --query "data.id" \
             --raw-output)
 
@@ -660,11 +671,11 @@ configure_kubectl() {
         echo "     --session-ttl 10800 \\"
         echo "     --display-name kubectl-tunnel"
         echo ""
-        echo "2. Get SSH command from session, then run:"
-        echo "   ssh -N -L 6443:${PRIVATE_ENDPOINT%:*}:6443 <session-ssh-command>"
+        echo "2. Find the 'ssh-command' in the output of the previous command and run it in a new terminal."
+        echo "   It will look like: ssh -i <private_key> -N -L 6443:${PRIVATE_ENDPOINT%:*}:6443 ...@host.bastion..."
         echo ""
         echo "3. Update kubeconfig to use localhost:"
-        echo "   kubectl config set-cluster <cluster-name> --server=https://127.0.0.1:6443"
+        echo "   kubectl config set-cluster \$(kubectl config current-context) --server=https://127.0.0.1:6443"
         echo ""
         echo "=============================================="
         echo ""
@@ -1030,6 +1041,7 @@ cleanup)
     echo "  CLUSTER_NAME        - Cluster name (default: production-stack)"
     echo "  GPU_SHAPE           - GPU shape (default: VM.GPU.A10.1)"
     echo "  PRIVATE_CLUSTER     - Use private endpoint + bastion (default: true)"
+    echo "  BASTION_CLIENT_CIDR - Allowed CIDR for bastion access (default: 0.0.0.0/0)"
     echo "  GPU_NODE_COUNT      - Number of GPU nodes (default: 1)"
     exit 1
     ;;

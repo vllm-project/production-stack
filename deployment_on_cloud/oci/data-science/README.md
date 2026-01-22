@@ -107,7 +107,15 @@ def predict(data):
     return [{"text": o.outputs[0].text} for o in outputs]
 ```
 
-## Step 2: Create Custom Container Image
+## Step 2: Create Custom Container Image (BYOC)
+
+There are two deployment approaches:
+
+**Approach A: Bring Your Own Container (BYOC)** - Use the vLLM OpenAI-compatible server directly (recommended for most use cases)
+
+**Approach B: Model Artifacts with score.py** - Use the OCI Data Science native scoring format (see score.py examples above)
+
+### BYOC Deployment (Recommended)
 
 Build and push a vLLM container to OCIR:
 
@@ -115,15 +123,10 @@ Build and push a vLLM container to OCIR:
 # Dockerfile
 FROM vllm/vllm-openai:latest
 
-# Install OCI SDK
+# Install OCI SDK for authentication
 RUN pip install oci oracle-ads
 
-# Copy inference script
-COPY score.py /opt/ds/model/deployed_model/score.py
-
-# Set entrypoint for Model Deployment
-# Note: This ENTRYPOINT is for the vLLM OpenAI-compatible API server.
-# If using score.py for ADS SDK deployments, the entry point is handled by the ADS runtime.
+# Set entrypoint for vLLM OpenAI-compatible API server
 ENTRYPOINT ["python", "-m", "vllm.entrypoints.openai.api_server"]
 ```
 

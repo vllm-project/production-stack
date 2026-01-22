@@ -16,8 +16,10 @@ servingEngineSpec:
     requestGPU: 1
 
     # Get token from https://huggingface.co/settings/tokens
-    # Replace with your actual Hugging Face token or use a Kubernetes Secret for production
-    hf_token: "YOUR_HUGGINGFACE_TOKEN"
+    # Create a secret: kubectl create secret generic hf-token-secret --from-literal=token=YOUR_HUGGINGFACE_TOKEN
+    hf_token:
+      secretName: "hf-token-secret"
+      secretKey: "token"
 
     # Storage configuration for OCI Block Volumes
     pvcStorage: "100Gi"
@@ -57,7 +59,9 @@ servingEngineSpec:
 #   requestMemory: "256Gi"
 #   requestGPU: 8
 #
-#   hf_token: "YOUR_HUGGINGFACE_TOKEN"
+#   hf_token:
+#     secretName: "hf-token-secret"
+#     secretKey: "token"
 #
 #   pvcStorage: "500Gi"
 #   pvcAccessMode:

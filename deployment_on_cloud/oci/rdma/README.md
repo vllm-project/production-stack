@@ -187,8 +187,9 @@ spec:
           - containerPort: 6379
         command: ["ray", "start", "--head", "--port=6379", "--dashboard-host=0.0.0.0"]
         resources:
-          limits:
-            nvidia.com/gpu: 8
+          requests:
+            cpu: "2"
+            memory: "4Gi"
 ```
 
 ## Step 5: Verify RDMA Connectivity
