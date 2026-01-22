@@ -244,8 +244,8 @@ class KvawareRouter(RoutingInterface):
         lmcache_controller_port: int,
         session_key: str,
         kv_aware_threshold: int = 2000,
-        health_check_interval: float = 5.0,
-        lmcache_worker_timeout: float = 30.0,
+        lmcache_health_check_interval: int = 5,
+        lmcache_worker_timeout: int = 30,
     ):
         self.lmcache_controller_port = lmcache_controller_port
         logger.info(
@@ -256,8 +256,8 @@ class KvawareRouter(RoutingInterface):
                 "pull": f"0.0.0.0:{self.lmcache_controller_port}",
                 "reply": None,
             },
-            health_check_interval,
-            lmcache_worker_timeout,
+            health_check_interval=lmcache_health_check_interval,
+            lmcache_worker_timeout=lmcache_worker_timeout,
         )
         self.req_id = 0
         self.instance_id_to_ip = {}
@@ -535,7 +535,7 @@ def initialize_routing_logic(
             lmcache_controller_port=kwargs.get("lmcache_controller_port"),
             session_key=kwargs.get("session_key"),
             kv_aware_threshold=kwargs.get("kv_aware_threshold"),
-            health_check_interval=kwargs.get("lmcache_health_check_interval"),
+            lmcache_health_check_interval=kwargs.get("lmcache_health_check_interval"),
             lmcache_worker_timeout=kwargs.get("lmcache_worker_timeout"),
         )
         router.start_kv_manager()
