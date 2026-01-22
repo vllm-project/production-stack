@@ -15,7 +15,7 @@ dependencies = [
     "aiofiles==24.1.0",
     "black>=25.1.0",
     "fastapi==0.128.0",
-    "aiohttp[speedups]==3.13.0",
+    "aiohttp[speedups]==3.13.3",
     "kubernetes==32.0.0",
     "numpy==1.26.4",
     "prometheus-client==0.21.1",
