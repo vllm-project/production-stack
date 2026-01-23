@@ -156,6 +156,8 @@ NAME          STATUS   ROLES   AGE   VERSION
 10.0.10.2     Ready    node    5m    v1.31.10
 ```
 
+> **Note**: The `entry_point.sh` script defaults to creating a **private cluster** for security. Private clusters require a bastion and SSH tunnel to access. See the [README.md](../../deployment_on_cloud/oci/README.md) for detailed instructions on setting up bastion access.
+
 ### Step 6: Install NVIDIA Device Plugin
 
 Deploy the NVIDIA device plugin to expose GPUs to Kubernetes:
@@ -197,7 +199,29 @@ volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 ```
 
-### Step 8: Deploy the vLLM Stack
+### Step 8: Expand GPU Node Filesystem (CRITICAL)
+
+> **Important**: OCI boot volumes have a ~47GB partition regardless of the volume size you specify. You **must** expand the filesystem before deploying vLLM, as the container image is ~10GB.
+
+```bash
+# Use the entry_point.sh helper
+./entry_point.sh expand-disk
+```
+
+Or manually expand using a privileged pod (see [README.md](../../deployment_on_cloud/oci/README.md#step-10-expand-gpu-node-filesystem-critical) for full instructions).
+
+The expansion process runs these 4 steps in order:
+1. `growpart /dev/sda 3` - Expand partition
+2. `pvresize /dev/sda3` - Resize LVM physical volume
+3. `lvextend -l +100%FREE /dev/ocivolume/root` - Extend logical volume
+4. `xfs_growfs /` - Grow XFS filesystem
+
+After expansion, verify the filesystem is ~180GB+:
+```bash
+kubectl exec -it <vllm-pod> -- df -h /
+```
+
+### Step 9: Deploy the vLLM Stack
 
 Add the Helm repository and deploy:
 
@@ -262,7 +286,7 @@ vllm-deployment-router-6786bdcc5b-abc12      1/1     Running   0          2m
 vllm-llama8b-deployment-vllm-7dd564bc8f-xyz  1/1     Running   0          2m
 ```
 
-### Step 9: Test the Inference Endpoint
+### Step 10: Test the Inference Endpoint
 
 Get the service endpoint:
 
@@ -288,7 +312,7 @@ curl http://localhost:8000/v1/completions \
   }'
 ```
 
-### Step 10: Expose via OCI Load Balancer (Optional)
+### Step 11: Expose via OCI Load Balancer (Optional)
 
 To expose the service externally, modify the service type:
 
@@ -299,7 +323,7 @@ kubectl patch svc vllm-deployment-router -p '{"spec": {"type": "LoadBalancer"}}'
 kubectl get svc vllm-deployment-router -w
 ```
 
-### Step 11: Clean Up
+### Step 12: Clean Up
 
 Remove the Helm release:
 
@@ -365,8 +389,11 @@ This tutorial covers:
 - Creating an OKE cluster with GPU nodes
 - Configuring OCI Block Volume storage
 - Installing NVIDIA device plugin
+- **Expanding the GPU node filesystem** (critical for OCI)
 - Deploying the vLLM production stack with Helm
 - Testing the inference endpoint
 - Cleaning up resources
+
+For detailed troubleshooting and advanced configuration (private clusters, bastion access, disk expansion issues), see the comprehensive [README.md](../../deployment_on_cloud/oci/README.md).
 
 Now your Oracle Cloud OKE production-stack is ready for large-scale AI model deployment!
