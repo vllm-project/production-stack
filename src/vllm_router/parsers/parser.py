@@ -240,6 +240,16 @@ def parse_args():
         help="The request rewriter to use. Default is 'noop' (no rewriting).",
     )
 
+    # Drop params arguments
+    parser.add_argument(
+        "--drop-params",
+        type=str,
+        default=None,
+        help="Comma-separated list of OpenAI parameters to drop from requests. "
+        "This allows dropping unsupported parameters by your LLM provider. "
+        "Example: 'frequency_penalty,logit_bias'",
+    )
+
     # Batch API
     # TODO(gaocegege): Make these batch api related arguments to a separate config.
     parser.add_argument(
