@@ -4,22 +4,18 @@
 servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
-  - name: "llama8b"
+  - name: "gpt-oss"
     repository: "vllm/vllm-openai"
     tag: "latest"
-    modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+    modelURL: "openai/gpt-oss-20b"
 
     replicaCount: 1
 
     requestCPU: 4
-    requestMemory: "16Gi"
+    requestMemory: "24Gi"
     requestGPU: 1
 
-    # Get token from https://huggingface.co/settings/tokens
-    # Create a secret: kubectl create secret generic hf-token-secret --from-literal=token=YOUR_HUGGINGFACE_TOKEN
-    hf_token:
-      secretName: "hf-token-secret"
-      secretKey: "token"
+    # No HF token needed - Apache 2.0 licensed OpenAI open source model
 
     # Storage configuration for OCI Block Volumes
     pvcStorage: "100Gi"
@@ -35,9 +31,9 @@ servingEngineSpec:
         operator: "Exists"
         effect: "NoSchedule"
 
-    # vLLM extra arguments
+    # vLLM extra arguments for gpt-oss-20b on A10 GPU
     extraArgs:
-      - "--max-model-len=4096"
+      - "--max-model-len=8192"
       - "--gpu-memory-utilization=0.90"
 
     # Uncomment for OCIR (Oracle Container Registry) images
