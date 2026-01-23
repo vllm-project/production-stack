@@ -1,4 +1,56 @@
 #!/usr/bin/env bash
+#
+# OCI OKE vLLM Deployment Script
+#
+# KEY LEARNINGS / GOTCHAS:
+#
+# 1. GPU NODE FILESYSTEM EXPANSION (CRITICAL):
+#    - OCI boot volumes have a FIXED ~47GB partition regardless of the volume size
+#    - Even with 200GB boot volume, OS only sees ~47GB until manually expanded
+#    - Do NOT use cloud-init with oci-growfs - it breaks node registration (>20min timeout)
+#    - Must expand filesystem AFTER the node joins using a privileged pod
+#    - CRITICAL: Run disk expansion BEFORE vLLM deployment, as the vLLM image is ~10GB
+#      and will cause DiskPressure on nodes with unexpanded filesystems
+#
+# 2. DISK EXPANSION STEPS (must be in this exact order):
+#    a) growpart /dev/sda 3       - Expand partition 3 to use full disk (THIS IS THE KEY STEP!)
+#    b) pvresize /dev/sda3        - Tell LVM the physical volume is larger
+#    c) lvextend -l +100%FREE ... - Extend the logical volume
+#    d) xfs_growfs /              - Grow XFS filesystem to fill the LV
+#
+#    IMPORTANT: Steps b-d do NOTHING if step a hasn't run first!
+#    The partition must be expanded before LVM can use the space.
+#
+# 3. OCI-GROWFS ISSUES:
+#    - oci-growfs can hang/timeout during LVM operations (not reliable)
+#    - Don't rely on oci-growfs alone - always run growpart directly first
+#    - The expand_gpu_disk() function handles all steps with proper verification
+#
+# 4. ROUTER OOM KILL:
+#    - Default router memory (500Mi) is too low and causes OOMKill
+#    - The fix_router_memory() function patches it to 1Gi after deployment
+#    - Run: ./entry_point.sh fix-router
+#
+# 5. GPU AVAILABILITY DOMAIN:
+#    - A10 GPUs are NOT available in all ADs - check before deployment
+#    - us-ashburn-1: AD-2 and AD-3 (use GPU_AD_INDEX=1 or 2)
+#    - us-chicago-1: AD-1 only (use GPU_AD_INDEX=0)
+#    - Check with: oci compute shape list --availability-domain <AD> | grep GPU
+#
+# 6. BASTION SSH TUNNEL:
+#    - Bastion sessions require SSH public key file (--ssh-public-key-file)
+#    - Use ServerAliveInterval to keep tunnel alive: ssh -o ServerAliveInterval=30
+#    - Tunnel format: ssh -i <key> -N -L 6443:<private-ip>:6443 <session>@host.bastion...
+#    - IMPORTANT: After starting tunnel, update kubeconfig to use 127.0.0.1:6443
+#
+# 7. PRIVATE CLUSTER WORKFLOW:
+#    a) Run: ./entry_point.sh setup
+#    b) Create bastion session: oci bastion session create-port-forwarding ...
+#    c) Start SSH tunnel in separate terminal (from the session output)
+#    d) Update kubeconfig: kubectl config set-cluster $(kubectl config current-context) --server=https://127.0.0.1:6443
+#    e) Verify: kubectl get nodes
+#    f) Run: ./entry_point.sh deploy-vllm
+#
 
 set -euo pipefail
 
@@ -18,6 +70,7 @@ GPU_NODE_POOL_NAME="${GPU_NODE_POOL_NAME:-gpu-pool}"
 GPU_NODE_COUNT="${GPU_NODE_COUNT:-1}"
 GPU_SHAPE="${GPU_SHAPE:-VM.GPU.A10.1}"
 GPU_IMAGE_ID="${GPU_IMAGE_ID:-}"  # Will be auto-detected if not set
+GPU_BOOT_VOLUME_GB="${GPU_BOOT_VOLUME_GB:-200}"  # 200GB for vLLM images + model weights
 
 # Private cluster mode (uses NAT Gateway + Bastion instead of public IPs)
 PRIVATE_CLUSTER="${PRIVATE_CLUSTER:-true}"
@@ -26,6 +79,11 @@ PRIVATE_CLUSTER="${PRIVATE_CLUSTER:-true}"
 # SECURITY: Set this to your IP/CIDR (e.g., "YOUR_IP/32" or "CORP_NETWORK/24")
 # Default 0.0.0.0/0 allows any IP but is less secure
 BASTION_CLIENT_CIDR="${BASTION_CLIENT_CIDR:-0.0.0.0/0}"
+
+# GPU Availability Domain index (0-based). GPU shapes may not be available in all ADs.
+# Use 'oci compute shape list --availability-domain <AD>' to check availability.
+# Default: 1 (second AD - Ashburn has A10 in AD-2 and AD-3)
+GPU_AD_INDEX="${GPU_AD_INDEX:-1}"
 
 # OCI CLI wrapper function to include profile and region
 oci_cmd() {
@@ -523,11 +581,12 @@ add_cpu_nodepool() {
         return
     fi
 
-    # Get availability domain
+    # Get availability domain - use same AD as GPU (AD-2) for consistency
     AD=$(oci_cmd iam availability-domain list \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
-        --query "data[0].name" \
+        --query "data[${GPU_AD_INDEX}].name" \
         --raw-output)
+    echo "Using availability domain for CPU: ${AD}"
 
     # Get CPU image
     CPU_IMAGE=$(get_cpu_image)
@@ -591,16 +650,21 @@ add_gpu_nodepool() {
         return
     fi
 
-    # Get availability domain
+    # Get availability domain for GPU nodes (may differ from CPU nodes due to shape availability)
     AD=$(oci_cmd iam availability-domain list \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
-        --query "data[0].name" \
+        --query "data[${GPU_AD_INDEX}].name" \
         --raw-output)
+    echo "Using availability domain for GPU: ${AD}"
 
     # Get GPU image
     GPU_IMAGE=$(get_gpu_image)
 
-    echo "Creating GPU node pool with shape: ${GPU_SHAPE}"
+    # NOTE: We do NOT use cloud-init here because it breaks node registration.
+    # Instead, we expand the filesystem after the node joins using a privileged pod.
+    # See expand_gpu_disk() function.
+
+    echo "Creating GPU node pool with shape: ${GPU_SHAPE} (boot volume: ${GPU_BOOT_VOLUME_GB}GB)"
     oci_cmd ce node-pool create \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
         --cluster-id "${CLUSTER_ID}" \
@@ -608,6 +672,7 @@ add_gpu_nodepool() {
         --kubernetes-version "${KUBERNETES_VERSION}" \
         --node-shape "${GPU_SHAPE}" \
         --node-image-id "${GPU_IMAGE}" \
+        --node-boot-volume-size-in-gbs "${GPU_BOOT_VOLUME_GB}" \
         --size "${GPU_NODE_COUNT}" \
         --placement-configs "[{\"availabilityDomain\": \"${AD}\", \"subnetId\": \"${WORKER_SUBNET_ID}\"}]" \
         --initial-node-labels '[{"key": "app", "value": "gpu"}, {"key": "nvidia.com/gpu", "value": "true"}]'
@@ -719,6 +784,344 @@ install_nvidia_device_plugin() {
 
     echo "Waiting for NVIDIA device plugin to be ready..."
     kubectl -n kube-system wait --for=condition=Ready pods -l name=nvidia-device-plugin-ds --timeout=300s || true
+}
+
+# Expand GPU node filesystem using privileged pod
+#
+# WHY THIS IS NEEDED:
+# - OCI boot volumes have a fixed ~47GB partition regardless of the volume size you request
+# - Even with a 200GB boot volume, the OS only sees ~47GB until the partition is expanded
+# - Cloud-init with oci-growfs breaks OKE node registration (>20min timeout)
+# - We cannot SSH directly to managed OKE nodes
+#
+# SOLUTION:
+# Run filesystem expansion commands via a privileged pod after the node joins.
+# The expansion has 4 steps that MUST run in order:
+#   1. growpart - Expand partition 3 to use the full disk
+#   2. pvresize - Tell LVM the physical volume is now larger
+#   3. lvextend - Extend the logical volume to use the new space
+#   4. xfs_growfs - Grow the XFS filesystem to fill the logical volume
+#
+# CRITICAL LEARNINGS:
+# - oci-growfs can hang/timeout during LVM operations - don't rely on it alone
+# - ALWAYS run growpart first to expand the partition (this is the key step!)
+# - pvresize/lvextend do nothing if the partition wasn't expanded first
+# - Must wait for each step to complete before moving to the next
+# - Kubelet needs time after restart to report new allocatable storage
+#
+expand_gpu_disk() {
+    echo "=============================================="
+    echo "EXPANDING GPU NODE FILESYSTEM"
+    echo "=============================================="
+    echo ""
+
+    # Get GPU node name
+    local GPU_NODE
+    GPU_NODE=$(kubectl get nodes -l app=gpu -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+
+    if [[ -z "${GPU_NODE}" ]]; then
+        echo "Warning: No GPU node found with label app=gpu. Skipping disk expansion."
+        return 0
+    fi
+
+    echo "Found GPU node: ${GPU_NODE}"
+
+    # Check current filesystem size by running df on the node
+    echo "Checking current filesystem size..."
+    local CURRENT_SIZE_OUTPUT
+    CURRENT_SIZE_OUTPUT=$(kubectl run check-disk-size --rm -i --restart=Never \
+        --image=busybox:latest \
+        --overrides="{\"spec\":{\"nodeName\":\"${GPU_NODE}\",\"tolerations\":[{\"operator\":\"Exists\"}],\"containers\":[{\"name\":\"check\",\"image\":\"busybox:latest\",\"command\":[\"sh\",\"-c\",\"chroot /host df -h / | tail -1\"],\"securityContext\":{\"privileged\":true},\"volumeMounts\":[{\"name\":\"host\",\"mountPath\":\"/host\"}]}],\"volumes\":[{\"name\":\"host\",\"hostPath\":{\"path\":\"/\"}}]}}" \
+        2>/dev/null || echo "unknown")
+
+    echo "Current filesystem: ${CURRENT_SIZE_OUTPUT}"
+
+    # Extract size in GB for comparison
+    local CURRENT_GB
+    CURRENT_GB=$(echo "${CURRENT_SIZE_OUTPUT}" | awk '{print $2}' | sed 's/G//' | cut -d. -f1 2>/dev/null || echo "0")
+
+    # If already expanded (>100GB), skip
+    if [[ "${CURRENT_GB}" =~ ^[0-9]+$ ]] && [[ ${CURRENT_GB} -gt 100 ]]; then
+        echo "Filesystem already expanded to ${CURRENT_GB}GB. Skipping."
+        return 0
+    fi
+
+    echo ""
+    echo "Filesystem needs expansion. Running expansion steps..."
+    echo ""
+
+    # Delete any leftover pods from previous runs
+    kubectl delete pod expand-gpu-disk --force --grace-period=0 2>/dev/null || true
+    sleep 5
+
+    # Create and run the expansion pod with detailed step-by-step verification
+    cat <<'EXPAND_EOF' | sed "s/\${GPU_NODE}/${GPU_NODE}/g" | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: expand-gpu-disk
+  namespace: default
+spec:
+  nodeName: ${GPU_NODE}
+  hostPID: true
+  tolerations:
+  - operator: "Exists"
+  priorityClassName: system-node-critical
+  containers:
+  - name: expand
+    image: oraclelinux:8
+    command: ["/bin/bash", "-c"]
+    args:
+    - |
+      set -x  # Enable debug output
+      echo "=========================================="
+      echo "STEP 0: Initial disk state"
+      echo "=========================================="
+      chroot /host bash -c '
+        echo "--- Partition table ---"
+        fdisk -l /dev/sda 2>/dev/null | head -20
+        echo ""
+        echo "--- LVM Physical Volumes ---"
+        pvs
+        echo ""
+        echo "--- LVM Volume Groups ---"
+        vgs
+        echo ""
+        echo "--- LVM Logical Volumes ---"
+        lvs
+        echo ""
+        echo "--- Current filesystem ---"
+        df -h /
+      '
+
+      echo ""
+      echo "=========================================="
+      echo "STEP 1: Expand partition using growpart"
+      echo "=========================================="
+      echo "This is the CRITICAL step - partition must be expanded first!"
+      chroot /host bash -c '
+        # Install growpart if not available
+        if ! command -v growpart &>/dev/null; then
+          echo "Installing cloud-utils-growpart..."
+          yum install -y cloud-utils-growpart 2>/dev/null || dnf install -y cloud-utils-growpart 2>/dev/null || true
+        fi
+
+        echo "Running growpart on /dev/sda partition 3..."
+        growpart /dev/sda 3 2>&1 || echo "growpart returned non-zero (partition may already be expanded)"
+
+        echo "Partition table after growpart:"
+        fdisk -l /dev/sda 2>/dev/null | grep "^/dev/sda"
+      '
+
+      # Give kernel time to re-read partition table
+      sleep 5
+
+      echo ""
+      echo "=========================================="
+      echo "STEP 2: Resize LVM Physical Volume"
+      echo "=========================================="
+      chroot /host bash -c '
+        echo "Running pvresize on /dev/sda3..."
+        pvresize /dev/sda3
+        echo ""
+        echo "PV size after pvresize:"
+        pvs /dev/sda3
+      '
+
+      echo ""
+      echo "=========================================="
+      echo "STEP 3: Extend LVM Logical Volume"
+      echo "=========================================="
+      chroot /host bash -c '
+        echo "Running lvextend to use all free space..."
+        lvextend -l +100%FREE /dev/ocivolume/root 2>&1 || echo "lvextend returned non-zero (may already be extended)"
+        echo ""
+        echo "LV size after lvextend:"
+        lvs /dev/ocivolume/root
+      '
+
+      echo ""
+      echo "=========================================="
+      echo "STEP 4: Grow XFS filesystem"
+      echo "=========================================="
+      chroot /host bash -c '
+        echo "Running xfs_growfs on root filesystem..."
+        xfs_growfs /
+        echo ""
+        echo "Filesystem size after xfs_growfs:"
+        df -h /
+      '
+
+      echo ""
+      echo "=========================================="
+      echo "EXPANSION COMPLETE"
+      echo "=========================================="
+      chroot /host df -h /
+      echo "EXPANSION_DONE_MARKER"
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - name: host
+      mountPath: /host
+  volumes:
+  - name: host
+    hostPath:
+      path: /
+  restartPolicy: Never
+EXPAND_EOF
+
+    # Wait for the pod to be created and start running
+    echo "Waiting for expansion pod to start..."
+    for i in {1..30}; do
+        local POD_PHASE
+        POD_PHASE=$(kubectl get pod expand-gpu-disk -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+        if [[ "${POD_PHASE}" == "Running" ]] || [[ "${POD_PHASE}" == "Succeeded" ]] || [[ "${POD_PHASE}" == "Failed" ]]; then
+            echo "Pod is ${POD_PHASE}"
+            break
+        fi
+        echo "  Waiting for pod to start... (${i}/30)"
+        sleep 5
+    done
+
+    # Stream logs while waiting for completion (max 5 minutes)
+    echo ""
+    echo "--- Expansion pod logs (streaming) ---"
+    timeout 300 kubectl logs -f expand-gpu-disk 2>/dev/null || true
+    echo "--- End of logs ---"
+    echo ""
+
+    # Check final pod status
+    local FINAL_STATUS
+    FINAL_STATUS=$(kubectl get pod expand-gpu-disk -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+    echo "Expansion pod final status: ${FINAL_STATUS}"
+
+    # Check if expansion marker was output
+    local LOGS
+    LOGS=$(kubectl logs expand-gpu-disk 2>/dev/null || echo "")
+    if echo "${LOGS}" | grep -q "EXPANSION_DONE_MARKER"; then
+        echo "✓ Expansion script completed successfully"
+    else
+        echo "Warning: Expansion script may not have completed fully"
+    fi
+
+    # Cleanup expansion pod
+    kubectl delete pod expand-gpu-disk --force --grace-period=0 2>/dev/null || true
+
+    # Restart kubelet to refresh node status with new allocatable storage
+    echo ""
+    echo "Restarting kubelet to update node allocatable storage..."
+    kubectl delete pod restart-kubelet --force --grace-period=0 2>/dev/null || true
+    sleep 3
+
+    cat <<RESTART_EOF | sed "s/\${GPU_NODE}/${GPU_NODE}/g" | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restart-kubelet
+  namespace: default
+spec:
+  nodeName: ${GPU_NODE}
+  hostPID: true
+  tolerations:
+  - operator: "Exists"
+  priorityClassName: system-node-critical
+  containers:
+  - name: restart
+    image: busybox:latest
+    command: ["/bin/sh", "-c"]
+    args:
+    - |
+      echo "Restarting kubelet..."
+      chroot /host systemctl restart kubelet
+      echo "Kubelet restarted. Waiting for it to stabilize..."
+      sleep 10
+      echo "RESTART_DONE"
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - name: host
+      mountPath: /host
+  volumes:
+  - name: host
+    hostPath:
+      path: /
+  restartPolicy: Never
+RESTART_EOF
+
+    # Wait for kubelet restart to complete
+    echo "Waiting for kubelet restart..."
+    for i in {1..24}; do
+        local RESTART_STATUS
+        RESTART_STATUS=$(kubectl get pod restart-kubelet -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+        if [[ "${RESTART_STATUS}" == "Succeeded" ]]; then
+            echo "Kubelet restart completed"
+            break
+        elif [[ "${RESTART_STATUS}" == "Failed" ]]; then
+            echo "Warning: Kubelet restart pod failed"
+            break
+        fi
+        sleep 5
+    done
+
+    kubectl delete pod restart-kubelet --force --grace-period=0 2>/dev/null || true
+
+    # Wait for node to be ready again after kubelet restart
+    echo "Waiting for node to be ready..."
+    kubectl wait --for=condition=Ready node "${GPU_NODE}" --timeout=120s 2>/dev/null || true
+
+    # Additional wait for kubelet to update allocatable resources
+    echo "Waiting for kubelet to report updated allocatable storage (60 seconds)..."
+    sleep 60
+
+    # Verify final filesystem size
+    echo ""
+    echo "=============================================="
+    echo "VERIFICATION"
+    echo "=============================================="
+    local FINAL_SIZE_OUTPUT
+    FINAL_SIZE_OUTPUT=$(kubectl run verify-disk-size --rm -i --restart=Never \
+        --image=busybox:latest \
+        --overrides="{\"spec\":{\"nodeName\":\"${GPU_NODE}\",\"tolerations\":[{\"operator\":\"Exists\"}],\"containers\":[{\"name\":\"check\",\"image\":\"busybox:latest\",\"command\":[\"sh\",\"-c\",\"chroot /host df -h / | tail -1\"],\"securityContext\":{\"privileged\":true},\"volumeMounts\":[{\"name\":\"host\",\"mountPath\":\"/host\"}]}],\"volumes\":[{\"name\":\"host\",\"hostPath\":{\"path\":\"/\"}}]}}" \
+        2>/dev/null || echo "unknown")
+
+    echo "Final filesystem: ${FINAL_SIZE_OUTPUT}"
+
+    local FINAL_GB
+    FINAL_GB=$(echo "${FINAL_SIZE_OUTPUT}" | awk '{print $2}' | sed 's/G//' | cut -d. -f1 2>/dev/null || echo "0")
+
+    if [[ "${FINAL_GB}" =~ ^[0-9]+$ ]] && [[ ${FINAL_GB} -gt 100 ]]; then
+        echo ""
+        echo "✓ SUCCESS: Filesystem expanded to ${FINAL_GB}GB"
+        echo ""
+    else
+        echo ""
+        echo "⚠ WARNING: Filesystem may not have expanded properly (${FINAL_GB}GB)"
+        echo ""
+        echo "Manual intervention may be needed. You can run:"
+        echo "  kubectl apply -f - <<EOF"
+        echo "  apiVersion: v1"
+        echo "  kind: Pod"
+        echo "  ... (create privileged debug pod)"
+        echo "  EOF"
+        echo ""
+        echo "Then inside the pod, run:"
+        echo "  chroot /host bash"
+        echo "  growpart /dev/sda 3"
+        echo "  pvresize /dev/sda3"
+        echo "  lvextend -l +100%FREE /dev/ocivolume/root"
+        echo "  xfs_growfs /"
+        echo "  df -h /"
+        echo ""
+    fi
+}
+
+# Fix router memory (default 500Mi causes OOMKill)
+fix_router_memory() {
+    echo "Increasing router memory to prevent OOMKill..."
+    kubectl patch deployment vllm-deployment-router --type='json' -p='[
+      {"op": "replace", "path": "/spec/template/spec/containers/0/resources/requests/memory", "value": "512Mi"},
+      {"op": "replace", "path": "/spec/template/spec/containers/0/resources/limits/memory", "value": "1Gi"}
+    ]' 2>/dev/null || echo "Router deployment not found yet, will be patched after vLLM deployment"
 }
 
 # Apply OCI Block Storage StorageClass
@@ -1011,28 +1414,79 @@ setup)
         echo "To complete the deployment, establish SSH tunnel first, then run:"
         echo ""
         echo "  # After SSH tunnel is active:"
+        echo "  $0 deploy-vllm [HELM_VALUES_FILE]"
+        echo ""
+        echo "This will:"
+        echo "  1. Install NVIDIA device plugin"
+        echo "  2. Apply storage classes"
+        echo "  3. Expand GPU disk to full boot volume size"
+        echo "  4. Deploy vLLM stack"
+        echo "  5. Fix router memory to prevent OOMKill"
+        echo ""
+        echo "Or run steps manually:"
         echo "  kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.1/nvidia-device-plugin.yml"
         echo "  kubectl apply -f ${SCRIPT_DIR}/oci-block-storage-sc.yaml"
-        echo "  helm repo add vllm https://vllm-project.github.io/production-stack"
-        echo "  helm repo update"
+        echo "  $0 expand-disk   # Expand GPU filesystem to full boot volume"
+        echo "  helm repo add vllm https://vllm-project.github.io/production-stack && helm repo update"
         echo "  helm upgrade -i --wait vllm vllm/vllm-stack -f ${2:-${SCRIPT_DIR}/production_stack_specification.yaml}"
+        echo "  $0 fix-router    # Increase router memory to prevent OOMKill"
         echo ""
     else
         install_nvidia_device_plugin
         apply_storage_class
+        expand_gpu_disk
         deploy_vllm_stack "${2:-}"
+        fix_router_memory
         echo ""
         echo "Setup complete! Your vLLM stack is ready."
         echo "Check pods with: kubectl get pods"
         echo "Get service endpoint: kubectl get svc"
     fi
     ;;
+deploy-vllm)
+    # For private clusters: complete deployment after SSH tunnel is established
+    echo "Completing vLLM deployment (private cluster)..."
+    install_nvidia_device_plugin
+    apply_storage_class
+
+    # Wait for GPU node to be ready
+    echo "Waiting for GPU node to be ready..."
+    kubectl wait --for=condition=Ready nodes -l app=gpu --timeout=600s || true
+
+    expand_gpu_disk
+    deploy_vllm_stack "${2:-}"
+
+    # Wait a bit for router to be created
+    echo "Waiting for router deployment..."
+    sleep 30
+    fix_router_memory
+
+    echo ""
+    echo "Deployment complete! Your vLLM stack is ready."
+    echo "Check pods with: kubectl get pods"
+    echo "Get service endpoint: kubectl get svc"
+    ;;
+expand-disk)
+    # Expand GPU node filesystem to use full boot volume
+    expand_gpu_disk
+    ;;
+fix-router)
+    # Increase router memory to prevent OOMKill
+    fix_router_memory
+    ;;
 cleanup)
     validate_env
     cleanup
     ;;
 *)
-    echo "Usage: $0 <setup|cleanup> [HELM_VALUES_FILE]"
+    echo "Usage: $0 <command> [HELM_VALUES_FILE]"
+    echo ""
+    echo "Commands:"
+    echo "  setup       - Create OKE cluster with GPU node pool (full deployment for public clusters)"
+    echo "  deploy-vllm - Deploy vLLM stack (for private clusters, after SSH tunnel is active)"
+    echo "  expand-disk - Expand GPU node filesystem to full boot volume size"
+    echo "  fix-router  - Increase router memory to 1Gi (prevents OOMKill)"
+    echo "  cleanup     - Delete all resources created by this script"
     echo ""
     echo "Environment variables:"
     echo "  OCI_PROFILE         - OCI CLI profile (default: DEFAULT)"
@@ -1040,9 +1494,20 @@ cleanup)
     echo "  OCI_REGION          - OCI region (default: us-ashburn-1)"
     echo "  CLUSTER_NAME        - Cluster name (default: production-stack)"
     echo "  GPU_SHAPE           - GPU shape (default: VM.GPU.A10.1)"
+    echo "  GPU_BOOT_VOLUME_GB  - Boot volume size in GB (default: 200)"
+    echo "  GPU_AD_INDEX        - Availability domain index (default: 1 for Ashburn AD-2)"
     echo "  PRIVATE_CLUSTER     - Use private endpoint + bastion (default: true)"
     echo "  BASTION_CLIENT_CIDR - Allowed CIDR for bastion access (default: 0.0.0.0/0)"
     echo "  GPU_NODE_COUNT      - Number of GPU nodes (default: 1)"
+    echo ""
+    echo "Typical usage for private cluster:"
+    echo "  1. $0 setup                    # Creates cluster + bastion"
+    echo "  2. Create bastion session and establish SSH tunnel"
+    echo "  3. $0 deploy-vllm              # Deploys vLLM stack after tunnel is active"
+    echo ""
+    echo "IMPORTANT: GPU shape availability varies by region and AD:"
+    echo "  - us-ashburn-1: VM.GPU.A10.1 available in AD-2 and AD-3 (use GPU_AD_INDEX=1 or 2)"
+    echo "  - us-chicago-1: VM.GPU.A10.1 available in AD-1 only (use GPU_AD_INDEX=0)"
     exit 1
     ;;
 esac
