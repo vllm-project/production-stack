@@ -100,65 +100,53 @@ kubectl get svc vllm-router-service
 
 ## Step 2: Deploy vLLM Semantic Router and point it at your vLLM router Service
 
-Follow the official guide from the official website with **the updated config file as the following**: [Install in Kubernetes](https://vllm-semantic-router.com/docs/installation/kubernetes).
+Follow the official guide from the official website with **the updated config file as the following**: [Install in Kubernetes](https://vllm-semantic-router.com/docs/installation/k8s/ai-gateway).
 
-Remember to update the semantic router config to include your vLLM router service as an endpoint. Edit `deploy/kubernetes/config.yaml` and set `vllm_endpoints` like this (replace the IP/port with your router Service ClusterIP/port from step 1):
-
-```yaml
-vllm_endpoints:
-  - name: "endpoint1"
-    address: <YOUR ROUTER SERVICE CLUSTERIP>
-    port: <YOUR ROUTER SERVICE PORT>
-    weight: 1
-```
-
-Minimal sequence (same as the guide):
+Deploy using Helm with custom values:
 
 ```bash
-# Deploy vLLM Semantic Router manifests
-kubectl apply -k deploy/kubernetes/
-kubectl wait --for=condition=Available deployment/semantic-router \
-  -n vllm-semantic-router-system --timeout=600s
+   # Deploy vLLM Semantic Router with custom values from GHCR OCI registry
+   # (Optional) If you use a registry mirror/proxy, append: --set global.imageRegistry=<your-registry>
+   helm install semantic-router oci://ghcr.io/vllm-project/charts/semantic-router \
+     --version v0.0.0-latest \
+     --namespace vllm-semantic-router-system \
+     --create-namespace \
+     -f https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/semantic-router-values/values.yaml
 
-# Install Envoy Gateway
-helm upgrade -i eg oci://docker.io/envoyproxy/gateway-helm \
-  --version v0.0.0-latest \
-  --namespace envoy-gateway-system \
-  --create-namespace
-kubectl wait --timeout=300s -n envoy-gateway-system \
-  deployment/envoy-gateway --for=condition=Available
+   kubectl wait --for=condition=Available deployment/semantic-router \
+     -n vllm-semantic-router-system --timeout=600s
 
-# Install Envoy AI Gateway
-helm upgrade -i aieg oci://docker.io/envoyproxy/ai-gateway-helm \
-  --version v0.0.0-latest \
-  --namespace envoy-ai-gateway-system \
-  --create-namespace
-kubectl wait --timeout=300s -n envoy-ai-gateway-system \
-  deployment/ai-gateway-controller --for=condition=Available
+   # Install Envoy Gateway
+   helm upgrade -i eg oci://docker.io/envoyproxy/gateway-helm \
+     --version v0.0.0-latest \
+     --namespace envoy-gateway-system \
+     --create-namespace \
+     -f https://raw.githubusercontent.com/envoyproxy/ai-gateway/main/manifests/envoy-gateway-values.yaml
 
-# Install Gateway API Inference Extension CRDs
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v1.0.1/manifests.yaml
-kubectl get crd | grep inference
+   # Install Envoy AI Gateway
+   helm upgrade -i aieg oci://docker.io/envoyproxy/ai-gateway-helm \
+     --version v0.0.0-latest \
+     --namespace envoy-ai-gateway-system \
+     --create-namespace
+
+   # Install Envoy AI Gateway CRDs
+   helm upgrade -i aieg-crd oci://docker.io/envoyproxy/ai-gateway-crds-helm \
+     --version v0.0.0-latest \
+     --namespace envoy-ai-gateway-system
+
+   kubectl wait --timeout=300s -n envoy-ai-gateway-system \
+     deployment/ai-gateway-controller --for=condition=Available
 ```
 
-Apply AI Gateway configuration and create the inference pool per the guide:
+**Note**: The values file contains the configuration for the semantic router. You can download and customize it from [values.yaml](https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/semantic-router-values/values.yaml) to match your vLLM Production Stack setup.
+
+Create LLM Demo Backends and AI Gateway Routes:
 
 ```bash
-# Apply AI Gateway configuration
-kubectl apply -f deploy/kubernetes/ai-gateway/configuration
-
-# Restart controllers to pick up new config
-kubectl rollout restart -n envoy-gateway-system deployment/envoy-gateway
-kubectl rollout restart -n envoy-ai-gateway-system deployment/ai-gateway-controller
-kubectl wait --timeout=120s -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
-kubectl wait --timeout=120s -n envoy-ai-gateway-system deployment/ai-gateway-controller --for=condition=Available
-
-# Create inference pool
-kubectl apply -f deploy/kubernetes/ai-gateway/inference-pool
-sleep 30
-
-# Verify inference pool
-kubectl get inferencepool vllm-semantic-router -n vllm-semantic-router-system -o yaml
+   # Apply LLM demo backends
+   kubectl apply -f https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/aigw-resources/base-model.yaml
+   # Apply AI Gateway routes
+   kubectl apply -f https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/aigw-resources/gwapi-resources.yaml
 ```
 
 ---
@@ -168,10 +156,10 @@ kubectl get inferencepool vllm-semantic-router -n vllm-semantic-router-system -o
 Port-forward to the Envoy service and send a test request, following the guide:
 
 ```bash
-export GATEWAY_IP="localhost:8080"
 export ENVOY_SERVICE=$(kubectl get svc -n envoy-gateway-system \
-  --selector=gateway.envoyproxy.io/owning-gateway-namespace=vllm-semantic-router-system,gateway.envoyproxy.io/owning-gateway-name=vllm-semantic-router \
+  --selector=gateway.envoyproxy.io/owning-gateway-namespace=default,gateway.envoyproxy.io/owning-gateway-name=semantic-router \
   -o jsonpath='{.items[0].metadata.name}')
+
 kubectl port-forward -n envoy-gateway-system svc/$ENVOY_SERVICE 8080:80
 ```
 
@@ -190,9 +178,33 @@ curl -i -X POST http://localhost:8080/v1/chat/completions \
 
 ---
 
+## Cleanup
+
+To remove the entire deployment:
+
+```bash
+# Remove Gateway API resources and Demo LLM
+kubectl delete -f https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/aigw-resources/gwapi-resources.yaml
+kubectl delete -f https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/aigw-resources/base-model.yaml
+
+# Remove semantic router
+helm uninstall semantic-router -n vllm-semantic-router-system
+
+# Remove AI gateway
+helm uninstall aieg -n envoy-ai-gateway-system
+helm uninstall aieg-crd -n envoy-ai-gateway-system
+
+# Remove Envoy gateway
+helm uninstall eg -n envoy-gateway-system
+
+# Remove vLLM Production Stack
+helm uninstall vllm-stack
+```
+
+---
+
 ## Troubleshooting
 
 - If the gateway is not accessible, check the Gateway and Envoy service per the guide.
-- If the inference pool is not ready, `kubectl describe` the `InferencePool` and check controller logs.
-- If the semantic router is not responding, check its pod status and logs.
+- If the semantic router is not responding, check its pod status and logs with `kubectl logs -n vllm-semantic-router-system`.
 - If it is returning error code, check the production stack router log.
