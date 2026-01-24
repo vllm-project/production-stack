@@ -64,6 +64,10 @@
               "tag": {
                 "type": "string"
               },
+              "imagePullSecret": {
+                "type": "string",
+                "description": "Name of secret with credentials to private container repository"
+              },
               "modelURL": {
                 "type": "string"
               },
@@ -107,6 +111,9 @@
                 "type": "string"
               },
               "priorityClassName": {
+                "type": "string"
+              },
+              "runtimeClassName": {
                 "type": "string"
               },
               "pvcStorage": {
@@ -475,6 +482,19 @@
         "replicaCount": {
           "type": "integer"
         },
+        "imagePullSecrets": {
+          "type": "array",
+          "description": "Image pull secrets for private container registries",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["name"]
+          }
+        },
         "autoscaling": {
           "type": "object",
           "properties": {
@@ -487,6 +507,17 @@
         "containerPort": {
           "type": "integer"
         },
+        "securityContext": {
+          "type": "object",
+          "description": "Pod-level security context configuration",
+          "additionalProperties": true
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level security context configuration",
+          "additionalProperties": true
+        },
+
         "servicePort": {
           "type": "integer"
         },
@@ -548,6 +579,26 @@
           "type": "object",
           "additionalProperties": {
             "type": "string"
+          }
+        },
+        "otel": {
+          "type": "object",
+          "description": "OpenTelemetry tracing configuration for the router",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "description": "OTLP endpoint for tracing (e.g., 'otel-collector:4317'). Tracing is enabled when this is set."
+            },
+            "serviceName": {
+              "type": "string",
+              "description": "Service name for OpenTelemetry traces",
+              "default": "vllm-router"
+            },
+            "secure": {
+              "type": "boolean",
+              "description": "Use secure (TLS) connection for OTLP exporter",
+              "default": false
+            }
           }
         }
       }

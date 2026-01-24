@@ -159,6 +159,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.repository` | string | `"lmcache/lmstack-router"` | Docker image repository for the router |
 | `routerSpec.tag` | string | `"latest"` | Docker image tag for the router |
 | `routerSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the router |
+| `routerSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
 | `routerSpec.enableRouter` | boolean | `true` | Whether to enable the router service |
 | `routerSpec.replicaCount` | integer | `1` | Number of replicas for the router pod |
 | `routerSpec.priorityClassName` | string | `""` | Priority class for router |
@@ -200,6 +201,14 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.readinessProbe.failureThreshold` | integer |`3`| Failure threshold for router's readiness probe |
 | `routerSpec.readinessProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's readiness probe will be testing |
 
+#### Router OpenTelemetry Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `routerSpec.otel.endpoint` | string | `""` | OTLP endpoint for tracing (e.g., "otel-collector:4317"). Tracing is enabled when this is set. |
+| `routerSpec.otel.serviceName` | string | `"vllm-router"` | Service name for OpenTelemetry traces |
+| `routerSpec.otel.secure` | boolean | `false` | Use secure (TLS) connection for OTLP exporter |
+
 #### Router Ingress Configuration
 
 | Field | Type | Default | Description |
@@ -218,6 +227,7 @@ This table documents all available configuration values for the Production Stack
 | `cacheserverSpec.image.repository` | string | `"lmcache/lmstack-cache-server"` | Docker image repository for the cache server |
 | `cacheserverSpec.image.tag` | string | `"latest"` | Docker image tag for the cache server |
 | `cacheserverSpec.image.pullPolicy` | string | `"Always"` | Image pull policy for the cache server |
+| `cacheserverSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
 | `cacheserverSpec.replicaCount` | integer | `1` | Number of replicas for the cache server pod |
 | `cacheserverSpec.containerPort` | integer | `8000` | Port the cache server container is listening on |
 | `cacheserverSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the cache server |

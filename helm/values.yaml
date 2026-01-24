@@ -21,6 +21,7 @@ servingEngineSpec:
   # - annotations: (Optional, map) The annotations to add to the deployment, e.g., {model: "opt125m"}
   # - serviceAccountName: (Optional, string) The name of the service account to use for the deployment, e.g., "vllm-service-account"
   # - priorityClassName: (Optional, string) The name of the priority class name for the deployment, e.g., "high-priority"
+  # - runtimeClassName: (Optional, string) Runtime class for the pod, e.g., "nvidia". If not specified, falls back to servingEngineSpec.runtimeClassName
   # - podAnnotations: (Optional, map) The annotations to add to the pod, e.g., {model: "opt125m"}
   # - name: (string) The name of the model, e.g., "example-model"
   # - repository: (string) The repository of the model, e.g., "vllm/vllm-openai"
@@ -312,6 +313,18 @@ routerSpec:
   tag: "latest"
   imagePullPolicy: "Always"
 
+  # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
+  securityContext: {}
+
+  # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
+  containerSecurityContext: {}
+
+  # -- Image pull secrets for private container registries
+  # Example:
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+  imagePullSecrets: []
+
   # -- Whether to enable the router service
   enableRouter: true
 
@@ -363,6 +376,16 @@ routerSpec:
 
   # -- Window size in seconds to calculate the request statistics
   requestStatsWindow: 60
+
+  # -- OpenTelemetry tracing configuration
+  # When otelEndpoint is set, tracing is automatically enabled
+  otel:
+    # -- OTLP endpoint for tracing (e.g., "localhost:4317" or "otel-collector:4317")
+    endpoint: ""
+    # -- Service name for traces (default: "vllm-router")
+    serviceName: "vllm-router"
+    # -- Use secure (TLS) connection for OTLP exporter (default: false, i.e., insecure)
+    secure: false
 
   # -- deployment strategy
   strategy: {}
