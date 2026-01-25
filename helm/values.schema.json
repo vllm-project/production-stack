@@ -38,6 +38,12 @@
             }
           ]
         },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "modelSpec": {
           "type": "array",
           "items": {
