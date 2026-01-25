@@ -53,11 +53,13 @@ brew install jq  # macOS
 ### OCI Configuration
 
 1. **OCI CLI Profile**: Configure your OCI CLI with API key authentication:
+
    ```bash
    oci setup config
    ```
 
 2. **Compartment**: Identify or create a compartment for your resources:
+
    ```bash
    oci iam compartment list --query 'data[*].{name:name, id:id}' --output table
    ```
@@ -65,6 +67,7 @@ brew install jq  # macOS
 3. **GPU Quota**: Ensure you have GPU quota in your tenancy. Request via OCI Support if needed.
 
 4. **SSH Key**: Have an SSH key pair ready for bastion access:
+
    ```bash
    # Generate if you don't have one
    ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa_oci
@@ -74,7 +77,7 @@ brew install jq  # macOS
 
 ## Architecture Overview
 
-```
+```text
                                     ┌─────────────────────────────────────────┐
                                     │              OCI Region                  │
                                     │                                          │
@@ -142,6 +145,7 @@ oci compute shape list \
 ```
 
 **Known GPU Availability:**
+
 | Region | A10 Available In |
 |--------|------------------|
 | us-ashburn-1 | AD-2, AD-3 (use `GPU_AD_INDEX=1` or `2`) |
@@ -577,6 +581,7 @@ If the filesystem didn't expand:
 5. **Verify filesystem**: `df -h /` should show ~180GB total
 
 If step 1 (growpart) didn't expand the partition, the disk geometry may not have been refreshed. Try:
+
 ```bash
 # Force kernel to re-read partition table
 chroot /host partprobe /dev/sda
@@ -742,6 +747,7 @@ export GPU_AD_INDEX="1"  # Check GPU availability first!
 **Problem**: A10 GPUs are not available in all ADs.
 
 **Solution**: Check availability before deployment:
+
 - `us-ashburn-1`: AD-2 and AD-3 (use `GPU_AD_INDEX=1` or `2`)
 - `us-chicago-1`: AD-1 only (use `GPU_AD_INDEX=0`)
 
@@ -750,6 +756,7 @@ export GPU_AD_INDEX="1"  # Check GPU availability first!
 **Problem**: Bastion SSH tunnels can drop.
 
 **Solution**: Use `ServerAliveInterval`:
+
 ```bash
 ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ...
 ```
@@ -765,6 +772,7 @@ ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ...
 **Problem**: When using automated scripts, the expansion pod may be deleted before the commands complete, leaving the filesystem unexpanded.
 
 **Solution**:
+
 - Stream pod logs to confirm each step completes
 - Wait for the pod to reach "Succeeded" status before deleting
 - Look for the "EXPANSION_COMPLETE" marker in the logs
@@ -775,6 +783,7 @@ ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ...
 **Problem**: After expanding the filesystem, Kubernetes may still report the old allocatable storage.
 
 **Solution**:
+
 1. Restart kubelet after expansion: `systemctl restart kubelet`
 2. Wait 60+ seconds for kubelet to recalculate allocatable storage
 3. Verify with: `kubectl describe node <node> | grep ephemeral-storage`
@@ -828,6 +837,7 @@ kubectl get events --sort-by='.lastTimestamp'
 ```
 
 Common causes:
+
 - DiskPressure: Expand filesystem (Step 10)
 - Insufficient resources: Check node capacity
 - GPU not detected: Verify NVIDIA device plugin
@@ -851,6 +861,7 @@ kubectl logs <vllm-pod-name>
 ```
 
 Common causes:
+
 - Insufficient GPU memory: Use smaller model or quantization
 - Disk space: Expand filesystem
 - HuggingFace token: Set `hf_token` in values if model requires authentication

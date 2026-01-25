@@ -211,12 +211,14 @@ allowVolumeExpansion: true
 Or manually expand using a privileged pod (see [README.md](../../deployment_on_cloud/oci/README.md#step-10-expand-gpu-node-filesystem-critical) for full instructions).
 
 The expansion process runs these 4 steps in order:
+
 1. `growpart /dev/sda 3` - Expand partition
 2. `pvresize /dev/sda3` - Resize LVM physical volume
 3. `lvextend -l +100%FREE /dev/ocivolume/root` - Extend logical volume
 4. `xfs_growfs /` - Grow XFS filesystem
 
 After expansion, verify the filesystem is ~180GB+:
+
 ```bash
 kubectl exec -it <vllm-pod> -- df -h /
 ```

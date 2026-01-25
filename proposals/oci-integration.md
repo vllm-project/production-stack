@@ -42,7 +42,7 @@ Oracle Cloud Infrastructure offers competitive GPU capabilities including A10, A
 
 Add `deployment_on_cloud/oci/` directory with:
 
-```
+```text
 deployment_on_cloud/oci/
   README.md                            # Main documentation
   entry_point.sh                       # One-click deploy/cleanup
@@ -52,6 +52,7 @@ deployment_on_cloud/oci/
 ```
 
 **entry_point.sh** provides:
+
 - OKE cluster creation with configurable GPU node pools
 - Block Volume CSI StorageClass configuration
 - NVIDIA device plugin deployment
@@ -59,12 +60,14 @@ deployment_on_cloud/oci/
 - Service exposure via OCI Load Balancer
 
 **StorageClass** uses OCI Block Volume CSI driver:
+
 ```yaml
 storageClassName: oci-block-storage-enc
 provisioner: blockvolume.csi.oraclecloud.com
 ```
 
 **Helm Values** include OCI-specific configuration:
+
 ```yaml
 nodeSelector:
   app: gpu
@@ -90,6 +93,7 @@ Add `tutorials/cloud_deployments/05-OCI-OKE-deployment.md` covering:
 #### Phase 3: Multi-GPU Support
 
 Add tensor parallelism configuration for bare metal GPU shapes:
+
 ```yaml
 tensorParallelSize: 8
 extraArgs:
@@ -102,6 +106,7 @@ nodeSelector:
 #### Phase 4: RDMA Multi-Node
 
 Add `deployment_on_cloud/oci/rdma/` with:
+
 - Cluster Network configuration for RoCEv2
 - NCCL environment variables for RDMA
 - Multi-node pipeline parallelism example
@@ -111,6 +116,7 @@ OCI RDMA provides 2-6.5 microsecond latency, enabling efficient multi-node infer
 #### Phase 5: OCI Data Science Integration
 
 Add `deployment_on_cloud/oci/data-science/` with:
+
 - Model deployment using OCI Data Science Model Deployment
 - ADS SDK integration example
 - Managed endpoint configuration
