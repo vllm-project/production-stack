@@ -401,15 +401,15 @@ def parse_args():
 
     parser.add_argument(
         "--lmcache-health-check-interval",
-        type=float,
-        default=5.0,
+        type=int,
+        default=5,
         help="Health check interval for LMCache worker (seconds)",
     )
 
     parser.add_argument(
         "--lmcache-worker-timeout",
-        type=float,
-        default=30.0,
+        type=int,
+        default=30,
         help="Timeout for LMCache worker (seconds)",
     )
 
