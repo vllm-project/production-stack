@@ -400,7 +400,7 @@ routerSpec:
       cpu: 400m
       memory: 500Mi
     limits:
-      memory: 500Mi
+      memory: 1000Mi
 
   # -- Customized labels for the router deployment
   labels:
