@@ -124,6 +124,14 @@ spec:
           {{- if $modelSpec.enableLoRA }}
           - "--enable-lora"
           {{- end }}
+          {{- if $modelSpec.runner }}
+          - "--runner"
+          - {{ $modelSpec.runner | quote }}
+          {{- end }}
+          {{- if $modelSpec.convert }}
+          - "--convert"
+          - {{ $modelSpec.convert | quote }}
+          {{- end }}
           {{- if $modelSpec.enableTool }}
           - "--enable-auto-tool-choice"
           {{- end }}
