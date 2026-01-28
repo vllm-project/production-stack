@@ -6,7 +6,9 @@ def initialize_batch_processor(
     batch_processor_name: str, storage_path: str, storage: Storage
 ) -> BatchProcessor:
     if batch_processor_name == "local":
-        from vllm_router.batch.local_processor import LocalBatchProcessor
+        from vllm_router.services.batch_service.local_processor import (
+            LocalBatchProcessor,
+        )
 
         return LocalBatchProcessor(storage_path, storage)
     else:

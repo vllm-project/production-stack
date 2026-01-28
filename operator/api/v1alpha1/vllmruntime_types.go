@@ -30,6 +30,9 @@ type DeploymentConfig struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas,omitempty"`
 
+	// Node selector
+	NodeSelectorTerms []corev1.NodeSelectorTerm `json:"nodeSelectorTerms,omitempty"`
+
 	// Deploy strategy
 	// +kubebuilder:validation:Enum=RollingUpdate;Recreate
 	// +kubebuilder:default=RollingUpdate
@@ -122,6 +125,9 @@ type ModelSpec struct {
 
 	// Maximum number of sequences
 	MaxNumSeqs int32 `json:"maxNumSeqs,omitempty"`
+
+	// Chat template
+	ChatTemplate string `json:"chatTemplate,omitempty"`
 }
 
 // LMCacheConfig defines the LM Cache configuration

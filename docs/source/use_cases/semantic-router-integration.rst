@@ -74,21 +74,29 @@ Identify the ClusterIP and port of your router Service:
 Step 2: Deploy vLLM Semantic Router
 ------------------------------------
 
-Follow the official `Install in Kubernetes <https://vllm-semantic-router.com/docs/installation/kubernetes>`_ guide with the updated configuration.
+Follow the official `Install in Kubernetes <https://vllm-semantic-router.com/docs/installation/k8s/ai-gateway>`_ guide with the updated configuration.
+
+Deploy vLLM Semantic Router using Helm:
 
 .. code-block:: bash
 
-   # Deploy vLLM Semantic Router manifests
-   kubectl apply -k deploy/kubernetes/ai-gateway/semantic-router
+   # Deploy vLLM Semantic Router with custom values from GHCR OCI registry
+   # (Optional) If you use a registry mirror/proxy, append: --set global.imageRegistry=<your-registry>
+   helm install semantic-router oci://ghcr.io/vllm-project/charts/semantic-router \
+     --version v0.0.0-latest \
+     --namespace vllm-semantic-router-system \
+     --create-namespace \
+     -f https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/semantic-router-values/values.yaml
+
    kubectl wait --for=condition=Available deployment/semantic-router \
      -n vllm-semantic-router-system --timeout=600s
 
    # Install Envoy Gateway
-  helm upgrade -i eg oci://docker.io/envoyproxy/gateway-helm \
-    --version v0.0.0-latest \
-    --namespace envoy-gateway-system \
-    --create-namespace \
-    -f https://raw.githubusercontent.com/envoyproxy/ai-gateway/main/manifests/envoy-gateway-values.yaml
+   helm upgrade -i eg oci://docker.io/envoyproxy/gateway-helm \
+     --version v0.0.0-latest \
+     --namespace envoy-gateway-system \
+     --create-namespace \
+     -f https://raw.githubusercontent.com/envoyproxy/ai-gateway/main/manifests/envoy-gateway-values.yaml
 
    # Install Envoy AI Gateway
    helm upgrade -i aieg oci://docker.io/envoyproxy/ai-gateway-helm \
@@ -97,20 +105,27 @@ Follow the official `Install in Kubernetes <https://vllm-semantic-router.com/doc
      --create-namespace
 
    # Install Envoy AI Gateway CRDs
-   helm upgrade -i aieg-crd oci://docker.io/envoyproxy/ai-gateway-crds-helm --version v0.0.0-latest --namespace envoy-ai-gateway-system
+   helm upgrade -i aieg-crd oci://docker.io/envoyproxy/ai-gateway-crds-helm \
+     --version v0.0.0-latest \
+     --namespace envoy-ai-gateway-system
 
    # Wait for AI Gateway to be ready
    kubectl wait --timeout=300s -n envoy-ai-gateway-system \
      deployment/ai-gateway-controller --for=condition=Available
+
+.. note::
+
+   The values file contains the configuration for the semantic router including domain classification, LoRA routing, and plugin settings. You can download and customize it from the `semantic-router-values <https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/semantic-router-values/values.yaml>`_ to match your vLLM Production Stack setup.
 
 Create LLM Demo Backends and AI Gateway Routes:
 
 .. code-block:: bash
 
    # Apply LLM demo backends
-   kubectl apply -f deploy/kubernetes/ai-gateway/aigw-resources/base-model.yaml
+   kubectl apply -f https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/aigw-resources/base-model.yaml
+
    # Apply AI Gateway routes
-   kubectl apply -f deploy/kubernetes/ai-gateway/aigw-resources/gwapi-resources.yaml
+   kubectl apply -f https://raw.githubusercontent.com/vllm-project/semantic-router/refs/heads/main/deploy/kubernetes/ai-gateway/aigw-resources/gwapi-resources.yaml
 
 Step 3: Test the Deployment
 ----------------------------

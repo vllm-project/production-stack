@@ -8,4 +8,4 @@ Info can be found in the [Google Doc](https://docs.google.com/document/d/1SCye2q
 
 Time: Bi-weekly
 
-**Every other Tuesday 5:30 - 6:00 PM PT** – [Add to Calendar](https://drive.usercontent.google.com/u/0/uc?id=1I3WuivUVAq1vZ2XSW4rmqgD5c0bQcxE0&export=download)
+**Every other Tuesday 5:30 - 6:00 PM PT** – [Add to Calendar](https://drive.google.com/uc?export=download&id=1D4SqQiqzdSx_xsEwS0QTd592zd3Xourh)

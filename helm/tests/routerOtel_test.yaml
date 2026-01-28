@@ -1,0 +1,77 @@
+suite: test router OpenTelemetry configuration
+templates:
+  - deployment-router.yaml
+tests:
+  - it: should not include otel args when endpoint is not set
+    set:
+      routerSpec:
+        enableRouter: true
+        otel:
+          endpoint: ""
+    asserts:
+      - template: deployment-router.yaml
+        notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--otel-endpoint"
+
+  - it: should include otel args when endpoint is set
+    set:
+      routerSpec:
+        enableRouter: true
+        otel:
+          endpoint: "otel-collector:4317"
+          serviceName: "vllm-router"
+          secure: false
+    asserts:
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].args
+          content: "--otel-endpoint"
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].args
+          content: "otel-collector:4317"
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].args
+          content: "--otel-service-name"
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].args
+          content: "vllm-router"
+      - template: deployment-router.yaml
+        notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--otel-secure"
+
+  - it: should use custom service name when specified
+    set:
+      routerSpec:
+        enableRouter: true
+        otel:
+          endpoint: "jaeger:4317"
+          serviceName: "my-custom-router"
+          secure: false
+    asserts:
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].args
+          content: "my-custom-router"
+
+  - it: should include otel-secure flag when secure is true
+    set:
+      routerSpec:
+        enableRouter: true
+        otel:
+          endpoint: "otel-collector:4317"
+          serviceName: "vllm-router"
+          secure: true
+    asserts:
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].args
+          content: "--otel-endpoint"
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].args
+          content: "--otel-secure"
