@@ -152,6 +152,39 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlPeerPort` | string | `"55555"` | NIXL peer port for KV transfer |
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlBufferSize` | string | `"1073741824"` | NIXL buffer size for KV transfer |
 
+#### KEDA Autoscaling Configuration
+
+> **Note**: Unless explicitly set, KEDA's default values will apply. The defaults shown below are KEDA's defaults, not values enforced by this Helm chart.
+
+| Field | Type | KEDA Default | Description |
+|-------|------|--------------|-------------|
+| `servingEngineSpec.modelSpec[].keda.enabled` | boolean | `false` | Enable KEDA autoscaling for this model deployment (requires KEDA installed in cluster) |
+| `servingEngineSpec.modelSpec[].keda.minReplicaCount` | integer | - | Minimum number of replicas (supports 0 for scale-to-zero); if not set, HPA minReplicas default applies |
+| `servingEngineSpec.modelSpec[].keda.maxReplicaCount` | integer | - | Maximum number of replicas; if not set, HPA maxReplicas default applies |
+| `servingEngineSpec.modelSpec[].keda.pollingInterval` | integer | `30` | How often KEDA checks metrics (in seconds) |
+| `servingEngineSpec.modelSpec[].keda.cooldownPeriod` | integer | `300` | Wait time before scaling down after scaling up (in seconds) |
+| `servingEngineSpec.modelSpec[].keda.idleReplicaCount` | integer | - | Number of replicas when no triggers are active |
+| `servingEngineSpec.modelSpec[].keda.initialCooldownPeriod` | integer | - | Initial cooldown period before scaling down after creation (in seconds) |
+| `servingEngineSpec.modelSpec[].keda.fallback` | map | - | Fallback configuration when scaler fails |
+| `servingEngineSpec.modelSpec[].keda.fallback.failureThreshold` | integer | - | Number of consecutive failures before fallback |
+| `servingEngineSpec.modelSpec[].keda.fallback.replicas` | integer | - | Number of replicas to scale to in fallback |
+| `servingEngineSpec.modelSpec[].keda.triggers` | list | See below | List of KEDA trigger configurations (Prometheus-based) |
+| `servingEngineSpec.modelSpec[].keda.triggers[].type` | string | - | Trigger type (e.g., `"prometheus"`) |
+| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.serverAddress` | string | - | Prometheus server URL (e.g., <http://prometheus-operated.monitoring.svc:9090>) |
+| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.metricName` | string | - | Name of the metric to monitor |
+| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.query` | string | - | PromQL query to fetch the metric |
+| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.threshold` | string | - | Threshold value that triggers scaling |
+| `servingEngineSpec.modelSpec[].keda.advanced` | map | - | Advanced KEDA configuration options |
+| `servingEngineSpec.modelSpec[].keda.advanced.restoreToOriginalReplicaCount` | boolean | `false` | Restore original replica count when ScaledObject is deleted |
+| `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig` | map | - | HPA-specific configuration |
+| `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig.name` | string | `keda-hpa-{scaled-object-name}` | Custom name for HPA resource |
+| `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig.behavior` | map | - | HPA scaling behavior configuration (see [K8s docs](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)) |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers` | map | - | Scaling modifiers for composite metrics |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.target` | string | - | Target value for the composed metric |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.activationTarget` | string | - | Activation target for the composed metric |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.metricType` | string | `"AverageValue"` | Metric type (AverageValue or Value) |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.formula` | string | - | Formula to compose metrics together |
+
 ### Router Configuration
 
 | Field | Type | Default | Description |
