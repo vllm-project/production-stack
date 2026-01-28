@@ -62,6 +62,8 @@ servingEngineSpec:
   #   extraVolumeMounts:
   #   - name: tmp-volume
   #     mountPath: /tmp
+  # - runner: (Optional, string) The runner type for the model, can be "auto" or "pooling". e.g., "pooling"
+  # - convert: (Optional, string) The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score". e.g., "embed"
   # - initContainer: (optional, list of objects) The configuration for the init container to be run before the main container.
   #   - name: (string) The name of the init container, e.g., "init"
   #   - image: (string) The Docker image for the init container, e.g., "busybox:latest"

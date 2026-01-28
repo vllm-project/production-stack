@@ -124,6 +124,13 @@ spec:
           {{- if $modelSpec.enableLoRA }}
           - "--enable-lora"
           {{- end }}
+          {{- if $modelSpec.enableTool }}
+          - "--enable-auto-tool-choice"
+          {{- end }}
+          {{- if $modelSpec.toolCallParser }}
+          - "--tool-call-parser"
+          - {{ $modelSpec.toolCallParser | quote }}
+          {{- end }}
           {{- if $modelSpec.runner }}
           - "--runner"
           - {{ $modelSpec.runner | quote }}
@@ -131,13 +138,6 @@ spec:
           {{- if $modelSpec.convert }}
           - "--convert"
           - {{ $modelSpec.convert | quote }}
-          {{- end }}
-          {{- if $modelSpec.enableTool }}
-          - "--enable-auto-tool-choice"
-          {{- end }}
-          {{- if $modelSpec.toolCallParser }}
-          - "--tool-call-parser"
-          - {{ $modelSpec.toolCallParser | quote }}
           {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{-   if hasKey . "enableChunkedPrefill" }}
