@@ -5,15 +5,7 @@ set -euo pipefail
 # This script is a standalone cleanup utility.
 # For full cleanup including cluster deletion, use: ./entry_point.sh cleanup
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-
-OCI_COMPARTMENT_ID="${OCI_COMPARTMENT_ID:-}"
 CLUSTER_NAME="${CLUSTER_NAME:-production-stack}"
-
-if [[ -z "${OCI_COMPARTMENT_ID}" ]]; then
-    echo "Error: OCI_COMPARTMENT_ID environment variable is required"
-    exit 1
-fi
 
 echo "Starting cleanup for cluster: ${CLUSTER_NAME}"
 
@@ -45,7 +37,7 @@ fi
 # Delete custom resources
 if kubectl get deployments,services,configmaps,secrets -l app.kubernetes.io/name=vllm --all-namespaces -o name 2>/dev/null | grep -q .; then
     echo "Deleting custom resources..."
-    kubectl delete deployments,services,configmaps,secrets -l app.kubernetes.io/name=vllm --all
+    kubectl delete deployments,services,configmaps,secrets --all-namespaces -l app.kubernetes.io/name=vllm
 else
     echo "No custom vLLM resources found to delete."
 fi
