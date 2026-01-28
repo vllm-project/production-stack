@@ -338,7 +338,7 @@ get_gpu_image() {
 
     # Extract full version without 'v' prefix (e.g., "v1.31.10" -> "1.31.10")
     local K8S_VERSION
-    K8S_VERSION=$(echo "${KUBERNETES_VERSION}" | sed 's/^v//')
+    K8S_VERSION="${KUBERNETES_VERSION#v}"
 
     # Get OKE-specific GPU image from node-pool-options API
     # These images have kubelet and OKE node registration components pre-installed
@@ -541,7 +541,7 @@ create_bastion() {
 get_cpu_image() {
     # Get OKE image for CPU nodes (non-GPU, non-ARM)
     local K8S_VERSION
-    K8S_VERSION=$(echo "${KUBERNETES_VERSION}" | sed 's/^v//')
+    K8S_VERSION="${KUBERNETES_VERSION#v}"
 
     local IMAGE_ID
     IMAGE_ID=$(oci_cmd ce node-pool-options get \
