@@ -28,8 +28,8 @@ from requests import JSONDecodeError
 
 from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import (
-    DisaggregatedPrefillRouter,
     DisaggregatedPrefillOrchestratedRouter,
+    DisaggregatedPrefillRouter,
     KvawareRouter,
     PrefixAwareRouter,
     SessionRouter,
@@ -271,7 +271,7 @@ async def route_general_request(
             request, endpoint, background_tasks
         )
         return response
-    
+
     # Handle orchestrated disaggregated inference (NxDI pattern)
     if isinstance(request.app.state.router, DisaggregatedPrefillOrchestratedRouter):
         response = await route_orchestrated_disaggregated_request(
@@ -567,26 +567,26 @@ async def route_orchestrated_disaggregated_request(
 ):
     """
     Orchestrated disaggregated inference following NxDI's toy_proxy_server pattern.
-    
+
     Flow (matches NxDI toy_proxy_server.py):
     1. Send request to Prefill endpoint with kv_transfer_params and max_tokens=1
     2. Get response containing kv_transfer_params with KV cache metadata
     3. Extract kv_transfer_params, set remote_host to prefill endpoint
     4. Forward kv_transfer_params to Decode endpoint
     5. Stream decode response back to client
-    
+
     Reference: NxDI/examples/vllm/disaggregated_inference/toy_proxy_server.py
     """
     in_router_time = time.time()
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
-    
+
     logger.info(f"[{request_id}] Starting orchestrated disaggregated inference")
-    
+
     # Get endpoints from service discovery
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
-    
+
     # Use router's _find_endpoints method to get prefill and decode endpoints
     router = request.app.state.router
     try:
@@ -598,20 +598,20 @@ async def route_orchestrated_disaggregated_request(
             content={"error": str(e)},
             headers={"X-Request-Id": request_id},
         )
-    
+
     # Use round-robin load balancing to select prefill and decode endpoints
     prefill_endpoint = router.select_prefill_endpoint(prefiller_endpoints)
     decode_endpoint = router.select_decode_endpoint(decoder_endpoints)
     prefill_url = prefill_endpoint.url
     decode_url = decode_endpoint.url
-    
+
     logger.info(f"[{request_id}] Prefill endpoint: {prefill_url}")
     logger.info(f"[{request_id}] Decode endpoint: {decode_url}")
-    
+
     # Step 1: Send to Prefill with max_tokens=1
     prefill_api_url = f"{prefill_url}{endpoint}"
     logger.info(f"[{request_id}] Sending prefill request to {prefill_api_url}")
-    
+
     # Create prefill request with max_tokens=1 to optimize prefill step
     # Also add kv_transfer_params to enable disaggregated mode on prefill
     # Reference: NxDI toy_proxy_server.py
@@ -626,20 +626,20 @@ async def route_orchestrated_disaggregated_request(
         "remote_engine_id": None,
         "remote_block_ids": None,
         "remote_host": None,
-        "remote_port": None
+        "remote_port": None,
     }
     # Disable streaming for prefill to get full response with kv_transfer_params
     prefill_request_json["stream"] = False
     if "stream_options" in prefill_request_json:
         del prefill_request_json["stream_options"]
-    
+
     st = time.time()
     is_streaming = request_json.get("stream", False)
-    
+
     try:
         # Use the shared aiohttp client from app state
         client = request.app.state.aiohttp_client_wrapper()
-        
+
         # Send to Prefill
         async with client.post(
             prefill_api_url,
@@ -648,22 +648,26 @@ async def route_orchestrated_disaggregated_request(
                 "Content-Type": "application/json",
                 "X-Request-Id": request_id,
             },
-            timeout=aiohttp.ClientTimeout(total=300)
+            timeout=aiohttp.ClientTimeout(total=300),
         ) as prefill_resp:
             if prefill_resp.status != 200:
                 error_text = await prefill_resp.text()
-                logger.error(f"[{request_id}] Prefill failed with status {prefill_resp.status}: {error_text}")
+                logger.error(
+                    f"[{request_id}] Prefill failed with status {prefill_resp.status}: {error_text}"
+                )
                 return JSONResponse(
                     status_code=prefill_resp.status,
                     content={"error": f"Prefill failed: {error_text}"},
                     headers={"X-Request-Id": request_id},
                 )
-            
+
             prefill_data = await prefill_resp.json()
             et = time.time()
             logger.info(f"[{request_id}] Prefill completed in {et - st:.4f}s (TTFT)")
-            logger.debug(f"[{request_id}] Prefill response keys: {prefill_data.keys() if isinstance(prefill_data, dict) else 'not a dict'}")
-        
+            logger.debug(
+                f"[{request_id}] Prefill response keys: {prefill_data.keys() if isinstance(prefill_data, dict) else 'not a dict'}"
+            )
+
         # Step 2: Extract kv_transfer_params and send to Decode
         # kv_transfer_params is the vLLM/NxDI-supported field for KV cache handoff
         # Reference: NxDI toy_proxy_server.py
@@ -671,14 +675,18 @@ async def route_orchestrated_disaggregated_request(
         kv_transfer_params = prefill_data.get("kv_transfer_params", {})
         if kv_transfer_params:
             # Set remote_host to prefill endpoint for KV cache retrieval
-            kv_transfer_params["remote_host"] = prefill_url.split("://")[1].split(":")[0]
+            kv_transfer_params["remote_host"] = prefill_url.split("://")[1].split(":")[
+                0
+            ]
             decode_request["kv_transfer_params"] = kv_transfer_params
         else:
-            logger.warning(f"[{request_id}] Prefill response did not contain kv_transfer_params")
-        
+            logger.warning(
+                f"[{request_id}] Prefill response did not contain kv_transfer_params"
+            )
+
         decode_api_url = f"{decode_url}{endpoint}"
         logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
-        
+
         async with client.post(
             decode_api_url,
             json=decode_request,
@@ -686,17 +694,19 @@ async def route_orchestrated_disaggregated_request(
                 "Content-Type": "application/json",
                 "X-Request-Id": request_id,
             },
-            timeout=aiohttp.ClientTimeout(total=600)
+            timeout=aiohttp.ClientTimeout(total=600),
         ) as decode_resp:
             if decode_resp.status != 200:
                 error_text = await decode_resp.text()
-                logger.error(f"[{request_id}] Decode failed with status {decode_resp.status}: {error_text}")
+                logger.error(
+                    f"[{request_id}] Decode failed with status {decode_resp.status}: {error_text}"
+                )
                 return JSONResponse(
                     status_code=decode_resp.status,
                     content={"error": f"Decode failed: {error_text}"},
                     headers={"X-Request-Id": request_id},
                 )
-            
+
             if is_streaming:
                 # For streaming, yield chunks as they arrive (true streaming)
                 async def generate_stream():
@@ -709,7 +719,7 @@ async def route_orchestrated_disaggregated_request(
                         logger.info(
                             f"[{request_id}] Orchestrated streaming request completed, total time = {curr_time - in_router_time:.4f}s"
                         )
-                
+
                 return StreamingResponse(
                     generate_stream(),
                     media_type="text/event-stream",
@@ -718,26 +728,31 @@ async def route_orchestrated_disaggregated_request(
             else:
                 # For non-streaming, read full response
                 response_data = await decode_resp.read()
-                
+
                 curr_time = time.time()
                 logger.info(
                     f"[{request_id}] Orchestrated request completed, total time = {curr_time - in_router_time:.4f}s"
                 )
-                
+
                 return JSONResponse(
                     content=json.loads(response_data),
                     headers={"X-Request-Id": request_id},
                 )
-                
+
     except aiohttp.ClientError as e:
-        logger.error(f"[{request_id}] HTTP error during orchestrated request: {e}", exc_info=True)
+        logger.error(
+            f"[{request_id}] HTTP error during orchestrated request: {e}", exc_info=True
+        )
         return JSONResponse(
             status_code=503,
             content={"error": f"HTTP error: {str(e)}"},
             headers={"X-Request-Id": request_id},
         )
     except Exception as e:
-        logger.error(f"[{request_id}] Unexpected error during orchestrated request: {e}", exc_info=True)
+        logger.error(
+            f"[{request_id}] Unexpected error during orchestrated request: {e}",
+            exc_info=True,
+        )
         return JSONResponse(
             status_code=500,
             content={"error": f"Unexpected error: {str(e)}"},
