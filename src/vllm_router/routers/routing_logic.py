@@ -55,6 +55,7 @@ class RoutingLogic(str, enum.Enum):
     KVAWARE = "kvaware"
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
+    DISAGGREGATED_PREFILL_ORCHESTRATED = "disaggregated_prefill_orchestrated"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -519,6 +520,105 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             return decoder_endpoints[0].url
 
 
+class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
+    """
+    Orchestrates disaggregated inference in a single request by chaining Prefill → Decode.
+
+    Unlike DisaggregatedPrefillRouter (which requires 2 separate client requests),
+    this router handles the entire flow internally:
+    1. Receives request from client
+    2. Forwards to Prefill endpoint with kv_transfer_params to enable disaggregated mode
+    3. Gets prefill response with kv_transfer_params containing KV cache metadata
+    4. Extracts kv_transfer_params, sets remote_host, and forwards to Decode
+    5. Streams decode response back to client
+
+    This is designed for NxDI (Neuronx Distributed Inference) on AWS Trainium,
+    following NxDI's toy_proxy_server.py pattern.
+
+    Reference: NxDI/examples/vllm/disaggregated_inference/toy_proxy_server.py
+
+    Load balancing: Uses round-robin across available prefill and decode pods.
+    """
+
+    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
+        if hasattr(self, "_initialized"):
+            return
+        self.prefill_model_labels = prefill_model_labels or []
+        self.decode_model_labels = decode_model_labels or []
+        # Round-robin counters for load balancing across xPyD pods
+        self.prefill_idx = 0
+        self.decode_idx = 0
+        self._initialized = True
+        logger.info(
+            f"Initialized DisaggregatedPrefillOrchestratedRouter with "
+            f"prefill_labels={self.prefill_model_labels}, "
+            f"decode_labels={self.decode_model_labels}"
+        )
+
+    def _find_endpoints(self, endpoints: List[EndpointInfo]):
+        """Find prefill and decode endpoints based on model labels."""
+        prefiller_endpoints = [
+            e for e in endpoints if e.model_label in self.prefill_model_labels
+        ]
+        decoder_endpoints = [
+            e for e in endpoints if e.model_label in self.decode_model_labels
+        ]
+
+        if not prefiller_endpoints:
+            raise ValueError(
+                f"No prefill endpoints found with labels {self.prefill_model_labels}. "
+                f"Available endpoints: {[(e.url, e.model_label) for e in endpoints]}"
+            )
+        if not decoder_endpoints:
+            raise ValueError(
+                f"No decode endpoints found with labels {self.decode_model_labels}. "
+                f"Available endpoints: {[(e.url, e.model_label) for e in endpoints]}"
+            )
+
+        return prefiller_endpoints, decoder_endpoints
+
+    def select_prefill_endpoint(
+        self, prefiller_endpoints: List[EndpointInfo]
+    ) -> EndpointInfo:
+        """Select prefill endpoint using round-robin load balancing."""
+        if not prefiller_endpoints:
+            raise ValueError("No prefill endpoints available")
+        # Sort for consistency across requests
+        sorted_endpoints = sorted(prefiller_endpoints, key=lambda e: e.url)
+        selected = sorted_endpoints[self.prefill_idx % len(sorted_endpoints)]
+        self.prefill_idx += 1
+        return selected
+
+    def select_decode_endpoint(
+        self, decoder_endpoints: List[EndpointInfo]
+    ) -> EndpointInfo:
+        """Select decode endpoint using round-robin load balancing."""
+        if not decoder_endpoints:
+            raise ValueError("No decode endpoints available")
+        # Sort for consistency across requests
+        sorted_endpoints = sorted(decoder_endpoints, key=lambda e: e.url)
+        selected = sorted_endpoints[self.decode_idx % len(sorted_endpoints)]
+        self.decode_idx += 1
+        return selected
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        """
+        This method is called by the router framework but for orchestrated routing,
+        we need to handle the full flow differently. This returns the prefill URL
+        as a placeholder - the actual orchestration happens in route_orchestrated_disaggregated_request.
+        """
+        prefiller_endpoints, _ = self._find_endpoints(endpoints)
+        # Return prefill URL - actual orchestration is done in request.py
+        return prefiller_endpoints[0].url
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -548,6 +648,13 @@ def initialize_routing_logic(
         return DisaggregatedPrefillRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
+    elif routing_logic == RoutingLogic.DISAGGREGATED_PREFILL_ORCHESTRATED:
+        logger.info(
+            "Initializing disaggregated prefill orchestrated routing logic (NxDI)"
+        )
+        return DisaggregatedPrefillOrchestratedRouter(
+            kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
+        )
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -568,6 +675,7 @@ def get_routing_logic() -> RoutingInterface:
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
+        DisaggregatedPrefillOrchestratedRouter,
     ):
         if cls in SingletonABCMeta._instances:
             return cls()
@@ -582,6 +690,7 @@ def cleanup_routing_logic():
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
+        DisaggregatedPrefillOrchestratedRouter,
     ):
         if cls in SingletonABCMeta._instances:
             instance = cls()
