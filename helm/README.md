@@ -84,6 +84,8 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].imagePullSecret` | string | `""` | (Optional) Name of secret with credentials to private container repository |
 | `servingEngineSpec.modelSpec[].modelURL` | string | `""` | The URL of the model, e.g., "facebook/opt-125m" |
 | `servingEngineSpec.modelSpec[].chatTemplate` | string | `null` | (Optional) Chat template (Jinja2) specifying tokenizer configuration |
+| `servingEngineSpec.modelSpec[].runner` | string | `""` | (Optional) The runner type for the model, can be "auto" or "pooling" |
+| `servingEngineSpec.modelSpec[].convert` | string | `""` | (Optional) The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score" |
 | `servingEngineSpec.modelSpec[].replicaCount` | integer | `1` | The number of replicas for the model |
 | `servingEngineSpec.modelSpec[].requestCPU` | integer | `0` | The number of CPUs requested for the model |
 | `servingEngineSpec.modelSpec[].requestMemory` | string | `""` | The amount of memory requested for the model, e.g., "16Gi" |
