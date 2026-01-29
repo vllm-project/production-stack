@@ -475,7 +475,12 @@ async def route_disaggregated_prefill_request(
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
 
-    orig_max_tokens = request_json.get("max_tokens", 0)
+    # Track whether max_tokens was originally present in the request
+    has_max_tokens = "max_tokens" in request_json
+    orig_max_tokens = request_json.get("max_tokens")
+    has_max_completion_tokens = "max_completion_tokens" in request_json
+    orig_max_completion_tokens = request_json.get("max_completion_tokens")
+
     request_json["max_tokens"] = 1
     st = time.time()
     try:
@@ -487,7 +492,18 @@ async def route_disaggregated_prefill_request(
         logger.info(
             f"Routing request {request_id} with session id None to {request.app.state.prefill_client._base_url} at {et}, process time = {et - in_router_time:.4f}"
         )
-        request_json["max_tokens"] = orig_max_tokens
+        # Restore max_tokens to original state: if it was present, restore the
+        # value; if it was not present, remove it entirely to avoid sending
+        # max_tokens=0 to the decoder which would cause a 400 Bad Request
+        if has_max_tokens:
+            request_json["max_tokens"] = orig_max_tokens
+        else:
+            del request_json["max_tokens"]
+        # Restore max_completion_tokens if it was modified by send_request_to_prefiller
+        if has_max_completion_tokens:
+            request_json["max_completion_tokens"] = orig_max_completion_tokens
+        elif "max_completion_tokens" in request_json:
+            del request_json["max_completion_tokens"]
     except aiohttp.ClientResponseError as e:
         logger.error(f"HTTP error in prefiller: {e}", exc_info=True)
         return JSONResponse(
