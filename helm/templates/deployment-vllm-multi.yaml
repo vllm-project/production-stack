@@ -131,14 +131,6 @@ spec:
           - "--tool-call-parser"
           - {{ $modelSpec.toolCallParser | quote }}
           {{- end }}
-          {{- if $modelSpec.runner }}
-          - "--runner"
-          - {{ $modelSpec.runner | quote }}
-          {{- end }}
-          {{- if $modelSpec.convert }}
-          - "--convert"
-          - {{ $modelSpec.convert | quote }}
-          {{- end }}
           {{- with $modelSpec.vllmConfig }}
           {{-   if hasKey . "enableChunkedPrefill" }}
           {{-     if .enableChunkedPrefill }}
@@ -175,6 +167,14 @@ spec:
           {{-   if hasKey . "maxLoras" }}
           - "--max_loras"
           - {{ .maxLoras | quote }}
+          {{-   end }}
+          {{-   if hasKey . "runner" }}
+          - "--runner"
+          - {{ .runner | quote }}
+          {{-   end }}
+          {{-   if hasKey . "convert" }}
+          - "--convert"
+          - {{ .convert | quote }}
           {{-   end }}
           {{-   if .extraArgs }}
           {{-     range .extraArgs }}
