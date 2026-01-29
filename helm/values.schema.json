@@ -134,6 +134,14 @@
               "serviceAccountName": {
                 "type": "string"
               },
+              "runner": {
+                "type": "string",
+                "enum": ["auto", "pooling"]
+              },
+              "convert": {
+                "type": "string",
+                "enum": ["token_embed", "embed", "token_classify", "classify", "score"]
+              },
               "initContainer": {
                 "type": "object",
                 "properties": {
