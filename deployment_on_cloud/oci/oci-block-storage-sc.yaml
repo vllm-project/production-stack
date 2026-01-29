@@ -1,0 +1,47 @@
+# OCI Block Volume StorageClass for vLLM model storage
+# Uses OCI Block Volume CSI driver with encryption enabled
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: oci-block-storage-enc
+provisioner: blockvolume.csi.oraclecloud.com
+parameters:
+  # Use balanced performance tier for cost-effectiveness
+  # Options: 0 (Lower Cost), 10 (Balanced), 20 (Higher Performance)
+  vpusPerGB: "10"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+
+---
+# High-performance StorageClass for larger models
+# Uses higher performance tier for faster model loading
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: oci-block-storage-hp
+provisioner: blockvolume.csi.oraclecloud.com
+parameters:
+  vpusPerGB: "20"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+
+---
+# OCI File Storage Service StorageClass (optional)
+# Use this for multi-node deployments requiring shared storage
+# Requires FSS mount target to be pre-created
+
+# apiVersion: storage.k8s.io/v1
+# kind: StorageClass
+# metadata:
+#   name: oci-fss
+# provisioner: fss.csi.oraclecloud.com
+# parameters:
+#   availabilityDomain: "US-ASHBURN-AD-1"
+#   mountTargetOcid: "ocid1.mounttarget.oc1.iad.xxxxx"
+#   exportPath: "/vllm-models"
+# reclaimPolicy: Delete
+# volumeBindingMode: Immediate

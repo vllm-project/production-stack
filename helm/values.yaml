@@ -119,6 +119,35 @@ servingEngineSpec:
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   # - enableLoRA: (optional, bool) Whether to enable LoRA, e.g., true
   #
+  # - keda: (optional, map) KEDA autoscaling configuration for this model deployment. Requires KEDA to be installed in the cluster.
+  #   - enabled: (optional, bool) Whether to enable KEDA autoscaling for this model, e.g., true
+  #   - minReplicaCount: (optional, int) Minimum number of replicas (supports 0 for scale-to-zero), e.g., 1
+  #   - maxReplicaCount: (optional, int) Maximum number of replicas, e.g., 5
+  #   - pollingInterval: (optional, int) How often KEDA should check the metrics (in seconds), e.g., 15
+  #   - cooldownPeriod: (optional, int) How long to wait before scaling down after scaling up (in seconds), e.g., 360
+  #   - idleReplicaCount: (optional, int) Number of replicas to scale to when no triggers are active, e.g., 0
+  #   - initialCooldownPeriod: (optional, int) Initial cooldown period in seconds before scaling down after creation, e.g., 60
+  #   - fallback: (optional, map) Fallback configuration when scaler fails
+  #     - failureThreshold: (int) Number of consecutive failures before fallback, e.g., 3
+  #     - replicas: (int) Number of replicas to scale to in fallback, e.g., 2
+  #   - triggers: (optional, list) List of KEDA trigger configurations
+  #     - type: (string) Trigger type, e.g., "prometheus"
+  #     - metadata: (map) Trigger metadata
+  #       - serverAddress: (string) Prometheus server address, e.g., "http://prometheus-operated.monitoring.svc:9090"
+  #       - metricName: (string) Name of the metric to monitor, e.g., "vllm:num_requests_waiting"
+  #       - query: (string) Prometheus query to fetch the metric, e.g., "vllm:num_requests_waiting"
+  #       - threshold: (string) Threshold value that triggers scaling, e.g., "5"
+  #   - advanced: (optional, map) Advanced KEDA configuration
+  #     - restoreToOriginalReplicaCount: (optional, bool) Restore original replica count when ScaledObject is deleted, e.g., false
+  #     - horizontalPodAutoscalerConfig: (optional, map) HPA-specific configuration
+  #       - name: (optional, string) Custom name for the HPA resource, default: "keda-hpa-{scaled-object-name}"
+  #       - behavior: (optional, map) HPA scaling behavior configuration, see https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+  #     - scalingModifiers: (optional, map) Scaling modifiers for composite metrics
+  #       - target: (string) Target value for the composed metric
+  #       - activationTarget: (optional, string) Activation target for the composed metric
+  #       - metricType: (optional, string) Metric type (AverageValue or Value), default: "AverageValue"
+  #       - formula: (string) Formula to compose metrics together
+  #
   # Example:
   # vllmApiKey: "vllm_xxxxxxxxxxxxx"
   # modelSpec:
@@ -177,6 +206,21 @@ servingEngineSpec:
   #         operator: "In"
   #         values:
   #         - "NVIDIA-RTX-A6000"
+  #
+  #   keda:
+  #     enabled: true
+  #     minReplicaCount: 1
+  #     maxReplicaCount: 3
+  #     pollingInterval: 15
+  #     cooldownPeriod: 360
+  #     triggers:
+  #       - type: prometheus
+  #         metadata:
+  #           serverAddress: http://prometheus-operated.monitoring.svc:9090
+  #           metricName: vllm:num_requests_waiting
+  #           query: vllm:num_requests_waiting
+  #           threshold: '5'
+
 
   #  extraVolumes:
   #    - name: dev-fuse

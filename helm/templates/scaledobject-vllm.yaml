@@ -1,0 +1,74 @@
+{{- if .Values.servingEngineSpec.enableEngine -}}
+{{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+{{- if and (hasKey $modelSpec "keda") $modelSpec.keda.enabled }}
+{{- if not (hasKey $modelSpec "raySpec") }}
+{{- with $ -}}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: "{{ .Release.Name }}-{{$modelSpec.name}}-scaledobject"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    model: {{ $modelSpec.name }}
+    helm-release-name: {{ .Release.Name }}
+  {{- include "chart.engineLabels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: "{{ .Release.Name }}-{{$modelSpec.name}}-deployment-vllm"
+  {{- if hasKey $modelSpec.keda "minReplicaCount" }}
+  minReplicaCount: {{ $modelSpec.keda.minReplicaCount }}
+  {{- end }}
+  {{- if hasKey $modelSpec.keda "maxReplicaCount" }}
+  maxReplicaCount: {{ $modelSpec.keda.maxReplicaCount }}
+  {{- end }}
+  {{- if hasKey $modelSpec.keda "pollingInterval" }}
+  pollingInterval: {{ $modelSpec.keda.pollingInterval }}
+  {{- end }}
+  {{- if hasKey $modelSpec.keda "cooldownPeriod" }}
+  cooldownPeriod: {{ $modelSpec.keda.cooldownPeriod }}
+  {{- end }}
+  {{- if hasKey $modelSpec.keda "idleReplicaCount" }}
+  idleReplicaCount: {{ $modelSpec.keda.idleReplicaCount }}
+  {{- end }}
+  {{- if hasKey $modelSpec.keda "initialCooldownPeriod" }}
+  initialCooldownPeriod: {{ $modelSpec.keda.initialCooldownPeriod }}
+  {{- end }}
+  {{- if hasKey $modelSpec.keda "fallback" }}
+  fallback:
+    {{- toYaml $modelSpec.keda.fallback | nindent 4 }}
+  {{- end }}
+  {{- if hasKey $modelSpec.keda "advanced" }}
+  advanced:
+    {{- if hasKey $modelSpec.keda.advanced "restoreToOriginalReplicaCount" }}
+    restoreToOriginalReplicaCount: {{ $modelSpec.keda.advanced.restoreToOriginalReplicaCount }}
+    {{- end }}
+    {{- if hasKey $modelSpec.keda.advanced "horizontalPodAutoscalerConfig" }}
+    horizontalPodAutoscalerConfig:
+      {{- toYaml $modelSpec.keda.advanced.horizontalPodAutoscalerConfig | nindent 6 }}
+    {{- end }}
+    {{- if hasKey $modelSpec.keda.advanced "scalingModifiers" }}
+    scalingModifiers:
+      {{- toYaml $modelSpec.keda.advanced.scalingModifiers | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- if hasKey $modelSpec.keda "triggers" }}
+  triggers:
+    {{- toYaml $modelSpec.keda.triggers | nindent 4 }}
+  {{- else }}
+  # Default trigger configuration - monitors vllm queue length
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-operated.monitoring.svc:9090
+        metricName: vllm:num_requests_waiting
+        query: vllm:num_requests_waiting{model="{{ $modelSpec.name }}"}
+        threshold: '5'
+  {{- end }}
+---
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

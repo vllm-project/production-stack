@@ -1,0 +1,91 @@
+# OCI-specific vLLM production stack configuration
+# Customize this file for your deployment
+
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "gpt-oss"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "openai/gpt-oss-20b"
+
+    replicaCount: 1
+
+    requestCPU: 4
+    requestMemory: "24Gi"
+    requestGPU: 1
+
+    # No HF token needed - Apache 2.0 licensed OpenAI open source model
+
+    # Storage configuration for OCI Block Volumes
+    pvcStorage: "100Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
+    storageClass: "oci-block-storage-enc"
+
+    # OCI GPU node selector and tolerations
+    nodeSelector:
+      app: gpu
+    tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+
+    # vLLM extra arguments for gpt-oss-20b on A10 GPU
+    extraArgs:
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.90"
+
+    # Uncomment for OCIR (Oracle Container Registry) images
+    # imagePullSecrets:
+    #   - name: iad.ocir.io
+
+# --- Multi-GPU Configuration (for BM.GPU shapes) ---
+# Uncomment and modify for tensor parallelism on bare metal GPU shapes
+
+# - name: "llama70b"
+#   repository: "vllm/vllm-openai"
+#   tag: "latest"
+#   modelURL: "meta-llama/Llama-3.1-70B-Instruct"
+#
+#   replicaCount: 1
+#   tensorParallelSize: 8
+#
+#   requestCPU: 32
+#   requestMemory: "256Gi"
+#   requestGPU: 8
+#
+#   hf_token:
+#     secretName: "hf-token-secret"
+#     secretKey: "token"
+#
+#   pvcStorage: "500Gi"
+#   pvcAccessMode:
+#     - ReadWriteOnce
+#   storageClass: "oci-block-storage-enc"
+#
+#   nodeSelector:
+#     node.kubernetes.io/instance-type: "BM.GPU.H100.8"
+#   tolerations:
+#     - key: "nvidia.com/gpu"
+#       operator: "Exists"
+#       effect: "NoSchedule"
+#
+#   extraArgs:
+#     - "--max-model-len=8192"
+#     - "--gpu-memory-utilization=0.95"
+#     - "--tensor-parallel-size=8"
+
+# --- OCI Object Storage Model Download ---
+# Alternative: Use PAR URLs for model download from OCI Object Storage
+# This is useful for private models or faster download within OCI
+
+# - name: "custom-model"
+#   repository: "iad.ocir.io/YOUR_TENANCY/vllm-custom:latest"
+#   modelURL: "/models/custom-model"  # Path inside container
+#
+#   env:
+#     - name: BUCKET_PAR_URL
+#       value: "https://objectstorage.us-ashburn-1.oraclecloud.com/p/xxx/n/namespace/b/bucket/o"
+#     - name: MODEL_NAME
+#       value: "custom-model"
