@@ -96,24 +96,22 @@ startupProbe:
   {{- if .successThreshold }}
   successThreshold: {{ .successThreshold }}
   {{- end }}
-  {{- if .tcpSocket }}
+  {{- if .exec }}
+  exec:
+    command: {{- range .exec.command }}
+      - {{.}} {{- end}}
+  {{- else if .tcpSocket }}
   tcpSocket:
     {{- if .tcpSocket.host }}
     host: {{ .tcpSocket.host }}
     {{- end }}
     port: {{ .tcpSocket.port }}
-  {{- end }}
-  {{- if .grpc }}
+  {{- else if .grpc }}
   grpc:
     {{- if .grpc.service }}
     service: {{ .grpc.service }}
     {{- end }}
     port: {{ .grpc.port }}
-  {{- end }}
-  {{- if .exec }}
-  exec:
-    command: {{- range .exec.command }}
-      - {{.}} {{- end}}
   {{- else }}
   httpGet:
     path:  {{ .httpGet.path | default "/health" }}
@@ -145,24 +143,22 @@ livenessProbe:
   {{- if .successThreshold }}
   successThreshold: {{ .successThreshold }}
   {{- end }}
-  {{- if .tcpSocket }}
-  tcpSocket:
-    {{- if .tcpSocket.host }}
-    host: {{ .tcpSocket.host }}
-    {{- end }}
-    port: {{ .tcpSocket.port }}
-  {{- end }}
-  {{- if .grpc }}
+  {{- if .exec }}
+  exec:
+    command: {{- range .exec.command }}
+      - {{.}} {{- end}}
+  {{- else if .grpc }}
   grpc:
     {{- if .grpc.service }}
     service: {{ .grpc.service }}
     {{- end }}
     port: {{ .grpc.port }}
-  {{- end }}
-  {{- if .exec }}
-  exec:
-    command: {{- range .exec.command }}
-      - {{.}} {{- end}}
+  {{- else if .tcpSocket }}
+  tcpSocket:
+    {{- if .tcpSocket.host }}
+    host: {{ .tcpSocket.host }}
+    {{- end }}
+    port: {{ .tcpSocket.port }}
   {{- else }}
   httpGet:
     path:  {{ .httpGet.path | default "/health" }}
@@ -194,24 +190,22 @@ readinessProbe:
   {{- if .successThreshold }}
   successThreshold: {{ .successThreshold }}
   {{- end }}
-  {{- if .tcpSocket }}
+  {{- if .exec }}
+  exec:
+    command: {{- range .exec.command }}
+      - {{.}} {{- end}}
+  {{- else if .tcpSocket }}
   tcpSocket:
     {{- if .tcpSocket.host }}
     host: {{ .tcpSocket.host }}
     {{- end }}
     port: {{ .tcpSocket.port }}
-  {{- end }}
-  {{- if .grpc }}
+  {{- else if .grpc }}
   grpc:
     {{- if .grpc.service }}
     service: {{ .grpc.service }}
     {{- end }}
     port: {{ .grpc.port }}
-  {{- end }}
-  {{- if .exec }}
-  exec:
-    command: {{- range .exec.command }}
-      - {{.}} {{- end}}
   {{- else }}
   httpGet:
     path:  {{ .httpGet.path | default "/health" }}
