@@ -132,6 +132,8 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].vllmConfig.maxNumSeqs` | integer | `256` | Maximum number of sequences to be processed in a single iteration |
 | `servingEngineSpec.modelSpec[].vllmConfig.maxLoras` | integer | `0` | The maximum number of LoRA models to be loaded in a single batch |
 | `servingEngineSpec.modelSpec[].vllmConfig.gpuMemoryUtilization` | number | `0.9` | The fraction of GPU memory to be used for the model executor (0-1) |
+| `servingEngineSpec.modelSpec[].vllmConfig.runner` | string | `""` | The runner type for the model, can be "auto" or "pooling" |
+| `servingEngineSpec.modelSpec[].vllmConfig.convert` | string | `""` | The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score" |
 | `servingEngineSpec.modelSpec[].vllmConfig.extraArgs` | list | `["--disable-log-requests"]` | Extra command line arguments to pass to vLLM |
 
 #### LMCache Configuration

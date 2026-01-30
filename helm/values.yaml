@@ -82,6 +82,8 @@ servingEngineSpec:
   #   - maxNumSeqs: (optional, int) Maximum number of sequences to be processed in a single iteration., e.g., 32
   #   - maxLoras: (optional, int) The maximum number of LoRA models to be loaded in a single batch, e.g., 4
   #   - gpuMemoryUtilization: (optional, float) The fraction of GPU memory to be used for the model executor, which can range from 0 to 1. e.g., 0.95
+  #   - runner: (optional, string) The runner type for the model, can be "auto" or "pooling". e.g., "pooling"
+  #   - convert: (optional, string) The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score". e.g., "embed"
   #   - extraArgs: (optional, list) Extra command line arguments to pass to vLLM, e.g., ["--disable-log-requests"]
   #
   # - lmcacheConfig: (optional, map) The configuration of the LMCache for KV offloading, supported options are:
