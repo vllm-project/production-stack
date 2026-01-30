@@ -23,7 +23,7 @@ metadata:
     model: {{ $modelSpec.name }}
     helm-release-name: {{ .Release.Name }}
   {{- include "chart.engineLabels" . | nindent 4 }}
-  {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name) | nindent 4 }}
+  {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 4 }}
 spec:
   replicas: {{ $modelSpec.replicaCount }}
   {{- include "chart.engineStrategy" . | nindent 2 }}
@@ -32,7 +32,7 @@ spec:
       model: {{ $modelSpec.name }}
       helm-release-name: {{ .Release.Name }}
     {{- include "chart.engineLabels" . | nindent 6 }}
-    {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name) | nindent 6 }}
+    {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 6 }}
   progressDeadlineSeconds: 1200
   template:
     metadata:
@@ -44,7 +44,7 @@ spec:
         model: {{ $modelSpec.name }}
         helm-release-name: {{ .Release.Name }}
       {{- include "chart.engineLabels" . | nindent 8 }}
-      {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name) | nindent 8 }}
+      {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 8 }}
     spec:
       {{- if $modelSpec.priorityClassName }}
       priorityClassName: {{ $modelSpec.priorityClassName | quote }}
