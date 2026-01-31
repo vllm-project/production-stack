@@ -200,12 +200,13 @@ async def process_request(
         # Track token usage for non-streaming requests
         if not is_streaming and full_response:
             try:
-                usage = json.loads(full_response).get("usage", {})
-                if usage.get("prompt_tokens"):
+                response_data = json.loads(full_response)
+                usage = response_data.get("usage", {})
+                if "prompt_tokens" in usage:
                     input_tokens_total.labels(server=backend_url, model=model_name).inc(
                         usage["prompt_tokens"]
                     )
-                if usage.get("completion_tokens"):
+                if "completion_tokens" in usage:
                     output_tokens_total.labels(
                         server=backend_url, model=model_name
                     ).inc(usage["completion_tokens"])
