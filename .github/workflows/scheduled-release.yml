@@ -219,9 +219,11 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/router:latest
+            ghcr.io/${{ github.repository }}/router:v${{ needs.prepare-release.outputs.new_version }}
             ghcr.io/${{ github.repository }}/router:${{ env.version }}
             ghcr.io/${{ github.repository }}/router:${{ github.sha }}
             lmcache/lmstack-router:latest
+            lmcache/lmstack-router:v${{ needs.prepare-release.outputs.new_version }}
             lmcache/lmstack-router:${{ env.version }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache,mode=max
