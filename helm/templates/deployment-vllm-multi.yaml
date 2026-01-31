@@ -168,6 +168,14 @@ spec:
           - "--max_loras"
           - {{ .maxLoras | quote }}
           {{-   end }}
+          {{-   if hasKey . "runner" }}
+          - "--runner"
+          - {{ .runner | quote }}
+          {{-   end }}
+          {{-   if hasKey . "convert" }}
+          - "--convert"
+          - {{ .convert | quote }}
+          {{-   end }}
           {{-   if .extraArgs }}
           {{-     range .extraArgs }}
           - {{ . | quote }}
