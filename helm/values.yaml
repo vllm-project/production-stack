@@ -398,9 +398,9 @@ routerSpec:
   resources:
     requests:
       cpu: 400m
-      memory: 800Mi
+      memory: 1000Mi
     limits:
-      memory: 1200Mi
+      memory: 1000Mi
 
   # -- Customized labels for the router deployment
   labels:
