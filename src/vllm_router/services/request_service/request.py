@@ -63,7 +63,12 @@ try:
 except ImportError:
     otel_available = False
 
-from vllm_router.services.metrics_service import num_incoming_requests_total
+from vllm_router.services.metrics_service import (
+    input_tokens_total,
+    num_incoming_requests_total,
+    output_tokens_total,
+    request_errors_total,
+)
 
 logger = init_logger(__name__)
 
@@ -88,6 +93,7 @@ async def process_request(
     request_id,
     endpoint,
     background_tasks: BackgroundTasks,
+    model: str = None,
     debug_request=None,
     parent_span_context=None,
 ):
@@ -100,6 +106,7 @@ async def process_request(
         backend_url: The URL of the backend to send the request to.
         request_id: A unique identifier for the request.
         endpoint: The endpoint to send the request to on the backend.
+        model: The model name being requested (for metrics tracking).
         debug_request: The original request object from the client, used for
             optional debug logging.
         parent_span_context: OpenTelemetry context from parent span for trace propagation.
@@ -191,6 +198,24 @@ async def process_request(
             backend_url, request_id, time.time()
         )
 
+        # Track token usage from non-streaming responses (streaming responses
+        # don't reliably include usage data in the final chunk)
+        if model and not is_streaming and full_response:
+            try:
+                response_json = json.loads(full_response)
+            except (json.JSONDecodeError, TypeError):
+                response_json = None
+            if response_json:
+                usage = response_json.get(
+                    "usage", {"prompt_tokens": 0, "completion_tokens": 0}
+                )
+                input_tokens_total.labels(server=backend_url, model=model).inc(
+                    usage.get("prompt_tokens", 0)
+                )
+                output_tokens_total.labels(server=backend_url, model=model).inc(
+                    usage.get("completion_tokens", 0)
+                )
+
         # Store in semantic cache if applicable
         # Use the full response for non-streaming requests, or the last chunk for streaming
         if request.app.state.semantic_cache_available:
@@ -202,7 +227,20 @@ async def process_request(
             background_tasks.add_task(
                 request.app.state.callbacks.post_request, request, full_response
             )
+    except aiohttp.ClientError as e:
+        # Track connection/client errors
+        if model:
+            request_errors_total.labels(
+                server=backend_url, model=model, error_type="connection_error"
+            ).inc()
+        end_span(span, error=e) if tracing_active else None
+        raise
     except Exception as e:
+        # Track other errors
+        if model:
+            request_errors_total.labels(
+                server=backend_url, model=model, error_type=type(e).__name__
+            ).inc()
         end_span(span, error=e) if tracing_active else None
         raise
     finally:
@@ -407,6 +445,7 @@ async def route_general_request(
         request_id,
         endpoint,
         background_tasks,
+        model=requested_model,
         parent_span_context=span_context,
     )
     headers, status = await anext(stream_generator)
@@ -420,6 +459,10 @@ async def route_general_request(
                 yield chunk
             end_span(span, status_code=status) if tracing_active else None
         except Exception as e:
+            # Track streaming errors
+            request_errors_total.labels(
+                server=server_url, model=requested_model, error_type=type(e).__name__
+            ).inc()
             end_span(span, error=e, status_code=500) if tracing_active else None
             raise
 
