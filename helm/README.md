@@ -71,6 +71,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.imagePullPolicy` |  string | `"Always"`| Image pull policy for serving engine |
 | `servingEngineSpec.extraVolumes` | list | `[]`| Extra volumes for serving engine |
 | `servingEngineSpec.extraVolumeMounts` | list | `[]` | Extra volume mounts for serving engine |
+| `servingEngineSpec.env` | list | `[]` | (Optional) Global environment variables for all serving engine containers. If a variable is set in both `servingEngineSpec.env` and `servingEngineSpec.modelSpec[].env`, the value from `modelSpec[].env` will override the global value for that model. |
 
 #### Model Specification Fields
 
