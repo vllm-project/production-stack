@@ -252,8 +252,17 @@ class StaticServiceDiscovery(ServiceDiscovery):
     async def check_model_health(self):
         while True:
             try:
+                previous_unhealthy = set(self.unhealthy_endpoint_hashes)
                 self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
-                time.sleep(60)
+                current_unhealthy = set(self.unhealthy_endpoint_hashes)
+
+                if previous_unhealthy != current_unhealthy:
+                    logger.info(
+                        f"Unhealthy endpoints changed from {previous_unhealthy} to {current_unhealthy}, updating client sessions"
+                    )
+                    await self.initialize_client_sessions()
+
+                await asyncio.sleep(60)
             except Exception as e:
                 logger.error(e)
 
@@ -328,16 +337,35 @@ class StaticServiceDiscovery(ServiceDiscovery):
             and self.decode_model_labels is not None
         ):
             endpoint_infos = self.get_endpoint_info()
+            logger.info(
+                f"Available endpoints for client session init: {[e.url for e in endpoint_infos]}"
+            )
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
+                    if (
+                        hasattr(self.app.state, "prefill_client")
+                        and self.app.state.prefill_client is not None
+                    ):
+                        await self.app.state.prefill_client.close()
                     self.app.state.prefill_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
+                    logger.info(
+                        f"Initialized prefill_client with base_url={endpoint_info.url}"
+                    )
                 elif endpoint_info.model_label in self.decode_model_labels:
+                    if (
+                        hasattr(self.app.state, "decode_client")
+                        and self.app.state.decode_client is not None
+                    ):
+                        await self.app.state.decode_client.close()
                     self.app.state.decode_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
+                    )
+                    logger.info(
+                        f"Initialized decode_client with base_url={endpoint_info.url}"
                     )
 
 
