@@ -99,7 +99,7 @@ startupProbe:
   {{- if .exec }}
   exec:
     command: {{- range .exec.command }}
-      - {{.}} {{- end}}
+      - {{. | quote }} {{- end}}
   {{- else if .tcpSocket }}
   tcpSocket:
     {{- if .tcpSocket.host }}
@@ -119,7 +119,7 @@ startupProbe:
     {{- if .httpGet.httpHeaders }}
     httpHeaders: {{- range .httpGet.httpHeaders }}
       - name: {{ .name }}
-        value: {{ .value }}
+        value: {{ .value | quote }}
     {{- end }}
     {{- end }}
     {{- if .httpGet.host }}
@@ -146,7 +146,7 @@ livenessProbe:
   {{- if .exec }}
   exec:
     command: {{- range .exec.command }}
-      - {{.}} {{- end}}
+      - {{. | quote }} {{- end}}
   {{- else if .grpc }}
   grpc:
     {{- if .grpc.service }}
@@ -166,7 +166,7 @@ livenessProbe:
     {{- if .httpGet.httpHeaders }}
     httpHeaders: {{- range .httpGet.httpHeaders }}
       - name: {{ .name }}
-        value: {{ .value }}
+        value: {{ .value | quote }}
     {{- end }}
     {{- end }}
     {{- if .httpGet.host }}
@@ -193,7 +193,7 @@ readinessProbe:
   {{- if .exec }}
   exec:
     command: {{- range .exec.command }}
-      - {{.}} {{- end}}
+      - {{. | quote }} {{- end}}
   {{- else if .tcpSocket }}
   tcpSocket:
     {{- if .tcpSocket.host }}
@@ -213,7 +213,7 @@ readinessProbe:
     {{- if .httpGet.httpHeaders }}
     httpHeaders: {{- range .httpGet.httpHeaders }}
       - name: {{ .name }}
-        value: {{ .value }}
+        value: {{ .value | quote }}
     {{- end }}
     {{- end }}
     {{- if .httpGet.host }}
