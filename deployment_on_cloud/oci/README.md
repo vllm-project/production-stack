@@ -272,7 +272,7 @@ BASTION_ID=$(oci bastion bastion create \
   --compartment-id ${OCI_COMPARTMENT_ID} \
   --bastion-type STANDARD \
   --target-subnet-id ${BASTION_SUBNET} \
-  --client-cidr-block-allow-list '["0.0.0.0/0"]' \
+  --client-cidr-block-allow-list '["YOUR_PUBLIC_IP/32"]' \
   --name "${CLUSTER_NAME}-bastion" \
   --query 'data.id' --raw-output)
 
@@ -286,6 +286,8 @@ while true; do
   sleep 30
 done
 ```
+
+> **Security Note:** Replace `YOUR_PUBLIC_IP/32` with your current public IP or corporate CIDR. Avoid `0.0.0.0/0` unless you are in a short-lived dev environment.
 
 ### Step 7: Create Node Pools
 
@@ -637,6 +639,8 @@ curl http://localhost:8080/v1/chat/completions \
 pkill -f "port-forward.*8080"
 ```
 
+> **Security Note:** `kubectl port-forward` binds to your local machine only. This is the safest way to test the private endpoint without exposing the service publicly.
+
 ---
 
 ## Using the Automated Script
@@ -692,6 +696,8 @@ export GPU_AD_INDEX="1"  # Check GPU availability first!
 | `BASTION_SESSION_TTL` | `10800` | Bastion session TTL in seconds (max 3 hours) |
 
 ---
+
+> **Security Note:** Set `BASTION_CLIENT_CIDR` to your public IP (for example, `203.0.113.10/32`) or your corporate CIDR. The default allows any IP to attempt a bastion session.
 
 ## Key Gotchas and Learnings
 
