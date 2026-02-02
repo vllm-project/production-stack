@@ -5,6 +5,7 @@ This example demonstrates the `disaggregated_prefill_orchestrated` routing mode,
 ## Overview
 
 In this mode, the router:
+
 1. Receives a client request
 2. Sends the request to the **prefill endpoint** with `kv_transfer_params` and `max_tokens=1`
 3. Extracts `kv_transfer_params` from the prefill response
@@ -30,6 +31,7 @@ kubectl apply -f decode-deploy.yaml
 ```
 
 Wait for pods to be ready:
+
 ```bash
 kubectl get pods -w
 ```
@@ -47,7 +49,8 @@ kubectl get pods
 ```
 
 Expected output:
-```
+
+```text
 NAME                      READY   STATUS    RESTARTS   AGE
 decode-xxx                1/1     Running   0          1m
 prefill-xxx               1/1     Running   0          1m
@@ -59,11 +62,13 @@ router-xxx                1/1     Running   0          1m
 ### Send a Request
 
 Port-forward to the router:
+
 ```bash
 kubectl port-forward deployment/router 8000:8000
 ```
 
 Send a test request:
+
 ```bash
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -103,7 +108,8 @@ kubectl logs deployment/router
 ```
 
 You should see logs like:
-```
+
+```text
 [INFO] Starting orchestrated disaggregated inference
 [INFO] Prefill endpoint: http://172.x.x.x:8000
 [INFO] Decode endpoint: http://172.x.x.x:8000
@@ -119,6 +125,7 @@ You should see logs like:
 ### Router Configuration
 
 Key router arguments for this mode:
+
 - `--routing-logic=disaggregated_prefill_orchestrated` - Enables orchestrated mode
 - `--service-discovery=k8s` - Uses Kubernetes pod discovery
 - `--k8s-label-selector="app in (prefill,decode)"` - Discovers prefill/decode pods
@@ -128,14 +135,15 @@ Key router arguments for this mode:
 ### Pod Labels
 
 Prefill and decode pods must have appropriate labels for discovery:
+
 - Prefill pods: `app: prefill`, `model: prefill`
 - Decode pods: `app: decode`, `model: decode`
 
 ## Differences from `disaggregated_prefill` Mode
 
-| Feature | `disaggregated_prefill` | `disaggregated_prefill_orchestrated` |
-|---------|------------------------|-------------------------------------|
-| KV Transfer | LMCache + NIXL | vLLM native `kv_transfer_params` |
-| Client Requests | 2 (prefill, then decode) | 1 (router orchestrates) |
-| Router Role | Transparent routing | Orchestration |
-| Backend | LMCache-enabled vLLM | Any vLLM with KV transfer support |
+| Feature         | `disaggregated_prefill`  | `disaggregated_prefill_orchestrated` |
+| --------------- | ------------------------ | ------------------------------------ |
+| KV Transfer     | LMCache + NIXL           | vLLM native `kv_transfer_params`     |
+| Client Requests | 2 (prefill, then decode) | 1 (router orchestrates)              |
+| Router Role     | Transparent routing      | Orchestration                        |
+| Backend         | LMCache-enabled vLLM     | Any vLLM with KV transfer support    |
