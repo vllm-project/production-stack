@@ -249,3 +249,36 @@ async def route_v1_audio_transcriptions(
 @main_router.post("/v1/responses")
 async def route_v1_responses(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/responses", background_tasks)
+
+
+@main_router.post("/v1/audio/speech")
+async def route_v1_audio_speech(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/audio/speech", background_tasks)
+
+
+@main_router.post("/v1/audio/translations")
+async def route_v1_audio_translations(
+    request: Request, background_tasks: BackgroundTasks
+):
+    return await route_general_request(
+        request, "/v1/audio/translations", background_tasks
+    )
+
+
+@main_router.get("/v1/audio/voices")
+async def route_v1_audio_voices(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/audio/voices", background_tasks)
+
+
+@main_router.post("/v1/images/generations")
+async def route_v1_images_generations(
+    request: Request, background_tasks: BackgroundTasks
+):
+    return await route_general_request(
+        request, "/v1/images/generations", background_tasks
+    )
+
+
+@main_router.post("/v1/images/edit")
+async def route_v1_images_edit(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/images/edit", background_tasks)
