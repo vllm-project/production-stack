@@ -37,16 +37,16 @@ Disaggregated inference separates compute-heavy prefill from memory-bound decode
 
 ### Two Disaggregated Inference Approaches
 
-| Approach | KV Transfer | Router Role | Use Case |
-|----------|-------------|-------------|----------|
-| **LMCache-based DI** | LMCache + NIXL | Transparent routing | GPU clusters with LMCache |
-| **Router-orchestrated DI** (this proposal) | vLLM native `kv_transfer_config` | Orchestrates P→D flow | Any backend with kv_connector |
+| Approach                                     | KV Transfer                        | Router Role             | Use Case                          |
+| -------------------------------------------- | ---------------------------------- | ----------------------- | --------------------------------- |
+| **LMCache-based DI**                         | LMCache + NIXL                     | Transparent routing     | GPU clusters with LMCache         |
+| **Router-orchestrated DI** (this proposal)   | vLLM native `kv_transfer_config`   | Orchestrates P→D flow   | Any backend with kv_connector     |
 
 ### Proposed Changes
 
 **Architecture:**
 
-```
+```text
     ┌──────────┐     ①              ┌─────────────────────────────────────┐
     │  Client  │────────────────────▶│  Router (disaggregated_prefill_    │
     │ Request  │                     │         orchestrated)              │
@@ -67,6 +67,7 @@ Disaggregated inference separates compute-heavy prefill from memory-bound decode
 ```
 
 **Request Flow:**
+
 1. Client sends `/v1/chat/completions` to Router
 2. Router forwards to Prefill pod with `max_tokens=1`
 3. Prefill returns KV transfer ID in `kv_transfer_params` field
@@ -76,6 +77,7 @@ Disaggregated inference separates compute-heavy prefill from memory-bound decode
 ### Implementation Details/Notes/Constraints
 
 **Architecture / Components:**
+
 - `src/vllm_router/routers/routing_logic.py` - New `DisaggregatedPrefillOrchestratedRouter` class
 - `src/vllm_router/parsers/parser.py` - New CLI arguments for prefill/decode labels
 - `src/vllm_router/services/request_service/request.py` - New `route_orchestrated_disaggregated_request()` function
@@ -83,13 +85,15 @@ Disaggregated inference separates compute-heavy prefill from memory-bound decode
 **Interface Changes:**
 
 New CLI arguments:
-| Argument | Description |
-|----------|-------------|
-| `--routing-logic=disaggregated_prefill_orchestrated` | Enable orchestrated disaggregated routing |
-| `--prefill-model-labels=prefill` | Model label to identify prefill pods |
-| `--decode-model-labels=decode` | Model label to identify decode pods |
+
+| Argument                                              | Description                                 |
+| ----------------------------------------------------- | ------------------------------------------- |
+| `--routing-logic=disaggregated_prefill_orchestrated`  | Enable orchestrated disaggregated routing   |
+| `--prefill-model-labels=prefill`                      | Model label to identify prefill pods        |
+| `--decode-model-labels=decode`                        | Model label to identify decode pods         |
 
 Pod labels required:
+
 ```yaml
 # Prefill deployment
 metadata:
@@ -105,29 +109,34 @@ metadata:
 ```
 
 **Performance Considerations:**
+
 - Adds one HTTP round-trip (router→prefill) before decode streaming begins
 - Prefill request is non-streaming (`max_tokens=1`) to get KV transfer ID
 - Decode request streams normally
 - No additional memory overhead in router
 
 **Resource Constraints:**
+
 - Minimal CPU overhead for JSON parsing of prefill response
 - No GPU resources required by router
 
 ### Test plans
 
 **Unit Tests:**
+
 - Test `DisaggregatedPrefillOrchestratedRouter.route()` returns correct endpoints
 - Test prefill/decode endpoint filtering based on model labels
 - Test KV transfer params extraction from prefill response
 
 **Integration/E2E Tests:**
+
 - Deploy prefill + decode + router pods
 - Send chat completion request
 - Verify response contains decode output
 - Verify logs show correct P→D flow
 
 **Negative Tests:**
+
 - No prefill endpoints available → 503 Service Unavailable
 - No decode endpoints available → 503 Service Unavailable
 - Prefill response missing `kv_transfer_params` → Error handling
@@ -145,6 +154,7 @@ metadata:
 3. **gRPC between P/D** - More complex, requires protocol changes
 
 This proposal is the best approach because it:
+
 - Leverages existing router infrastructure
 - Follows established routing_logic patterns
 - Supports any kv_connector backend
@@ -153,11 +163,13 @@ This proposal is the best approach because it:
 ## Implementation Timeline / Phases
 
 **Phase 1 (Complete):** Core implementation
+
 - DisaggregatedPrefillOrchestratedRouter class
 - CLI argument parsing
 - Orchestrated request flow
 
 **Phase 2 (TODO):** Testing & Documentation
+
 - Unit tests
 - E2E tests
 - Documentation update
