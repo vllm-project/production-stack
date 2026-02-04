@@ -85,6 +85,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].modelURL` | string | `""` | The URL of the model, e.g., "facebook/opt-125m" |
 | `servingEngineSpec.modelSpec[].chatTemplate` | string | `null` | (Optional) Chat template (Jinja2) specifying tokenizer configuration |
 | `servingEngineSpec.modelSpec[].replicaCount` | integer | `1` | The number of replicas for the model |
+| `servingEngineSpec.modelSpec[].resources` | object | `{}` | Standard Kubernetes resources block (requests/limits). If specified, this takes priority over and ignores simplified resource fields (requestCPU, requestMemory, requestGPU, etc.) |
 | `servingEngineSpec.modelSpec[].requestCPU` | integer | `0` | The number of CPUs requested for the model |
 | `servingEngineSpec.modelSpec[].requestMemory` | string | `""` | The amount of memory requested for the model, e.g., "16Gi" |
 | `servingEngineSpec.modelSpec[].requestGPU` | integer | `0` | The number of GPUs requested for the model |
