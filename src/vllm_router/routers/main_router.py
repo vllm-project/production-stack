@@ -279,6 +279,6 @@ async def route_v1_images_generations(
     )
 
 
-@main_router.post("/v1/images/edit")
+@main_router.post("/v1/images/edits")
 async def route_v1_images_edit(request: Request, background_tasks: BackgroundTasks):
-    return await route_general_request(request, "/v1/images/edit", background_tasks)
+    return await route_general_request(request, "/v1/images/edits", background_tasks)
