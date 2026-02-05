@@ -255,6 +255,9 @@ spec:
                 key: {{ $vllmApiKey.secretKey }}
             {{- end }}
           {{- end }}
+          {{- with .Values.servingEngineSpec.env }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
           {{- with $modelSpec.env }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
