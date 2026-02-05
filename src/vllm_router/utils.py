@@ -9,7 +9,7 @@ from typing import Optional
 
 import requests
 from fastapi.requests import Request
-from starlette.datastructures import MutableHeaders
+from starlette.datastructures import Headers, MutableHeaders
 
 from vllm_router.log import init_logger
 
@@ -208,6 +208,32 @@ def parse_static_aliases(static_aliases: str):
         aliases[alias] = model
     logger.info(f"Loaded aliases {aliases}")
     return aliases
+
+
+def redact_token_in_request_header(headers: Headers, disable: bool = False) -> Headers:
+    if disable:
+        return Headers(headers)
+
+    sensitive_headers = {
+        "authorization",
+        "x-api-key",
+        "api-key",
+        "x-auth-token",
+        "auth-token",
+        "x-access-token",
+        "access-token",
+    }
+
+    header_dict = dict(headers.items())
+    for header_name in list(header_dict.keys()):
+        if header_name.lower() in sensitive_headers:
+            header_value = header_dict[header_name]
+            if header_value and len(header_value) > 4:
+                header_dict[header_name] = header_value[:4] + "****"
+            else:
+                header_dict[header_name] = "****"
+
+    return Headers(header_dict)
 
 
 def replace_model_in_request_body(request_json: dict, model: str):
