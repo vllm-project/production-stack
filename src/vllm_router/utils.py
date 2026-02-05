@@ -223,18 +223,17 @@ def parse_static_aliases(static_aliases: str):
 
 def redact_token_in_request_header(headers: Headers, disable: bool = False) -> Headers:
     if disable:
-        return Headers(headers)
+        return headers
 
-    header_dict = dict(headers.items())
-    for header_name in header_dict:
-        if header_name.lower() in _SENSITIVE_HEADERS:
-            header_value = header_dict[header_name]
-            if header_value and len(header_value) > 4:
-                header_dict[header_name] = header_value[:4] + "****"
+    redacted_items = []
+    for key, value in headers.items():
+        if key.lower() in _SENSITIVE_HEADERS:
+            if value and len(value) > 4:
+                value = value[:4] + "****"
             else:
-                header_dict[header_name] = "****"
-
-    return Headers(header_dict)
+                value = "****"
+        redacted_items.append((key, value))
+    return Headers(dict(redacted_items))
 
 
 def replace_model_in_request_body(request_json: dict, model: str):
