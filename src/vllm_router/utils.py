@@ -15,6 +15,17 @@ from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
 
+# Sensitive headers that commonly contain authentication tokens
+_SENSITIVE_HEADERS = {
+    "authorization",
+    "x-api-key",
+    "api-key",
+    "x-auth-token",
+    "auth-token",
+    "x-access-token",
+    "access-token",
+}
+
 # prepare a WAV byte to prevent repeatedly generating it
 # Generate a 0.1 second silent audio file
 # This will be used for the /v1/audio/transcriptions endpoint
@@ -214,19 +225,9 @@ def redact_token_in_request_header(headers: Headers, disable: bool = False) -> H
     if disable:
         return Headers(headers)
 
-    sensitive_headers = {
-        "authorization",
-        "x-api-key",
-        "api-key",
-        "x-auth-token",
-        "auth-token",
-        "x-access-token",
-        "access-token",
-    }
-
     header_dict = dict(headers.items())
-    for header_name in list(header_dict.keys()):
-        if header_name.lower() in sensitive_headers:
+    for header_name in header_dict:
+        if header_name.lower() in _SENSITIVE_HEADERS:
             header_value = header_dict[header_name]
             if header_value and len(header_value) > 4:
                 header_dict[header_name] = header_value[:4] + "****"
