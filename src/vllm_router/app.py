@@ -321,6 +321,9 @@ def initialize_all(app: FastAPI, args):
     app.state.router = get_routing_logic()
     app.state.request_rewriter = get_request_rewriter()
 
+    # Set token redaction flag from command-line arguments
+    app.state.disable_token_redaction = getattr(args, "disable_token_redaction", False)
+
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(main_router)
