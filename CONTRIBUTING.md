@@ -88,4 +88,4 @@ Please include sufficient examples in your PR. Unit tests and integrations are a
 
 <h2>What to Expect for the Reviews</h2>
 
-We aim to address all PRs in a timely manner. If no one reviews your PR within 5 days, please @-mention one of YuhanLiu11, Shaoting-Feng or ApostaC.
+We aim to address all PRs in a timely manner. If no one reviews your PR within 5 days, please @-mention one of ruizhang0101, YuhanLiu11, Shaoting-Feng or ApostaC.

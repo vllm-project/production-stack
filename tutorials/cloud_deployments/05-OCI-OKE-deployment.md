@@ -302,6 +302,8 @@ Port forward to test locally:
 kubectl port-forward svc/vllm-deployment-router 8000:80
 ```
 
+> **Security Note:** `kubectl port-forward` binds to your local machine only. This is the safest way to test when using a private cluster via bastion.
+
 Send a test request:
 
 ```bash
@@ -318,11 +320,20 @@ curl http://localhost:8000/v1/completions \
 
 To expose the service externally, modify the service type:
 
+> **Security Note:** This exposes the inference API to the public internet by default. Do not enable this in production without TLS, authentication (API key/JWT/mTLS), and IP allow-listing or WAF controls. If you need external access, prefer an internal load balancer or an ingress/API gateway that enforces auth and rate limits.
+
 ```bash
 kubectl patch svc vllm-deployment-router -p '{"spec": {"type": "LoadBalancer"}}'
 
 # Wait for external IP
 kubectl get svc vllm-deployment-router -w
+```
+
+If you want an internal load balancer, annotate the service:
+
+```bash
+kubectl annotate svc vllm-deployment-router \
+  "service.beta.kubernetes.io/oci-load-balancer-internal"="true"
 ```
 
 ### Step 12: Clean Up

@@ -11,7 +11,8 @@ This guide provides a complete walkthrough for deploying the vLLM production sta
 > - **Recommended approach**: Execute each step manually first to understand the process
 > - **Every environment is different**: OCI regions, availability domains, quotas, and network configurations vary
 > - **Test before automating**: Only run the full script (`./entry_point.sh setup`) after you have successfully executed the entire process step-by-step at least once
-> - **Costs apply**: GPU instances incur significant costs (~$50/day for A10). Always clean up resources when not in use.
+> - **GPU quota required**: You must have GPU compute quota in your tenancy. If you do not, [request it via a support ticket](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/servicelimits.htm#Requesti). GPU shapes are also subject to capacity constraints — check availability in your target AD before deploying
+> - **Costs apply**: GPU instances incur significant costs (~$50/day for A10). Always run `./entry_point.sh cleanup` when not in use
 
 ---
 
@@ -270,8 +271,8 @@ BASTION_ID=$(oci bastion bastion create \
   --profile ${OCI_PROFILE} \
   --compartment-id ${OCI_COMPARTMENT_ID} \
   --bastion-type STANDARD \
-  --target-subnet-id ${WORKER_SUBNET} \
-  --client-cidr-block-allow-list '["0.0.0.0/0"]' \
+  --target-subnet-id ${BASTION_SUBNET} \
+  --client-cidr-block-allow-list '["YOUR_PUBLIC_IP/32"]' \
   --name "${CLUSTER_NAME}-bastion" \
   --query 'data.id' --raw-output)
 
@@ -285,6 +286,8 @@ while true; do
   sleep 30
 done
 ```
+
+> **Security Note:** Replace `YOUR_PUBLIC_IP/32` with your current public IP or corporate CIDR. Avoid `0.0.0.0/0` unless you are in a short-lived dev environment.
 
 ### Step 7: Create Node Pools
 
@@ -421,7 +424,7 @@ ssh -i ~/.ssh/id_rsa_oci -N -L 6443:${PRIVATE_IP}:6443 \
 **Update kubeconfig to use localhost:**
 
 ```bash
-kubectl config set-cluster cluster-$(echo ${CLUSTER_ID} | cut -d. -f6) \
+kubectl config set-cluster "$(kubectl config view --minify -o jsonpath='{.clusters[0].name}')" \
   --server=https://127.0.0.1:6443 \
   --insecure-skip-tls-verify=true
 
@@ -526,38 +529,14 @@ kubectl logs -f expand-gpu-disk
 # Wait for completion
 kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/expand-gpu-disk --timeout=300s
 
-# Restart kubelet to update allocatable storage reporting
-cat <<EOF | sed "s/\\\${GPU_NODE}/${GPU_NODE}/g" | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: restart-kubelet
-spec:
-  nodeName: \${GPU_NODE}
-  hostPID: true
-  tolerations:
-  - operator: "Exists"
-  containers:
-  - name: restart
-    image: busybox:latest
-    command: ["/bin/sh", "-c", "chroot /host systemctl restart kubelet && sleep 10 && echo DONE"]
-    securityContext:
-      privileged: true
-    volumeMounts:
-    - name: host
-      mountPath: /host
-  volumes:
-  - name: host
-    hostPath:
-      path: /
-  restartPolicy: Never
-EOF
-
-# Wait for kubelet restart
-kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/restart-kubelet --timeout=60s
+# Restart kubelet using nsenter from the existing expansion pod.
+# Note: chroot alone can't access the systemd bus — nsenter enters the
+# host's PID namespace where systemd runs.
+kubectl exec expand-gpu-disk -- nsenter -t 1 -m -p -- systemctl restart kubelet 2>/dev/null \
+    || echo "Warning: kubelet restart failed (non-critical — kubelet is still running)"
 
 # Cleanup
-kubectl delete pod expand-gpu-disk restart-kubelet --force --grace-period=0
+kubectl delete pod expand-gpu-disk --force --grace-period=0
 
 # Wait for node to be ready
 kubectl wait --for=condition=Ready node/${GPU_NODE} --timeout=120s
@@ -613,21 +592,25 @@ kubectl apply -f oci-block-storage-sc.yaml
 helm repo add vllm https://vllm-project.github.io/production-stack
 helm repo update
 
-# Deploy vLLM
-helm upgrade -i --wait --timeout 15m \
+# Deploy vLLM (do NOT use --wait — the router CrashLoops until patched in Step 14)
+helm upgrade -i \
   vllm vllm/vllm-stack \
   -f production_stack_specification.yaml
+
+# Wait for the engine pod only
+kubectl wait --for=condition=Ready pods -l model=gpt-oss --timeout=600s
 
 # Watch deployment progress
 kubectl get pods -w
 ```
 
-### Step 14: Fix Router Memory (Prevent OOMKill)
+### Step 14: Fix Router (GPU Toleration + Memory)
 
-The default router memory (500Mi) is too low:
+The router needs a GPU toleration to schedule on GPU-tainted nodes, and increased memory (default 500Mi causes OOMKill):
 
 ```bash
 kubectl patch deployment vllm-deployment-router --type='json' -p='[
+  {"op": "add", "path": "/spec/template/spec/tolerations", "value": [{"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"}]},
   {"op": "replace", "path": "/spec/template/spec/containers/0/resources/requests/memory", "value": "512Mi"},
   {"op": "replace", "path": "/spec/template/spec/containers/0/resources/limits/memory", "value": "1Gi"}
 ]'
@@ -656,6 +639,8 @@ curl http://localhost:8080/v1/chat/completions \
 pkill -f "port-forward.*8080"
 ```
 
+> **Security Note:** `kubectl port-forward` binds to your local machine only. This is the safest way to test the private endpoint without exposing the service publicly.
+
 ---
 
 ## Using the Automated Script
@@ -674,11 +659,10 @@ export GPU_AD_INDEX="1"  # Check GPU availability first!
 # Step 1: Create infrastructure
 ./entry_point.sh setup
 
-# Step 2: Create bastion session (shown in output)
-# Step 3: Start SSH tunnel in separate terminal
-# Step 4: Update kubeconfig to use localhost
+# Step 2: Start tunnel (in a SEPARATE terminal — auto-reconnects)
+./entry_point.sh tunnel
 
-# Step 5: Deploy vLLM
+# Step 3: Deploy vLLM (back in original terminal)
 ./entry_point.sh deploy-vllm
 ```
 
@@ -687,6 +671,7 @@ export GPU_AD_INDEX="1"  # Check GPU availability first!
 | Command | Description |
 |---------|-------------|
 | `./entry_point.sh setup` | Create OKE cluster with GPU node pool |
+| `./entry_point.sh tunnel` | Start SSH tunnel with auto-reconnect (private clusters) |
 | `./entry_point.sh deploy-vllm` | Deploy vLLM stack (after SSH tunnel is active) |
 | `./entry_point.sh expand-disk` | Expand GPU node filesystem |
 | `./entry_point.sh fix-router` | Increase router memory to 1Gi |
@@ -701,13 +686,18 @@ export GPU_AD_INDEX="1"  # Check GPU availability first!
 | `OCI_REGION` | `us-ashburn-1` | OCI region |
 | `CLUSTER_NAME` | `production-stack` | Cluster name |
 | `GPU_SHAPE` | `VM.GPU.A10.1` | GPU shape |
-| `GPU_BOOT_VOLUME_GB` | `200` | Boot volume size (GB) |
+| `GPU_BOOT_VOLUME_GB` | `200` | GPU node boot volume size (GB) |
+| `CPU_BOOT_VOLUME_GB` | `100` | CPU node boot volume size (GB) |
 | `GPU_AD_INDEX` | `1` | Availability Domain index |
 | `GPU_NODE_COUNT` | `1` | Number of GPU nodes |
 | `PRIVATE_CLUSTER` | `true` | Use private endpoint |
 | `BASTION_CLIENT_CIDR` | `0.0.0.0/0` | Allowed CIDR for bastion |
+| `SSH_KEY_FILE` | `~/.ssh/id_rsa` | SSH private key for bastion tunnel |
+| `BASTION_SESSION_TTL` | `10800` | Bastion session TTL in seconds (max 3 hours) |
 
 ---
+
+> **Security Note:** Set `BASTION_CLIENT_CIDR` to your public IP (for example, `203.0.113.10/32`) or your corporate CIDR. The default allows any IP to attempt a bastion session.
 
 ## Key Gotchas and Learnings
 
@@ -788,6 +778,64 @@ ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ...
 2. Wait 60+ seconds for kubelet to recalculate allocatable storage
 3. Verify with: `kubectl describe node <node> | grep ephemeral-storage`
 
+### 9. kubectl exec Exit Code 137
+
+**Problem**: `kubectl exec` inside the expansion pod can return exit code 137 (SIGKILL) after the operation completes. With `set -euo pipefail`, this kills the entire script even though the operation succeeded.
+
+**Solution**: Append `|| echo "Warning: ..."` to all `kubectl exec` steps in `expand_gpu_disk()`. The disk operations (growpart, pvresize, lvextend, xfs_growfs) are all idempotent, so a non-zero exit is safe to ignore. The verification step at the end confirms the actual filesystem state.
+
+### 10. CPU Node Disk Pressure
+
+**Problem**: The router container image (`lmcache/lmstack-router`) is ~10GB. On a CPU node with the default 50GB boot volume, pulling this image triggers `DiskPressure` and pod eviction.
+
+**Solution**: Set `CPU_BOOT_VOLUME_GB=100` (default). The CPU node pool now uses 100GB boot volumes to avoid disk pressure from large container images.
+
+### 11. OCI Image Naming Convention
+
+**Problem**: OKE node images do NOT contain `x86_64` in their names. Using `contains('x86_64')` matches nothing and node pool creation fails with "Invalid nodeSourceDetails".
+
+**Solution**: Use `!contains('aarch64')` to select x86_64 images. Image naming:
+
+- Standard CPU: `Oracle-Linux-8.10-2025.xx.xx-x-OKE-1.31.10-xxx` (no arch suffix)
+- ARM: `Oracle-Linux-8.10-aarch64-2025.xx.xx-x-OKE-1.31.10-xxx`
+- GPU: `Oracle-Linux-8.10-Gen2-GPU-2025.xx.xx-x-OKE-1.31.10-xxx`
+
+### 12. Kubeconfig Context vs Cluster Name
+
+**Problem**: `kubectl config current-context` returns the context name (e.g., `context-xyz`), but `kubectl config set-cluster` requires the cluster name (e.g., `cluster-xyz`). Using the context name creates a new cluster entry instead of updating the existing one.
+
+**Solution**: Use `kubectl config view --minify -o jsonpath='{.clusters[0].name}'` to get the actual cluster name.
+
+### 13. Helm --wait vs Router CrashLoopBackOff
+
+**Problem**: `helm upgrade --wait` blocks forever because the router pod CrashLoops until patched with GPU toleration and increased memory.
+
+**Solution**: Deploy without `--wait`, wait for the engine pod only, patch the router, then wait for the router separately.
+
+### 14. SSH Tunnel Drops During kubectl exec
+
+**Problem**: During heavy `kubectl exec` operations (especially disk expansion), the SSH tunnel through OCI Bastion can drop. The bastion session transitions to DELETED state and cannot be reused. You must create a new session, start a new tunnel, update kubeconfig, and re-run the deployment.
+
+**Root cause**: OCI Bastion sessions are sensitive to SSH tunnel interruptions. Long-running `kubectl exec` commands (like LVM operations during disk expansion) can cause the SSH client to miss keepalive packets, leading OCI to terminate the session.
+
+**Solution**: Use the `tunnel` command which handles the full reconnection lifecycle automatically:
+
+```bash
+# In a separate terminal (runs in foreground, Ctrl+C to stop)
+./entry_point.sh tunnel
+```
+
+The tunnel command:
+
+- Creates (or reuses) a bastion session automatically
+- Starts SSH with `ServerAliveInterval=30` for early dead-connection detection
+- On disconnect: checks if the bastion session is still ACTIVE
+- If session is DELETED/expired: creates a new session automatically
+- Reconnects with exponential backoff (5s -> 10s -> 20s -> ... -> 120s cap)
+- Resets backoff when a stable connection drops (lasted >60s)
+
+All `deploy-vllm` operations are idempotent, so re-running after a tunnel reconnect is safe.
+
 ---
 
 ## GPU Shapes Reference
@@ -852,7 +900,11 @@ Fix: Run filesystem expansion (Step 10)
 
 ### SSH tunnel drops
 
-Create a new bastion session (they expire after TTL) and reconnect.
+The SSH tunnel through OCI Bastion can drop during heavy operations (see [Gotcha #14](#14-ssh-tunnel-drops-during-kubectl-exec)).
+
+**Recommended**: Use `./entry_point.sh tunnel` which handles reconnection automatically.
+
+**Manual fix**: Create a new bastion session and reconnect — the old session is likely DELETED. All `deploy-vllm` operations are idempotent, so re-running is safe.
 
 ### Model loading fails
 
