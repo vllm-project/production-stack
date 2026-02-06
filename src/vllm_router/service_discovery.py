@@ -226,7 +226,6 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.engines_id = [str(uuid.uuid4()) for i in range(0, len(urls))]
         self.added_timestamp = int(time.time())
         self.unhealthy_endpoint_hashes = []
-        self._running = True
         if static_backend_health_checks:
             self.start_health_check_task()
         self.prefill_model_labels = prefill_model_labels
@@ -251,13 +250,19 @@ class StaticServiceDiscovery(ServiceDiscovery):
         return unhealthy_endpoints
 
     async def check_model_health(self):
-        while self._running:
+        while True:
             try:
+                previous_unhealthy = set(self.unhealthy_endpoint_hashes)
                 self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
+                current_unhealthy = set(self.unhealthy_endpoint_hashes)
+
+                if previous_unhealthy != current_unhealthy:
+                    logger.info(
+                        f"Unhealthy endpoints changed from {previous_unhealthy} to {current_unhealthy}, updating client sessions"
+                    )
+                    await self.initialize_client_sessions()
+
                 await asyncio.sleep(60)
-            except asyncio.CancelledError:
-                logger.debug("Health check task cancelled")
-                break
             except Exception as e:
                 logger.error(e)
 
@@ -332,51 +337,36 @@ class StaticServiceDiscovery(ServiceDiscovery):
             and self.decode_model_labels is not None
         ):
             endpoint_infos = self.get_endpoint_info()
+            logger.info(
+                f"Available endpoints for client session init: {[e.url for e in endpoint_infos]}"
+            )
             for endpoint_info in endpoint_infos:
                 if endpoint_info.model_label in self.prefill_model_labels:
+                    if (
+                        hasattr(self.app.state, "prefill_client")
+                        and self.app.state.prefill_client is not None
+                    ):
+                        await self.app.state.prefill_client.close()
                     self.app.state.prefill_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
+                    logger.info(
+                        f"Initialized prefill_client with base_url={endpoint_info.url}"
+                    )
                 elif endpoint_info.model_label in self.decode_model_labels:
+                    if (
+                        hasattr(self.app.state, "decode_client")
+                        and self.app.state.decode_client is not None
+                    ):
+                        await self.app.state.decode_client.close()
                     self.app.state.decode_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
-
-    def close(self):
-        """
-        Close the service discovery module and clean up health check resources.
-        """
-        self._running = False
-        if hasattr(self, "loop") and self.loop.is_running():
-            # Schedule a coroutine to gracefully shut down the event loop
-            async def shutdown():
-                tasks = [
-                    t
-                    for t in asyncio.all_tasks(self.loop)
-                    if t is not asyncio.current_task()
-                ]
-                for task in tasks:
-                    task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
-                self.loop.stop()
-
-            future = asyncio.run_coroutine_threadsafe(shutdown(), self.loop)
-            try:
-                future.result(timeout=15.0)
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "Timed out waiting for shutdown(loop might already be closed)"
-                )
-            except Exception as e:
-                logger.warning(f"Error during health check shutdown: {e}")
-
-        if hasattr(self, "thread") and self.thread.is_alive():
-            self.thread.join(timeout=5.0)
-
-        if hasattr(self, "loop") and not self.loop.is_closed():
-            self.loop.close()
+                    logger.info(
+                        f"Initialized decode_client with base_url={endpoint_info.url}"
+                    )
 
 
 class K8sPodIPServiceDiscovery(ServiceDiscovery):
