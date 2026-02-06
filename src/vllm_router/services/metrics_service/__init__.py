@@ -50,3 +50,16 @@ avg_itl = Gauge("vllm:avg_itl", "Average Inter-Token Latency", ["server"])
 num_requests_swapped = Gauge(
     "vllm:num_requests_swapped", "Number of swapped requests", ["server"]
 )
+
+# New model-level metrics
+input_tokens_total = Counter(
+    "vllm:input_tokens_total", "Total input tokens processed", ["server", "model"]
+)
+output_tokens_total = Counter(
+    "vllm:output_tokens_total", "Total output tokens generated", ["server", "model"]
+)
+request_errors_total = Counter(
+    "vllm:request_errors_total",
+    "Total request errors",
+    ["server", "model", "error_type"],
+)
