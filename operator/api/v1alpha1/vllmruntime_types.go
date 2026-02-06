@@ -103,10 +103,7 @@ type ModelSpec struct {
 	ModelURL string `json:"modelURL"`
 
 	// HuggingFace token secret
-	HFTokenSecret corev1.LocalObjectReference `json:"hfTokenSecret,omitempty"`
-	// +kubebuilder:default=token
-	// +kubebuilder:validation:RequiredWhen=HFTokenSecret.Name!=""
-	HFTokenName string `json:"hfTokenName,omitempty"`
+	HFTokenSecret HuggingFaceTokenSecret `json:"hfTokenSecret,omitempty"`
 
 	// Enable LoRA
 	EnableLoRA bool `json:"enableLoRA,omitempty"`
@@ -128,6 +125,16 @@ type ModelSpec struct {
 
 	// Chat template
 	ChatTemplate string `json:"chatTemplate,omitempty"`
+}
+
+type HuggingFaceTokenSecret struct {
+	// HuggingFace token secret name
+	HFTokenSecretName corev1.LocalObjectReference `json:"HFTokenSecretName,omitempty"`
+
+	// HuggingFace token key name in the secret
+	// +kubebuilder:default=token
+	// +kubebuilder:validation:RequiredWhen=HFTokenSecret.Name!=""
+	HFTokenKeyName string `json:"hfTokenKeyName,omitempty"`
 }
 
 // LMCacheConfig defines the LM Cache configuration

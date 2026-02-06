@@ -609,13 +609,13 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		})
 	}
 
-	if vllmRuntime.Spec.Model.HFTokenSecret.Name != "" {
+	if vllmRuntime.Spec.Model.HFTokenSecret.HFTokenSecretName.Name != "" {
 		env = append(env, corev1.EnvVar{
 			Name: "HF_TOKEN",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: vllmRuntime.Spec.Model.HFTokenSecret,
-					Key:                  vllmRuntime.Spec.Model.HFTokenName,
+					LocalObjectReference: vllmRuntime.Spec.Model.HFTokenSecret.HFTokenSecretName,
+					Key:                  vllmRuntime.Spec.Model.HFTokenSecret.HFTokenKeyName,
 				},
 			},
 		})
