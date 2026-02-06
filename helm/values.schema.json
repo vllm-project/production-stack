@@ -92,6 +92,37 @@
               "replicaCount": {
                 "type": "integer"
               },
+              "resources": {
+                "type": "object",
+                "properties": {
+                  "limits": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "integer"
+                        }
+                      ]
+                    }
+                  },
+                  "requests": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "integer"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
               "requestCPU": {
                 "type": "integer"
               },
@@ -228,11 +259,20 @@
                   },
                   "runner": {
                     "type": "string",
-                    "enum": ["auto", "pooling"]
+                    "enum": [
+                      "auto",
+                      "pooling"
+                    ]
                   },
                   "convert": {
                     "type": "string",
-                    "enum": ["token_embed", "embed", "token_classify", "classify", "score"]
+                    "enum": [
+                      "token_embed",
+                      "embed",
+                      "token_classify",
+                      "classify",
+                      "score"
+                    ]
                   },
                   "extraArgs": {
                     "type": "array",
