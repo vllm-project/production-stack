@@ -26,30 +26,46 @@
 #    - Don't rely on oci-growfs alone - always run growpart directly first
 #    - The expand_gpu_disk() function handles all steps with proper verification
 #
-# 4. ROUTER OOM KILL:
+# 4. ROUTER OOM KILL + GPU TOLERATION:
 #    - Default router memory (500Mi) is too low and causes OOMKill
-#    - The fix_router_memory() function patches it to 1Gi after deployment
+#    - Router also lacks nvidia.com/gpu toleration, preventing scheduling on GPU-only clusters
+#    - The fix_router_memory() function patches both issues after deployment
 #    - Run: ./entry_point.sh fix-router
 #
-# 5. GPU AVAILABILITY DOMAIN:
+# 5. COREDNS ON GPU-ONLY CLUSTERS:
+#    - OKE taints GPU nodes with nvidia.com/gpu=present:NoSchedule
+#    - CoreDNS and kube-dns-autoscaler don't tolerate this taint by default
+#    - Without CoreDNS, DNS resolution fails for ALL pods (vLLM can't download models)
+#    - The fix_coredns_gpu_toleration() function patches both deployments
+#    - This must run BEFORE deploying vLLM
+#
+# 6. SERVICE GATEWAY (CRITICAL):
+#    - OKE worker nodes need Service Gateway access to Oracle Services Network
+#    - Without it, the cloud controller can't initialize nodes (topology labels, taints)
+#    - CSI driver can't provision block volumes without Service Gateway
+#    - Required for BOTH public and private clusters
+#
+# 7. GPU AVAILABILITY DOMAIN:
 #    - A10 GPUs are NOT available in all ADs - check before deployment
 #    - us-ashburn-1: AD-2 and AD-3 (use GPU_AD_INDEX=1 or 2)
 #    - us-chicago-1: AD-1 only (use GPU_AD_INDEX=0)
 #    - Check with: oci compute shape list --availability-domain <AD> | grep GPU
 #
-# 6. BASTION SSH TUNNEL:
+# 8. BASTION SSH TUNNEL:
 #    - Bastion sessions require SSH public key file (--ssh-public-key-file)
 #    - Use ServerAliveInterval to keep tunnel alive: ssh -o ServerAliveInterval=30
 #    - Tunnel format: ssh -i <key> -N -L 6443:<private-ip>:6443 <session>@host.bastion...
 #    - IMPORTANT: After starting tunnel, update kubeconfig to use 127.0.0.1:6443
 #
-# 7. PRIVATE CLUSTER WORKFLOW:
+# 9. PRIVATE CLUSTER WORKFLOW:
 #    a) Run: ./entry_point.sh setup
-#    b) Create bastion session: oci bastion session create-port-forwarding ...
-#    c) Start SSH tunnel in separate terminal (from the session output)
-#    d) Update kubeconfig: kubectl config set-cluster $(kubectl config current-context) --server=https://127.0.0.1:6443
-#    e) Verify: kubectl get nodes
-#    f) Run: ./entry_point.sh deploy-vllm
+#    b) Run: ./entry_point.sh tunnel       (in a separate terminal — auto-reconnects)
+#    c) Verify: kubectl get nodes
+#    d) Run: ./entry_point.sh deploy-vllm
+#
+#    The tunnel command handles bastion sessions, SSH tunnels, and kubeconfig
+#    updates automatically. It reconnects on SSH drops and creates new bastion
+#    sessions when the old one expires or is deleted by OCI.
 #
 
 set -euo pipefail
@@ -71,6 +87,7 @@ GPU_NODE_COUNT="${GPU_NODE_COUNT:-1}"
 GPU_SHAPE="${GPU_SHAPE:-VM.GPU.A10.1}"
 GPU_IMAGE_ID="${GPU_IMAGE_ID:-}"  # Will be auto-detected if not set
 GPU_BOOT_VOLUME_GB="${GPU_BOOT_VOLUME_GB:-200}"  # 200GB for vLLM images + model weights
+CPU_BOOT_VOLUME_GB="${CPU_BOOT_VOLUME_GB:-100}"  # 100GB — router image alone is ~10GB
 
 # Private cluster mode (uses NAT Gateway + Bastion instead of public IPs)
 PRIVATE_CLUSTER="${PRIVATE_CLUSTER:-true}"
@@ -80,9 +97,21 @@ PRIVATE_CLUSTER="${PRIVATE_CLUSTER:-true}"
 # Default 0.0.0.0/0 allows any IP but is less secure
 BASTION_CLIENT_CIDR="${BASTION_CLIENT_CIDR:-0.0.0.0/0}"
 
+# SSH key for bastion tunnel (private key path; public key must be at ${SSH_KEY_FILE}.pub)
+SSH_KEY_FILE="${SSH_KEY_FILE:-${HOME}/.ssh/id_rsa}"
+
+# Bastion session TTL in seconds (max 10800 = 3 hours)
+BASTION_SESSION_TTL="${BASTION_SESSION_TTL:-10800}"
+
 # GPU Availability Domain index (0-based). GPU shapes may not be available in all ADs.
 # Use 'oci compute shape list --availability-domain <AD>' to check availability.
 # Default: 1 (second AD - Ashburn has A10 in AD-2 and AD-3)
+#
+# NOTE: GPU instances are subject to capacity constraints. If the node pool stays in
+# CREATING state with "Out of host capacity" errors, try a different AD:
+#   GPU_AD_INDEX=0 ./entry_point.sh setup ...   # Try AD-1
+#   GPU_AD_INDEX=2 ./entry_point.sh setup ...   # Try AD-3
+# You can also request a capacity reservation via the OCI Console or a support ticket.
 GPU_AD_INDEX="${GPU_AD_INDEX:-1}"
 
 # OCI CLI wrapper function to include profile and region
@@ -212,13 +241,25 @@ get_or_create_network() {
 
             RT_ID="${PRIVATE_RT_ID}"
         else
-            # Create Route Table (public)
+            # Create Service Gateway for Oracle Services Network access
+            # Required for OKE cloud controller to initialize worker nodes (set topology labels,
+            # remove uninitialized taint) and for CSI driver to provision block volumes
+            echo "Creating Service Gateway..."
+            SGW_ID=$(oci_cmd network service-gateway create \
+                --compartment-id "${OCI_COMPARTMENT_ID}" \
+                --vcn-id "${VCN_ID}" \
+                --display-name "${CLUSTER_NAME}-sgw" \
+                --services "[{\"serviceId\": \"${SERVICE_ID}\"}]" \
+                --query "data.id" \
+                --raw-output)
+
+            # Create Route Table (public workers use IGW for internet + SGW for OCI services)
             echo "Creating Route Table..."
             RT_ID=$(oci_cmd network route-table create \
                 --compartment-id "${OCI_COMPARTMENT_ID}" \
                 --vcn-id "${VCN_ID}" \
                 --display-name "${CLUSTER_NAME}-rt" \
-                --route-rules "[{\"cidrBlock\": \"0.0.0.0/0\", \"networkEntityId\": \"${IGW_ID}\"}]" \
+                --route-rules "[{\"cidrBlock\": \"0.0.0.0/0\", \"networkEntityId\": \"${IGW_ID}\"}, {\"destination\": \"${SERVICE_CIDR}\", \"destinationType\": \"SERVICE_CIDR_BLOCK\", \"networkEntityId\": \"${SGW_ID}\"}]" \
                 --query "data.id" \
                 --raw-output)
             PUBLIC_RT_ID="${RT_ID}"
@@ -343,6 +384,7 @@ get_gpu_image() {
     # Get OKE-specific GPU image from node-pool-options API
     # These images have kubelet and OKE node registration components pre-installed
     # Search for exact version match (e.g., OKE-1.31.10)
+    # Exclude aarch64 images since GPU shapes are x86_64 only
     local IMAGE_ID
     IMAGE_ID=$(oci_cmd ce node-pool-options get \
         --node-pool-option-id all \
@@ -537,9 +579,241 @@ create_bastion() {
     fi
 }
 
+# Discover cluster, bastion, and private endpoint from OCI API.
+# Needed for standalone commands (tunnel, deploy-vllm) that run after setup.
+resolve_cluster_and_bastion() {
+    echo "Discovering cluster and bastion resources..."
+
+    CLUSTER_ID=$(oci_cmd ce cluster list \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --name "${CLUSTER_NAME}" \
+        --lifecycle-state ACTIVE \
+        --query "data[0].id" \
+        --raw-output 2>/dev/null || echo "")
+
+    if [[ -z "${CLUSTER_ID}" || "${CLUSTER_ID}" == "null" ]]; then
+        echo "Error: No active cluster '${CLUSTER_NAME}' found."
+        echo "Run './entry_point.sh setup' first."
+        exit 1
+    fi
+    echo "  Cluster: ${CLUSTER_ID}"
+
+    PRIVATE_ENDPOINT=$(oci_cmd ce cluster get \
+        --cluster-id "${CLUSTER_ID}" \
+        --query "data.endpoints.\"private-endpoint\"" \
+        --raw-output)
+
+    if [[ -z "${PRIVATE_ENDPOINT}" || "${PRIVATE_ENDPOINT}" == "null" ]]; then
+        echo "Error: Cluster has no private endpoint. Is PRIVATE_CLUSTER=true?"
+        exit 1
+    fi
+    echo "  Private endpoint: ${PRIVATE_ENDPOINT}"
+
+    BASTION_ID=$(oci_cmd bastion bastion list \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --bastion-lifecycle-state ACTIVE \
+        --query "data[?name=='${CLUSTER_NAME}-bastion'].id | [0]" \
+        --raw-output 2>/dev/null || echo "")
+
+    if [[ -z "${BASTION_ID}" || "${BASTION_ID}" == "null" ]]; then
+        echo "Error: No active bastion '${CLUSTER_NAME}-bastion' found."
+        echo "Run './entry_point.sh setup' first."
+        exit 1
+    fi
+    echo "  Bastion: ${BASTION_ID}"
+}
+
+# Create a new bastion port-forwarding session for kubectl access.
+# Sets global: BASTION_SESSION_ID
+create_bastion_session() {
+    local target_ip="${PRIVATE_ENDPOINT%:*}"
+
+    echo "Creating bastion session (target: ${target_ip}:6443, TTL: ${BASTION_SESSION_TTL}s)..."
+
+    BASTION_SESSION_ID=$(oci_cmd bastion session create-port-forwarding \
+        --bastion-id "${BASTION_ID}" \
+        --target-private-ip "${target_ip}" \
+        --target-port 6443 \
+        --session-ttl "${BASTION_SESSION_TTL}" \
+        --ssh-public-key-file "${SSH_KEY_FILE}.pub" \
+        --display-name "kubectl-tunnel-$(date +%s)" \
+        --query "data.id" \
+        --raw-output)
+
+    echo "Waiting for session to become ACTIVE..."
+    local state
+    for _ in {1..30}; do
+        state=$(oci_cmd bastion session get \
+            --session-id "${BASTION_SESSION_ID}" \
+            --query "data.\"lifecycle-state\"" \
+            --raw-output 2>/dev/null || echo "UNKNOWN")
+        if [[ "${state}" == "ACTIVE" ]]; then
+            echo "  Session is ACTIVE: ${BASTION_SESSION_ID}"
+            return 0
+        elif [[ "${state}" == "FAILED" || "${state}" == "DELETED" ]]; then
+            echo "Error: Bastion session failed (state: ${state})"
+            return 1
+        fi
+        sleep 10
+    done
+    echo "Error: Timed out waiting for bastion session"
+    return 1
+}
+
+# Find an existing active bastion session or create a new one.
+# Sets global: BASTION_SESSION_ID
+get_or_create_bastion_session() {
+    echo "Checking for existing active bastion sessions..."
+
+    BASTION_SESSION_ID=$(oci_cmd bastion session list \
+        --bastion-id "${BASTION_ID}" \
+        --session-lifecycle-state ACTIVE \
+        --query "data[?\"target-resource-details\".\"target-resource-port\"==\`6443\`].id | [0]" \
+        --raw-output 2>/dev/null || echo "")
+
+    if [[ -n "${BASTION_SESSION_ID}" && "${BASTION_SESSION_ID}" != "null" ]]; then
+        echo "  Reusing existing session: ${BASTION_SESSION_ID}"
+        return 0
+    fi
+
+    echo "  No active session found. Creating new one..."
+    create_bastion_session
+}
+
+# Check if a bastion session is still usable.
+# Returns 0 if ACTIVE, 1 otherwise.
+check_bastion_session_alive() {
+    local session_id="${1}"
+    local state
+    state=$(oci_cmd bastion session get \
+        --session-id "${session_id}" \
+        --query "data.\"lifecycle-state\"" \
+        --raw-output 2>/dev/null || echo "UNKNOWN")
+
+    if [[ "${state}" == "ACTIVE" ]]; then
+        return 0
+    else
+        echo "  Bastion session state: ${state} (not usable)"
+        return 1
+    fi
+}
+
+# Automated SSH tunnel with auto-reconnect for private OKE clusters.
+# Runs in the foreground. Press Ctrl+C to stop.
+tunnel() {
+    echo "=============================================="
+    echo "OCI BASTION SSH TUNNEL (auto-reconnect)"
+    echo "=============================================="
+    echo ""
+
+    # Validate SSH key
+    if [[ ! -f "${SSH_KEY_FILE}" ]]; then
+        echo "Error: SSH private key not found: ${SSH_KEY_FILE}"
+        echo "Set SSH_KEY_FILE to your key path, e.g.: export SSH_KEY_FILE=~/.ssh/id_rsa_oci"
+        exit 1
+    fi
+    if [[ ! -f "${SSH_KEY_FILE}.pub" ]]; then
+        echo "Error: SSH public key not found: ${SSH_KEY_FILE}.pub"
+        exit 1
+    fi
+
+    resolve_cluster_and_bastion
+    get_or_create_bastion_session
+
+    # Update kubeconfig to use localhost
+    echo ""
+    echo "Updating kubeconfig to use localhost tunnel..."
+    local cluster_ctx
+    cluster_ctx=$(kubectl config view --minify -o jsonpath='{.clusters[0].name}' 2>/dev/null || echo "")
+    if [[ -n "${cluster_ctx}" ]]; then
+        kubectl config set-cluster "${cluster_ctx}" \
+            --server=https://127.0.0.1:6443 \
+            --insecure-skip-tls-verify=true
+        echo "  Updated cluster '${cluster_ctx}' -> https://127.0.0.1:6443"
+    else
+        echo "Warning: No kubeconfig context found. Run 'entry_point.sh setup' first."
+    fi
+
+    trap 'echo ""; echo "Tunnel stopped."; exit 0' INT TERM
+
+    local backoff=5
+    local max_backoff=120
+    local consecutive_failures=0
+    local max_failures=10
+
+    echo ""
+    echo "Starting SSH tunnel (Ctrl+C to stop)..."
+    echo "=============================================="
+
+    while true; do
+        # Check session before connecting
+        if ! check_bastion_session_alive "${BASTION_SESSION_ID}"; then
+            echo ""
+            echo "Bastion session expired. Creating new session..."
+            create_bastion_session || {
+                consecutive_failures=$((consecutive_failures + 1))
+                if [[ ${consecutive_failures} -ge ${max_failures} ]]; then
+                    echo "Error: ${max_failures} consecutive failures. Giving up."
+                    exit 1
+                fi
+                echo "Retrying in ${backoff}s... (${consecutive_failures}/${max_failures})"
+                sleep "${backoff}"
+                backoff=$(( backoff * 2 > max_backoff ? max_backoff : backoff * 2 ))
+                continue
+            }
+        fi
+
+        local target_ip="${PRIVATE_ENDPOINT%:*}"
+        echo ""
+        echo "[$(date '+%H:%M:%S')] Connecting: localhost:6443 -> ${target_ip}:6443"
+        echo "  Session: ${BASTION_SESSION_ID}"
+
+        local ssh_start
+        ssh_start=$(date +%s)
+
+        ssh -i "${SSH_KEY_FILE}" \
+            -N \
+            -L "6443:${target_ip}:6443" \
+            -p 22 \
+            -o StrictHostKeyChecking=no \
+            -o IdentitiesOnly=yes \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=3 \
+            -o ExitOnForwardFailure=yes \
+            -o ConnectTimeout=30 \
+            "${BASTION_SESSION_ID}@host.bastion.${OCI_REGION}.oci.oraclecloud.com" \
+            2>&1 || true
+
+        local ssh_duration=$(( $(date +%s) - ssh_start ))
+        echo ""
+        echo "[$(date '+%H:%M:%S')] SSH tunnel disconnected after ${ssh_duration}s."
+
+        # If connection lasted >60s it was a working tunnel that dropped — reset backoff
+        if [[ ${ssh_duration} -gt 60 ]]; then
+            backoff=5
+            consecutive_failures=0
+            echo "  Connection was stable — resetting backoff."
+        else
+            consecutive_failures=$((consecutive_failures + 1))
+            if [[ ${consecutive_failures} -ge ${max_failures} ]]; then
+                echo "Error: ${max_failures} consecutive failures. Giving up."
+                echo "Check SSH key, bastion, and network connectivity."
+                exit 1
+            fi
+            backoff=$(( backoff * 2 > max_backoff ? max_backoff : backoff * 2 ))
+        fi
+
+        echo "Reconnecting in ${backoff}s... (attempt ${consecutive_failures}/${max_failures})"
+        sleep "${backoff}"
+    done
+}
+
 # Get CPU-compatible OKE image
 get_cpu_image() {
-    # Get OKE image for CPU nodes (non-GPU, non-ARM)
+    # Get OKE image for CPU nodes — exclude GPU and aarch64 images
+    # Standard x86_64 images have no architecture suffix in their name (e.g.,
+    # Oracle-Linux-8.10-2025.09.16-0-OKE-1.31.10-1330), so we exclude aarch64
+    # and GPU images via !contains() to match them.
     local K8S_VERSION
     K8S_VERSION="${KUBERNETES_VERSION#v}"
 
@@ -547,7 +821,7 @@ get_cpu_image() {
     IMAGE_ID=$(oci_cmd ce node-pool-options get \
         --node-pool-option-id all \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
-        --query "data.sources[?contains(\"source-name\", 'OKE-${K8S_VERSION}') && !contains(\"source-name\", 'GPU') && !contains(\"source-name\", 'aarch64') && !contains(\"source-name\", 'Gen2')].\"image-id\" | [0]" \
+        --query "data.sources[?contains(\"source-name\", 'OKE-${K8S_VERSION}') && !contains(\"source-name\", 'GPU') && !contains(\"source-name\", 'aarch64')].\"image-id\" | [0]" \
         --raw-output 2>/dev/null)
 
     if [[ -n "${IMAGE_ID}" && "${IMAGE_ID}" != "null" ]]; then
@@ -555,7 +829,7 @@ get_cpu_image() {
         return
     fi
 
-    # Fallback to any non-GPU OKE image
+    # Fallback to any non-GPU, non-aarch64 OKE image
     oci_cmd ce node-pool-options get \
         --node-pool-option-id all \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
@@ -592,7 +866,7 @@ add_cpu_nodepool() {
     CPU_IMAGE=$(get_cpu_image)
     echo "Using CPU image: ${CPU_IMAGE}"
 
-    echo "Creating CPU node pool with shape: VM.Standard.E5.Flex"
+    echo "Creating CPU node pool with shape: VM.Standard.E5.Flex (boot volume: ${CPU_BOOT_VOLUME_GB}GB)"
     oci_cmd ce node-pool create \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
         --cluster-id "${CLUSTER_ID}" \
@@ -601,6 +875,7 @@ add_cpu_nodepool() {
         --node-shape "VM.Standard.E5.Flex" \
         --node-shape-config '{"memoryInGBs": 16, "ocpus": 2}' \
         --node-image-id "${CPU_IMAGE}" \
+        --node-boot-volume-size-in-gbs "${CPU_BOOT_VOLUME_GB}" \
         --size 1 \
         --placement-configs "[{\"availabilityDomain\": \"${AD}\", \"subnetId\": \"${WORKER_SUBNET_ID}\"}]"
 
@@ -734,13 +1009,26 @@ configure_kubectl() {
         echo "     --target-private-ip ${PRIVATE_ENDPOINT%:*} \\"
         echo "     --target-port 6443 \\"
         echo "     --session-ttl 10800 \\"
+        echo "     --ssh-public-key-file ~/.ssh/id_rsa.pub \\"
         echo "     --display-name kubectl-tunnel"
         echo ""
-        echo "2. Find the 'ssh-command' in the output of the previous command and run it in a new terminal."
-        echo "   It will look like: ssh -i <private_key> -N -L 6443:${PRIVATE_ENDPOINT%:*}:6443 ...@host.bastion..."
+        echo "2. Wait for the session to become ACTIVE, then get the SSH command:"
+        echo "   oci bastion session get \\"
+        echo "     --profile ${OCI_PROFILE} --region ${OCI_REGION} \\"
+        echo "     --session-id <SESSION_OCID_FROM_STEP_1> \\"
+        echo "     --query \"data.\\\"ssh-metadata\\\".command\" \\"
+        echo "     --raw-output"
         echo ""
-        echo "3. Update kubeconfig to use localhost:"
-        echo "   kubectl config set-cluster \$(kubectl config current-context) --server=https://127.0.0.1:6443"
+        echo "3. Run the SSH command in a SEPARATE terminal. It will look like:"
+        echo "   ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes -N -L 6443:${PRIVATE_ENDPOINT%:*}:6443 -p 22 <session_ocid>@host.bastion.${OCI_REGION}.oci.oraclecloud.com"
+        echo "   (IdentitiesOnly=yes prevents 'too many authentication failures' when SSH agent has multiple keys)"
+        echo "   Keep this terminal open — the tunnel must stay running."
+        echo ""
+        echo "4. Update kubeconfig to use localhost (with TLS skip for tunnel):"
+        echo "   kubectl config set-cluster \$(kubectl config view --minify -o jsonpath='{.clusters[0].name}') --server=https://127.0.0.1:6443 --insecure-skip-tls-verify=true"
+        echo ""
+        echo "5. Verify the tunnel works:"
+        echo "   kubectl get nodes"
         echo ""
         echo "=============================================="
         echo ""
@@ -786,6 +1074,43 @@ install_nvidia_device_plugin() {
     kubectl -n kube-system wait --for=condition=Ready pods -l name=nvidia-device-plugin-ds --timeout=300s || true
 }
 
+# Fix CoreDNS scheduling on GPU-only clusters
+#
+# WHY THIS IS NEEDED:
+# - OKE applies a nvidia.com/gpu=present:NoSchedule taint to GPU nodes
+# - CoreDNS (and kube-dns-autoscaler) don't have tolerations for this taint
+# - In clusters with only GPU nodes (no CPU node pool), CoreDNS cannot schedule
+# - Without CoreDNS, DNS resolution fails for ALL pods (including vLLM downloading models)
+#
+# This function patches CoreDNS and kube-dns-autoscaler to tolerate the GPU taint.
+#
+fix_coredns_gpu_toleration() {
+    echo "Patching CoreDNS with GPU node toleration..."
+
+    # Check if CoreDNS pods are already running (toleration may not be needed)
+    local COREDNS_READY
+    COREDNS_READY=$(kubectl get pods -n kube-system -l k8s-app=kube-dns -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "Unknown")
+
+    if [[ "${COREDNS_READY}" == "Running" ]]; then
+        echo "CoreDNS is already running, skipping GPU toleration patch."
+        return 0
+    fi
+
+    echo "CoreDNS is not running (status: ${COREDNS_READY}). Adding GPU toleration..."
+
+    kubectl patch deployment coredns -n kube-system --type='json' \
+        -p='[{"op": "add", "path": "/spec/template/spec/tolerations/-", "value": {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"}}]' \
+        2>/dev/null || echo "Warning: Failed to patch CoreDNS deployment"
+
+    kubectl patch deployment kube-dns-autoscaler -n kube-system --type='json' \
+        -p='[{"op": "add", "path": "/spec/template/spec/tolerations/-", "value": {"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"}}]' \
+        2>/dev/null || echo "Warning: Failed to patch kube-dns-autoscaler deployment"
+
+    # Wait for CoreDNS to become ready
+    echo "Waiting for CoreDNS to be ready..."
+    kubectl -n kube-system wait --for=condition=Ready pods -l k8s-app=kube-dns --timeout=120s || true
+}
+
 # Expand GPU node filesystem using privileged pod
 #
 # WHY THIS IS NEEDED:
@@ -817,7 +1142,7 @@ expand_gpu_disk() {
 
     # Get GPU node name
     local GPU_NODE
-    GPU_NODE=$(kubectl get nodes -l app=gpu -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    GPU_NODE=$(kubectl get nodes -l app=gpu -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 
     if [[ -z "${GPU_NODE}" ]]; then
         echo "Warning: No GPU node found with label app=gpu. Skipping disk expansion."
@@ -826,19 +1151,23 @@ expand_gpu_disk() {
 
     echo "Found GPU node: ${GPU_NODE}"
 
-    # Check current filesystem size by running df on the node
+    # Check current filesystem size using a debug pod on the GPU node
     echo "Checking current filesystem size..."
-    local CURRENT_SIZE_OUTPUT
-    CURRENT_SIZE_OUTPUT=$(kubectl run check-disk-size --rm -i --restart=Never \
+    kubectl run check-disk-size --restart=Never \
         --image=busybox:latest \
-        --overrides="{\"spec\":{\"nodeName\":\"${GPU_NODE}\",\"tolerations\":[{\"operator\":\"Exists\"}],\"containers\":[{\"name\":\"check\",\"image\":\"busybox:latest\",\"command\":[\"sh\",\"-c\",\"chroot /host df -h / | tail -1\"],\"securityContext\":{\"privileged\":true},\"volumeMounts\":[{\"name\":\"host\",\"mountPath\":\"/host\"}]}],\"volumes\":[{\"name\":\"host\",\"hostPath\":{\"path\":\"/\"}}]}}" \
-        2>/dev/null || echo "unknown")
+        --overrides="{\"spec\":{\"nodeName\":\"${GPU_NODE}\",\"tolerations\":[{\"operator\":\"Exists\"}],\"containers\":[{\"name\":\"check\",\"image\":\"busybox:latest\",\"command\":[\"sleep\",\"30\"],\"securityContext\":{\"privileged\":true},\"volumeMounts\":[{\"name\":\"host\",\"mountPath\":\"/host\"}]}],\"volumes\":[{\"name\":\"host\",\"hostPath\":{\"path\":\"/\"}}]}}" \
+        2>/dev/null || true
+    kubectl wait --for=condition=Ready pod/check-disk-size --timeout=60s 2>/dev/null || true
+
+    local CURRENT_SIZE_OUTPUT
+    CURRENT_SIZE_OUTPUT=$(kubectl exec check-disk-size -- chroot /host df -h / 2>/dev/null | tail -1 || echo "unknown")
+    kubectl delete pod check-disk-size --force --grace-period=0 2>/dev/null || true
 
     echo "Current filesystem: ${CURRENT_SIZE_OUTPUT}"
 
     # Extract size in GB for comparison
     local CURRENT_GB
-    CURRENT_GB=$(echo "${CURRENT_SIZE_OUTPUT}" | awk '{print $2}' | sed 's/G//' | cut -d. -f1 2>/dev/null || echo "0")
+    CURRENT_GB=$(echo "${CURRENT_SIZE_OUTPUT}" | awk 'NR==1{print $2}' | sed 's/G//' | cut -d. -f1 2>/dev/null || echo "0")
 
     # If already expanded (>100GB), skip
     if [[ "${CURRENT_GB}" =~ ^[0-9]+$ ]] && [[ ${CURRENT_GB} -gt 100 ]]; then
@@ -854,240 +1183,128 @@ expand_gpu_disk() {
     kubectl delete pod expand-gpu-disk --force --grace-period=0 2>/dev/null || true
     sleep 5
 
-    # Create and run the expansion pod with detailed step-by-step verification
-    cat <<'EXPAND_EOF' | sed "s/\${GPU_NODE}/${GPU_NODE}/g" | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: expand-gpu-disk
-  namespace: default
-spec:
-  nodeName: ${GPU_NODE}
-  hostPID: true
-  tolerations:
-  - operator: "Exists"
-  priorityClassName: system-node-critical
-  containers:
-  - name: expand
-    image: oraclelinux:8
-    command: ["/bin/bash", "-c"]
-    args:
-    - |
-      set -x  # Enable debug output
-      echo "=========================================="
-      echo "STEP 0: Initial disk state"
-      echo "=========================================="
-      chroot /host bash -c '
-        echo "--- Partition table ---"
-        fdisk -l /dev/sda 2>/dev/null | head -20
-        echo ""
-        echo "--- LVM Physical Volumes ---"
-        pvs
-        echo ""
-        echo "--- LVM Volume Groups ---"
-        vgs
-        echo ""
-        echo "--- LVM Logical Volumes ---"
-        lvs
-        echo ""
-        echo "--- Current filesystem ---"
-        df -h /
-      '
+    # Create a long-running privileged pod on the GPU node.
+    # Using sleep+exec approach instead of a single-shot command to avoid timing issues
+    # where the pod gets cleaned up before all expansion steps complete.
+    echo "Creating privileged expansion pod on ${GPU_NODE}..."
+    kubectl run expand-gpu-disk --restart=Never \
+        --image=oraclelinux:8 \
+        --overrides="{\"spec\":{\"nodeName\":\"${GPU_NODE}\",\"tolerations\":[{\"operator\":\"Exists\"}],\"priorityClassName\":\"system-node-critical\",\"containers\":[{\"name\":\"expand\",\"image\":\"oraclelinux:8\",\"command\":[\"sleep\",\"600\"],\"securityContext\":{\"privileged\":true},\"volumeMounts\":[{\"name\":\"host\",\"mountPath\":\"/host\"}]}],\"volumes\":[{\"name\":\"host\",\"hostPath\":{\"path\":\"/\"}}]}}"
 
-      echo ""
-      echo "=========================================="
-      echo "STEP 1: Expand partition using growpart"
-      echo "=========================================="
-      echo "This is the CRITICAL step - partition must be expanded first!"
-      chroot /host bash -c '
-        # Install growpart if not available
-        if ! command -v growpart &>/dev/null; then
-          echo "Installing cloud-utils-growpart..."
-          yum install -y cloud-utils-growpart 2>/dev/null || dnf install -y cloud-utils-growpart 2>/dev/null || true
-        fi
-
-        echo "Running growpart on /dev/sda partition 3..."
-        growpart /dev/sda 3 2>&1 || echo "growpart returned non-zero (partition may already be expanded)"
-
-        echo "Partition table after growpart:"
-        fdisk -l /dev/sda 2>/dev/null | grep "^/dev/sda"
-      '
-
-      # Give kernel time to re-read partition table
-      sleep 5
-
-      echo ""
-      echo "=========================================="
-      echo "STEP 2: Resize LVM Physical Volume"
-      echo "=========================================="
-      chroot /host bash -c '
-        echo "Running pvresize on /dev/sda3..."
-        pvresize /dev/sda3
-        echo ""
-        echo "PV size after pvresize:"
-        pvs /dev/sda3
-      '
-
-      echo ""
-      echo "=========================================="
-      echo "STEP 3: Extend LVM Logical Volume"
-      echo "=========================================="
-      chroot /host bash -c '
-        echo "Running lvextend to use all free space..."
-        lvextend -l +100%FREE /dev/ocivolume/root 2>&1 || echo "lvextend returned non-zero (may already be extended)"
-        echo ""
-        echo "LV size after lvextend:"
-        lvs /dev/ocivolume/root
-      '
-
-      echo ""
-      echo "=========================================="
-      echo "STEP 4: Grow XFS filesystem"
-      echo "=========================================="
-      chroot /host bash -c '
-        echo "Running xfs_growfs on root filesystem..."
-        xfs_growfs /
-        echo ""
-        echo "Filesystem size after xfs_growfs:"
-        df -h /
-      '
-
-      echo ""
-      echo "=========================================="
-      echo "EXPANSION COMPLETE"
-      echo "=========================================="
-      chroot /host df -h /
-      echo "EXPANSION_DONE_MARKER"
-    securityContext:
-      privileged: true
-    volumeMounts:
-    - name: host
-      mountPath: /host
-  volumes:
-  - name: host
-    hostPath:
-      path: /
-  restartPolicy: Never
-EXPAND_EOF
-
-    # Wait for the pod to be created and start running
+    # Wait for the pod to be running
     echo "Waiting for expansion pod to start..."
     for i in {1..30}; do
         local POD_PHASE
         POD_PHASE=$(kubectl get pod expand-gpu-disk -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-        if [[ "${POD_PHASE}" == "Running" ]] || [[ "${POD_PHASE}" == "Succeeded" ]] || [[ "${POD_PHASE}" == "Failed" ]]; then
-            echo "Pod is ${POD_PHASE}"
+        if [[ "${POD_PHASE}" == "Running" ]]; then
+            echo "Pod is Running"
             break
         fi
         echo "  Waiting for pod to start... (${i}/30)"
         sleep 5
     done
 
-    # Stream logs while waiting for completion (max 5 minutes)
-    echo ""
-    echo "--- Expansion pod logs (streaming) ---"
-    timeout 300 kubectl logs -f expand-gpu-disk 2>/dev/null || true
-    echo "--- End of logs ---"
-    echo ""
+    # Run ALL expansion steps in a single kubectl exec to avoid the pod being
+    # killed (exit 137) between steps. If the exec fails, we retry with a new
+    # pod since all operations are idempotent.
+    local EXPAND_SCRIPT='
+set -x
+echo "=== STEP 0: Initial state ==="
+df -h / ; pvs ; lvs
 
-    # Check final pod status
-    local FINAL_STATUS
-    FINAL_STATUS=$(kubectl get pod expand-gpu-disk -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-    echo "Expansion pod final status: ${FINAL_STATUS}"
+echo "=== STEP 1: Expand partition ==="
+if ! command -v growpart &>/dev/null; then
+    yum install -y cloud-utils-growpart 2>/dev/null || dnf install -y cloud-utils-growpart 2>/dev/null || true
+fi
+growpart /dev/sda 3 2>&1 || echo "growpart: partition may already be expanded"
+sleep 3
 
-    # Check if expansion marker was output
-    local LOGS
-    LOGS=$(kubectl logs expand-gpu-disk 2>/dev/null || echo "")
-    if echo "${LOGS}" | grep -q "EXPANSION_DONE_MARKER"; then
-        echo "✓ Expansion script completed successfully"
-    else
-        echo "Warning: Expansion script may not have completed fully"
-    fi
+echo "=== STEP 2: Resize PV ==="
+pvresize /dev/sda3 && pvs /dev/sda3
 
-    # Cleanup expansion pod
-    kubectl delete pod expand-gpu-disk --force --grace-period=0 2>/dev/null || true
+echo "=== STEP 3: Extend LV ==="
+lvextend -l +100%FREE /dev/ocivolume/root 2>&1 || echo "lvextend: may already be extended"
 
-    # Restart kubelet to refresh node status with new allocatable storage
-    echo ""
-    echo "Restarting kubelet to update node allocatable storage..."
-    kubectl delete pod restart-kubelet --force --grace-period=0 2>/dev/null || true
-    sleep 3
+echo "=== STEP 4: Grow XFS ==="
+xfs_growfs /
 
-    cat <<RESTART_EOF | sed "s/\${GPU_NODE}/${GPU_NODE}/g" | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: restart-kubelet
-  namespace: default
-spec:
-  nodeName: ${GPU_NODE}
-  hostPID: true
-  tolerations:
-  - operator: "Exists"
-  priorityClassName: system-node-critical
-  containers:
-  - name: restart
-    image: busybox:latest
-    command: ["/bin/sh", "-c"]
-    args:
-    - |
-      echo "Restarting kubelet..."
-      chroot /host systemctl restart kubelet
-      echo "Kubelet restarted. Waiting for it to stabilize..."
-      sleep 10
-      echo "RESTART_DONE"
-    securityContext:
-      privileged: true
-    volumeMounts:
-    - name: host
-      mountPath: /host
-  volumes:
-  - name: host
-    hostPath:
-      path: /
-  restartPolicy: Never
-RESTART_EOF
+echo "=== STEP 5: Final state ==="
+df -h /
 
-    # Wait for kubelet restart to complete
-    echo "Waiting for kubelet restart..."
-    for i in {1..24}; do
-        local RESTART_STATUS
-        RESTART_STATUS=$(kubectl get pod restart-kubelet -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-        if [[ "${RESTART_STATUS}" == "Succeeded" ]]; then
-            echo "Kubelet restart completed"
-            break
-        elif [[ "${RESTART_STATUS}" == "Failed" ]]; then
-            echo "Warning: Kubelet restart pod failed"
+echo "EXPANSION_COMPLETE"
+'
+
+    local ATTEMPT
+    for ATTEMPT in 1 2 3; do
+        echo ""
+        echo "Expansion attempt ${ATTEMPT}/3..."
+
+        # Ensure pod exists and is running
+        local POD_PHASE
+        POD_PHASE=$(kubectl get pod expand-gpu-disk -o jsonpath='{.status.phase}' 2>/dev/null || echo "Missing")
+        if [[ "${POD_PHASE}" != "Running" ]]; then
+            echo "Pod not running (${POD_PHASE}), recreating..."
+            kubectl delete pod expand-gpu-disk --force --grace-period=0 2>/dev/null || true
+            sleep 3
+            kubectl run expand-gpu-disk --restart=Never \
+                --image=oraclelinux:8 \
+                --overrides="{\"spec\":{\"nodeName\":\"${GPU_NODE}\",\"hostPID\":true,\"tolerations\":[{\"operator\":\"Exists\"}],\"containers\":[{\"name\":\"expand\",\"image\":\"oraclelinux:8\",\"command\":[\"sleep\",\"600\"],\"securityContext\":{\"privileged\":true},\"volumeMounts\":[{\"name\":\"host\",\"mountPath\":\"/host\"}]}],\"volumes\":[{\"name\":\"host\",\"hostPath\":{\"path\":\"/\"}}]}}"
+            for _ in {1..30}; do
+                POD_PHASE=$(kubectl get pod expand-gpu-disk -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+                [[ "${POD_PHASE}" == "Running" ]] && break
+                sleep 5
+            done
+        fi
+
+        # Run all steps in one exec
+        local EXEC_OUTPUT
+        EXEC_OUTPUT=$(kubectl exec expand-gpu-disk -- chroot /host bash -c "${EXPAND_SCRIPT}" 2>&1) || true
+        echo "${EXEC_OUTPUT}"
+
+        # Check if expansion completed
+        if echo "${EXEC_OUTPUT}" | grep -q "EXPANSION_COMPLETE"; then
+            echo ""
+            echo "Disk expansion completed successfully."
             break
         fi
+
+        echo "Expansion did not complete on attempt ${ATTEMPT}. Retrying..."
         sleep 5
     done
 
-    kubectl delete pod restart-kubelet --force --grace-period=0 2>/dev/null || true
+    # Restart kubelet via nsenter (best-effort)
+    echo ""
+    echo "Restarting kubelet..."
+    kubectl exec expand-gpu-disk -- nsenter -t 1 -m -p -- systemctl restart kubelet 2>/dev/null \
+        || echo "Warning: kubelet restart failed (non-critical — kubelet is still running)"
 
-    # Wait for node to be ready again after kubelet restart
-    echo "Waiting for node to be ready..."
-    kubectl wait --for=condition=Ready node "${GPU_NODE}" --timeout=120s 2>/dev/null || true
-
-    # Additional wait for kubelet to update allocatable resources
-    echo "Waiting for kubelet to report updated allocatable storage (60 seconds)..."
-    sleep 60
-
-    # Verify final filesystem size
+    # Verify final filesystem size using the expansion pod (before deleting it)
     echo ""
     echo "=============================================="
     echo "VERIFICATION"
     echo "=============================================="
     local FINAL_SIZE_OUTPUT
-    FINAL_SIZE_OUTPUT=$(kubectl run verify-disk-size --rm -i --restart=Never \
-        --image=busybox:latest \
-        --overrides="{\"spec\":{\"nodeName\":\"${GPU_NODE}\",\"tolerations\":[{\"operator\":\"Exists\"}],\"containers\":[{\"name\":\"check\",\"image\":\"busybox:latest\",\"command\":[\"sh\",\"-c\",\"chroot /host df -h / | tail -1\"],\"securityContext\":{\"privileged\":true},\"volumeMounts\":[{\"name\":\"host\",\"mountPath\":\"/host\"}]}],\"volumes\":[{\"name\":\"host\",\"hostPath\":{\"path\":\"/\"}}]}}" \
-        2>/dev/null || echo "unknown")
+    local POD_PHASE
+    POD_PHASE=$(kubectl get pod expand-gpu-disk -o jsonpath='{.status.phase}' 2>/dev/null || echo "Missing")
+    if [[ "${POD_PHASE}" == "Running" ]]; then
+        FINAL_SIZE_OUTPUT=$(kubectl exec expand-gpu-disk -- chroot /host df -h / 2>/dev/null | tail -1 || echo "unknown")
+    else
+        FINAL_SIZE_OUTPUT="unknown (expansion pod not running)"
+    fi
 
     echo "Final filesystem: ${FINAL_SIZE_OUTPUT}"
 
+    # Cleanup expansion pod
+    echo ""
+    echo "Cleaning up expansion pod..."
+    kubectl delete pod expand-gpu-disk --force --grace-period=0 2>/dev/null || true
+
+    # Wait for node to be ready again after kubelet restart
+    echo "Waiting for node to be ready..."
+    kubectl wait --for=condition=Ready node "${GPU_NODE}" --timeout=120s 2>/dev/null || true
+
     local FINAL_GB
-    FINAL_GB=$(echo "${FINAL_SIZE_OUTPUT}" | awk '{print $2}' | sed 's/G//' | cut -d. -f1 2>/dev/null || echo "0")
+    FINAL_GB=$(echo "${FINAL_SIZE_OUTPUT}" | awk 'NR==1{print $2}' | sed 's/G//' | cut -d. -f1 2>/dev/null || echo "0")
 
     if [[ "${FINAL_GB}" =~ ^[0-9]+$ ]] && [[ ${FINAL_GB} -gt 100 ]]; then
         echo ""
@@ -1097,14 +1314,7 @@ RESTART_EOF
         echo ""
         echo "⚠ WARNING: Filesystem may not have expanded properly (${FINAL_GB}GB)"
         echo ""
-        echo "Manual intervention may be needed. You can run:"
-        echo "  kubectl apply -f - <<EOF"
-        echo "  apiVersion: v1"
-        echo "  kind: Pod"
-        echo "  ... (create privileged debug pod)"
-        echo "  EOF"
-        echo ""
-        echo "Then inside the pod, run:"
+        echo "Manual intervention may be needed. Create a privileged pod and run:"
         echo "  chroot /host bash"
         echo "  growpart /dev/sda 3"
         echo "  pvresize /dev/sda3"
@@ -1115,10 +1325,17 @@ RESTART_EOF
     fi
 }
 
-# Fix router memory (default 500Mi causes OOMKill)
+# Fix router deployment for GPU-only clusters
+#
+# Two issues with the default router deployment:
+# 1. Memory: Default 500Mi causes OOMKill - increase to 1Gi
+# 2. GPU toleration: Router doesn't tolerate nvidia.com/gpu taint, so it can't
+#    schedule on GPU-only clusters (same issue as CoreDNS)
+#
 fix_router_memory() {
-    echo "Increasing router memory to prevent OOMKill..."
+    echo "Patching router: GPU toleration + memory fix..."
     kubectl patch deployment vllm-deployment-router --type='json' -p='[
+      {"op": "add", "path": "/spec/template/spec/tolerations", "value": [{"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule"}]},
       {"op": "replace", "path": "/spec/template/spec/containers/0/resources/requests/memory", "value": "512Mi"},
       {"op": "replace", "path": "/spec/template/spec/containers/0/resources/limits/memory", "value": "1Gi"}
     ]' 2>/dev/null || echo "Router deployment not found yet, will be patched after vLLM deployment"
@@ -1143,15 +1360,19 @@ deploy_vllm_stack() {
         HELM_VALUES_FLAG="-f ${SCRIPT_DIR}/production_stack_specification.yaml"
     fi
 
+    # Don't use --wait here. The router pod will CrashLoop until fix_router_memory
+    # patches it with GPU toleration and increased memory. Using --wait would block
+    # for 10 minutes and then fail. Instead, install without waiting, fix the router,
+    # and then wait for all pods.
     # shellcheck disable=SC2086
     helm upgrade -i \
-        --wait \
         --timeout 10m \
         vllm \
         vllm/vllm-stack ${HELM_VALUES_FLAG}
 
-    echo "Waiting for vLLM pods to be ready..."
-    kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=vllm --timeout=600s || true
+    echo "Waiting for vLLM engine pods to start..."
+    sleep 10
+    kubectl wait --for=condition=Ready pods -l helm-release-name=vllm --timeout=600s 2>/dev/null || true
     kubectl get pods
 }
 
@@ -1188,64 +1409,82 @@ cleanup() {
         fi
     done
 
-    # Get cluster ID (any state except DELETED)
+    # FIX: Delete ALL clusters matching the name, not just the first one.
+    # Multiple clusters with the same name can exist (e.g., from failed deployments
+    # or re-runs). If we only delete data[0], orphan clusters leave behind service
+    # VNICs in the API subnet, blocking subnet/VCN deletion.
     CLUSTER_JSON=$(oci_cmd ce cluster list \
         --compartment-id "${OCI_COMPARTMENT_ID}" \
         --name "${CLUSTER_NAME}" \
-        --query "data[?\"lifecycle-state\"!='DELETED']" 2>/dev/null || echo "[]")
+        --query "data[?\"lifecycle-state\"!='DELETED'].id" 2>/dev/null || echo "[]")
 
-    CLUSTER_ID=$(echo "${CLUSTER_JSON}" | jq -r '.[0].id // empty' 2>/dev/null || echo "")
+    CLUSTER_IDS=$(echo "${CLUSTER_JSON}" | jq -r '.[]?' 2>/dev/null)
 
-    if [[ -n "${CLUSTER_ID}" ]]; then
-        echo "Found cluster: ${CLUSTER_ID}"
+    if [[ -n "${CLUSTER_IDS}" ]]; then
+        # Process each cluster: delete its node pools, then delete the cluster
+        while read -r CLUSTER_ID; do
+            [[ -z "${CLUSTER_ID}" ]] && continue
+            echo "Found cluster: ${CLUSTER_ID}"
 
-        # Delete node pools
-        echo "Deleting node pools..."
-        NODE_POOLS_JSON=$(oci_cmd ce node-pool list \
-            --compartment-id "${OCI_COMPARTMENT_ID}" \
-            --cluster-id "${CLUSTER_ID}" \
-            --query "data[*].id" 2>/dev/null || echo "[]")
-
-        echo "${NODE_POOLS_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r POOL_ID; do
-            if [[ -n "${POOL_ID}" ]]; then
-                echo "Deleting node pool: ${POOL_ID}"
-                if ! oci_cmd ce node-pool delete --node-pool-id "${POOL_ID}" --force; then
-                    echo "Warning: Failed to delete node pool: ${POOL_ID}"
-                fi
-            fi
-        done
-
-        # Wait for node pools to be deleted
-        echo "Waiting for node pools to be deleted..."
-        for i in {1..20}; do
-            REMAINING=$(oci_cmd ce node-pool list \
+            # Delete node pools for this cluster
+            echo "Deleting node pools..."
+            NODE_POOLS_JSON=$(oci_cmd ce node-pool list \
                 --compartment-id "${OCI_COMPARTMENT_ID}" \
                 --cluster-id "${CLUSTER_ID}" \
-                --query "length(data)" --raw-output 2>/dev/null || echo "0")
-            if [[ "${REMAINING}" == "0" || -z "${REMAINING}" ]]; then
-                echo "All node pools deleted."
-                break
-            fi
-            echo "  Waiting for ${REMAINING} node pool(s) to be deleted..."
-            sleep 30
-        done
+                --query "data[*].id" 2>/dev/null || echo "[]")
 
-        # Delete cluster
-        echo "Deleting OKE cluster: ${CLUSTER_ID}"
-        oci_cmd ce cluster delete --cluster-id "${CLUSTER_ID}" --force 2>/dev/null || true
+            echo "${NODE_POOLS_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r POOL_ID; do
+                if [[ -n "${POOL_ID}" ]]; then
+                    echo "Deleting node pool: ${POOL_ID}"
+                    if ! oci_cmd ce node-pool delete --node-pool-id "${POOL_ID}" --force; then
+                        echo "Warning: Failed to delete node pool: ${POOL_ID}"
+                    fi
+                fi
+            done
 
-        # Poll for cluster deletion instead of fixed sleep
-        echo "Waiting for cluster to be deleted..."
-        for i in {1..40}; do
-            STATE=$(oci_cmd ce cluster get --cluster-id "${CLUSTER_ID}" \
-                --query "data.\"lifecycle-state\"" --raw-output 2>/dev/null || echo "DELETED")
-            if [[ "${STATE}" == "DELETED" || "${STATE}" == "null" || -z "${STATE}" ]]; then
-                echo "Cluster deleted."
-                break
-            fi
-            echo "  Cluster state: ${STATE} (waiting...)"
-            sleep 30
-        done
+            # Wait for node pools to be deleted
+            echo "Waiting for node pools to be deleted..."
+            for i in {1..20}; do
+                REMAINING=$(oci_cmd ce node-pool list \
+                    --compartment-id "${OCI_COMPARTMENT_ID}" \
+                    --cluster-id "${CLUSTER_ID}" \
+                    --query "length(data)" --raw-output 2>/dev/null || echo "0")
+                if [[ "${REMAINING}" == "0" || -z "${REMAINING}" ]]; then
+                    echo "All node pools deleted."
+                    break
+                fi
+                echo "  Waiting for ${REMAINING} node pool(s) to be deleted..."
+                sleep 30
+            done
+
+            # Delete cluster
+            echo "Deleting OKE cluster: ${CLUSTER_ID}"
+            oci_cmd ce cluster delete --cluster-id "${CLUSTER_ID}" --force 2>/dev/null || true
+        done <<< "${CLUSTER_IDS}"
+
+        # Wait for ALL clusters to reach DELETED state before proceeding to VCN cleanup.
+        # Cluster deletion releases the API endpoint VNIC from the subnet — if we try
+        # to delete subnets before this completes, we get "references service VNIC" errors.
+        echo "Waiting for all clusters to be deleted..."
+        while read -r CLUSTER_ID; do
+            [[ -z "${CLUSTER_ID}" ]] && continue
+            for i in {1..40}; do
+                STATE=$(oci_cmd ce cluster get --cluster-id "${CLUSTER_ID}" \
+                    --query "data.\"lifecycle-state\"" --raw-output 2>/dev/null || echo "DELETED")
+                if [[ "${STATE}" == "DELETED" || "${STATE}" == "null" || -z "${STATE}" ]]; then
+                    echo "Cluster ${CLUSTER_ID} deleted."
+                    break
+                fi
+                echo "  Cluster state: ${STATE} (waiting...)"
+                sleep 30
+            done
+        done <<< "${CLUSTER_IDS}"
+
+        # OCI needs additional time to release the cluster API endpoint VNICs from subnets
+        # after cluster deletion completes. Without this wait, subnet deletion fails with
+        # "references the service VNIC" conflict errors.
+        echo "Waiting for cluster VNICs to be released (60 seconds)..."
+        sleep 60
     else
         echo "No active cluster found."
     fi
@@ -1260,9 +1499,12 @@ cleanup() {
     if [[ -n "${VCN_ID}" && "${VCN_ID}" != "null" ]]; then
         echo "Cleaning up VCN resources: ${VCN_ID}"
 
-        # Delete subnets first (with retry logic for dependencies)
+        # Delete subnets (with retry logic for dependency conflicts).
+        # Subnets can't be deleted while they still have VNICs attached — e.g., the
+        # API endpoint subnet retains a service VNIC until OCI fully releases it after
+        # cluster deletion. We retry with increasing waits to handle this.
         echo "Deleting subnets..."
-        for attempt in {1..5}; do
+        for attempt in {1..10}; do
             SUBNETS_JSON=$(oci_cmd network subnet list \
                 --compartment-id "${OCI_COMPARTMENT_ID}" \
                 --vcn-id "${VCN_ID}" \
@@ -1274,17 +1516,17 @@ cleanup() {
                 break
             fi
 
-            echo "  Attempt ${attempt}/5: Deleting ${SUBNET_COUNT} subnet(s)..."
+            echo "  Attempt ${attempt}/10: Deleting ${SUBNET_COUNT} subnet(s)..."
             echo "${SUBNETS_JSON}" | jq -r '.[]?' 2>/dev/null | while read -r SUBNET_ID; do
                 if [[ -n "${SUBNET_ID}" ]]; then
                     echo "    Deleting subnet: ${SUBNET_ID}"
                     if ! oci_cmd network subnet delete --subnet-id "${SUBNET_ID}" --force; then
-                        echo "    Warning: Failed to delete subnet: ${SUBNET_ID}"
+                        echo "    Warning: Failed to delete subnet (VNIC may still be attached): ${SUBNET_ID}"
                     fi
                 fi
             done
 
-            echo "  Waiting for subnets to be deleted..."
+            echo "  Waiting for subnets to be released..."
             sleep 30
         done
 
@@ -1411,34 +1653,56 @@ setup)
         echo "=============================================="
         echo ""
         echo "Infrastructure created successfully!"
-        echo "To complete the deployment, establish SSH tunnel first, then run:"
         echo ""
-        echo "  # After SSH tunnel is active:"
-        echo "  $0 deploy-vllm [HELM_VALUES_FILE]"
+        echo "NEXT STEPS — complete the SSH tunnel (steps 1-5 above), then deploy:"
         echo ""
-        echo "This will:"
-        echo "  1. Install NVIDIA device plugin"
-        echo "  2. Apply storage classes"
-        echo "  3. Expand GPU disk to full boot volume size"
-        echo "  4. Deploy vLLM stack"
-        echo "  5. Fix router memory to prevent OOMKill"
+        echo "  # 1. Create bastion session  (step 1 above)"
+        echo "  # 2. Get SSH command          (step 2 above)"
+        echo "  # 3. Run SSH tunnel           (step 3 — keep open in separate terminal)"
+        echo "  # 4. Update kubeconfig        (step 4 above)"
+        echo "  # 5. Verify: kubectl get nodes"
         echo ""
-        echo "Or run steps manually:"
-        echo "  kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.1/nvidia-device-plugin.yml"
-        echo "  kubectl apply -f ${SCRIPT_DIR}/oci-block-storage-sc.yaml"
-        echo "  $0 expand-disk   # Expand GPU filesystem to full boot volume"
-        echo "  helm repo add vllm https://vllm-project.github.io/production-stack && helm repo update"
-        echo "  helm upgrade -i --wait vllm vllm/vllm-stack -f ${2:-${SCRIPT_DIR}/production_stack_specification.yaml}"
-        echo "  $0 fix-router    # Increase router memory to prevent OOMKill"
+        echo "  # 6. Deploy vLLM stack:"
+        echo "  $0 deploy-vllm ${2:-[HELM_VALUES_FILE]}"
+        echo ""
+        echo "  deploy-vllm will automatically:"
+        echo "    - Install NVIDIA device plugin"
+        echo "    - Fix CoreDNS GPU toleration (for GPU-only clusters)"
+        echo "    - Apply storage classes"
+        echo "    - Expand GPU disk to full boot volume size"
+        echo "    - Deploy vLLM stack via Helm"
+        echo "    - Fix router deployment (GPU toleration + memory)"
         echo ""
     else
         install_nvidia_device_plugin
+
+        # Wait for GPU node to register — same logic as deploy-vllm path
+        echo "Waiting for GPU node to join the cluster..."
+        for i in {1..60}; do
+            GPU_COUNT=$(kubectl get nodes -l app=gpu --no-headers 2>/dev/null | wc -l | tr -d ' ')
+            if [[ "${GPU_COUNT}" -gt 0 ]]; then
+                echo "GPU node found, waiting for Ready status..."
+                kubectl wait --for=condition=Ready nodes -l app=gpu --timeout=300s || true
+                break
+            fi
+            printf "  %s No GPU node yet (%d/60)\n" "$(date +%H:%M:%S)" "${i}"
+            sleep 30
+        done
+
+        fix_coredns_gpu_toleration
         apply_storage_class
         expand_gpu_disk
         deploy_vllm_stack "${2:-}"
         fix_router_memory
+
+        echo "Waiting for router to be ready after patching..."
+        sleep 10
+        kubectl rollout status deployment/vllm-deployment-router --timeout=120s 2>/dev/null || true
+
         echo ""
         echo "Setup complete! Your vLLM stack is ready."
+        kubectl get pods
+        echo ""
         echo "Check pods with: kubectl get pods"
         echo "Get service endpoint: kubectl get svc"
     fi
@@ -1447,24 +1711,48 @@ deploy-vllm)
     # For private clusters: complete deployment after SSH tunnel is established
     echo "Completing vLLM deployment (private cluster)..."
     install_nvidia_device_plugin
+
+    # Wait for GPU node to register in the cluster.
+    # The node pool may be ACTIVE in OCI but the node hasn't joined Kubernetes yet.
+    # kubectl wait -l app=gpu fails with "no matching resources found" if no node
+    # has that label yet, so we poll until a labeled node appears.
+    echo "Waiting for GPU node to join the cluster..."
+    for i in {1..60}; do
+        GPU_COUNT=$(kubectl get nodes -l app=gpu --no-headers 2>/dev/null | wc -l | tr -d ' ')
+        if [[ "${GPU_COUNT}" -gt 0 ]]; then
+            echo "GPU node found, waiting for Ready status..."
+            kubectl wait --for=condition=Ready nodes -l app=gpu --timeout=300s || true
+            break
+        fi
+        printf "  %s No GPU node yet (%d/60)\n" "$(date +%H:%M:%S)" "${i}"
+        sleep 30
+    done
+
+    fix_coredns_gpu_toleration
     apply_storage_class
-
-    # Wait for GPU node to be ready
-    echo "Waiting for GPU node to be ready..."
-    kubectl wait --for=condition=Ready nodes -l app=gpu --timeout=600s || true
-
     expand_gpu_disk
     deploy_vllm_stack "${2:-}"
-
-    # Wait a bit for router to be created
-    echo "Waiting for router deployment..."
-    sleep 30
     fix_router_memory
+
+    echo "Waiting for router to be ready after patching..."
+    sleep 10
+    kubectl rollout status deployment/vllm-deployment-router --timeout=120s 2>/dev/null || true
 
     echo ""
     echo "Deployment complete! Your vLLM stack is ready."
+    kubectl get pods
+    echo ""
     echo "Check pods with: kubectl get pods"
     echo "Get service endpoint: kubectl get svc"
+    ;;
+tunnel)
+    # Automated SSH tunnel with auto-reconnect for private cluster access
+    if [[ "${PRIVATE_CLUSTER}" != "true" ]]; then
+        echo "Error: tunnel command is only for private clusters (PRIVATE_CLUSTER=true)"
+        exit 1
+    fi
+    validate_env
+    tunnel
     ;;
 expand-disk)
     # Expand GPU node filesystem to use full boot volume
@@ -1483,9 +1771,10 @@ cleanup)
     echo ""
     echo "Commands:"
     echo "  setup       - Create OKE cluster with GPU node pool (full deployment for public clusters)"
+    echo "  tunnel      - Start SSH tunnel with auto-reconnect (private clusters, run in separate terminal)"
     echo "  deploy-vllm - Deploy vLLM stack (for private clusters, after SSH tunnel is active)"
     echo "  expand-disk - Expand GPU node filesystem to full boot volume size"
-    echo "  fix-router  - Increase router memory to 1Gi (prevents OOMKill)"
+    echo "  fix-router  - Fix router (GPU toleration + memory increase to 1Gi)"
     echo "  cleanup     - Delete all resources created by this script"
     echo ""
     echo "Environment variables:"
@@ -1498,11 +1787,13 @@ cleanup)
     echo "  GPU_AD_INDEX        - Availability domain index (default: 1 for Ashburn AD-2)"
     echo "  PRIVATE_CLUSTER     - Use private endpoint + bastion (default: true)"
     echo "  BASTION_CLIENT_CIDR - Allowed CIDR for bastion access (default: 0.0.0.0/0)"
+    echo "  SSH_KEY_FILE        - SSH private key for bastion (default: ~/.ssh/id_rsa)"
+    echo "  BASTION_SESSION_TTL - Bastion session TTL in seconds (default: 10800)"
     echo "  GPU_NODE_COUNT      - Number of GPU nodes (default: 1)"
     echo ""
     echo "Typical usage for private cluster:"
     echo "  1. $0 setup                    # Creates cluster + bastion"
-    echo "  2. Create bastion session and establish SSH tunnel"
+    echo "  2. $0 tunnel                   # Start tunnel (separate terminal, auto-reconnects)"
     echo "  3. $0 deploy-vllm              # Deploys vLLM stack after tunnel is active"
     echo ""
     echo "IMPORTANT: GPU shape availability varies by region and AD:"
