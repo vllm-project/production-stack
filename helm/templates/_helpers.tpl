@@ -83,25 +83,70 @@ Define additional router ports
 {{/*
 Define startup, liveness and readiness probes
 */}}
+{{- define "chart.templateProbe"}}
+  initialDelaySeconds: {{ .initialDelaySeconds | default 15 }}
+  periodSeconds: {{ .periodSeconds | default 10 }}
+  failureThreshold: {{ .failureThreshold | default 3 }}
+  {{- if .timeoutSeconds }}
+  timeoutSeconds: {{ .timeoutSeconds }}
+  {{- end }}
+  {{- if .successThreshold }}
+  successThreshold: {{ .successThreshold }}
+  {{- end }}
+  {{- if .exec }}
+  exec:
+    command: {{- range .exec.command }}
+      - {{. | quote }} {{- end}}
+  {{- else if .tcpSocket }}
+  tcpSocket:
+    {{- if .tcpSocket.host }}
+    host: {{ .tcpSocket.host }}
+    {{- end }}
+    port: {{ .tcpSocket.port }}
+  {{- else if .grpc }}
+  grpc:
+    {{- if .grpc.service }}
+    service: {{ .grpc.service }}
+    {{- end }}
+    port: {{ .grpc.port }}
+  {{- else }}
+  httpGet:
+    path:  {{ .httpGet.path | default "/health" }}
+    port: {{ .httpGet.port | default 8000 }}
+    {{- if .httpGet.httpHeaders }}
+    httpHeaders: {{- range .httpGet.httpHeaders }}
+      - name: {{ .name }}
+        value: {{ .value | quote }}
+    {{- end }}
+    {{- end }}
+    {{- if .httpGet.host }}
+    host: {{ .httpGet.host }}
+    {{- end }}
+    {{- if .httpGet.scheme }}
+    scheme: {{ .httpGet.scheme }}
+    {{- end }}
+  {{- end }}
+{{- end }}
 {{- define "chart.probes" -}}
-{{-   if .Values.servingEngineSpec.startupProbe  }}
+{{- if .Values.servingEngineSpec.startupProbe }}
 startupProbe:
-{{-     with .Values.servingEngineSpec.startupProbe }}
-{{-       toYaml . | nindent 2 }}
-{{-     end }}
-{{-   end }}
-{{-   if .Values.servingEngineSpec.livenessProbe  }}
+  {{- with .Values.servingEngineSpec.startupProbe }}
+  {{- include "chart.templateProbe" . }}
+  {{- end }}
+{{- end }}
+{{- if .Values.servingEngineSpec.livenessProbe }}
 livenessProbe:
-{{-     with .Values.servingEngineSpec.livenessProbe }}
-{{-       toYaml . | nindent 2 }}
-{{-     end }}
-{{-   end }}
-{{-   if .Values.servingEngineSpec.readinessProbe  }}
+  {{- with .Values.servingEngineSpec.livenessProbe }}
+  {{- include "chart.templateProbe" . }}
+  {{- end }}
+{{- end }}
+{{- if .Values.servingEngineSpec.readinessProbe }}
 readinessProbe:
-{{-     with .Values.servingEngineSpec.readinessProbe }}
-{{-       toYaml . | nindent 2 }}
-{{-     end }}
-{{-   end }}
+  {{- with .Values.servingEngineSpec.readinessProbe }}
+  {{- include "chart.templateProbe" . }}
+  {{- end }}
+{{- end }}
+
 {{- end }}
 
 {{- define "chart.hasLimits" -}}
