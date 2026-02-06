@@ -33,6 +33,9 @@ type DeploymentConfig struct {
 	// Node selector
 	NodeSelectorTerms []corev1.NodeSelectorTerm `json:"nodeSelectorTerms,omitempty"`
 
+	// Toleration
+	Toleration []corev1.Toleration `json:"toleration,omitempty"`
+
 	// Deploy strategy
 	// +kubebuilder:validation:Enum=RollingUpdate;Recreate
 	// +kubebuilder:default=RollingUpdate
