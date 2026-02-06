@@ -264,11 +264,11 @@ servingEngineSpec:
     failureThreshold:
       60
       # -- Configuration of the Kubelet http request on the server
-    #httpGet:
+    httpGet:
     #  # -- Path to access on the HTTP server
-    #  path: /health
+      path: /health
     #  # -- Name or number of the port to access on the container, on which the server is listening
-    #  port: 8000
+      port: 8000
 
   # -- Liveness probe configuration
   livenessProbe:
@@ -279,11 +279,11 @@ servingEngineSpec:
     # -- How often (in seconds) to perform the liveness probe
     periodSeconds: 10
     # -- Configuration of the Kubelet http request on the server
-    #httpGet:
+    httpGet:
     #  # -- Path to access on the HTTP server
-    #  path: /health
+      path: /health
     #  # -- Name or number of the port to access on the container, on which the server is listening
-    #  port: 8000
+      port: 8000
 
   # -- Readiness probe configuration
   readinessProbe:
@@ -294,11 +294,11 @@ servingEngineSpec:
     # -- How often (in seconds) to perform the readiness probe
     periodSeconds: 5
     # -- Configuration of the Kubelet http request on the server
-    #httpGet:
+    httpGet:
     #  # -- Path to access on the HTTP server
-    #  path: /health
+      path: /health
     #  # -- Name or number of the port to access on the container, on which the server is listening
-    #  port: 8000
+      port: 8000
 
   # -- Disruption Budget Configuration
   maxUnavailablePodDisruptionBudget: ""
