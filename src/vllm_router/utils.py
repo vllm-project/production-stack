@@ -9,11 +9,22 @@ from typing import Optional
 
 import requests
 from fastapi.requests import Request
-from starlette.datastructures import MutableHeaders
+from starlette.datastructures import Headers, MutableHeaders
 
 from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
+
+# Sensitive headers that commonly contain authentication tokens
+_SENSITIVE_HEADERS = {
+    "authorization",
+    "x-api-key",
+    "api-key",
+    "x-auth-token",
+    "auth-token",
+    "x-access-token",
+    "access-token",
+}
 
 # prepare a WAV byte to prevent repeatedly generating it
 # Generate a 0.1 second silent audio file
@@ -208,6 +219,21 @@ def parse_static_aliases(static_aliases: str):
         aliases[alias] = model
     logger.info(f"Loaded aliases {aliases}")
     return aliases
+
+
+def redact_token_in_request_header(headers: Headers, disable: bool = False) -> Headers:
+    if disable:
+        return headers
+
+    redacted_items = []
+    for key, value in headers.items():
+        if key.lower() in _SENSITIVE_HEADERS:
+            if value and len(value) > 4:
+                value = value[:4] + "****"
+            else:
+                value = "****"
+        redacted_items.append((key, value))
+    return Headers(dict(redacted_items))
 
 
 def replace_model_in_request_body(request_json: dict, model: str):

@@ -339,6 +339,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--disable-token-redaction",
+        action="store_true",
+        default=False,
+        help="Disable redacting sensitive tokens in request headers when logging (default: False).",
+    )
+
+    parser.add_argument(
         "--sentry-dsn",
         type=str,
         help="Enables Sentry Error Reporting to the specified Data Source Name",
