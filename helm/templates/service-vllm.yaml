@@ -7,6 +7,7 @@ metadata:
   name: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
   namespace: {{ $.Release.Namespace }}
   labels:
+  {{- include "chart.engineStandardLabels" (dict "releaseName" $.Release.Name "modelName" $modelSpec.name "chartName" $.Chart.Name) | nindent 4 }}
   {{- include "chart.engineLabels" $ | nindent 4 }}
 spec:
   type: ClusterIP
@@ -27,5 +28,7 @@ spec:
   selector:
     model: "{{ $modelSpec.name }}"
     helm-release-name: "{{ $.Release.Name }}"
+  {{- include "chart.engineStandardLabels" (dict "releaseName" $.Release.Name "modelName" $modelSpec.name "chartName" $.Chart.Name) | nindent 4 }}
+  {{- include "chart.engineLabels" $ | nindent 4 }}
 {{- end }}
 {{- end}}

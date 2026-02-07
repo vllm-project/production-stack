@@ -5,6 +5,7 @@ metadata:
   name: "{{ .Release.Name }}-cache-server-service"
   namespace: {{ .Release.Namespace }}
   labels:
+  {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.cacheserverLabels" . | nindent 4 }}
 spec:
   type: ClusterIP
@@ -14,5 +15,6 @@ spec:
       targetPort: {{ .Values.cacheserverSpec.containerPort }}
       protocol: TCP
   selector:
+  {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.cacheserverLabels" . | nindent 4 }}
 {{- end -}}
