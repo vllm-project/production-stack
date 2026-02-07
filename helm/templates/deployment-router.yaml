@@ -5,8 +5,8 @@ metadata:
   name: "{{ .Release.Name }}-deployment-router"
   namespace: {{ .Release.Namespace }}
   labels:
-  {{- include "chart.routerLabels" . | nindent 4 }}
   {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
+  {{- include "chart.routerLabels" . | nindent 4 }}
 spec:
 {{- if .Values.routerSpec.autoscaling.enabled }}
   replicas: {{ .Values.routerSpec.autoscaling.minReplicas }}
@@ -16,13 +16,13 @@ spec:
   {{- include "chart.routerStrategy" . | nindent 2 }}
   selector:
     matchLabels:
-    {{- include "chart.routerLabels" . | nindent 6 }}
     {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 6 }}
+    {{- include "chart.routerLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-      {{- include "chart.routerLabels" . | nindent 8 }}
       {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 8 }}
+      {{- include "chart.routerLabels" . | nindent 8 }}
       {{- with .Values.routerSpec.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}

@@ -11,8 +11,8 @@ metadata:
   labels:
     model: {{ $modelSpec.name }}
     helm-release-name: {{ .Release.Name }}
-  {{- include "chart.engineLabels" . | nindent 4 }}
   {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 4 }}
+  {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

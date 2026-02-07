@@ -232,3 +232,15 @@ app.kubernetes.io/component: router
 app.kubernetes.io/part-of: {{ .chartName }}
 app.kubernetes.io/managed-by: helm
 {{- end -}}
+
+{{/*
+  Define standard Kubernetes labels for cache server
+  Usage: include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name)
+*/}}
+{{- define "chart.cacheserverStandardLabels" -}}
+app.kubernetes.io/name: cache-server
+app.kubernetes.io/instance: {{ .releaseName }}
+app.kubernetes.io/component: cache-server
+app.kubernetes.io/part-of: {{ .chartName }}
+app.kubernetes.io/managed-by: helm
+{{- end -}}
