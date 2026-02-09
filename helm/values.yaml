@@ -266,9 +266,9 @@ servingEngineSpec:
       60
       # -- Configuration of the Kubelet http request on the server
     httpGet:
-    #  # -- Path to access on the HTTP server
+    # -- Path to access on the HTTP server
       path: /health
-    #  # -- Name or number of the port to access on the container, on which the server is listening
+    # -- Name or number of the port to access on the container, on which the server is listening
       port: 8000
 
   # -- Liveness probe configuration
@@ -281,9 +281,9 @@ servingEngineSpec:
     periodSeconds: 10
     # -- Configuration of the Kubelet http request on the server
     httpGet:
-    #  # -- Path to access on the HTTP server
+    # -- Path to access on the HTTP server
       path: /health
-    #  # -- Name or number of the port to access on the container, on which the server is listening
+    # -- Name or number of the port to access on the container, on which the server is listening
       port: 8000
 
   # -- Readiness probe configuration
@@ -296,9 +296,9 @@ servingEngineSpec:
     periodSeconds: 5
     # -- Configuration of the Kubelet http request on the server
     httpGet:
-    #  # -- Path to access on the HTTP server
+    # -- Path to access on the HTTP server
       path: /health
-    #  # -- Name or number of the port to access on the container, on which the server is listening
+    # -- Name or number of the port to access on the container, on which the server is listening
       port: 8000
 
   # -- Disruption Budget Configuration
