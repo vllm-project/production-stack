@@ -5,15 +5,18 @@ metadata:
   name: "{{ .Release.Name }}-deployment-cache-server"
   namespace: {{ .Release.Namespace }}
   labels:
+  {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.cacheserverLabels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
+    {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 6 }}
     {{- include "chart.cacheserverLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
+      {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 8 }}
       {{- include "chart.cacheserverLabels" . | nindent 8 }}
     spec:
       {{- if .Values.cacheserverSpec.priorityClassName}}
