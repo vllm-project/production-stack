@@ -83,25 +83,70 @@ Define additional router ports
 {{/*
 Define startup, liveness and readiness probes
 */}}
+{{- define "chart.templateProbe"}}
+  initialDelaySeconds: {{ .initialDelaySeconds | default 15 }}
+  periodSeconds: {{ .periodSeconds | default 10 }}
+  failureThreshold: {{ .failureThreshold | default 3 }}
+  {{- if .timeoutSeconds }}
+  timeoutSeconds: {{ .timeoutSeconds }}
+  {{- end }}
+  {{- if .successThreshold }}
+  successThreshold: {{ .successThreshold }}
+  {{- end }}
+  {{- if .exec }}
+  exec:
+    command: {{- range .exec.command }}
+      - {{. | quote }} {{- end}}
+  {{- else if .tcpSocket }}
+  tcpSocket:
+    {{- if .tcpSocket.host }}
+    host: {{ .tcpSocket.host }}
+    {{- end }}
+    port: {{ .tcpSocket.port }}
+  {{- else if .grpc }}
+  grpc:
+    {{- if .grpc.service }}
+    service: {{ .grpc.service }}
+    {{- end }}
+    port: {{ .grpc.port }}
+  {{- else }}
+  httpGet:
+    path:  {{ .httpGet.path | default "/health" }}
+    port: {{ .httpGet.port | default 8000 }}
+    {{- if .httpGet.httpHeaders }}
+    httpHeaders: {{- range .httpGet.httpHeaders }}
+      - name: {{ .name }}
+        value: {{ .value | quote }}
+    {{- end }}
+    {{- end }}
+    {{- if .httpGet.host }}
+    host: {{ .httpGet.host }}
+    {{- end }}
+    {{- if .httpGet.scheme }}
+    scheme: {{ .httpGet.scheme }}
+    {{- end }}
+  {{- end }}
+{{- end }}
 {{- define "chart.probes" -}}
-{{-   if .Values.servingEngineSpec.startupProbe  }}
+{{- if .Values.servingEngineSpec.startupProbe }}
 startupProbe:
-{{-     with .Values.servingEngineSpec.startupProbe }}
-{{-       toYaml . | nindent 2 }}
-{{-     end }}
-{{-   end }}
-{{-   if .Values.servingEngineSpec.livenessProbe  }}
+  {{- with .Values.servingEngineSpec.startupProbe }}
+  {{- include "chart.templateProbe" . }}
+  {{- end }}
+{{- end }}
+{{- if .Values.servingEngineSpec.livenessProbe }}
 livenessProbe:
-{{-     with .Values.servingEngineSpec.livenessProbe }}
-{{-       toYaml . | nindent 2 }}
-{{-     end }}
-{{-   end }}
-{{-   if .Values.servingEngineSpec.readinessProbe  }}
+  {{- with .Values.servingEngineSpec.livenessProbe }}
+  {{- include "chart.templateProbe" . }}
+  {{- end }}
+{{- end }}
+{{- if .Values.servingEngineSpec.readinessProbe }}
 readinessProbe:
-{{-     with .Values.servingEngineSpec.readinessProbe }}
-{{-       toYaml . | nindent 2 }}
-{{-     end }}
-{{-   end }}
+  {{- with .Values.servingEngineSpec.readinessProbe }}
+  {{- include "chart.templateProbe" . }}
+  {{- end }}
+{{- end }}
+
 {{- end }}
 
 {{- define "chart.hasLimits" -}}
@@ -207,4 +252,40 @@ limits:
 */}}
 {{- define "cacheserver.formatRemoteUrl" -}}
 lm://{{ .service_name }}:{{ .port }}
+{{- end -}}
+
+{{/*
+  Define standard Kubernetes labels for serving engine
+  Usage: include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name)
+*/}}
+{{- define "chart.engineStandardLabels" -}}
+app.kubernetes.io/name: {{ .modelName }}
+app.kubernetes.io/instance: {{ .releaseName }}
+app.kubernetes.io/component: serving-engine
+app.kubernetes.io/part-of: {{ .chartName }}
+app.kubernetes.io/managed-by: helm
+{{- end -}}
+
+{{/*
+  Define standard Kubernetes labels for router
+  Usage: include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name)
+*/}}
+{{- define "chart.routerStandardLabels" -}}
+app.kubernetes.io/name: router
+app.kubernetes.io/instance: {{ .releaseName }}
+app.kubernetes.io/component: router
+app.kubernetes.io/part-of: {{ .chartName }}
+app.kubernetes.io/managed-by: helm
+{{- end -}}
+
+{{/*
+  Define standard Kubernetes labels for cache server
+  Usage: include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name)
+*/}}
+{{- define "chart.cacheserverStandardLabels" -}}
+app.kubernetes.io/name: cache-server
+app.kubernetes.io/instance: {{ .releaseName }}
+app.kubernetes.io/component: cache-server
+app.kubernetes.io/part-of: {{ .chartName }}
+app.kubernetes.io/managed-by: helm
 {{- end -}}
