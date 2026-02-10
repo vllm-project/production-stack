@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "helm/**"
+      - ".github/**"
   push:
     branches:
       - main
