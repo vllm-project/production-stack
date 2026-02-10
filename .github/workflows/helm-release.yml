@@ -50,8 +50,6 @@ jobs:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
   release-docker:
-    # Run on PRs too, but only PUSH on main after release
-    needs: [release]
     permissions:
       contents: read
       packages: write
