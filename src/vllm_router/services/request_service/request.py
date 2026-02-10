@@ -63,7 +63,12 @@ try:
 except ImportError:
     otel_available = False
 
-from vllm_router.services.metrics_service import num_incoming_requests_total
+from vllm_router.services.metrics_service import (
+    input_tokens_total,
+    num_incoming_requests_total,
+    output_tokens_total,
+    request_errors_total,
+)
 
 logger = init_logger(__name__)
 
@@ -136,10 +141,11 @@ async def process_request(
     request.app.state.request_stats_monitor.on_new_request(
         backend_url, request_id, start_time
     )
-    # Check if this is a streaming request
+    # Check if this is a streaming request and extract model name
     try:
         request_json = json.loads(body)
         is_streaming = request_json.get("stream", False)
+        model_name = request_json.get("model", "unknown")
     except JSONDecodeError:
         # If we can't parse the body as JSON, assume it's not streaming
         raise HTTPException(status=400, detail="Request body is not JSON parsable.")
@@ -191,6 +197,22 @@ async def process_request(
             backend_url, request_id, time.time()
         )
 
+        # Track token usage for non-streaming requests
+        if not is_streaming and full_response:
+            try:
+                response_data = json.loads(full_response)
+                usage = response_data.get("usage", {})
+                if "prompt_tokens" in usage:
+                    input_tokens_total.labels(server=backend_url, model=model_name).inc(
+                        usage["prompt_tokens"]
+                    )
+                if "completion_tokens" in usage:
+                    output_tokens_total.labels(
+                        server=backend_url, model=model_name
+                    ).inc(usage["completion_tokens"])
+            except json.JSONDecodeError:
+                logger.debug("Cannot parse response as JSON, skipping token tracking")
+
         # Store in semantic cache if applicable
         # Use the full response for non-streaming requests, or the last chunk for streaming
         if request.app.state.semantic_cache_available:
@@ -203,6 +225,10 @@ async def process_request(
                 request.app.state.callbacks.post_request, request, full_response
             )
     except Exception as e:
+        # Track other errors
+        request_errors_total.labels(
+            server=backend_url, model=model_name, error_type=type(e).__name__
+        ).inc()
         end_span(span, error=e) if tracing_active else None
         raise
     finally:
