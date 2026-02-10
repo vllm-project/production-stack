@@ -100,5 +100,5 @@ jobs:
             ghcr.io/${{ github.repository }}/router:${{ github.sha }}
             lmcache/lmstack-router:latest
             lmcache/lmstack-router:v${{ steps.chart-version.outputs.version }}
-            cache-from: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && format('type=registry,ref=ghcr.io/{0}/router:buildcache', github.repository) || 'type=gha' }}
-            cache-to: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && format('type=registry,ref=ghcr.io/{0}/router:buildcache,mode=max', github.repository) || 'type=gha,mode=max' }}
+          cache-from: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && format('type=registry,ref=ghcr.io/{0}/router:buildcache', github.repository) || 'type=gha' }}
+          cache-to: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && format('type=registry,ref=ghcr.io/{0}/router:buildcache,mode=max', github.repository) || 'type=gha,mode=max' }}
