@@ -1,10 +1,6 @@
 name: Release vLLM Production Stack Helm Charts
 
 on:
-  pull_request:
-    paths:
-      - "helm/**"
-      - ".github/**"
   push:
     branches:
       - main
@@ -50,6 +46,7 @@ jobs:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
   release-docker:
+    needs: [release]
     permissions:
       contents: read
       packages: write
@@ -73,7 +70,6 @@ jobs:
 
       # Login only on main (since PRs must NOT push)
       - name: Login to GHCR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -81,7 +77,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: docker.io
@@ -93,12 +88,12 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          push: true
           tags: |
             ghcr.io/${{ github.repository }}/router:latest
             ghcr.io/${{ github.repository }}/router:v${{ steps.chart-version.outputs.version }}
             ghcr.io/${{ github.repository }}/router:${{ github.sha }}
             lmcache/lmstack-router:latest
             lmcache/lmstack-router:v${{ steps.chart-version.outputs.version }}
-          cache-from: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && format('type=registry,ref=ghcr.io/{0}/router:buildcache', github.repository) || 'type=gha' }}
-          cache-to: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && format('type=registry,ref=ghcr.io/{0}/router:buildcache,mode=max', github.repository) || 'type=gha,mode=max' }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache,mode=max
