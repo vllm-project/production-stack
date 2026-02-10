@@ -253,3 +253,39 @@ limits:
 {{- define "cacheserver.formatRemoteUrl" -}}
 lm://{{ .service_name }}:{{ .port }}
 {{- end -}}
+
+{{/*
+  Define standard Kubernetes labels for serving engine
+  Usage: include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name)
+*/}}
+{{- define "chart.engineStandardLabels" -}}
+app.kubernetes.io/name: {{ .modelName }}
+app.kubernetes.io/instance: {{ .releaseName }}
+app.kubernetes.io/component: serving-engine
+app.kubernetes.io/part-of: {{ .chartName }}
+app.kubernetes.io/managed-by: helm
+{{- end -}}
+
+{{/*
+  Define standard Kubernetes labels for router
+  Usage: include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name)
+*/}}
+{{- define "chart.routerStandardLabels" -}}
+app.kubernetes.io/name: router
+app.kubernetes.io/instance: {{ .releaseName }}
+app.kubernetes.io/component: router
+app.kubernetes.io/part-of: {{ .chartName }}
+app.kubernetes.io/managed-by: helm
+{{- end -}}
+
+{{/*
+  Define standard Kubernetes labels for cache server
+  Usage: include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name)
+*/}}
+{{- define "chart.cacheserverStandardLabels" -}}
+app.kubernetes.io/name: cache-server
+app.kubernetes.io/instance: {{ .releaseName }}
+app.kubernetes.io/component: cache-server
+app.kubernetes.io/part-of: {{ .chartName }}
+app.kubernetes.io/managed-by: helm
+{{- end -}}
