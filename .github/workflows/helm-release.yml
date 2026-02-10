@@ -6,37 +6,39 @@ on:
       - main
     paths:
       - "helm/**"
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'What to release'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - docker_only
+          - helm_only
+          - both
 
 jobs:
   release:
-    # Only do actual chart release on main
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
       packages: write
     runs-on: ubuntu-latest
-    outputs:
-      chart_version: ${{ steps.chart-version.outputs.version }}
     steps:
       - name: Checkout Repository
+        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'both' }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Configure Git
+        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'both' }}
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Extract chart version
-        id: chart-version
-        run: |
-          set -euo pipefail
-          CHART_VERSION=$(grep -oP 'version: \K[0-9]+\.[0-9]+\.[0-9]+' helm/Chart.yaml)
-          echo "version=${CHART_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Chart version: ${CHART_VERSION}"
-
       - name: Run chart-releaser
+        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'both' }}
         uses: helm/chart-releaser-action@v1.7.0
         with:
           skip_existing: false
@@ -46,7 +48,8 @@ jobs:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
   release-docker:
-    needs: [release]
+    needs: release
+    if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'docker_only' || github.event.inputs.release_type == 'both' }}
     permissions:
       contents: read
       packages: write
@@ -83,7 +86,7 @@ jobs:
           username: lmcache
           password: ${{ secrets.LMCACHE_DOCKER_SECRET }}
 
-      - name: Build (PRs) / Build+Push (main)
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
