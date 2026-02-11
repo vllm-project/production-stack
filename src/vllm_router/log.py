@@ -2,6 +2,33 @@ import logging
 import sys
 from logging import Logger
 
+_LOG_LEVEL = logging.INFO
+_loggers: list[Logger] = []
+
+_LEVEL_NAME_MAP = {
+    "critical": logging.CRITICAL,
+    "error": logging.ERROR,
+    "warning": logging.WARNING,
+    "info": logging.INFO,
+    "debug": logging.DEBUG,
+    "trace": logging.DEBUG,
+}
+
+
+def set_log_level(level_str: str) -> None:
+    global _LOG_LEVEL
+    _LOG_LEVEL = _LEVEL_NAME_MAP.get(level_str.lower(), logging.INFO)
+    for logger in _loggers:
+        logger.setLevel(_LOG_LEVEL)
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(
+                handler, logging.FileHandler
+            ):
+                # Only lower the stdout handler level; keep the stderr
+                # handler at WARNING so errors always surface.
+                if handler.stream is sys.stdout:
+                    handler.setLevel(_LOG_LEVEL)
+
 
 def build_format(color):
     reset = "\x1b[0m"
@@ -41,7 +68,10 @@ class MaxLevelFilter(logging.Filter):
         return record.levelno <= self.max_level
 
 
-def init_logger(name: str, log_level=logging.DEBUG) -> Logger:
+def init_logger(name: str, log_level=None) -> Logger:
+    if log_level is None:
+        log_level = _LOG_LEVEL
+
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
 
@@ -57,4 +87,5 @@ def init_logger(name: str, log_level=logging.DEBUG) -> Logger:
     logger.addHandler(error_stream)
     logger.propagate = False
 
+    _loggers.append(logger)
     return logger
