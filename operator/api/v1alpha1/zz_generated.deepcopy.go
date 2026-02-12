@@ -168,6 +168,13 @@ func (in *DeploymentConfig) DeepCopyInto(out *DeploymentConfig) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Toleration != nil {
+		in, out := &in.Toleration, &out.Toleration
+		*out = make([]v1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	out.Resources = in.Resources
 	out.Image = in.Image
 	in.SidecarConfig.DeepCopyInto(&out.SidecarConfig)

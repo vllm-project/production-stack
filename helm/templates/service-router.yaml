@@ -8,6 +8,7 @@ metadata:
   annotations: {{- toYaml .Values.routerSpec.serviceAnnotations | nindent 4 }}
   {{- end }}
   labels:
+  {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.routerLabels" . | nindent 4 }}
 spec:
   type: {{ .Values.routerSpec.serviceType }}
@@ -22,5 +23,6 @@ spec:
       protocol: TCP
   {{- include "chart.routerExtraPorts" $ | nindent 4 }}
   selector:
+  {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.routerLabels" . | nindent 4 }}
 {{- end }}

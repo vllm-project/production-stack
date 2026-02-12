@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -336,9 +337,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
 ) *appsv1.Deployment {
 	labels := map[string]string{"app": vllmRuntime.Name}
-	for k, v := range vllmRuntime.Labels {
-		labels[k] = v
-	}
+	maps.Copy(labels, vllmRuntime.Labels)
 
 	// Define probes
 	readinessProbe := &corev1.Probe{
@@ -743,6 +742,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 				},
 				Spec: corev1.PodSpec{
 					Affinity:         affinity,
+					Tolerations:      vllmRuntime.Spec.DeploymentConfig.Toleration,
 					ImagePullSecrets: imagePullSecrets,
 					Volumes:          volumes,
 					Containers:       containers,
@@ -984,6 +984,19 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 		return true
 	}
 
+	actualTolerations := dep.Spec.Template.Spec.Tolerations
+	expectedTolerations := expectedDep.Spec.Template.Spec.Tolerations
+	if !reflect.DeepEqual(expectedTolerations, actualTolerations) {
+		log.Info(
+			"Tolerations mismatch",
+			"expected",
+			expectedTolerations,
+			"actual",
+			actualTolerations,
+		)
+		return true
+	}
+
 	return false
 }
 
@@ -1025,9 +1038,7 @@ func (r *VLLMRuntimeReconciler) serviceForVLLMRuntime(
 	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
 ) *corev1.Service {
 	labels := map[string]string{"app": vllmRuntime.Name}
-	for k, v := range vllmRuntime.Labels {
-		labels[k] = v
-	}
+	maps.Copy(labels, vllmRuntime.Labels)
 
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1070,9 +1081,7 @@ func (r *VLLMRuntimeReconciler) pvcForVLLMRuntime(
 	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
 ) *corev1.PersistentVolumeClaim {
 	labels := map[string]string{"app": vllmRuntime.Name}
-	for k, v := range vllmRuntime.Labels {
-		labels[k] = v
-	}
+	maps.Copy(labels, vllmRuntime.Labels)
 
 	// Set default values if not specified
 	accessMode := corev1.ReadWriteOnce
