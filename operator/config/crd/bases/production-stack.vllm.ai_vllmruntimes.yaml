@@ -157,6 +157,8 @@ spec:
                         type: string
                       gpu:
                         type: string
+                      gpuType:
+                        type: string
                       memory:
                         type: string
                     type: object
@@ -221,6 +223,8 @@ spec:
                           cpu:
                             type: string
                           gpu:
+                            type: string
+                          gpuType:
                             type: string
                           memory:
                             type: string

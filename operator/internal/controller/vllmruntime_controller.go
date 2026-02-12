@@ -586,9 +586,14 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 
 	if vllmRuntime.Spec.DeploymentConfig.Resources.GPU != "" {
 		// Parse GPU resource as a decimal value
+		// Determine which GPU type to use (default nvidia.com/gpu)
+		gpuType := "nvidia.com/gpu"
+		if vllmRuntime.Spec.DeploymentConfig.Resources.GPUType != "" {
+			gpuType = vllmRuntime.Spec.DeploymentConfig.Resources.GPUType
+		}
 		gpuResource := resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.GPU)
-		resources.Requests["nvidia.com/gpu"] = gpuResource
-		resources.Limits["nvidia.com/gpu"] = gpuResource
+		resources.Requests[corev1.ResourceName(gpuType)] = gpuResource
+		resources.Limits[corev1.ResourceName(gpuType)] = gpuResource
 	}
 
 	// Get the image from Image spec or use default
@@ -827,12 +832,21 @@ func (r *VLLMRuntimeReconciler) buildSidecarContainer(
 	}
 
 	if sidecarConfig.Resources.GPU != "" {
+		gpuType := "nvidia.com/gpu"
+		if sidecarConfig.Resources.GPUType != "" {
+			gpuType = sidecarConfig.Resources.GPUType
+		}
 		gpuResource := resource.MustParse(sidecarConfig.Resources.GPU)
-		sidecarResources.Requests["nvidia.com/gpu"] = gpuResource
-		sidecarResources.Limits["nvidia.com/gpu"] = gpuResource
+		sidecarResources.Requests[corev1.ResourceName(gpuType)] = gpuResource
+		sidecarResources.Limits[corev1.ResourceName(gpuType)] = gpuResource
 	} else {
-		sidecarResources.Requests["nvidia.com/gpu"] = resource.MustParse("0")
-		sidecarResources.Limits["nvidia.com/gpu"] = resource.MustParse("0")
+		gpuType := "nvidia.com/gpu"
+		if sidecarConfig.Resources.GPUType != "" {
+			gpuType = sidecarConfig.Resources.GPUType
+		}
+		zeroQty := resource.MustParse("0")
+		sidecarResources.Requests[corev1.ResourceName(gpuType)] = zeroQty
+		sidecarResources.Limits[corev1.ResourceName(gpuType)] = zeroQty
 	}
 
 	// Get sidecar image
