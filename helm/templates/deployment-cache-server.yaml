@@ -5,15 +5,18 @@ metadata:
   name: "{{ .Release.Name }}-deployment-cache-server"
   namespace: {{ .Release.Namespace }}
   labels:
+  {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.cacheserverLabels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
+    {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 6 }}
     {{- include "chart.cacheserverLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
+      {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 8 }}
       {{- include "chart.cacheserverLabels" . | nindent 8 }}
     spec:
       {{- if .Values.cacheserverSpec.priorityClassName}}
@@ -31,17 +34,15 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
+      {{- with .Values.cacheserverSpec.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: "lmcache-server"
           image: "{{ required "Required value 'cacheserverSpec.repository' must be defined !" .Values.cacheserverSpec.repository }}:{{ required "Required value 'cacheserverSpec.tag' must be defined !" .Values.cacheserverSpec.tag }}"
           command:
-          {{- if eq .Values.cacheserverSpec.tag "latest-nightly" }}
           - "/opt/venv/bin/lmcache_server"
-          {{- else if eq .Values.cacheserverSpec.tag "latest" }}
-          - "/opt/venv/bin/lmcache_experimental_server"
-          {{- else }}
-          - "lmcache_experimental_server"
-          {{- end }}
           - "0.0.0.0"
           - "{{ .Values.cacheserverSpec.containerPort }}"
           {{- if .Values.cacheserverSpec.resources }}

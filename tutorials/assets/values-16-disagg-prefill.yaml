@@ -23,7 +23,7 @@ servingEngineSpec:
         kvRole: "kv_producer"
         enableNixl: true
         nixlRole: "sender"
-        nixlPeerHost: "vllm-llama-decode-engine-service"
+        nixlPeerHost: "pd-llama-decode-engine-service"
         nixlPeerPort: "55555"
         nixlBufferSize: "1073741824"  # 1GB
         nixlBufferDevice: "cuda"

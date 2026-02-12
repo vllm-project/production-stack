@@ -1,25 +1,17 @@
 {{- if .Values.routerSpec.enableRouter -}}
-{{- if .Values.routerSpec.k8sServiceDiscoveryType | default "pod-ip" | eq "pod-ip" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: "{{ .Release.Name }}-pod-reader"
+  name: "{{ .Release.Name }}-reader"
   namespace: {{ .Release.Namespace }}
 rules:
 - apiGroups: [""] # "" indicates the core API group
+{{- if .Values.routerSpec.k8sServiceDiscoveryType | default "pod-ip" | eq "pod-ip" }}
   resources: ["pods"]
-  verbs: ["get", "watch", "list", "patch"]
 {{- else }}
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: "{{ .Release.Name }}-service-reader"
-  namespace: {{ .Release.Namespace }}
-rules:
-  - apiGroups: [ "" ] # "" indicates the core API group
-    resources: [ "services", "endpoints" ]
-    verbs: [ "get", "watch", "list", "patch" ]
+  resources: ["pods", "services", "endpoints"]
 {{- end }}
+  verbs: ["get", "watch", "list", "patch"]
 {{- end }}
 
 {{- if .Values.loraController.enableLoraController }}

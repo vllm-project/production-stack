@@ -95,4 +95,4 @@ Using ``-s`` with ``git commit`` will automatically add this header.
 What to Expect for the Reviews
 ------------------------------
 
-We aim to address all PRs in a timely manner. If no one reviews your PR within 5 days, please @-mention one of YuhanLiu11, Shaoting-Feng or ApostaC.
+We aim to address all PRs in a timely manner. If no one reviews your PR within 5 days, please @-mention one of ruizhang0101, YuhanLiu11, Shaoting-Feng or ApostaC.

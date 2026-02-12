@@ -22,6 +22,7 @@ metadata:
   labels:
     model: {{ $modelSpec.name }}
     helm-release-name: {{ .Release.Name }}
+  {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
   replicas: {{ $modelSpec.replicaCount }}
@@ -30,6 +31,7 @@ spec:
     matchLabels:
       model: {{ $modelSpec.name }}
       helm-release-name: {{ .Release.Name }}
+    {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 6 }}
     {{- include "chart.engineLabels" . | nindent 6 }}
   progressDeadlineSeconds: 1200
   template:
@@ -41,6 +43,7 @@ spec:
       labels:
         model: {{ $modelSpec.name }}
         helm-release-name: {{ .Release.Name }}
+      {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 8 }}
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
       {{- if $modelSpec.priorityClassName }}
@@ -86,6 +89,10 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
+          {{- if .Values.servingEngineSpec.containerSecurityContext }}
+          securityContext:
+            {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
+          {{- end }}
       {{- end }}
       {{- if .Values.servingEngineSpec.securityContext }}
       securityContext:
@@ -106,16 +113,7 @@ spec:
           securityContext:
             {{- toYaml .Values.servingEngineSpec.containerSecurityContext | nindent 12 }}
           command:
-          {{- if or
-            (eq $modelSpec.tag "2025-05-27-v1")
-            (eq $modelSpec.tag "2025-05-17-v1")
-            (eq $modelSpec.tag "latest-nightly")
-            (hasPrefix "nightly-" $modelSpec.tag)
-            (and
-              (eq $modelSpec.tag "latest")
-              (eq $modelSpec.repository "lmcache/vllm-openai")
-            )
-          }}
+          {{- if eq $modelSpec.repository "lmcache/vllm-openai" }}
           - "/opt/venv/bin/vllm"
           {{- else }}
           - "vllm"
@@ -173,6 +171,14 @@ spec:
           - "--max_loras"
           - {{ .maxLoras | quote }}
           {{-   end }}
+          {{-   if hasKey . "runner" }}
+          - "--runner"
+          - {{ .runner | quote }}
+          {{-   end }}
+          {{-   if hasKey . "convert" }}
+          - "--convert"
+          - {{ .convert | quote }}
+          {{-   end }}
           {{-   if .extraArgs }}
           {{-     range .extraArgs }}
           - {{ . | quote }}
@@ -199,6 +205,8 @@ spec:
           {{- end }}
           imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
           env:
+          - name: PYTHONHASHSEED
+            value: "123"
           - name: HF_HOME
             {{- if hasKey $modelSpec "pvcStorage" }}
             value: /data
@@ -249,6 +257,9 @@ spec:
                 name: {{ $vllmApiKey.secretName }}
                 key: {{ $vllmApiKey.secretKey }}
             {{- end }}
+          {{- end }}
+          {{- with .Values.servingEngineSpec.env }}
+          {{- toYaml . | nindent 10 }}
           {{- end }}
           {{- with $modelSpec.env }}
           {{- toYaml . | nindent 10 }}
@@ -328,18 +339,31 @@ spec:
           {{-   if hasKey $modelSpec.lmcacheConfig "instanceId" }}
           - name: LMCACHE_LMCACHE_INSTANCE_ID
             value: {{ $modelSpec.lmcacheConfig.instanceId | quote }}
+          {{- else }}
+          - name: LMCACHE_LMCACHE_INSTANCE_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
           {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "controllerPort" }}
-          - name: LMCACHE_CONTROLLER_URL
+          - name: LMCACHE_CONTROLLER_PULL_URL
             value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
           {{-   end }}
-          {{-   if hasKey $modelSpec.lmcacheConfig "workerPort" }}
-          - name: LMCACHE_LMCACHE_WORKER_PORT
-            value: {{ $modelSpec.lmcacheConfig.workerPort | quote }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "workerPorts" }}
+          - name: LMCACHE_LMCACHE_WORKER_PORTS
+            value: {{ $modelSpec.lmcacheConfig.workerPorts | quote }}
           {{-   end }}
-          {{-  if hasKey $modelSpec.lmcacheConfig "distributedUrl" }}
-          - name: LMCACHE_DISTRIBUTED_URL
-            value: {{ $modelSpec.lmcacheConfig.distributedUrl | quote }}
+          {{-  if hasKey $modelSpec.lmcacheConfig "p2pHost" }}
+          - name: LMCACHE_P2P_HOST
+            value: {{ $modelSpec.lmcacheConfig.p2pHost | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "p2pInitPorts" }}
+          - name: LMCACHE_P2P_INIT_PORTS
+            value: {{ $modelSpec.lmcacheConfig.p2pInitPorts | quote }}
+          {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "workerHeartbeatTime" }}
+          - name: LMCACHE_LMCACHE_WORKER_HEARTBEAT_TIME
+            value: {{ $modelSpec.lmcacheConfig.workerHeartbeatTime | quote }}
           {{-   end }}
           {{- end }}
           {{- if or .Values.servingEngineSpec.configs $modelSpec.envFromSecret }}
@@ -361,7 +385,11 @@ spec:
             - name: ucx-port
               containerPort: 9999
           {{- include "chart.probes" . | indent 10 }}
+          {{- if $modelSpec.resources }}
+          resources: {{ toYaml $modelSpec.resources | nindent 12 }}
+          {{- else }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
+          {{- end }}
           {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
           volumeMounts:
           {{- end }}
@@ -455,8 +483,8 @@ spec:
       {{-   end }}
       {{- end }}
 
-      {{- if .Values.servingEngineSpec.runtimeClassName }}
-      runtimeClassName: {{ .Values.servingEngineSpec.runtimeClassName }}
+      {{- with (ternary $modelSpec.runtimeClassName .Values.servingEngineSpec.runtimeClassName (hasKey $modelSpec "runtimeClassName")) }}
+      runtimeClassName: {{ . }}
       {{- end }}
       {{- if .Values.servingEngineSpec.schedulerName }}
       schedulerName: {{ .Values.servingEngineSpec.schedulerName }}

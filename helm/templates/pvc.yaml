@@ -8,6 +8,10 @@ kind: PersistentVolumeClaim
 metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
   namespace: {{ .Release.Namespace }}
+  {{- if not (empty $modelSpec.pvcLabels) }}
+  labels:
+    {{- toYaml $modelSpec.pvcLabels | nindent 4}}
+  {{- end }}
 spec:
   accessModes:
     {{- if $modelSpec.pvcAccessMode }}

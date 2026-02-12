@@ -38,6 +38,24 @@
             }
           ]
         },
+        "env": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ]
+          }
+        },
         "modelSpec": {
           "type": "array",
           "items": {
@@ -64,11 +82,46 @@
               "tag": {
                 "type": "string"
               },
+              "imagePullSecret": {
+                "type": "string",
+                "description": "Name of secret with credentials to private container repository"
+              },
               "modelURL": {
                 "type": "string"
               },
               "replicaCount": {
                 "type": "integer"
+              },
+              "resources": {
+                "type": "object",
+                "properties": {
+                  "limits": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "integer"
+                        }
+                      ]
+                    }
+                  },
+                  "requests": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "integer"
+                        }
+                      ]
+                    }
+                  }
+                }
               },
               "requestCPU": {
                 "type": "integer"
@@ -109,8 +162,17 @@
               "priorityClassName": {
                 "type": "string"
               },
+              "runtimeClassName": {
+                "type": "string"
+              },
               "pvcStorage": {
                 "type": "string"
+              },
+              "pvcLabels": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
               },
               "pvcMatchLabels": {
                 "type": "object",
@@ -194,6 +256,23 @@
                   },
                   "dtype": {
                     "type": "string"
+                  },
+                  "runner": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "pooling"
+                    ]
+                  },
+                  "convert": {
+                    "type": "string",
+                    "enum": [
+                      "token_embed",
+                      "embed",
+                      "token_classify",
+                      "classify",
+                      "score"
+                    ]
                   },
                   "extraArgs": {
                     "type": "array",
@@ -293,6 +372,111 @@
                     }
                   }
                 }
+              },
+              "keda": {
+                "type": "object",
+                "description": "KEDA autoscaling configuration for this model deployment",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Whether to enable KEDA autoscaling for this model"
+                  },
+                  "minReplicaCount": {
+                    "type": "integer",
+                    "description": "Minimum number of replicas (supports 0 for scale-to-zero)",
+                    "minimum": 0
+                  },
+                  "maxReplicaCount": {
+                    "type": "integer",
+                    "description": "Maximum number of replicas",
+                    "minimum": 1
+                  },
+                  "pollingInterval": {
+                    "type": "integer",
+                    "description": "How often KEDA should check the metrics (in seconds)",
+                    "minimum": 1
+                  },
+                  "cooldownPeriod": {
+                    "type": "integer",
+                    "description": "How long to wait before scaling down after scaling up (in seconds)",
+                    "minimum": 0
+                  },
+                  "idleReplicaCount": {
+                    "type": "integer",
+                    "description": "Number of replicas to scale to when no triggers are active",
+                    "minimum": 0
+                  },
+                  "initialCooldownPeriod": {
+                    "type": "integer",
+                    "description": "Initial cooldown period in seconds before scaling down after creation",
+                    "minimum": 0
+                  },
+                  "fallback": {
+                    "type": "object",
+                    "description": "Fallback configuration when scaler fails",
+                    "properties": {
+                      "failureThreshold": {
+                        "type": "integer",
+                        "description": "Number of consecutive failures before fallback",
+                        "minimum": 1
+                      },
+                      "replicas": {
+                        "type": "integer",
+                        "description": "Number of replicas to scale to in fallback",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "failureThreshold",
+                      "replicas"
+                    ]
+                  },
+                  "triggers": {
+                    "type": "array",
+                    "description": "List of KEDA trigger configurations",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "description": "Trigger type (e.g., prometheus, cpu, memory)"
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "description": "Trigger-specific metadata",
+                          "additionalProperties": true
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "metadata"
+                      ]
+                    }
+                  },
+                  "advanced": {
+                    "type": "object",
+                    "description": "Advanced KEDA configuration",
+                    "properties": {
+                      "restoreToOriginalReplicaCount": {
+                        "type": "boolean",
+                        "description": "Restore original replica count when ScaledObject is deleted"
+                      },
+                      "horizontalPodAutoscalerConfig": {
+                        "type": "object",
+                        "description": "HPA-specific configuration",
+                        "additionalProperties": true
+                      },
+                      "scalingModifiers": {
+                        "type": "object",
+                        "description": "Scaling modifiers for composite metrics",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
               }
             },
             "required": [
@@ -469,17 +653,50 @@
         "replicaCount": {
           "type": "integer"
         },
+        "imagePullSecrets": {
+          "type": "array",
+          "description": "Image pull secrets for private container registries",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        },
         "autoscaling": {
           "type": "object",
           "properties": {
-            "enabled": {"type": "boolean"},
-            "minReplicas": {"type": "integer"},
-            "maxReplicas": {"type": "integer"},
-            "targetCPUUtilizationPercentage": {"type": "integer"}
+            "enabled": {
+              "type": "boolean"
+            },
+            "minReplicas": {
+              "type": "integer"
+            },
+            "maxReplicas": {
+              "type": "integer"
+            },
+            "targetCPUUtilizationPercentage": {
+              "type": "integer"
+            }
           }
         },
         "containerPort": {
           "type": "integer"
+        },
+        "securityContext": {
+          "type": "object",
+          "description": "Pod-level security context configuration",
+          "additionalProperties": true
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level security context configuration",
+          "additionalProperties": true
         },
         "servicePort": {
           "type": "integer"
@@ -487,12 +704,18 @@
         "serviceDiscovery": {
           "type": "string",
           "description": "Service discovery mode. Available values: k8s or static.",
-          "enum": ["k8s", "static"]
+          "enum": [
+            "k8s",
+            "static"
+          ]
         },
         "k8sServiceDiscoveryType": {
           "type": "string",
           "description": "Kubernetes service discovery type. Available values: pod-ip and service-name.",
-          "enum": ["pod-ip", "service-name"]
+          "enum": [
+            "pod-ip",
+            "service-name"
+          ]
         },
         "routingLogic": {
           "type": "string"
@@ -535,6 +758,32 @@
             },
             "release": {
               "type": "string"
+            }
+          }
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "otel": {
+          "type": "object",
+          "description": "OpenTelemetry tracing configuration for the router",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "description": "OTLP endpoint for tracing (e.g., 'otel-collector:4317'). Tracing is enabled when this is set."
+            },
+            "serviceName": {
+              "type": "string",
+              "description": "Service name for OpenTelemetry traces",
+              "default": "vllm-router"
+            },
+            "secure": {
+              "type": "boolean",
+              "description": "Use secure (TLS) connection for OTLP exporter",
+              "default": false
             }
           }
         }
