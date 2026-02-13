@@ -532,11 +532,6 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
     4. Extracts kv_transfer_params, sets remote_host, and forwards to Decode
     5. Streams decode response back to client
 
-    This is designed for NxDI (Neuronx Distributed Inference) on AWS Trainium,
-    following NxDI's toy_proxy_server.py pattern.
-
-    Reference: NxDI/examples/vllm/disaggregated_inference/toy_proxy_server.py
-
     Load balancing: Uses round-robin across available prefill and decode pods.
     """
 
@@ -648,9 +643,7 @@ def initialize_routing_logic(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
     elif routing_logic == RoutingLogic.DISAGGREGATED_PREFILL_ORCHESTRATED:
-        logger.info(
-            "Initializing disaggregated prefill orchestrated routing logic (NxDI)"
-        )
+        logger.info("Initializing disaggregated prefill orchestrated routing logic")
         return DisaggregatedPrefillOrchestratedRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
