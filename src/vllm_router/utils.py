@@ -83,16 +83,18 @@ class TokenRedactionFilter(logging.Filter):
             for i, arg in enumerate(args_list):
                 # Check if arg is a Starlette Headers object
                 if isinstance(arg, (Headers, MutableHeaders)):
+                    arg_was_modified = False
                     redacted_dict = {}
                     for key, value in arg.items():
                         if isinstance(key, str) and key.lower() in _SENSITIVE_HEADERS:
                             # Redact the value
                             redacted_dict[key] = self._redact_value(value)
-                            modified = True
+                            arg_was_modified = True
                         else:
                             redacted_dict[key] = value
-                    if modified:
+                    if arg_was_modified:
                         args_list[i] = redacted_dict
+                        modified = True
 
             if modified:
                 record.args = (
