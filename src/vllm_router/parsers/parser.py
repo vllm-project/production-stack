@@ -335,7 +335,7 @@ def parse_args():
         type=str,
         default="info",
         choices=["critical", "error", "warning", "info", "debug", "trace"],
-        help="Log level for uvicorn. Default is 'info'.",
+        help="Log level for the router and uvicorn. Default is 'info'.",
     )
 
     parser.add_argument(
@@ -358,6 +358,26 @@ def parse_args():
         help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%)",
     )
 
+    # OpenTelemetry tracing arguments
+    parser.add_argument(
+        "--otel-endpoint",
+        type=str,
+        default=None,
+        help="OTLP endpoint for tracing (e.g., localhost:4317). Enables tracing when set.",
+    )
+    parser.add_argument(
+        "--otel-service-name",
+        type=str,
+        default="vllm-router",
+        help="Service name for OpenTelemetry tracing. Default is 'vllm-router'.",
+    )
+    parser.add_argument(
+        "--otel-secure",
+        action="store_true",
+        default=False,
+        help="Use secure (TLS) connection for OTLP exporter. Default is insecure.",
+    )
+
     parser.add_argument(
         "--prefill-model-labels",
         type=str,
@@ -377,6 +397,20 @@ def parse_args():
         type=int,
         default=2000,
         help="The threshold for kv-aware routing.",
+    )
+
+    parser.add_argument(
+        "--lmcache-health-check-interval",
+        type=int,
+        default=5,
+        help="Health check interval for LMCache worker (seconds)",
+    )
+
+    parser.add_argument(
+        "--lmcache-worker-timeout",
+        type=int,
+        default=30,
+        help="Timeout for LMCache worker (seconds)",
     )
 
     args = parser.parse_args()

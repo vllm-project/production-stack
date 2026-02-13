@@ -52,6 +52,7 @@ spec:
       cpu: "5"
       memory: "32Gi"
       gpu: "1"
+      gpuType: "nvidia.com/gpu"
 
     # Image configuration
     image:

@@ -18,9 +18,10 @@ package v1alpha1
 
 // ResourceRequirements defines the resource requirements
 type ResourceRequirements struct {
-	CPU    string `json:"cpu,omitempty"`
-	Memory string `json:"memory,omitempty"`
-	GPU    string `json:"gpu,omitempty"`
+	CPU     string `json:"cpu,omitempty"`
+	Memory  string `json:"memory,omitempty"`
+	GPU     string `json:"gpu,omitempty"`
+	GPUType string `json:"gpuType,omitempty"`
 }
 
 // ImageSpec defines the container image configuration

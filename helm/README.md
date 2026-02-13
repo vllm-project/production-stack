@@ -71,6 +71,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.imagePullPolicy` |  string | `"Always"`| Image pull policy for serving engine |
 | `servingEngineSpec.extraVolumes` | list | `[]`| Extra volumes for serving engine |
 | `servingEngineSpec.extraVolumeMounts` | list | `[]` | Extra volume mounts for serving engine |
+| `servingEngineSpec.env` | list | `[]` | (Optional) Global environment variables for all serving engine containers. If a variable is set in both `servingEngineSpec.env` and `servingEngineSpec.modelSpec[].env`, the value from `modelSpec[].env` will override the global value for that model. |
 
 #### Model Specification Fields
 
@@ -85,6 +86,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].modelURL` | string | `""` | The URL of the model, e.g., "facebook/opt-125m" |
 | `servingEngineSpec.modelSpec[].chatTemplate` | string | `null` | (Optional) Chat template (Jinja2) specifying tokenizer configuration |
 | `servingEngineSpec.modelSpec[].replicaCount` | integer | `1` | The number of replicas for the model |
+| `servingEngineSpec.modelSpec[].resources` | object | `{}` | Standard Kubernetes resources block (requests/limits). If specified, this takes priority over and ignores simplified resource fields (requestCPU, requestMemory, requestGPU, etc.) |
 | `servingEngineSpec.modelSpec[].requestCPU` | integer | `0` | The number of CPUs requested for the model |
 | `servingEngineSpec.modelSpec[].requestMemory` | string | `""` | The amount of memory requested for the model, e.g., "16Gi" |
 | `servingEngineSpec.modelSpec[].requestGPU` | integer | `0` | The number of GPUs requested for the model |
@@ -132,6 +134,8 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].vllmConfig.maxNumSeqs` | integer | `256` | Maximum number of sequences to be processed in a single iteration |
 | `servingEngineSpec.modelSpec[].vllmConfig.maxLoras` | integer | `0` | The maximum number of LoRA models to be loaded in a single batch |
 | `servingEngineSpec.modelSpec[].vllmConfig.gpuMemoryUtilization` | number | `0.9` | The fraction of GPU memory to be used for the model executor (0-1) |
+| `servingEngineSpec.modelSpec[].vllmConfig.runner` | string | `""` | The runner type for the model, can be "auto" or "pooling" |
+| `servingEngineSpec.modelSpec[].vllmConfig.convert` | string | `""` | The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score" |
 | `servingEngineSpec.modelSpec[].vllmConfig.extraArgs` | list | `["--disable-log-requests"]` | Extra command line arguments to pass to vLLM |
 
 #### LMCache Configuration
@@ -152,6 +156,39 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlPeerPort` | string | `"55555"` | NIXL peer port for KV transfer |
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlBufferSize` | string | `"1073741824"` | NIXL buffer size for KV transfer |
 
+#### KEDA Autoscaling Configuration
+
+> **Note**: Unless explicitly set, KEDA's default values will apply. The defaults shown below are KEDA's defaults, not values enforced by this Helm chart.
+
+| Field | Type | KEDA Default | Description |
+|-------|------|--------------|-------------|
+| `servingEngineSpec.modelSpec[].keda.enabled` | boolean | `false` | Enable KEDA autoscaling for this model deployment (requires KEDA installed in cluster) |
+| `servingEngineSpec.modelSpec[].keda.minReplicaCount` | integer | - | Minimum number of replicas (supports 0 for scale-to-zero); if not set, HPA minReplicas default applies |
+| `servingEngineSpec.modelSpec[].keda.maxReplicaCount` | integer | - | Maximum number of replicas; if not set, HPA maxReplicas default applies |
+| `servingEngineSpec.modelSpec[].keda.pollingInterval` | integer | `30` | How often KEDA checks metrics (in seconds) |
+| `servingEngineSpec.modelSpec[].keda.cooldownPeriod` | integer | `300` | Wait time before scaling down after scaling up (in seconds) |
+| `servingEngineSpec.modelSpec[].keda.idleReplicaCount` | integer | - | Number of replicas when no triggers are active |
+| `servingEngineSpec.modelSpec[].keda.initialCooldownPeriod` | integer | - | Initial cooldown period before scaling down after creation (in seconds) |
+| `servingEngineSpec.modelSpec[].keda.fallback` | map | - | Fallback configuration when scaler fails |
+| `servingEngineSpec.modelSpec[].keda.fallback.failureThreshold` | integer | - | Number of consecutive failures before fallback |
+| `servingEngineSpec.modelSpec[].keda.fallback.replicas` | integer | - | Number of replicas to scale to in fallback |
+| `servingEngineSpec.modelSpec[].keda.triggers` | list | See below | List of KEDA trigger configurations (Prometheus-based) |
+| `servingEngineSpec.modelSpec[].keda.triggers[].type` | string | - | Trigger type (e.g., `"prometheus"`) |
+| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.serverAddress` | string | - | Prometheus server URL (e.g., <http://prometheus-operated.monitoring.svc:9090>) |
+| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.metricName` | string | - | Name of the metric to monitor |
+| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.query` | string | - | PromQL query to fetch the metric |
+| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.threshold` | string | - | Threshold value that triggers scaling |
+| `servingEngineSpec.modelSpec[].keda.advanced` | map | - | Advanced KEDA configuration options |
+| `servingEngineSpec.modelSpec[].keda.advanced.restoreToOriginalReplicaCount` | boolean | `false` | Restore original replica count when ScaledObject is deleted |
+| `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig` | map | - | HPA-specific configuration |
+| `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig.name` | string | `keda-hpa-{scaled-object-name}` | Custom name for HPA resource |
+| `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig.behavior` | map | - | HPA scaling behavior configuration (see [K8s docs](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)) |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers` | map | - | Scaling modifiers for composite metrics |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.target` | string | - | Target value for the composed metric |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.activationTarget` | string | - | Activation target for the composed metric |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.metricType` | string | `"AverageValue"` | Metric type (AverageValue or Value) |
+| `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.formula` | string | - | Formula to compose metrics together |
+
 ### Router Configuration
 
 | Field | Type | Default | Description |
@@ -159,6 +196,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.repository` | string | `"lmcache/lmstack-router"` | Docker image repository for the router |
 | `routerSpec.tag` | string | `"latest"` | Docker image tag for the router |
 | `routerSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the router |
+| `routerSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
 | `routerSpec.enableRouter` | boolean | `true` | Whether to enable the router service |
 | `routerSpec.replicaCount` | integer | `1` | Number of replicas for the router pod |
 | `routerSpec.priorityClassName` | string | `""` | Priority class for router |
@@ -200,6 +238,14 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.readinessProbe.failureThreshold` | integer |`3`| Failure threshold for router's readiness probe |
 | `routerSpec.readinessProbe.httpGet.path` | string |`"/health"`| Endpoint that the router's readiness probe will be testing |
 
+#### Router OpenTelemetry Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `routerSpec.otel.endpoint` | string | `""` | OTLP endpoint for tracing (e.g., "otel-collector:4317"). Tracing is enabled when this is set. |
+| `routerSpec.otel.serviceName` | string | `"vllm-router"` | Service name for OpenTelemetry traces |
+| `routerSpec.otel.secure` | boolean | `false` | Use secure (TLS) connection for OTLP exporter |
+
 #### Router Ingress Configuration
 
 | Field | Type | Default | Description |
@@ -218,6 +264,7 @@ This table documents all available configuration values for the Production Stack
 | `cacheserverSpec.image.repository` | string | `"lmcache/lmstack-cache-server"` | Docker image repository for the cache server |
 | `cacheserverSpec.image.tag` | string | `"latest"` | Docker image tag for the cache server |
 | `cacheserverSpec.image.pullPolicy` | string | `"Always"` | Image pull policy for the cache server |
+| `cacheserverSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
 | `cacheserverSpec.replicaCount` | integer | `1` | Number of replicas for the cache server pod |
 | `cacheserverSpec.containerPort` | integer | `8000` | Port the cache server container is listening on |
 | `cacheserverSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the cache server |
