@@ -23,7 +23,7 @@ import uuid
 from typing import Dict, List, Optional
 
 import requests
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 try:
     from transformers import AutoTokenizer
@@ -551,7 +551,13 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         )
 
     def _find_endpoints(self, endpoints: List[EndpointInfo]):
-        """Find prefill and decode endpoints based on model labels."""
+        """Find prefill and decode endpoints based on model labels.
+
+        Raises:
+            HTTPException: 503 if prefill or decode endpoints are not available.
+                - PREFILL_SERVICE_UNAVAILABLE: No prefill endpoints discovered
+                - DECODE_SERVICE_UNAVAILABLE: No decode endpoints discovered
+        """
         prefiller_endpoints = [
             e for e in endpoints if e.model_label in self.prefill_model_labels
         ]
@@ -560,14 +566,22 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         ]
 
         if not prefiller_endpoints:
-            raise ValueError(
+            logger.warning(
                 f"No prefill endpoints found with labels {self.prefill_model_labels}. "
                 f"Available endpoints: {[(e.url, e.model_label) for e in endpoints]}"
             )
+            raise HTTPException(
+                status_code=503,
+                detail="PREFILL_SERVICE_UNAVAILABLE: No prefill endpoints discovered",
+            )
         if not decoder_endpoints:
-            raise ValueError(
+            logger.warning(
                 f"No decode endpoints found with labels {self.decode_model_labels}. "
                 f"Available endpoints: {[(e.url, e.model_label) for e in endpoints]}"
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="DECODE_SERVICE_UNAVAILABLE: No decode endpoints discovered",
             )
 
         return prefiller_endpoints, decoder_endpoints
