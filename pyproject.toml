@@ -19,7 +19,7 @@ dependencies = [
     "kubernetes==32.0.0",
     "numpy==1.26.4",
     "prometheus-client==0.21.1",
-    "python-multipart==0.0.20",
+    "python-multipart==0.0.22",
     "sentry-sdk[fastapi]==2.27.0",
     "uhashring==2.3",
     "uvicorn==0.34.0",
