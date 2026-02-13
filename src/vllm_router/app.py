@@ -27,6 +27,7 @@ from vllm_router.dynamic_config import (
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
+from vllm_router.log import set_log_level
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
@@ -333,6 +334,7 @@ app.state.otel_enabled = False
 
 def main():
     args = parse_args()
+    set_log_level(args.log_level)
     initialize_all(app, args)
     if args.log_stats:
         threading.Thread(
@@ -347,7 +349,7 @@ def main():
     # Workaround to avoid footguns where uvicorn drops requests with too
     # many concurrent requests active.
     set_ulimit()
-    uvicorn.run(app, host=args.host, port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
 
 
 if __name__ == "__main__":

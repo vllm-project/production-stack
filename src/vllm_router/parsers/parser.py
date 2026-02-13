@@ -335,7 +335,7 @@ def parse_args():
         type=str,
         default="info",
         choices=["critical", "error", "warning", "info", "debug", "trace"],
-        help="Log level for uvicorn. Default is 'info'.",
+        help="Log level for the router and uvicorn. Default is 'info'.",
     )
 
     parser.add_argument(
