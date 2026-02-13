@@ -37,7 +37,7 @@ from vllm_router.services.request_service.rewriter import (
     is_request_rewriter_initialized,
 )
 from vllm_router.utils import (
-    redact_token_in_request_header,
+    TokenRedactionFilter,
     replace_model_in_request_body,
     update_content_length,
 )
@@ -75,6 +75,7 @@ from vllm_router.services.metrics_service import (
 )
 
 logger = init_logger(__name__)
+logger.addFilter(TokenRedactionFilter())
 
 _HOP_BY_HOP_HEADERS = {
     "host",
@@ -417,13 +418,7 @@ async def route_general_request(
     )
     logger.debug(f"Debug session extraction - Session key config: {session_key}")
 
-    disable_redaction = getattr(request.app.state, "disable_token_redaction", False)
-    redacted_headers = redact_token_in_request_header(
-        request.headers, disable=disable_redaction
-    )
-    logger.debug(
-        f"Debug session extraction - Request headers: {dict(redacted_headers)}"
-    )
+    logger.debug("Debug session extraction - Request headers: %s", request.headers)
 
     logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
 

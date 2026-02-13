@@ -2,6 +2,7 @@ import abc
 import enum
 import io
 import json
+import logging
 import re
 import resource
 import wave
@@ -24,7 +25,82 @@ _SENSITIVE_HEADERS = {
     "auth-token",
     "x-access-token",
     "access-token",
+    "cookie",
+    "set-cookie",
 }
+
+# Common authentication schemes to preserve when redacting
+_AUTH_SCHEMES = {
+    "bearer",
+    "basic",
+    "token",
+    "digest",
+    "oauth",
+    "apikey",
+}
+
+
+class TokenRedactionFilter(logging.Filter):
+    """Logger filter that redacts sensitive tokens from Starlette Headers objects."""
+
+    def _redact_value(self, value: str) -> str:
+        """
+        Redact a sensitive value, preserving auth scheme prefixes if present.
+
+        Examples:
+            "Bearer sk-1234567890" -> "Bearer ****"
+            "Basic dXNlcjpwYXNz" -> "Basic ****"
+            "sk-1234567890" -> "sk-1****"
+        """
+        value_str = str(value)
+
+        # Check if value starts with a known auth scheme
+        if " " in value_str:
+            parts = value_str.split(" ", 1)
+            if len(parts) == 2 and parts[0].lower() in _AUTH_SCHEMES:
+                return f"{parts[0]} ****"
+
+        # Default redaction: keep first 4 characters
+        if len(value_str) > 4:
+            return value_str[:4] + "****"
+        return "****"
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """
+        Redact sensitive header values in log messages.
+
+        This filter specifically checks for Starlette Headers objects and redacts
+        their sensitive values before the message is emitted.
+        """
+        # Check if there are args that might contain headers
+        if hasattr(record, "args") and record.args:
+            # Convert args to list for modification
+            args_list = (
+                list(record.args) if isinstance(record.args, tuple) else [record.args]
+            )
+            modified = False
+
+            for i, arg in enumerate(args_list):
+                # Check if arg is a Starlette Headers object
+                if isinstance(arg, (Headers, MutableHeaders)):
+                    redacted_dict = {}
+                    for key, value in arg.items():
+                        if isinstance(key, str) and key.lower() in _SENSITIVE_HEADERS:
+                            # Redact the value
+                            redacted_dict[key] = self._redact_value(value)
+                            modified = True
+                        else:
+                            redacted_dict[key] = value
+                    if modified:
+                        args_list[i] = redacted_dict
+
+            if modified:
+                record.args = (
+                    tuple(args_list) if isinstance(record.args, tuple) else args_list[0]
+                )
+
+        return True
+
 
 # prepare a WAV byte to prevent repeatedly generating it
 # Generate a 0.1 second silent audio file
@@ -219,21 +295,6 @@ def parse_static_aliases(static_aliases: str):
         aliases[alias] = model
     logger.info(f"Loaded aliases {aliases}")
     return aliases
-
-
-def redact_token_in_request_header(headers: Headers, disable: bool = False) -> Headers:
-    if disable:
-        return headers
-
-    redacted_items = []
-    for key, value in headers.items():
-        if key.lower() in _SENSITIVE_HEADERS:
-            if value and len(value) > 4:
-                value = value[:4] + "****"
-            else:
-                value = "****"
-        redacted_items.append((key, value))
-    return Headers(dict(redacted_items))
 
 
 def replace_model_in_request_body(request_json: dict, model: str):
