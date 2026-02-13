@@ -179,7 +179,18 @@ async def process_request(
                 span.set_attribute("http.status_code", backend_response.status)
 
             # Yield headers and status code first.
-            yield backend_response.headers, backend_response.status
+            sanitized_headers = {
+                k: v
+                for k, v in backend_response.headers.items()
+                if k.lower()
+                not in {
+                    "content-encoding",
+                    "transfer-encoding",
+                    "connection",
+                    "content-length",
+                }
+            }
+            yield sanitized_headers, backend_response.status
             # Stream response content.
             async for chunk in backend_response.content.iter_any():
                 total_len += len(chunk)
