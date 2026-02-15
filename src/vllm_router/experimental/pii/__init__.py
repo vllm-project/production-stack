@@ -1,7 +1,8 @@
 """PII detection module for vLLM router."""
 
-import logging
 from typing import Optional
+
+from vllm_router.log import init_logger
 
 from .analyzers.base import PIIAnalyzer
 from .analyzers.factory import create_analyzer
@@ -9,7 +10,7 @@ from .config import PIIConfig
 from .middleware import check_pii
 from .types import PIIAction, PIITarget, PIIType
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 # Global analyzer instance
 _analyzer: Optional[PIIAnalyzer] = None

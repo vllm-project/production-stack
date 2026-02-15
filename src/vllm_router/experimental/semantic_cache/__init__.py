@@ -5,16 +5,15 @@ This module provides semantic caching functionality for LLM requests and respons
 It is considered experimental and may change or be removed at any time.
 """
 
-import logging
-
 from vllm_router.experimental.feature_gates import get_feature_gates
 from vllm_router.experimental.semantic_cache.semantic_cache import (
     SemanticCache,
     get_semantic_cache,
     initialize_semantic_cache,
 )
+from vllm_router.log import init_logger
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 __all__ = [
     "SemanticCache",

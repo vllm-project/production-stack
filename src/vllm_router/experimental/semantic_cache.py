@@ -1,4 +1,3 @@
-import logging
 import os
 import uuid
 from typing import Any, Dict, List, Optional
@@ -6,8 +5,9 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from vllm_router.experimental.semantic_cache_db import SemanticCacheDB
+from vllm_router.log import init_logger
 
-logger = logging.getLogger("uvicorn")
+logger = init_logger(__name__)
 
 # Feature gate for semantic cache
 _semantic_cache_enabled = False
