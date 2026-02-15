@@ -37,7 +37,6 @@ from vllm_router.services.request_service.rewriter import (
     is_request_rewriter_initialized,
 )
 from vllm_router.utils import (
-    TokenRedactionFilter,
     replace_model_in_request_body,
     update_content_length,
 )
@@ -75,7 +74,6 @@ from vllm_router.services.metrics_service import (
 )
 
 logger = init_logger(__name__)
-logger.addFilter(TokenRedactionFilter())
 
 _HOP_BY_HOP_HEADERS = {
     "host",
