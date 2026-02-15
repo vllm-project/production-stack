@@ -18,8 +18,8 @@ spec:
     maxNumSeqs: 32
     # HuggingFace token secret (optional)
     hfTokenSecret:
-      name: "huggingface-token"
-    hfTokenName: "token"
+      hfTokenSecretName: "huggingface-token"
+      hfTokenKeyName: "token"
 
   # vLLM server configuration
   vllmConfig:
