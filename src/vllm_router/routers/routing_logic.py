@@ -83,13 +83,6 @@ class RoutingInterface(metaclass=SingletonABCMeta):
                 ret = url
         return ret
 
-    def set_max_instance_failover_reroute_attempts(
-        self, max_instance_failover_reroute_attempts
-    ):
-        self.max_instance_failover_reroute_attempts = (
-            max_instance_failover_reroute_attempts
-        )
-
     def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
         """
         Update the hash ring with the current list of endpoints.
@@ -557,8 +550,8 @@ def initialize_routing_logic(
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
-    router.set_max_instance_failover_reroute_attempts(
-        kwargs.get("max_instance_failover_reroute_attempts", 0)
+    router.max_instance_failover_reroute_attempts = kwargs.get(
+        "max_instance_failover_reroute_attempts", 0
     )
     return router
 

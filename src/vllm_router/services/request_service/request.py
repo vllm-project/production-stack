@@ -343,73 +343,29 @@ async def route_general_request(
     # Track all valid incoming requests
     num_incoming_requests_total.labels(model=requested_model).inc()
 
-    error_urls: set[str] = set()
-    max_attempts = request.app.state.router.max_instance_failover_reroute_attempts + 1
-    last_error: Exception | None = None
+    endpoints = service_discovery.get_endpoint_info()
 
-    for attempt in range(max_attempts):
-        endpoints = service_discovery.get_endpoint_info()
+    if not request_endpoint:
+        endpoints = list(
+            filter(
+                lambda x: requested_model in x.model_names and not x.sleep,
+                endpoints,
+            )
+        )
+        engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
+        request_stats = request.app.state.request_stats_monitor.get_request_stats(
+            time.time()
+        )
+    else:
+        endpoints = list(
+            filter(
+                lambda x: requested_model in x.model_names
+                and x.Id == request_endpoint
+                and not x.sleep,
+                endpoints,
+            )
+        )
 
-        if not request_endpoint:
-            endpoints = list(
-                filter(
-                    lambda x: requested_model in x.model_names
-                    and not x.sleep
-                    and x.url not in error_urls,
-                    endpoints,
-                )
-            )
-            engine_stats = request.app.state.engine_stats_scraper.get_engine_stats()
-            request_stats = request.app.state.request_stats_monitor.get_request_stats(
-                time.time()
-            )
-        else:
-            endpoints = list(
-                filter(
-                    lambda x: requested_model in x.model_names
-                    and x.Id == request_endpoint
-                    and not x.sleep
-                    and x.url not in error_urls,
-                    endpoints,
-                )
-            )
-
-        if not endpoints:
-            if error_urls:
-                break
-            if not model_ever_existed:
-                return JSONResponse(
-                    status_code=404,
-                    content={
-                        "error": f"Model '{requested_model}' not found. Available models can be listed at /v1/models."
-                    },
-                    headers={"X-Request-Id": request_id},
-                )
-            else:
-                return JSONResponse(
-                    status_code=503,
-                    content={
-                        "error": f"Model '{requested_model}' is temporarily unavailable. Please try again later."
-                    },
-                    headers={"X-Request-Id": request_id},
-                )
-
-        logger.debug(f"Routing request {request_id} for model: {requested_model}")
-        if request_endpoint:
-            server_url = endpoints[0].url
-            logger.debug(
-                f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
-            )
-        elif isinstance(
-            request.app.state.router,
-            (KvawareRouter, PrefixAwareRouter, SessionRouter),
-        ):
-            server_url = await request.app.state.router.route_request(
-                endpoints, engine_stats, request_stats, request, request_json
-            )
-        else:
-            server_url = request.app.state.router.route_request(
-                endpoints, engine_stats, request_stats, request
     if not endpoints:
         if not model_ever_existed:
             end_span(span, status_code=404) if tracing_active else None
@@ -421,7 +377,6 @@ async def route_general_request(
                 headers={"X-Request-Id": request_id},
             )
         else:
-            # Model existed before but is now scaled to zero
             end_span(span, status_code=503) if tracing_active else None
             return JSONResponse(
                 status_code=503,
@@ -431,23 +386,71 @@ async def route_general_request(
                 headers={"X-Request-Id": request_id},
             )
 
-        curr_time = time.time()
-        session_key = getattr(request.app.state.router, "session_key", None)
-        session_id = request.app.state.router.extract_session_id(request, request_json)
-        session_id_display = session_id if session_id is not None else "None"
-
+    logger.debug(f"Routing request {request_id} for model: {requested_model}")
+    if request_endpoint:
+        server_url = endpoints[0].url
         logger.debug(
-            f"Debug session extraction - Router type: {type(request.app.state.router).__name__}"
+            f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
-        logger.debug(f"Debug session extraction - Session key config: {session_key}")
-        logger.debug(
-            f"Debug session extraction - Request headers: {dict(request.headers)}"
+    elif isinstance(
+        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
+    ):
+        server_url = await request.app.state.router.route_request(
+            endpoints, engine_stats, request_stats, request, request_json
         )
-        logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
+    else:
+        server_url = request.app.state.router.route_request(
+            endpoints, engine_stats, request_stats, request
+        )
 
-        logger.info(
-            f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+    curr_time = time.time()
+    session_key = getattr(request.app.state.router, "session_key", None)
+    session_id = request.app.state.router.extract_session_id(request, request_json)
+    session_id_display = session_id if session_id is not None else "None"
+
+    logger.debug(
+        f"Debug session extraction - Router type: {type(request.app.state.router).__name__}"
+    )
+    logger.debug(f"Debug session extraction - Session key config: {session_key}")
+    logger.debug(f"Debug session extraction - Request headers: {dict(request.headers)}")
+    logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
+
+    logger.info(
+        f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+    )
+
+    if span is not None:
+        span.set_attribute("vllm.backend_url", server_url)
+        span.set_attribute(
+            "vllm.routing_logic", type(request.app.state.router).__name__
         )
+
+    error_urls = set()
+    last_error = None
+    max_attempts = request.app.state.router.max_instance_failover_reroute_attempts + 1
+
+    for attempt in range(max_attempts):
+        if attempt > 0:
+            remaining = [ep for ep in endpoints if ep.url not in error_urls]
+            if not remaining:
+                break
+            if request_endpoint:
+                server_url = remaining[0].url
+            elif isinstance(
+                request.app.state.router,
+                (KvawareRouter, PrefixAwareRouter, SessionRouter),
+            ):
+                server_url = await request.app.state.router.route_request(
+                    remaining, engine_stats, request_stats, request, request_json
+                )
+            else:
+                server_url = request.app.state.router.route_request(
+                    remaining, engine_stats, request_stats, request
+                )
+            logger.info(
+                f"Rerouting request {request_id} to {server_url} "
+                f"(attempt {attempt + 1}/{max_attempts})"
+            )
 
         try:
             stream_generator = process_request(
@@ -457,12 +460,15 @@ async def route_general_request(
                 request_id,
                 endpoint,
                 background_tasks,
+                parent_span_context=span_context,
             )
             headers, status = await anext(stream_generator)
             headers_dict = {key: value for key, value in headers.items()}
             headers_dict["X-Request-Id"] = request_id
             last_error = None
             break
+        except HTTPException:
+            raise
         except Exception as e:
             error_urls.add(server_url)
             last_error = e
@@ -472,43 +478,9 @@ async def route_general_request(
             )
 
     if last_error:
+        end_span(span, error=last_error, status_code=500) if tracing_active else None
         raise last_error
 
-    # Debug logging to help troubleshoot session ID extraction
-    logger.debug(
-        f"Debug session extraction - Router type: {type(request.app.state.router).__name__}"
-    )
-    logger.debug(f"Debug session extraction - Session key config: {session_key}")
-
-    logger.debug("Debug session extraction - Request headers: %s", request.headers)
-
-    logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
-
-    logger.info(
-        f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
-    )
-
-    # Add backend URL to parent span
-    if span is not None:
-        span.set_attribute("vllm.backend_url", server_url)
-        span.set_attribute(
-            "vllm.routing_logic", type(request.app.state.router).__name__
-        )
-
-    stream_generator = process_request(
-        request,
-        request_body,
-        server_url,
-        request_id,
-        endpoint,
-        background_tasks,
-        parent_span_context=span_context,
-    )
-    headers, status = await anext(stream_generator)
-    headers_dict = {key: value for key, value in headers.items()}
-    headers_dict["X-Request-Id"] = request_id
-
-    # Wrap the generator to end parent span when streaming completes
     async def traced_stream():
         try:
             async for chunk in stream_generator:
