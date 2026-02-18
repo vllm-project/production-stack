@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
-import logging
 import threading
 from contextlib import asynccontextmanager
 
@@ -27,7 +26,7 @@ from vllm_router.dynamic_config import (
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
-from vllm_router.log import set_log_level
+from vllm_router.log import init_logger, set_log_level
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
@@ -92,7 +91,7 @@ try:
 except ImportError:
     otel_available = False
 
-logger = logging.getLogger("uvicorn")
+logger = init_logger(__name__)
 
 
 @asynccontextmanager

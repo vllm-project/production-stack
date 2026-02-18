@@ -6,7 +6,6 @@ This module provides functions to integrate the semantic cache with the vLLM rou
 
 import argparse
 import json
-import logging
 import time
 import uuid
 from typing import Optional
@@ -19,8 +18,9 @@ from vllm_router.experimental.semantic_cache import (
     get_semantic_cache,
     is_semantic_cache_enabled,
 )
+from vllm_router.log import init_logger
 
-logger = logging.getLogger("uvicorn")
+logger = init_logger(__name__)
 
 # Prometheus metrics for semantic cache
 semantic_cache_hits = Gauge(

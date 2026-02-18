@@ -1,4 +1,3 @@
-import logging
 import os
 import uuid
 from typing import Any, Dict, List, Optional
@@ -9,8 +8,9 @@ from sentence_transformers import SentenceTransformer
 from vllm_router.experimental.semantic_cache.db_adapters import (
     FAISSAdapter,
 )
+from vllm_router.log import init_logger
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 
 class SemanticCache:

@@ -13,12 +13,13 @@
 # limitations under the License.
 
 import asyncio
-import logging
 from typing import Generator, Set, Tuple
 
 import xxhash
 
-logger = logging.getLogger(__name__)
+from vllm_router.log import init_logger
+
+logger = init_logger(__name__)
 
 
 class TrieNode:

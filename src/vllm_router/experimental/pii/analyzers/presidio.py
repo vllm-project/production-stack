@@ -1,7 +1,8 @@
 """Presidio-based PII analyzer implementation."""
 
-import logging
 from typing import Dict, Optional, Set
+
+from vllm_router.log import init_logger
 
 from ..types import PIIType
 from .base import PIIAnalysisResult, PIIAnalyzer, PIILocation
@@ -26,7 +27,7 @@ except ImportError:
     MISSING_DEPS.append("presidio-analyzer>=2.2.0")
 
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 # Mapping from our PII types to Presidio entity types
 PII_TO_PRESIDIO = {

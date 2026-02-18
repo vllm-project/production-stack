@@ -282,3 +282,8 @@ async def route_v1_images_generations(
 @main_router.post("/v1/images/edits")
 async def route_v1_images_edit(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/images/edits", background_tasks)
+
+
+@main_router.post("/v1/messages")
+async def route_anthropic_messages(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/messages", background_tasks)
