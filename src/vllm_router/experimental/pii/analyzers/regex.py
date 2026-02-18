@@ -1,13 +1,14 @@
 """Regex-based PII analyzer implementation."""
 
-import logging
 import re
 from typing import Dict, Optional, Set
+
+from vllm_router.log import init_logger
 
 from ..types import PIIType
 from .base import PIIAnalysisResult, PIIAnalyzer, PIILocation
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 # Regex patterns for different PII types
 PII_PATTERNS = {

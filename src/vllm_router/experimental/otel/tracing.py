@@ -21,7 +21,6 @@ It handles:
 - Trace context injection into outgoing requests to backends
 """
 
-import logging
 from typing import Any, Dict, Optional
 
 from opentelemetry import trace
@@ -32,7 +31,9 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-logger = logging.getLogger(__name__)
+from vllm_router.log import init_logger
+
+logger = init_logger(__name__)
 
 # Global state for tracing
 _tracer: Optional[trace.Tracer] = None
