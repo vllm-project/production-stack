@@ -36,7 +36,10 @@ from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
     is_request_rewriter_initialized,
 )
-from vllm_router.utils import replace_model_in_request_body, update_content_length
+from vllm_router.utils import (
+    replace_model_in_request_body,
+    update_content_length,
+)
 
 try:
     # Semantic cache integration
@@ -48,7 +51,27 @@ try:
 except ImportError:
     semantic_cache_available = False
 
-from vllm_router.services.metrics_service import num_incoming_requests_total
+try:
+    # OpenTelemetry tracing integration
+    from opentelemetry import trace
+
+    from vllm_router.experimental.otel import (
+        end_span,
+        extract_context,
+        inject_context,
+        start_span,
+    )
+
+    otel_available = True
+except ImportError:
+    otel_available = False
+
+from vllm_router.services.metrics_service import (
+    input_tokens_total,
+    num_incoming_requests_total,
+    output_tokens_total,
+    request_errors_total,
+)
 
 logger = init_logger(__name__)
 
@@ -74,6 +97,7 @@ async def process_request(
     endpoint,
     background_tasks: BackgroundTasks,
     debug_request=None,
+    parent_span_context=None,
 ):
     """
     Process a request by sending it to the chosen backend.
@@ -86,6 +110,7 @@ async def process_request(
         endpoint: The endpoint to send the request to on the backend.
         debug_request: The original request object from the client, used for
             optional debug logging.
+        parent_span_context: OpenTelemetry context from parent span for trace propagation.
 
     Yields:
         The response headers and status code, followed by the response content.
@@ -93,67 +118,124 @@ async def process_request(
     Raises:
         HTTPError: If the backend returns a 4xx or 5xx status code.
     """
+    # OpenTelemetry tracing: create child span at function entry
+    span, span_context = None, None
+    tracing_active = (
+        otel_available
+        and request.app.state.otel_enabled
+        and parent_span_context is not None
+    )
+    if tracing_active:
+        span, span_context = start_span(
+            "process_request",
+            parent_context=parent_span_context,
+            kind=trace.SpanKind.CLIENT,
+            attributes={
+                "http.method": request.method,
+                "http.url": backend_url + endpoint,
+                "vllm.backend_url": backend_url,
+                "vllm.request_id": request_id,
+            },
+        )
+
     first_token = False
     total_len = 0
     start_time = time.time()
     request.app.state.request_stats_monitor.on_new_request(
         backend_url, request_id, start_time
     )
-    # Check if this is a streaming request
+    # Check if this is a streaming request and extract model name
     try:
         request_json = json.loads(body)
         is_streaming = request_json.get("stream", False)
+        model_name = request_json.get("model", "unknown")
     except JSONDecodeError:
         # If we can't parse the body as JSON, assume it's not streaming
         raise HTTPException(status=400, detail="Request body is not JSON parsable.")
 
-    # sanitize the request headers
+    # Add streaming info to span after parsing
+    if span is not None:
+        span.set_attribute("vllm.is_streaming", is_streaming)
+
+    # Sanitize the request headers
     headers = {
         k: v for k, v in request.headers.items() if k.lower() not in _HOP_BY_HOP_HEADERS
     }
 
+    # Inject trace context into outgoing headers
+    if tracing_active:
+        inject_context(headers, span_context)
+
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
 
-    async with request.app.state.aiohttp_client_wrapper().request(
-        method=request.method,
-        url=backend_url + endpoint,
-        headers=headers,
-        data=body,
-        timeout=aiohttp.ClientTimeout(total=None),
-    ) as backend_response:
-        # Yield headers and status code first.
-        yield backend_response.headers, backend_response.status
-        # Stream response content.
-        async for chunk in backend_response.content.iter_any():
-            total_len += len(chunk)
-            if not first_token:
-                first_token = True
-                request.app.state.request_stats_monitor.on_request_response(
-                    backend_url, request_id, time.time()
-                )
-            # For non-streaming requests, collect the full response
-            if full_response is not None:
-                full_response.extend(chunk)
-            yield chunk
+    try:
+        async with request.app.state.aiohttp_client_wrapper().request(
+            method=request.method,
+            url=backend_url + endpoint,
+            headers=headers,
+            data=body,
+            timeout=aiohttp.ClientTimeout(total=None),
+        ) as backend_response:
+            # Set response status on span if tracing
+            if span is not None:
+                span.set_attribute("http.status_code", backend_response.status)
 
-    request.app.state.request_stats_monitor.on_request_complete(
-        backend_url, request_id, time.time()
-    )
+            # Yield headers and status code first.
+            yield backend_response.headers, backend_response.status
+            # Stream response content.
+            async for chunk in backend_response.content.iter_any():
+                total_len += len(chunk)
+                if not first_token:
+                    first_token = True
+                    request.app.state.request_stats_monitor.on_request_response(
+                        backend_url, request_id, time.time()
+                    )
+                # For non-streaming requests, collect the full response
+                if full_response is not None:
+                    full_response.extend(chunk)
+                yield chunk
 
-    # if debug_request:
-    #    logger.debug(f"Finished the request with request id: {debug_request.headers.get('x-request-id', None)} at {time.time()}")
-    # Store in semantic cache if applicable
-    # Use the full response for non-streaming requests, or the last chunk for streaming
-    if request.app.state.semantic_cache_available:
-        cache_chunk = bytes(full_response) if not is_streaming else chunk
-        await store_in_semantic_cache(
-            endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
+        request.app.state.request_stats_monitor.on_request_complete(
+            backend_url, request_id, time.time()
         )
-    if background_tasks and getattr(request.app.state, "callbacks", None):
-        background_tasks.add_task(
-            request.app.state.callbacks.post_request, request, full_response
-        )
+
+        # Track token usage for non-streaming requests
+        if not is_streaming and full_response:
+            try:
+                response_data = json.loads(full_response)
+                usage = response_data.get("usage", {})
+                if "prompt_tokens" in usage:
+                    input_tokens_total.labels(server=backend_url, model=model_name).inc(
+                        usage["prompt_tokens"]
+                    )
+                if "completion_tokens" in usage:
+                    output_tokens_total.labels(
+                        server=backend_url, model=model_name
+                    ).inc(usage["completion_tokens"])
+            except json.JSONDecodeError:
+                logger.debug("Cannot parse response as JSON, skipping token tracking")
+
+        # Store in semantic cache if applicable
+        # Use the full response for non-streaming requests, or the last chunk for streaming
+        if request.app.state.semantic_cache_available:
+            cache_chunk = bytes(full_response) if not is_streaming else chunk
+            await store_in_semantic_cache(
+                endpoint=endpoint, method=request.method, body=body, chunk=cache_chunk
+            )
+        if background_tasks and getattr(request.app.state, "callbacks", None):
+            background_tasks.add_task(
+                request.app.state.callbacks.post_request, request, full_response
+            )
+    except Exception as e:
+        # Track other errors
+        request_errors_total.labels(
+            server=backend_url, model=model_name, error_type=type(e).__name__
+        ).inc()
+        end_span(span, error=e) if tracing_active else None
+        raise
+    finally:
+        end_span(span) if tracing_active else None
 
 
 async def route_general_request(
@@ -185,6 +267,23 @@ async def route_general_request(
     request_body = await request.body()
     request_json = json.loads(request_body) if request_body else {}
 
+    # OpenTelemetry tracing: extract incoming context and create parent span
+    span, span_context = None, None
+    tracing_active = otel_available and request.app.state.otel_enabled
+    if tracing_active:
+        incoming_context = extract_context(dict(request.headers))
+        span, span_context = start_span(
+            f"router {endpoint}",
+            parent_context=incoming_context,
+            kind=trace.SpanKind.SERVER,
+            attributes={
+                "http.method": request.method,
+                "http.url": str(request.url),
+                "http.target": endpoint,
+                "vllm.request_id": request_id,
+            },
+        )
+
     if request.query_params:
         request_endpoint = request.query_params.get("id")
     else:
@@ -200,11 +299,16 @@ async def route_general_request(
 
     requested_model = request_json.get("model", None)
     if requested_model is None:
+        end_span(span, status_code=400) if tracing_active else None
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid request: missing 'model' in request body."},
             headers={"X-Request-Id": request_id},
         )
+
+    # Add model info to parent span
+    if span is not None:
+        span.set_attribute("vllm.model", requested_model)
 
     # Apply request rewriting if enabled
     if is_request_rewriter_initialized():
@@ -306,6 +410,25 @@ async def route_general_request(
         else:
             server_url = request.app.state.router.route_request(
                 endpoints, engine_stats, request_stats, request
+    if not endpoints:
+        if not model_ever_existed:
+            end_span(span, status_code=404) if tracing_active else None
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": f"Model '{requested_model}' not found. Available models can be listed at /v1/models."
+                },
+                headers={"X-Request-Id": request_id},
+            )
+        else:
+            # Model existed before but is now scaled to zero
+            end_span(span, status_code=503) if tracing_active else None
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": f"Model '{requested_model}' is temporarily unavailable. Please try again later."
+                },
+                headers={"X-Request-Id": request_id},
             )
 
         curr_time = time.time()
@@ -351,8 +474,52 @@ async def route_general_request(
     if last_error:
         raise last_error
 
+    # Debug logging to help troubleshoot session ID extraction
+    logger.debug(
+        f"Debug session extraction - Router type: {type(request.app.state.router).__name__}"
+    )
+    logger.debug(f"Debug session extraction - Session key config: {session_key}")
+
+    logger.debug("Debug session extraction - Request headers: %s", request.headers)
+
+    logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
+
+    logger.info(
+        f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+    )
+
+    # Add backend URL to parent span
+    if span is not None:
+        span.set_attribute("vllm.backend_url", server_url)
+        span.set_attribute(
+            "vllm.routing_logic", type(request.app.state.router).__name__
+        )
+
+    stream_generator = process_request(
+        request,
+        request_body,
+        server_url,
+        request_id,
+        endpoint,
+        background_tasks,
+        parent_span_context=span_context,
+    )
+    headers, status = await anext(stream_generator)
+    headers_dict = {key: value for key, value in headers.items()}
+    headers_dict["X-Request-Id"] = request_id
+
+    # Wrap the generator to end parent span when streaming completes
+    async def traced_stream():
+        try:
+            async for chunk in stream_generator:
+                yield chunk
+            end_span(span, status_code=status) if tracing_active else None
+        except Exception as e:
+            end_span(span, error=e, status_code=500) if tracing_active else None
+            raise
+
     return StreamingResponse(
-        stream_generator,
+        traced_stream(),
         status_code=status,
         headers=headers_dict,
         media_type="text/event-stream",
@@ -403,8 +570,15 @@ async def route_disaggregated_prefill_request(
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
 
-    orig_max_tokens = request_json.get("max_tokens", 0)
+    # Save original request for decode phase
+    orig_request_json = request_json.copy()
+
+    # Prepare prefill request: set max_tokens=1 and remove max_completion_tokens
+    # (max_completion_tokens takes precedence over max_tokens in OpenAI API,
+    # so we must remove it to ensure prefill generates only 1 token)
     request_json["max_tokens"] = 1
+    request_json.pop("max_completion_tokens", None)
+
     st = time.time()
     try:
         await send_request_to_prefiller(
@@ -415,7 +589,8 @@ async def route_disaggregated_prefill_request(
         logger.info(
             f"Routing request {request_id} with session id None to {request.app.state.prefill_client._base_url} at {et}, process time = {et - in_router_time:.4f}"
         )
-        request_json["max_tokens"] = orig_max_tokens
+        # Use original request for decode phase
+        request_json = orig_request_json
     except aiohttp.ClientResponseError as e:
         logger.error(f"HTTP error in prefiller: {e}", exc_info=True)
         return JSONResponse(
@@ -693,7 +868,13 @@ async def route_general_transcriptions(
         headers = {
             k: v
             for k, v in backend_response.headers.items()
-            if k.lower() not in ("content-encoding", "transfer-encoding", "connection")
+            if k.lower()
+            not in (
+                "content-length",
+                "content-encoding",
+                "transfer-encoding",
+                "connection",
+            )
         }
 
         headers["X-Request-Id"] = request_id

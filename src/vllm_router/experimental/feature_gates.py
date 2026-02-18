@@ -1,12 +1,12 @@
 """Feature gates for experimental features."""
 
-import logging
 from enum import Enum
 from typing import Dict, Optional, Set
 
+from vllm_router.log import init_logger
 from vllm_router.utils import SingletonMeta
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 # Feature gate names
 SEMANTIC_CACHE = "SemanticCache"

@@ -31,6 +31,7 @@ servingEngineSpec:
   # - chatTemplate: (Optional, string) Chat template (Jinga2) specifying tokenizer configuration, e.g. "{% for message in messages %}\n{% if message['role'] == 'user' %}\n{{ 'Question:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'system' %}\n{{ 'System:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'assistant' %}{{ 'Answer:\n'  + message['content'] + '\n\n' }}{% endif %}\n{% if loop.last and add_generation_prompt %}\n{{ 'Answer:\n' }}{% endif %}{% endfor %}"
   #
   # - replicaCount: (int) The number of replicas for the model, e.g. 1
+  # - resources: (object) a resources block containing requests and limits. If specified, this takes priority over simplified resource fields (requestCPU, etc.).
   # - requestCPU: (int) The number of CPUs requested for the model, e.g. 6
   # - requestMemory: (string) The amount of memory requested for the model, e.g., "16Gi"
   # - requestGPU: (int) The number of GPUs requested for the model, e.g., 1
@@ -82,6 +83,8 @@ servingEngineSpec:
   #   - maxNumSeqs: (optional, int) Maximum number of sequences to be processed in a single iteration., e.g., 32
   #   - maxLoras: (optional, int) The maximum number of LoRA models to be loaded in a single batch, e.g., 4
   #   - gpuMemoryUtilization: (optional, float) The fraction of GPU memory to be used for the model executor, which can range from 0 to 1. e.g., 0.95
+  #   - runner: (optional, string) The runner type for the model, can be "auto" or "pooling". e.g., "pooling"
+  #   - convert: (optional, string) The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score". e.g., "embed"
   #   - extraArgs: (optional, list) Extra command line arguments to pass to vLLM, e.g., ["--disable-log-requests"]
   #
   # - lmcacheConfig: (optional, map) The configuration of the LMCache for KV offloading, supported options are:
@@ -118,6 +121,35 @@ servingEngineSpec:
   # - nodeName: (optional) Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
   # - enableLoRA: (optional, bool) Whether to enable LoRA, e.g., true
+  #
+  # - keda: (optional, map) KEDA autoscaling configuration for this model deployment. Requires KEDA to be installed in the cluster.
+  #   - enabled: (optional, bool) Whether to enable KEDA autoscaling for this model, e.g., true
+  #   - minReplicaCount: (optional, int) Minimum number of replicas (supports 0 for scale-to-zero), e.g., 1
+  #   - maxReplicaCount: (optional, int) Maximum number of replicas, e.g., 5
+  #   - pollingInterval: (optional, int) How often KEDA should check the metrics (in seconds), e.g., 15
+  #   - cooldownPeriod: (optional, int) How long to wait before scaling down after scaling up (in seconds), e.g., 360
+  #   - idleReplicaCount: (optional, int) Number of replicas to scale to when no triggers are active, e.g., 0
+  #   - initialCooldownPeriod: (optional, int) Initial cooldown period in seconds before scaling down after creation, e.g., 60
+  #   - fallback: (optional, map) Fallback configuration when scaler fails
+  #     - failureThreshold: (int) Number of consecutive failures before fallback, e.g., 3
+  #     - replicas: (int) Number of replicas to scale to in fallback, e.g., 2
+  #   - triggers: (optional, list) List of KEDA trigger configurations
+  #     - type: (string) Trigger type, e.g., "prometheus"
+  #     - metadata: (map) Trigger metadata
+  #       - serverAddress: (string) Prometheus server address, e.g., "http://prometheus-operated.monitoring.svc:9090"
+  #       - metricName: (string) Name of the metric to monitor, e.g., "vllm:num_requests_waiting"
+  #       - query: (string) Prometheus query to fetch the metric, e.g., "vllm:num_requests_waiting"
+  #       - threshold: (string) Threshold value that triggers scaling, e.g., "5"
+  #   - advanced: (optional, map) Advanced KEDA configuration
+  #     - restoreToOriginalReplicaCount: (optional, bool) Restore original replica count when ScaledObject is deleted, e.g., false
+  #     - horizontalPodAutoscalerConfig: (optional, map) HPA-specific configuration
+  #       - name: (optional, string) Custom name for the HPA resource, default: "keda-hpa-{scaled-object-name}"
+  #       - behavior: (optional, map) HPA scaling behavior configuration, see https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+  #     - scalingModifiers: (optional, map) Scaling modifiers for composite metrics
+  #       - target: (string) Target value for the composed metric
+  #       - activationTarget: (optional, string) Activation target for the composed metric
+  #       - metricType: (optional, string) Metric type (AverageValue or Value), default: "AverageValue"
+  #       - formula: (string) Formula to compose metrics together
   #
   # Example:
   # vllmApiKey: "vllm_xxxxxxxxxxxxx"
@@ -177,6 +209,21 @@ servingEngineSpec:
   #         operator: "In"
   #         values:
   #         - "NVIDIA-RTX-A6000"
+  #
+  #   keda:
+  #     enabled: true
+  #     minReplicaCount: 1
+  #     maxReplicaCount: 3
+  #     pollingInterval: 15
+  #     cooldownPeriod: 360
+  #     triggers:
+  #       - type: prometheus
+  #         metadata:
+  #           serverAddress: http://prometheus-operated.monitoring.svc:9090
+  #           metricName: vllm:num_requests_waiting
+  #           query: vllm:num_requests_waiting
+  #           threshold: '5'
+
 
   #  extraVolumes:
   #    - name: dev-fuse
@@ -377,6 +424,16 @@ routerSpec:
   # -- Window size in seconds to calculate the request statistics
   requestStatsWindow: 60
 
+  # -- OpenTelemetry tracing configuration
+  # When otelEndpoint is set, tracing is automatically enabled
+  otel:
+    # -- OTLP endpoint for tracing (e.g., "localhost:4317" or "otel-collector:4317")
+    endpoint: ""
+    # -- Service name for traces (default: "vllm-router")
+    serviceName: "vllm-router"
+    # -- Use secure (TLS) connection for OTLP exporter (default: false, i.e., insecure)
+    secure: false
+
   # -- deployment strategy
   strategy: {}
 
@@ -388,9 +445,9 @@ routerSpec:
   resources:
     requests:
       cpu: 400m
-      memory: 500Mi
+      memory: 1000Mi
     limits:
-      memory: 500Mi
+      memory: 1000Mi
 
   # -- Customized labels for the router deployment
   labels:

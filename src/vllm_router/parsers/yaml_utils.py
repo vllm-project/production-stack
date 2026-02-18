@@ -1,9 +1,10 @@
-import logging
 from typing import Any
 
 import yaml
 
-logger = logging.getLogger(__name__)
+from vllm_router.log import init_logger
+
+logger = init_logger(__name__)
 
 
 def generate_static_backends(models: dict[str, Any]) -> str:

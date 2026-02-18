@@ -5,6 +5,7 @@ metadata:
   name: "{{ .Release.Name }}-deployment-router"
   namespace: {{ .Release.Namespace }}
   labels:
+  {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.routerLabels" . | nindent 4 }}
 spec:
 {{- if .Values.routerSpec.autoscaling.enabled }}
@@ -15,10 +16,12 @@ spec:
   {{- include "chart.routerStrategy" . | nindent 2 }}
   selector:
     matchLabels:
+    {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 6 }}
     {{- include "chart.routerLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
+      {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 8 }}
       {{- include "chart.routerLabels" . | nindent 8 }}
       {{- with .Values.routerSpec.podAnnotations }}
       annotations:
@@ -135,6 +138,15 @@ spec:
           {{- if .Values.routerSpec.lmcacheControllerPort }}
           - "--lmcache-controller-port"
           - "{{ .Values.routerSpec.lmcacheControllerPort }}"
+          {{- end }}
+          {{- if .Values.routerSpec.otel.endpoint }}
+          - "--otel-endpoint"
+          - "{{ .Values.routerSpec.otel.endpoint }}"
+          - "--otel-service-name"
+          - "{{ .Values.routerSpec.otel.serviceName | default "vllm-router" }}"
+          {{- if .Values.routerSpec.otel.secure }}
+          - "--otel-secure"
+          {{- end }}
           {{- end }}
         {{- if .Values.routerSpec.resources }}
         resources:

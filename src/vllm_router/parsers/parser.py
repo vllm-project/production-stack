@@ -13,10 +13,10 @@
 # limitations under the License.
 import argparse
 import json
-import logging
 import sys
 
 from vllm_router import utils
+from vllm_router.log import init_logger
 from vllm_router.parsers.yaml_utils import (
     read_and_process_yaml_config_file,
 )
@@ -32,7 +32,7 @@ except ImportError:
     semantic_cache_available = False
 
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 
 def verify_required_args_provided(args: argparse.Namespace) -> None:
@@ -335,7 +335,7 @@ def parse_args():
         type=str,
         default="info",
         choices=["critical", "error", "warning", "info", "debug", "trace"],
-        help="Log level for uvicorn. Default is 'info'.",
+        help="Log level for the router and uvicorn. Default is 'info'.",
     )
 
     parser.add_argument(
@@ -356,6 +356,26 @@ def parse_args():
         type=float,
         default=1.0,
         help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%)",
+    )
+
+    # OpenTelemetry tracing arguments
+    parser.add_argument(
+        "--otel-endpoint",
+        type=str,
+        default=None,
+        help="OTLP endpoint for tracing (e.g., localhost:4317). Enables tracing when set.",
+    )
+    parser.add_argument(
+        "--otel-service-name",
+        type=str,
+        default="vllm-router",
+        help="Service name for OpenTelemetry tracing. Default is 'vllm-router'.",
+    )
+    parser.add_argument(
+        "--otel-secure",
+        action="store_true",
+        default=False,
+        help="Use secure (TLS) connection for OTLP exporter. Default is insecure.",
     )
 
     parser.add_argument(
@@ -384,6 +404,17 @@ def parse_args():
         type=int,
         default=0,
         help="Number of reroute attempts per failed request",
+        "--lmcache-health-check-interval",
+        type=int,
+        default=5,
+        help="Health check interval for LMCache worker (seconds)",
+    )
+
+    parser.add_argument(
+        "--lmcache-worker-timeout",
+        type=int,
+        default=30,
+        help="Timeout for LMCache worker (seconds)",
     )
 
     args = parser.parse_args()

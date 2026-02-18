@@ -1,13 +1,14 @@
 """Factory for creating PII analyzers."""
 
-import logging
 from typing import Dict, Optional, Type
+
+from vllm_router.log import init_logger
 
 from .base import PIIAnalyzer
 from .presidio import PresidioAnalyzer
 from .regex import RegexAnalyzer
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 # Registry of available analyzers
 ANALYZERS: Dict[str, Type[PIIAnalyzer]] = {

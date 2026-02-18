@@ -22,6 +22,7 @@ metadata:
   labels:
     model: {{ $modelSpec.name }}
     helm-release-name: {{ .Release.Name }}
+  {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
   replicas: {{ $modelSpec.replicaCount }}
@@ -30,6 +31,7 @@ spec:
     matchLabels:
       model: {{ $modelSpec.name }}
       helm-release-name: {{ .Release.Name }}
+    {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 6 }}
     {{- include "chart.engineLabels" . | nindent 6 }}
   progressDeadlineSeconds: 1200
   template:
@@ -41,6 +43,7 @@ spec:
       labels:
         model: {{ $modelSpec.name }}
         helm-release-name: {{ .Release.Name }}
+      {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 8 }}
       {{- include "chart.engineLabels" . | nindent 8 }}
     spec:
       {{- if $modelSpec.priorityClassName }}
@@ -168,6 +171,14 @@ spec:
           - "--max_loras"
           - {{ .maxLoras | quote }}
           {{-   end }}
+          {{-   if hasKey . "runner" }}
+          - "--runner"
+          - {{ .runner | quote }}
+          {{-   end }}
+          {{-   if hasKey . "convert" }}
+          - "--convert"
+          - {{ .convert | quote }}
+          {{-   end }}
           {{-   if .extraArgs }}
           {{-     range .extraArgs }}
           - {{ . | quote }}
@@ -246,6 +257,9 @@ spec:
                 name: {{ $vllmApiKey.secretName }}
                 key: {{ $vllmApiKey.secretKey }}
             {{- end }}
+          {{- end }}
+          {{- with .Values.servingEngineSpec.env }}
+          {{- toYaml . | nindent 10 }}
           {{- end }}
           {{- with $modelSpec.env }}
           {{- toYaml . | nindent 10 }}
@@ -371,7 +385,11 @@ spec:
             - name: ucx-port
               containerPort: 9999
           {{- include "chart.probes" . | indent 10 }}
+          {{- if $modelSpec.resources }}
+          resources: {{ toYaml $modelSpec.resources | nindent 12 }}
+          {{- else }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
+          {{- end }}
           {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
           volumeMounts:
           {{- end }}
