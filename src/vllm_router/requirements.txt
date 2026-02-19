@@ -13,5 +13,5 @@ psutil==7.0.0
 python-multipart==0.0.22
 sentry-sdk[fastapi]==2.27.0
 uhashring==2.3
-uvicorn==0.34.0
+uvicorn[standard]==0.34.0
 xxhash==3.5.0
