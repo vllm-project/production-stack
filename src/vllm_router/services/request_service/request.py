@@ -391,6 +391,7 @@ async def route_general_request(
         logger.debug(
             f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
+
     elif isinstance(
         request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
     ):
@@ -407,6 +408,7 @@ async def route_general_request(
     session_key = getattr(request.app.state.router, "session_key", None)
     session_id = request.app.state.router.extract_session_id(request, request_json)
     session_id_display = session_id if session_id is not None else "None"
+
     # Debug logging to help troubleshoot session ID extraction
     logger.debug(
         f"Debug session extraction - Router type: {type(request.app.state.router).__name__}"
@@ -418,6 +420,7 @@ async def route_general_request(
     logger.info(
         f"Routing request {request_id} with session id {session_id_display} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
     )
+
     # Add backend URL to parent span
     if span is not None:
         span.set_attribute("vllm.backend_url", server_url)
