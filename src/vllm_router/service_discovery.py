@@ -50,6 +50,7 @@ class ModelInfo:
     root: Optional[str] = None
     parent: Optional[str] = None
     is_adapter: bool = False
+    max_model_len: Optional[int] = None
 
     @classmethod
     def from_dict(cls, data: Dict) -> "ModelInfo":
@@ -62,6 +63,7 @@ class ModelInfo:
             root=data.get("root", None),
             parent=data.get("parent", None),
             is_adapter=data.get("parent") is not None,
+            max_model_len=data.get("max_model_len", None),
         )
 
     def to_dict(self) -> Dict:
@@ -74,6 +76,7 @@ class ModelInfo:
             "root": self.root,
             "parent": self.parent,
             "is_adapter": self.is_adapter,
+            "max_model_len": self.max_model_len,
         }
 
 

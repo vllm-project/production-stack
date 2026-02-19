@@ -49,6 +49,7 @@ class ModelCard(OpenAIBaseModel):
     owned_by: str = "vllm"
     root: Optional[str] = None
     parent: Optional[str] = None
+    max_model_len: Optional[int] = None
 
 
 class ModelList(OpenAIBaseModel):

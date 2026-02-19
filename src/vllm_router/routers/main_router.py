@@ -157,6 +157,7 @@ async def show_models():
                 created=model_info.created,
                 owned_by=model_info.owned_by,
                 parent=model_info.parent,
+                max_model_len=model_info.max_model_len,
             )
             model_cards.append(model_card)
             existing_models.add(model_id)
