@@ -36,7 +36,10 @@ from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
     is_request_rewriter_initialized,
 )
-from vllm_router.utils import replace_model_in_request_body, update_content_length
+from vllm_router.utils import (
+    replace_model_in_request_body,
+    update_content_length,
+)
 
 try:
     # Semantic cache integration
@@ -419,7 +422,9 @@ async def route_general_request(
         f"Debug session extraction - Router type: {type(request.app.state.router).__name__}"
     )
     logger.debug(f"Debug session extraction - Session key config: {session_key}")
-    logger.debug(f"Debug session extraction - Request headers: {dict(request.headers)}")
+
+    logger.debug("Debug session extraction - Request headers: %s", request.headers)
+
     logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
 
     logger.info(

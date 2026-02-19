@@ -1,4 +1,3 @@
-import logging
 import os
 import pickle
 from typing import Any, Dict, List, Optional
@@ -6,9 +5,11 @@ from typing import Any, Dict, List, Optional
 import faiss
 import numpy as np
 
+from vllm_router.log import init_logger
+
 from .base import VectorDBAdapterBase
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 
 class FAISSAdapter(VectorDBAdapterBase):

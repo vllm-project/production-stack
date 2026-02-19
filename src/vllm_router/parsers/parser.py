@@ -13,10 +13,10 @@
 # limitations under the License.
 import argparse
 import json
-import logging
 import sys
 
 from vllm_router import utils
+from vllm_router.log import init_logger
 from vllm_router.parsers.yaml_utils import (
     read_and_process_yaml_config_file,
 )
@@ -32,7 +32,7 @@ except ImportError:
     semantic_cache_available = False
 
 
-logger = logging.getLogger(__name__)
+logger = init_logger(__name__)
 
 
 def verify_required_args_provided(args: argparse.Namespace) -> None:
