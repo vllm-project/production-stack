@@ -11,12 +11,13 @@ on:
       release_type:
         description: 'What to release'
         required: true
-        default: 'both'
+        default: 'all'
         type: choice
         options:
-          - docker_only
+          - router_only
+          - crd_only
           - helm_only
-          - both
+          - all
 
 jobs:
   release:
@@ -26,19 +27,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'both' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'all' }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Configure Git
-        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'both' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'all' }}
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Run chart-releaser
-        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'both' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'all' }}
         uses: helm/chart-releaser-action@v1.7.0
         with:
           skip_existing: false
@@ -49,7 +50,7 @@ jobs:
 
   release-docker:
     needs: release
-    if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'docker_only' || github.event.inputs.release_type == 'both' }}
+    if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'router_only' || github.event.inputs.release_type == 'crd_only' || github.event.inputs.release_type == 'all' }}
     permissions:
       contents: read
       packages: write
@@ -86,7 +87,8 @@ jobs:
           username: lmcache
           password: ${{ secrets.LMCACHE_DOCKER_SECRET }}
 
-      - name: Build and push Docker image
+      - name: Build and push router Docker image
+        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'router_only' || github.event.inputs.release_type == 'all' }}
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -100,3 +102,19 @@ jobs:
             lmcache/lmstack-router:v${{ steps.chart-version.outputs.version }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/router:buildcache,mode=max
+
+      - name: Build and push CRD controller Docker image
+        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'crd_only' || github.event.inputs.release_type == 'all' }}
+        uses: docker/build-push-action@v5
+        with:
+          context: operator
+          file: operator/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/production-stack-operator:latest
+            ghcr.io/${{ github.repository }}/production-stack-operator:v${{ steps.chart-version.outputs.version }}
+            ghcr.io/${{ github.repository }}/production-stack-operator:${{ github.sha }}
+            lmcache/production-stack-operator:latest
+            lmcache/production-stack-operator:v${{ steps.chart-version.outputs.version }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/production-stack-operator:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/production-stack-operator:buildcache,mode=max
