@@ -84,7 +84,7 @@ _HOP_BY_HOP_HEADERS = {
     "trailer",
 }
 
-_HEADERS_TO_STRIP_FROM_STREAMING_RESPONSE = {
+_HEADERS_TO_STRIP_FROM_RESPONSE = {
     "content-length",
     "content-encoding",
     "transfer-encoding",
@@ -446,7 +446,7 @@ async def route_general_request(
     headers_dict = {
         key: value
         for key, value in headers.items()
-        if key.lower() not in _HEADERS_TO_STRIP_FROM_STREAMING_RESPONSE
+        if key.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
     }
     headers_dict["X-Request-Id"] = request_id
 
@@ -810,7 +810,7 @@ async def route_general_transcriptions(
         headers = {
             k: v
             for k, v in backend_response.headers.items()
-            if k.lower() not in _HEADERS_TO_STRIP_FROM_STREAMING_RESPONSE
+            if k.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
         }
 
         headers["X-Request-Id"] = request_id
