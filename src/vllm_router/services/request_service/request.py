@@ -484,6 +484,7 @@ async def route_general_request(
         end_span(span, error=last_error, status_code=500) if tracing_active else None
         raise last_error
 
+    # Wrap the generator to end parent span when streaming completes
     async def traced_stream():
         try:
             async for chunk in stream_generator:
