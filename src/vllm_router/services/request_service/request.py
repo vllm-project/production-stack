@@ -328,7 +328,7 @@ async def route_general_request(
             )
 
     service_discovery = get_service_discovery()
-
+    endpoints = service_discovery.get_endpoint_info()
     aliases = getattr(service_discovery, "aliases", None)
     if aliases and requested_model in aliases.keys():
         requested_model = aliases[requested_model]
@@ -339,11 +339,6 @@ async def route_general_request(
     model_ever_existed = False
     if hasattr(service_discovery, "has_ever_seen_model"):
         model_ever_existed = service_discovery.has_ever_seen_model(requested_model)
-
-    # Track all valid incoming requests
-    num_incoming_requests_total.labels(model=requested_model).inc()
-
-    endpoints = service_discovery.get_endpoint_info()
 
     if not request_endpoint:
         endpoints = list(
@@ -365,6 +360,9 @@ async def route_general_request(
                 endpoints,
             )
         )
+
+    # Track all valid incoming requests
+    num_incoming_requests_total.labels(model=requested_model).inc()
 
     if not endpoints:
         if not model_ever_existed:
