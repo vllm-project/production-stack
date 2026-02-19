@@ -454,6 +454,8 @@ async def route_general_request(
                 f"Rerouting request {request_id} to {server_url} "
                 f"(attempt {attempt + 1}/{max_attempts})"
             )
+            if span is not None:
+                span.set_attribute("vllm.backend_url", server_url)
 
         try:
             stream_generator = process_request(
