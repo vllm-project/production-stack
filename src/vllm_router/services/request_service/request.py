@@ -451,7 +451,7 @@ async def route_general_request(
                     remaining, engine_stats, request_stats, request
                 )
             logger.info(
-                f"Rerouting request {request_id} to {server_url} "
+                f"Routing request {request_id} to {server_url} "
                 f"(attempt {attempt + 1}/{max_attempts})"
             )
             if span is not None:
