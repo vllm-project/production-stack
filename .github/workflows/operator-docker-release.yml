@@ -1,0 +1,56 @@
+name: Release Production Stack Operator Docker Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'operator/**'
+
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to GitHub Container Registry (GHCR)
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: lmcache
+          password: ${{ secrets.LMCACHE_DOCKER_SECRET }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: operator
+          file: operator/Dockerfile
+          push: true
+          # Unstable build on every merge to main; chart version tags come from helm-release workflow
+          tags: |
+            ghcr.io/${{ github.repository }}/production-stack-operator:latest
+            ghcr.io/${{ github.repository }}/production-stack-operator:${{ github.sha }}
+            lmcache/production-stack-operator:latest
+            lmcache/production-stack-operator:${{ github.sha }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/production-stack-operator:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/production-stack-operator:buildcache,mode=max
