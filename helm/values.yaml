@@ -90,6 +90,7 @@ servingEngineSpec:
   # - lmcacheConfig: (optional, map) The configuration of the LMCache for KV offloading, supported options are:
   #   - enabled: (optional, bool) Enable LMCache, e.g., true
   #   - cpuOffloadingBufferSize: (optional, string) The CPU offloading buffer size, e.g., "30"
+  #   - logLevel: (optional, string) The log level for LMCache, e.g., "DEBUG", "INFO", "WARNING", "ERROR"
   #
   # - hf_token: (optional) Hugging Face token configuration. Can be either:
   #   - A string containing the token directly (will be stored in a generated secret)
@@ -199,6 +200,7 @@ servingEngineSpec:
   #   lmcacheConfig:
   #     enabled: true
   #     cpuOffloadingBufferSize: "30"
+  #     logLevel: "INFO"
   #
   #   hf_token: "hf_xxxxxxxxxxxxx"
   #

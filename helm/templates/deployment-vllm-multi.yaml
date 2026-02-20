@@ -218,8 +218,6 @@ spec:
               fieldRef:
                 fieldPath: status.podIP
           {{- with $modelSpec.vllmConfig}}
-          - name: LMCACHE_LOG_LEVEL
-            value: "DEBUG"
           {{- if and (hasKey . "v0") (eq (toString $modelSpec.vllmConfig.v0) "1") }}
           - name: VLLM_USE_V1
             value: "0"
@@ -270,6 +268,10 @@ spec:
             value: "True"
           - name: VLLM_RPC_TIMEOUT
             value: "1000000"
+          {{-   if hasKey .Values.routerSpec.lmcacheConfig "logLevel" }}
+          - name: LMCACHE_LOG_LEVEL
+            value: {{ .Values.routerSpec.lmcacheConfig.logLevel | quote }}
+          {{-   end }}
           {{-   end }}
           {{- if hasKey $modelSpec.lmcacheConfig "cudaVisibleDevices" }}
           - name: CUDA_VISIBLE_DEVICES
