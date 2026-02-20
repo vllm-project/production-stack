@@ -124,6 +124,12 @@ def parse_args():
         "--port", type=int, default=8001, help="The port to run the server on."
     )
     parser.add_argument(
+        "--root-path",
+        type=str,
+        default="",
+        help="FastAPI root path for hosting under a subpath (e.g. /vllm).",
+    )
+    parser.add_argument(
         "--service-discovery",
         type=str,
         choices=["static", "k8s"],
