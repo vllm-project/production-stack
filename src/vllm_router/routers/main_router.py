@@ -68,6 +68,13 @@ async def route_chat_completion(request: Request, background_tasks: BackgroundTa
 async def route_completion(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/completions", background_tasks)
 
+@main_router.post("/v1/audio/speech")
+async def route_v1_audio_speech(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/audio/speech", background_tasks)
+
+@main_router.post("/v1/images/generations")
+async def route_v1_images_generations(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/images/generations", background_tasks)
 
 @main_router.post("/v1/embeddings")
 async def route_embeddings(request: Request, background_tasks: BackgroundTasks):
