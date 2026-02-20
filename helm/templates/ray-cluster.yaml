@@ -53,8 +53,6 @@ spec:
                 value: /tmp
                 {{- end }}
               {{- with $modelSpec.vllmConfig}}
-              - name: LMCACHE_LOG_LEVEL
-                value: "DEBUG"
               {{- if hasKey . "v1" }}
               - name: VLLM_USE_V1
                 value: {{ $modelSpec.vllmConfig.v1 | quote }}
@@ -96,6 +94,13 @@ spec:
               {{- toYaml . | nindent 14 }}
               {{- end }}
               {{- if $modelSpec.lmcacheConfig }}
+              {{-   if hasKey $modelSpec.lmcacheConfig "logLevel" }}
+              - name: LMCACHE_LOG_LEVEL
+                value: {{ $modelSpec.lmcacheConfig.logLevel | quote }}
+              {{-   else }}
+              - name: LMCACHE_LOG_LEVEL
+                value: "INFO"
+              {{-   end }}
               {{-   if $modelSpec.lmcacheConfig.enabled }}
               - name: LMCACHE_USE_EXPERIMENTAL
                 value: "True"
@@ -278,8 +283,6 @@ spec:
                   value: /tmp
                   {{- end }}
                 {{- with $modelSpec.vllmConfig}}
-                - name: LMCACHE_LOG_LEVEL
-                  value: "DEBUG"
                 {{- if hasKey . "v1" }}
                 - name: VLLM_USE_V1
                   value: {{ $modelSpec.vllmConfig.v1 | quote }}
@@ -326,6 +329,10 @@ spec:
                   value: "True"
                 - name: VLLM_RPC_TIMEOUT
                   value: "1000000"
+                {{-   if hasKey .Values.routerSpec.lmcacheConfig "logLevel" }}
+                - name: LMCACHE_LOG_LEVEL
+                  value: {{ .Values.routerSpec.lmcacheConfig.logLevel | quote }}
+                {{-   end }}
                 {{-   end }}
                 {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
                 - name: LMCACHE_LOCAL_CPU
