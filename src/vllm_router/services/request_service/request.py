@@ -376,6 +376,7 @@ async def route_general_request(
                 headers={"X-Request-Id": request_id},
             )
         else:
+            # Model existed before but is now scaled to zero
             end_span(span, status_code=503) if tracing_active else None
             return JSONResponse(
                 status_code=503,
