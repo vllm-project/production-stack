@@ -67,8 +67,12 @@ spec:
           {{- end }}
           - name: PYTHONHASHSEED
             value: "123"
+          {{- if .Values.routerSpec.lmcacheConfig }}
+          {{-   if hasKey .Values.routerSpec.lmcacheConfig "logLevel" }}
           - name: LMCACHE_LOG_LEVEL
-            value: "DEBUG"
+            value: {{ .Values.routerSpec.lmcacheConfig.logLevel | quote }}
+          {{-   end }}
+          {{- end }}
           {{- if .Values.servingEngineSpec.enableEngine -}}
           {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
           {{- if $vllmApiKey }}
