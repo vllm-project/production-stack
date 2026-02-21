@@ -1,0 +1,68 @@
+suite: test PVC configuration
+templates:
+  - pvc.yaml
+tests:
+  - it: should set default values
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            pvcStorage: "50Gi"
+    asserts:
+      - template: pvc.yaml
+        equal:
+          path: spec.accessModes
+          value:
+            - ReadWriteOnce
+      - template: pvc.yaml
+        equal:
+          path: spec.resources.requests.storage
+          value: "50Gi"
+      - template: pvc.yaml
+        notExists:
+          path: metadata.annotations
+      - template: pvc.yaml
+        notExists:
+          path: metadata.labels
+
+  - it: should set custom values
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            pvcStorage: "100Gi"
+            pvcLabels:
+              label_excluded_from_alerts: "true"
+            pvcAnnotations:
+              annotation_example: "value"
+            pvcAccessMode:
+              - ReadWriteMany
+            pvcMatchLabels:
+              model: "mistral"
+    asserts:
+      - template: pvc.yaml
+        equal:
+          path: spec.accessModes
+          value:
+            - ReadWriteMany
+      - template: pvc.yaml
+        equal:
+          path: spec.resources.requests.storage
+          value: "100Gi"
+      - template: pvc.yaml
+        equal:
+          path: metadata.annotations
+          value:
+            annotation_example: "value"
+      - template: pvc.yaml
+        equal:
+          path: metadata.labels
+          value:
+            label_excluded_from_alerts: "true"
+      - template: pvc.yaml
+        equal:
+          path: spec.selector.matchLabels
+          value:
+            model: "mistral"

@@ -1,0 +1,79 @@
+suite: test extra objects configuration
+templates:
+  - extra-objects.yaml
+tests:
+  - it: should not render extra objects
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render extra objects without templating
+    set:
+      extraObjects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: test-configmap
+          data:
+            key: value
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: test-configmap2
+          data:
+            key: value
+    asserts:
+    - hasDocuments:
+        count: 2
+    - documentIndex: 0
+      equal:
+        path: metadata.name
+        value: test-configmap
+    - documentIndex: 0
+      equal:
+        path: data.key
+        value: value
+    - documentIndex: 1
+      equal:
+        path: metadata.name
+        value: test-configmap2
+    - documentIndex: 1
+      equal:
+        path: data.key
+        value: value
+
+  - it: should render extra objects with templating
+    set:
+      random_value: templated-value
+      extraObjects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: test-configmap
+          data:
+            key: value
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: test-configmap2
+          data:
+            key: "{{ .Values.random_value }}"
+    asserts:
+    - hasDocuments:
+        count: 2
+    - documentIndex: 0
+      equal:
+        path: metadata.name
+        value: test-configmap
+    - documentIndex: 0
+      equal:
+        path: data.key
+        value: value
+    - documentIndex: 1
+      equal:
+        path: metadata.name
+        value: test-configmap2
+    - documentIndex: 1
+      equal:
+        path: data.key
+        value: templated-value
