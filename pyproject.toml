@@ -29,6 +29,8 @@ dependencies = [
     "opentelemetry-api>=1.28.0",
     "opentelemetry-sdk>=1.28.0",
     "opentelemetry-exporter-otlp>=1.28.0",
+    "h11>=0.16.0",  # fix critical vulnerability GHSA-vqfr-h8mv-ghfj
+    "httpcore>=1.0.8",  # required for h11>=0.16.0
 ]
 
 [project.scripts]

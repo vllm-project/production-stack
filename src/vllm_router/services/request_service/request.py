@@ -87,6 +87,13 @@ _HOP_BY_HOP_HEADERS = {
     "trailer",
 }
 
+_HEADERS_TO_STRIP_FROM_RESPONSE = {
+    "content-length",
+    "content-encoding",
+    "transfer-encoding",
+    "connection",
+}
+
 
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
@@ -441,7 +448,11 @@ async def route_general_request(
         parent_span_context=span_context,
     )
     headers, status = await anext(stream_generator)
-    headers_dict = {key: value for key, value in headers.items()}
+    headers_dict = {
+        key: value
+        for key, value in headers.items()
+        if key.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
+    }
     headers_dict["X-Request-Id"] = request_id
 
     # Wrap the generator to end parent span when streaming completes
@@ -804,13 +815,7 @@ async def route_general_transcriptions(
         headers = {
             k: v
             for k, v in backend_response.headers.items()
-            if k.lower()
-            not in (
-                "content-length",
-                "content-encoding",
-                "transfer-encoding",
-                "connection",
-            )
+            if k.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
         }
 
         headers["X-Request-Id"] = request_id
