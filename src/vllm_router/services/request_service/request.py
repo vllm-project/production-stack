@@ -476,7 +476,11 @@ async def route_general_request(
                 parent_span_context=span_context,
             )
             headers, status = await anext(stream_generator)
-            headers_dict = {key: value for key, value in headers.items()}
+            headers_dict = {
+                key: value
+                for key, value in headers.items()
+                if key.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
+            }
             headers_dict["X-Request-Id"] = request_id
             last_error = None
             break
