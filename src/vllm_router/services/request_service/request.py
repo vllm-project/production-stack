@@ -488,10 +488,6 @@ async def send_request_to_prefiller(
     client, endpoint: str, req_data: dict, request_id: str
 ):
     """Send a request to a prefiller service using aiohttp."""
-    from vllm_router.log import init_logger
-
-    logger = init_logger(__name__)
-
     req_data = req_data.copy()
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
@@ -554,60 +550,6 @@ async def route_disaggregated_prefill_request(
 
     orig_max_tokens = request_json.get("max_tokens", 0)
     stream_options = request_json.pop("stream_options", None)
-
-    # Check if client sessions are initialized, if not, try to initialize them
-    if (
-        not hasattr(request.app.state, "prefill_client")
-        or request.app.state.prefill_client is None
-    ):
-        logger.warning(
-            "prefill_client not initialized, attempting to initialize client sessions"
-        )
-        try:
-            from vllm_router.service_discovery import get_service_discovery
-
-            service_discovery = get_service_discovery()
-            if hasattr(service_discovery, "initialize_client_sessions"):
-                logger.info(
-                    "In route_disaggregated_prefill_request: Calling initialize_client_sessions"
-                )
-                await service_discovery.initialize_client_sessions()
-                logger.info("Successfully initialized client sessions")
-            else:
-                logger.error(
-                    "Service discovery does not have initialize_client_sessions method"
-                )
-        except Exception as e:
-            logger.error(f"Failed to initialize client sessions: {e}", exc_info=True)
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "error": {
-                        "message": f"Failed to initialize client sessions: {str(e)}",
-                        "type": "initialization_error",
-                        "code": 500,
-                    }
-                },
-                headers={"X-Request-Id": request_id},
-            )
-
-    # Final check
-    if (
-        not hasattr(request.app.state, "prefill_client")
-        or request.app.state.prefill_client is None
-    ):
-        logger.error("prefill_client still not available after initialization attempt")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": {
-                    "message": "Disaggregated prefill is not properly configured. prefill_client is not available.",
-                    "type": "configuration_error",
-                    "code": 500,
-                }
-            },
-            headers={"X-Request-Id": request_id},
-        )
 
     st = time.time()
     try:
