@@ -47,13 +47,10 @@ from vllm_router.service_discovery import (
 from vllm_router.services.batch_service import initialize_batch_processor
 from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
-from vllm_router.services.request_service.request import (
-    start_zmq_task,
-    stop_zmq_task,
-)
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
 )
+from vllm_router.services.request_service.zmq_proxy import ZmqProxy
 from vllm_router.stats.engine_stats import (
     get_engine_stats_scraper,
     initialize_engine_stats_scraper,
@@ -127,14 +124,14 @@ async def lifespan(app: FastAPI):
             "Starting ZMQ task because the routing logic is"
             " RoutingLogic.DISAGGREGATED_PREFILL"
         )
-        await start_zmq_task(
+        app.state.zmq_proxy = ZmqProxy()
+        await app.state.zmq_proxy.start(
             app.state.args.nixl_proxy_host, app.state.args.nixl_proxy_port
         )
 
         yield
 
-        # Stop the ZMQ task
-        await stop_zmq_task()
+        await app.state.zmq_proxy.stop()
     else:
         yield
 

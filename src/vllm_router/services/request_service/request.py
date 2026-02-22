@@ -42,20 +42,6 @@ from vllm_router.utils import (
 )
 
 try:
-    from lmcache.v1.storage_backend.connector.nixl_connector_v3 import (
-        NixlMsg,
-    )
-except ImportError:
-    try:
-        from lmcache.v1.storage_backend.pd_backend import ProxyNotif as NixlMsg
-    except ImportError:
-        import msgspec as _msgspec
-
-        class NixlMsg(_msgspec.Struct):
-            req_id: str
-
-
-try:
     # Semantic cache integration
     from vllm_router.experimental.semantic_cache_integration import (
         store_in_semantic_cache,
@@ -100,13 +86,6 @@ _HOP_BY_HOP_HEADERS = {
     "te",  # codespell:ignore
     "trailer",
 }
-
-
-from vllm_router.services.request_service.zmq_proxy import (  # noqa: E402
-    start_zmq_task,
-    stop_zmq_task,
-    wait_decode_kv_ready,
-)
 
 
 # TODO: (Brian) check if request is json beforehand
@@ -694,7 +673,7 @@ async def route_disaggregated_prefill_request(
                 "data: " + json.dumps(head_chunk, separators=(",", ":")) + "\n\n"
             ).encode()
 
-            await wait_decode_kv_ready(request_id)
+            await request.app.state.zmq_proxy.wait_kv_ready(request_id)
 
             # Stream the rest from decode service
             async for chunk in send_request_to_decode(
