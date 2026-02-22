@@ -17,10 +17,9 @@ servingEngineSpec:
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "60"
+      lmcacheConfig: DEBUG
 
-    env:
-      - name: LMCACHE_LOG_LEVEL
-        value: "DEBUG"
+    env: []
     hf_token: <hf-token>
 
 routerSpec:

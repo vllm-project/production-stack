@@ -93,19 +93,13 @@ spec:
               {{- with $modelSpec.env }}
               {{- toYaml . | nindent 14 }}
               {{- end }}
-              {{- if $modelSpec.lmcacheConfig }}
-              {{-   if hasKey $modelSpec.lmcacheConfig "logLevel" }}
-              - name: LMCACHE_LOG_LEVEL
-                value: {{ $modelSpec.lmcacheConfig.logLevel | quote }}
-              {{-   else }}
-              - name: LMCACHE_LOG_LEVEL
-                value: "INFO"
-              {{-   end }}
               {{-   if $modelSpec.lmcacheConfig.enabled }}
               - name: LMCACHE_USE_EXPERIMENTAL
                 value: "True"
               - name: VLLM_RPC_TIMEOUT
                 value: "1000000"
+              - name: LMCACHE_LOG_LEVEL
+                value: {{ $modelSpec.lmcacheConfig.logLevel | default "INFO" | quote }}
               {{-   end }}
               {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
               - name: LMCACHE_LOCAL_CPU
@@ -329,10 +323,8 @@ spec:
                   value: "True"
                 - name: VLLM_RPC_TIMEOUT
                   value: "1000000"
-                {{-   if hasKey $modelSpec.lmcacheConfig "logLevel" }}
                 - name: LMCACHE_LOG_LEVEL
-                  value: {{ $modelSpec.lmcacheConfig.logLevel | quote }}
-                {{-   end }}
+                  value: {{ $modelSpec.lmcacheConfig.logLevel | default "INFO" | quote }}
                 {{-   end }}
                 {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
                 - name: LMCACHE_LOCAL_CPU

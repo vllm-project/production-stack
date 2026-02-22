@@ -268,10 +268,8 @@ spec:
             value: "True"
           - name: VLLM_RPC_TIMEOUT
             value: "1000000"
-          {{-   if hasKey .Values.modelSpec.lmcacheConfig "logLevel" }}
           - name: LMCACHE_LOG_LEVEL
-            value: {{ .Values.routerSpec.lmcacheConfig.logLevel | quote }}
-          {{-   end }}
+            value: {{ .$modelSpec.lmcacheConfig.logLevel | default "INFO" | quote }}
           {{-   end }}
           {{- if hasKey $modelSpec.lmcacheConfig "cudaVisibleDevices" }}
           - name: CUDA_VISIBLE_DEVICES
