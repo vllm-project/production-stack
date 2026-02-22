@@ -329,9 +329,9 @@ spec:
                   value: "True"
                 - name: VLLM_RPC_TIMEOUT
                   value: "1000000"
-                {{-   if hasKey .Values.routerSpec.lmcacheConfig "logLevel" }}
+                {{-   if hasKey $modelSpec.lmcacheConfig "logLevel" }}
                 - name: LMCACHE_LOG_LEVEL
-                  value: {{ .Values.routerSpec.lmcacheConfig.logLevel | quote }}
+                  value: {{ $modelSpec.lmcacheConfig.logLevel | quote }}
                 {{-   end }}
                 {{-   end }}
                 {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
