@@ -167,7 +167,9 @@ def test_validate_static_model_types_when_model_types_contains_only_supported_mo
     parser.validate_static_model_types("chat,completion,rerank,score")
 
 
-def test_parse_args_log_format_defaults_to_text(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parse_args_log_format_defaults_to_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         sys,
         "argv",

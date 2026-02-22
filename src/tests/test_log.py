@@ -306,7 +306,7 @@ class TestJsonFormatter:
             args=(),
             exc_info=None,
         )
-        record.stack_info = "Stack (most recent call last):\n  File \"test.py\""
+        record.stack_info = 'Stack (most recent call last):\n  File "test.py"'
         output = formatter.format(record)
         parsed = json.loads(output)
         assert "stack_info" in parsed
