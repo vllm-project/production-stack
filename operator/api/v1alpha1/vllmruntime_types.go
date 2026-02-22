@@ -53,6 +53,44 @@ type DeploymentConfig struct {
 
 // VLLMRuntimeSpec defines the desired state of VLLMRuntime
 type VLLMRuntimeSpec struct {
+	// Enable PD (Prefill-Decode) disaggregation
+	// When true, creates separate prefill and decode deployments
+	// When false, creates a single unified deployment (legacy behavior)
+	// +kubebuilder:default=false
+	EnablePDDisaggregation bool `json:"enablePDDisaggregation,omitempty"`
+
+	// Topology configuration for PD disaggregation (only used when EnablePDDisaggregation=true)
+	// If EnablePDDisaggregation=false, the legacy fields below are used instead
+	Topology *TopologySpec `json:"topology,omitempty"`
+
+	// Legacy fields (used when EnablePDDisaggregation=false)
+	// Model configuration
+	Model ModelSpec `json:"model,omitempty"`
+
+	// vLLM server configuration
+	VLLMConfig VLLMConfig `json:"vllmConfig,omitempty"`
+
+	// LM Cache configuration
+	LMCacheConfig LMCacheConfig `json:"lmCacheConfig,omitempty"`
+
+	// Storage configuration
+	StorageConfig StorageConfig `json:"storageConfig,omitempty"`
+
+	// Deployment configuration
+	DeploymentConfig DeploymentConfig `json:"deploymentConfig,omitempty"`
+}
+
+// TopologySpec defines the PD disaggregation topology
+type TopologySpec struct {
+	// Prefill node config
+	Prefill NodeConfig `json:"prefill"`
+
+	// Decode node config
+	Decode NodeConfig `json:"decode"`
+}
+
+// NodeConfig defines configuration for a node (prefill or decode)
+type NodeConfig struct {
 	// Model configuration
 	Model ModelSpec `json:"model"`
 
@@ -159,6 +197,51 @@ type LMCacheConfig struct {
 
 	// RemoteSerde is the serialization format for the remote cache
 	RemoteSerde string `json:"remoteSerde,omitempty"`
+
+	// KV role for kv store (used in PD disaggregation)
+	KVRole string `json:"kvRole,omitempty"`
+
+	// Local CPU for kv store
+	LocalCPU string `json:"localCpu,omitempty"`
+
+	// Max local CPU size for kv store
+	MaxLocalCPUSize int `json:"maxLocalCpuSize,omitempty"`
+
+	// Enable Nixl
+	EnableNixl bool `json:"enableNixl,omitempty"`
+
+	// Enable Xpyd
+	EnableXpyd bool `json:"enableXpyd,omitempty"`
+
+	// Nixl role
+	NixlRole string `json:"nixlRole,omitempty"`
+
+	// Nixl proxy host (for prefill)
+	NixlProxyHost string `json:"nixlProxyHost,omitempty"`
+
+	// Nixl proxy port (for prefill)
+	NixlProxyPort string `json:"nixlProxyPort,omitempty"`
+
+	// Nixl peer host (for decode)
+	NixlPeerHost string `json:"nixlPeerHost,omitempty"`
+
+	// Nixl peer init port (for decode)
+	NixlPeerInitPort string `json:"nixlPeerInitPort,omitempty"`
+
+	// Nixl peer alloc port (for decode)
+	NixlPeerAllocPort string `json:"nixlPeerAllocPort,omitempty"`
+
+	// Nixl buffer size
+	NixlBufferSize string `json:"nixlBufferSize,omitempty"`
+
+	// Nixl buffer device
+	NixlBufferDevice string `json:"nixlBufferDevice,omitempty"`
+
+	// RPC port
+	RPCPort string `json:"rpcPort,omitempty"`
+
+	// Skip last N tokens (for decode)
+	SkipLastNTokens int `json:"skipLastNTokens,omitempty"`
 }
 
 // StorageConfig defines the storage configuration
@@ -236,6 +319,7 @@ type VLLMRuntimeStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=vr
+// +kubebuilder:storageversion
 
 // VLLMRuntime is the Schema for the vllmruntimes API
 type VLLMRuntime struct {

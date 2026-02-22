@@ -23,7 +23,8 @@ RUN pip install --no-cache-dir uv && \
     uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
     uv pip install --upgrade --no-cache-dir pip setuptools_scm && \
-    uv pip install --no-cache-dir .[$INSTALL_OPTIONAL_DEP]
+    uv pip install --no-cache-dir .[$INSTALL_OPTIONAL_DEP] && \
+    uv pip install --no-cache-dir zmq msgspec
 
 # Set the entrypoint
 ENTRYPOINT ["/opt/venv/bin/vllm-router"]

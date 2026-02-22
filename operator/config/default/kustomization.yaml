@@ -42,7 +42,12 @@ patches:
       kind: Deployment
 
   # Set the controller image
-  - path: manager_image_patch.yaml
+  # - path: manager_image_patch.yaml
+  #   target:
+  #     kind: Deployment
+
+  # Set image pull policy to IfNotPresent for local images
+  - path: manager_pull_policy_patch.yaml
     target:
       kind: Deployment
 

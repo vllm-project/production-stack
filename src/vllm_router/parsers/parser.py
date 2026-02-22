@@ -13,10 +13,10 @@
 # limitations under the License.
 import argparse
 import json
+import logging
 import sys
 
 from vllm_router import utils
-from vllm_router.log import init_logger
 from vllm_router.parsers.yaml_utils import (
     read_and_process_yaml_config_file,
 )
@@ -32,7 +32,7 @@ except ImportError:
     semantic_cache_available = False
 
 
-logger = init_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def verify_required_args_provided(args: argparse.Namespace) -> None:
@@ -411,6 +411,35 @@ def parse_args():
         type=int,
         default=30,
         help="Timeout for LMCache worker (seconds)",
+    )
+
+    parser.add_argument(
+        "--nixl-peer-host",
+        type=str,
+        help="The hostname or IP address of the NIXL peer service. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-peer-init-port",
+        type=int,
+        default=7300,
+        help="The initialization port for the NIXL peer service. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-peer-alloc-port",
+        type=int,
+        default=7400,
+        help="The allocation port for the NIXL peer service. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-proxy-host",
+        type=str,
+        help="The hostname or IP address for the NIXL proxy server. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-proxy-port",
+        type=int,
+        default=7500,
+        help="The port for the NIXL proxy server. Only use for DisaggregatedPrefillRouter.",
     )
 
     args = parser.parse_args()
