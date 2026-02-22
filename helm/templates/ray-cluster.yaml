@@ -93,6 +93,7 @@ spec:
               {{- with $modelSpec.env }}
               {{- toYaml . | nindent 14 }}
               {{- end }}
+              {{- if $modelSpec.lmcacheConfig }}
               {{-   if $modelSpec.lmcacheConfig.enabled }}
               - name: LMCACHE_USE_EXPERIMENTAL
                 value: "True"
