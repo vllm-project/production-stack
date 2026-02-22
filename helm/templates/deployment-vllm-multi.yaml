@@ -269,7 +269,7 @@ spec:
           - name: VLLM_RPC_TIMEOUT
             value: "1000000"
           - name: LMCACHE_LOG_LEVEL
-            value: {{ .$modelSpec.lmcacheConfig.logLevel | default "INFO" | quote }}
+            value: {{ $modelSpec.lmcacheConfig.logLevel | default "INFO" | quote }}
           {{-   end }}
           {{- if hasKey $modelSpec.lmcacheConfig "cudaVisibleDevices" }}
           - name: CUDA_VISIBLE_DEVICES
