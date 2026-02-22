@@ -26,7 +26,7 @@ from vllm_router.dynamic_config import (
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
-from vllm_router.log import init_logger, set_log_level
+from vllm_router.log import JsonFormatter, init_logger, set_log_format, set_log_level
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
@@ -334,6 +334,7 @@ app.state.otel_enabled = False
 def main():
     args = parse_args()
     set_log_level(args.log_level)
+    set_log_format(args.log_format)
     initialize_all(app, args)
     if args.log_stats:
         threading.Thread(
@@ -348,7 +349,57 @@ def main():
     # Workaround to avoid footguns where uvicorn drops requests with too
     # many concurrent requests active.
     set_ulimit()
-    uvicorn.run(app, host=args.host, port=args.port, log_level=args.log_level)
+
+    uvicorn_kwargs = {
+        "host": args.host,
+        "port": args.port,
+        "log_level": args.log_level,
+    }
+    if args.log_format == "json":
+        # Map 'trace' to 'DEBUG' since TRACE is not a standard Python
+        # logging level and would cause dictConfig to fail.
+        uvicorn_log_level = (
+            "DEBUG" if args.log_level == "trace" else args.log_level.upper()
+        )
+        uvicorn_kwargs["log_config"] = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "json": {
+                    "()": JsonFormatter,
+                },
+            },
+            "handlers": {
+                "default": {
+                    "formatter": "json",
+                    "class": "logging.StreamHandler",
+                    "stream": "ext://sys.stdout",
+                },
+                "access": {
+                    "formatter": "json",
+                    "class": "logging.StreamHandler",
+                    "stream": "ext://sys.stdout",
+                },
+            },
+            "loggers": {
+                "uvicorn": {
+                    "handlers": ["default"],
+                    "level": uvicorn_log_level,
+                    "propagate": False,
+                },
+                "uvicorn.error": {
+                    "handlers": ["default"],
+                    "level": uvicorn_log_level,
+                    "propagate": False,
+                },
+                "uvicorn.access": {
+                    "handlers": ["access"],
+                    "level": uvicorn_log_level,
+                    "propagate": False,
+                },
+            },
+        }
+    uvicorn.run(app, **uvicorn_kwargs)
 
 
 if __name__ == "__main__":
