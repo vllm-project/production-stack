@@ -348,7 +348,6 @@ async def route_general_request(
                 status_code=400, detail="Request body is not JSON parsable."
             )
 
-    # TODO (ApostaC): merge two awaits into one
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
 
