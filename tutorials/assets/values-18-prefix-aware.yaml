@@ -17,7 +17,7 @@ servingEngineSpec:
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "60"
-      lmcacheConfig: DEBUG
+      logLevel: "DEBUG"
 
     env: []
     hf_token: <hf-token>
