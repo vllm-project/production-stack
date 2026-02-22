@@ -324,7 +324,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
 
     async def initialize_client_sessions(self) -> None:
         """
-        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        Initialize aiohttp client sessions for prefill and decode endpoints.
         This must be called from an async context during app startup.
         """
         if (
@@ -725,23 +725,27 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
-        if self.event_loop_ready.is_set() and self.event_loop is not None:
-            try:
-                fut = asyncio.run_coroutine_threadsafe(
-                    self.initialize_client_sessions(),
-                    self.event_loop,
-                )
-                fut.result()
-            except Exception as e:
-                logger.error(f"Error initializing client sessions: {e}")
-        else:
-            logger.debug(
-                "Event loop not ready; deferring client session initialization"
-            )
-
         # Track all models we've ever seen
         with self.known_models_lock:
             self.known_models.update(model_names)
+
+        # Initialize client sessions only if event_loop is available
+        try:
+            if hasattr(self.app.state, "event_loop") and self.app.state.event_loop:
+                fut = asyncio.run_coroutine_threadsafe(
+                    self.initialize_client_sessions(), self.app.state.event_loop
+                )
+                fut.result()
+                logger.info("Client sessions initialized successfully in _add_engine")
+            else:
+                # Event loop not ready yet, client sessions will be initialized in lifespan
+                logger.debug(
+                    "Event loop not ready in _add_engine, client sessions will be initialized later"
+                )
+        except Exception as e:
+            logger.error(
+                f"Error initializing client sessions in _add_engine: {e}", exc_info=True
+            )
 
     def _delete_engine(self, engine_name: str):
         logger.info(f"Serving engine {engine_name} is deleted")
@@ -819,15 +823,22 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
 
     async def initialize_client_sessions(self) -> None:
         """
-        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        Initialize aiohttp client sessions for prefill and decode endpoints.
         This must be called from an async context during app startup.
         """
+        logger.info(
+            f"initialize_client_sessions called. prefill_model_labels={self.prefill_model_labels}, decode_model_labels={self.decode_model_labels}"
+        )
         if (
             self.prefill_model_labels is not None
             and self.decode_model_labels is not None
         ):
             endpoint_infos = self.get_endpoint_info()
+            logger.info(f"Got {len(endpoint_infos)} endpoints")
             for endpoint_info in endpoint_infos:
+                logger.info(
+                    f"Checking endpoint: url={endpoint_info.url}, model_label={endpoint_info.model_label}"
+                )
                 if endpoint_info.model_label in self.prefill_model_labels:
                     if (
                         hasattr(self.app.state, "prefill_client")
@@ -838,6 +849,10 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
+                    logger.info(
+                        f"Created prefill_client for {endpoint_info.url} with timeout=None"
+                    )
+
                 elif endpoint_info.model_label in self.decode_model_labels:
                     if (
                         hasattr(self.app.state, "decode_client")
@@ -848,6 +863,13 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
+                    logger.info(
+                        f"Created decode_client for {endpoint_info.url} with timeout=None"
+                    )
+        else:
+            logger.warning(
+                "prefill_model_labels or decode_model_labels is None, skipping client session initialization"
+            )
 
     def has_ever_seen_model(self, model_name: str) -> bool:
         """Check if we've ever seen this model, even if currently scaled to zero."""
@@ -1181,6 +1203,21 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             # Store model information in the endpoint info
             self.available_engines[engine_name].model_info = model_info
 
+        try:
+            # Only initialize client sessions if event_loop is available
+            if hasattr(self.app.state, "event_loop") and self.app.state.event_loop:
+                fut = asyncio.run_coroutine_threadsafe(
+                    self.initialize_client_sessions(), self.app.state.event_loop
+                )
+                fut.result()
+            else:
+                # Event loop not ready yet, client sessions will be initialized in lifespan
+                logger.debug(
+                    "Event loop not ready, client sessions will be initialized later"
+                )
+        except Exception as e:
+            logger.error(f"Error initializing client sessions: {e}")
+
     def _delete_engine(self, engine_name: str):
         logger.info(f"Serving engine {engine_name} is deleted")
         with self.available_engines_lock:
@@ -1256,25 +1293,52 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
 
     async def initialize_client_sessions(self) -> None:
         """
-        Initialize aiohttp ClientSession objects for prefill and decode endpoints.
+        Initialize aiohttp client sessions for prefill and decode endpoints.
         This must be called from an async context during app startup.
         """
+        logger.info(
+            f"K8sServiceNameServiceDiscovery.initialize_client_sessions called. prefill_model_labels={self.prefill_model_labels}, decode_model_labels={self.decode_model_labels}"
+        )
         if (
             self.prefill_model_labels is not None
             and self.decode_model_labels is not None
         ):
             endpoint_infos = self.get_endpoint_info()
+            logger.info(f"Got {len(endpoint_infos)} endpoints")
             for endpoint_info in endpoint_infos:
+                logger.info(
+                    f"Checking endpoint: url={endpoint_info.url}, model_label={endpoint_info.model_label}"
+                )
                 if endpoint_info.model_label in self.prefill_model_labels:
+                    if (
+                        hasattr(self.app.state, "prefill_client")
+                        and self.app.state.prefill_client is not None
+                    ):
+                        await self.app.state.prefill_client.close()
                     self.app.state.prefill_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
+                    logger.info(
+                        f"Created prefill_client for {endpoint_info.url} with timeout=None"
+                    )
                 elif endpoint_info.model_label in self.decode_model_labels:
+                    if (
+                        hasattr(self.app.state, "decode_client")
+                        and self.app.state.decode_client is not None
+                    ):
+                        await self.app.state.decode_client.close()
                     self.app.state.decode_client = aiohttp.ClientSession(
                         base_url=endpoint_info.url,
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
+                    logger.info(
+                        f"Created decode_client for {endpoint_info.url} with timeout=None"
+                    )
+        else:
+            logger.warning(
+                "K8sServiceNameServiceDiscovery: prefill_model_labels or decode_model_labels is None, skipping client session initialization"
+            )
 
 
 def _create_service_discovery(
