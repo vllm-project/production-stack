@@ -37,13 +37,16 @@ def set_log_level(level_str: str) -> None:
 def set_log_format(format_str: str) -> None:
     global _LOG_FORMAT
     _LOG_FORMAT = format_str.lower()
-    formatter = JsonFormatter() if _LOG_FORMAT == "json" else None
+    if _LOG_FORMAT == "json":
+        formatter = JsonFormatter()
+    else:
+        formatter = CustomFormatter()
     for logger in _loggers:
         for handler in logger.handlers:
             if _LOG_FORMAT == "json":
                 handler.setFormatter(formatter)
             elif isinstance(handler.formatter, JsonFormatter):
-                handler.setFormatter(CustomFormatter())
+                handler.setFormatter(formatter)
 
 
 def build_format(color):
@@ -86,7 +89,9 @@ class JsonFormatter(logging.Formatter):
         }
         if record.exc_info and record.exc_info[0] is not None:
             log_record["exception"] = self.formatException(record.exc_info)
-        return json.dumps(log_record)
+        if record.stack_info:
+            log_record["stack_info"] = self.formatStack(record.stack_info)
+        return json.dumps(log_record, default=str)
 
 
 class MaxLevelFilter(logging.Filter):

@@ -295,6 +295,38 @@ class TestJsonFormatter:
         for handler in logger.handlers:
             assert isinstance(handler.formatter, log.CustomFormatter)
 
+    def test_json_formatter_includes_stack_info(self, formatter):
+        """Test that stack_info is included when present."""
+        record = logging.LogRecord(
+            name="test",
+            level=logging.ERROR,
+            pathname="test.py",
+            lineno=1,
+            msg="stack trace",
+            args=(),
+            exc_info=None,
+        )
+        record.stack_info = "Stack (most recent call last):\n  File \"test.py\""
+        output = formatter.format(record)
+        parsed = json.loads(output)
+        assert "stack_info" in parsed
+        assert "test.py" in parsed["stack_info"]
+
+    def test_json_formatter_handles_non_serializable_default_str(self, formatter):
+        """Test that non-serializable objects are handled via default=str."""
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="msg: %s",
+            args=(object(),),
+            exc_info=None,
+        )
+        output = formatter.format(record)
+        parsed = json.loads(output)
+        assert "message" in parsed
+
     def test_init_logger_respects_json_format(self):
         """Test that init_logger uses JsonFormatter when _LOG_FORMAT is 'json'."""
         log._LOG_FORMAT = "json"
