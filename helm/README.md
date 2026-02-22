@@ -155,6 +155,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlPeerHost` | string | `"decode-service"` | NIXL peer host for KV transfer |
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlPeerPort` | string | `"55555"` | NIXL peer port for KV transfer |
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlBufferSize` | string | `"1073741824"` | NIXL buffer size for KV transfer |
+| `servingEngineSpec.modelSpec[].lmcacheConfig.logLevel` | string | `"info"` | Log level for LMCache |
 
 #### KEDA Autoscaling Configuration
 
@@ -225,6 +226,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
 | `routerSpec.hf_token` | string | `""`| Hugging Face token for router |
 | `routerSpec.lmcacheControllerPort` | string |`"8000"`|LMCache controller port |
+| `routerSpec.lmcacheConfig.logLevel` | string | `"INFO"`| Log level for LMCache in the router when routingLogic is kwaware |
 | `routerSpec.livenessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's liveness probe |
 | `routerSpec.livenessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's liveness probe |
 | `routerSpec.livenessProbe.failureThreshold` | integer |`3`| Failure threshold for router's liveness probe |
