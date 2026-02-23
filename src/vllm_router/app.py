@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import logging
 import threading
 from contextlib import asynccontextmanager
 
@@ -26,13 +27,14 @@ from vllm_router.dynamic_config import (
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
-from vllm_router.log import init_logger, set_log_level
+from vllm_router.log import set_log_level
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
 from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
 from vllm_router.routers.routing_logic import (
+    DisaggregatedPrefillRouter,
     cleanup_routing_logic,
     get_routing_logic,
     initialize_routing_logic,
@@ -48,6 +50,7 @@ from vllm_router.services.files_service import initialize_storage
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
 )
+from vllm_router.services.request_service.zmq_proxy import ZmqProxy
 from vllm_router.stats.engine_stats import (
     get_engine_stats_scraper,
     initialize_engine_stats_scraper,
@@ -91,12 +94,16 @@ try:
 except ImportError:
     otel_available = False
 
-logger = init_logger(__name__)
+logger = logging.getLogger("uvicorn")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.aiohttp_client_wrapper.start()
+
+    # Set event_loop early so it's available for service discovery
+    app.state.event_loop = asyncio.get_event_loop()
+
     if hasattr(app.state, "batch_processor"):
         await app.state.batch_processor.initialize()
 
@@ -111,7 +118,23 @@ async def lifespan(app: FastAPI):
     if hasattr(service_discovery, "initialize_client_sessions"):
         await service_discovery.initialize_client_sessions()
 
-    yield
+    # only start the ZMQ task if the routing logic is RoutingLogic.DISAGGREGATED_PREFILL
+    if isinstance(app.state.router, DisaggregatedPrefillRouter):
+        logger.info(
+            "Starting ZMQ task because the routing logic is"
+            " RoutingLogic.DISAGGREGATED_PREFILL"
+        )
+        app.state.zmq_proxy = ZmqProxy()
+        await app.state.zmq_proxy.start(
+            app.state.args.nixl_proxy_host, app.state.args.nixl_proxy_port
+        )
+
+        yield
+
+        await app.state.zmq_proxy.stop()
+    else:
+        yield
+
     await app.state.aiohttp_client_wrapper.stop()
 
     # Close the threaded-components
@@ -209,8 +232,16 @@ def initialize_all(app: FastAPI, args):
             namespace=args.k8s_namespace,
             port=args.k8s_port,
             label_selector=args.k8s_label_selector,
-            prefill_model_labels=args.prefill_model_labels,
-            decode_model_labels=args.decode_model_labels,
+            prefill_model_labels=(
+                parse_comma_separated_args(args.prefill_model_labels)
+                if args.prefill_model_labels
+                else None
+            ),
+            decode_model_labels=(
+                parse_comma_separated_args(args.decode_model_labels)
+                if args.decode_model_labels
+                else None
+            ),
             watcher_timeout_seconds=args.k8s_watcher_timeout_seconds,
             health_check_timeout_seconds=args.backend_health_check_timeout_seconds,
         )
@@ -319,6 +350,7 @@ def initialize_all(app: FastAPI, args):
     app.state.request_stats_monitor = get_request_stats_monitor()
     app.state.router = get_routing_logic()
     app.state.request_rewriter = get_request_rewriter()
+    app.state.args = args
 
 
 app = FastAPI(lifespan=lifespan)
