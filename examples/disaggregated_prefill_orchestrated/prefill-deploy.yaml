@@ -103,9 +103,9 @@ spec:
               value: "DEBUG"
             # TODO: Update model paths
             - name: MODEL_ID
-              value: "/var/mdl/<your-model-path>"
+              value: "/var/mdl/YOUR-MODEL-PATH"
             - name: SERVED_MODEL_NAME
-              value: "<your-model-name>"
+              value: "YOUR-MODEL-NAME"
             - name: HF_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -131,7 +131,7 @@ spec:
               # pip install vllm  # or custom installation
               
               # TODO: Install dependencies from PVC if needed
-              # pip install /var/mdl/<your-deps-path>/your-packages.whl
+              # pip install /var/mdl/YOUR-DEPS-PATH/your-packages.whl
 
               # Start vLLM server with KV transfer enabled
               # TODO: Update the server start command for your setup
@@ -151,4 +151,4 @@ spec:
         # TODO: Replace with your PVC
         - name: shared-pvc
           persistentVolumeClaim:
-            claimName: <your-pvc-name>
+            claimName: YOUR-PVC-NAME

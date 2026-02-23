@@ -108,8 +108,8 @@ spec:
 
               # Extract and install production-stack from PVC
               # TODO: Update path to match your PVC structure
-              echo "Extracting production-stack from /var/mdl/<your-deps-path>/production-stack.tar.gz"
-              tar -xzf /var/mdl/<your-deps-path>/production-stack.tar.gz -C /tmp/
+              echo "Extracting production-stack from /var/mdl/YOUR-DEPS-PATH/production-stack.tar.gz"
+              tar -xzf /var/mdl/YOUR-DEPS-PATH/production-stack.tar.gz -C /tmp/
               
               # Install production-stack router dependencies
               export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_VLLM_ROUTER=0.1.0
@@ -144,4 +144,4 @@ spec:
         # TODO: Replace with your PVC
         - name: shared-pvc
           persistentVolumeClaim:
-            claimName: <your-pvc-name>
+            claimName: YOUR-PVC-NAME
