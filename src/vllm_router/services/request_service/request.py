@@ -901,3 +901,227 @@ async def route_general_transcriptions(
             status_code=500,
             content={"error": "Internal server error"},
         )
+
+
+async def route_image_edit_request(
+    request: Request,
+    endpoint: str,
+    background_tasks: BackgroundTasks,
+):
+    """Route OpenAI-compatible image edit requests (multipart/form-data)."""
+
+    in_router_time = time.time()
+    request_id = request.headers.get("X-Request-Id", str(uuid.uuid4()))
+
+    # --- 1. Read raw body and extract model from content-type boundary ---
+    body = await request.body()
+
+    try:
+        form = await request.form()
+        model = form.get("model")
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid multipart/form-data request"},
+            headers={"X-Request-Id": request_id},
+        )
+
+    if not model:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: missing 'model' in form data."},
+            headers={"X-Request-Id": request_id},
+        )
+
+    # --- 2. OpenTelemetry tracing: extract incoming context and create parent span ---
+    span, span_context = None, None
+    tracing_active = otel_available and request.app.state.otel_enabled
+    if tracing_active:
+        incoming_context = extract_context(dict(request.headers))
+        span, span_context = start_span(
+            f"router {endpoint}",
+            parent_context=incoming_context,
+            kind=trace.SpanKind.SERVER,
+            attributes={
+                "http.method": request.method,
+                "http.url": str(request.url),
+                "http.target": endpoint,
+                "vllm.request_id": request_id,
+                "vllm.model": model,
+            },
+        )
+
+    # --- 3. pre_request callback ---
+    if getattr(request.app.state, "callbacks", None) and (
+        response_overwrite := request.app.state.callbacks.pre_request(request, body, {})
+    ):
+        response_overwrite.headers["X-Request-Id"] = request_id
+        return response_overwrite
+
+    # --- 4. Service discovery ---
+    service_discovery = get_service_discovery()
+    router = request.app.state.router
+    engine_stats_scraper = request.app.state.engine_stats_scraper
+    request_stats_monitor = request.app.state.request_stats_monitor
+
+    endpoints = service_discovery.get_endpoint_info()
+
+    # Resolve model aliases
+    aliases = getattr(service_discovery, "aliases", None)
+    if aliases and model in aliases:
+        model = aliases[model]
+
+    # Check if model has ever been seen (even if currently scaled to zero)
+    model_ever_existed = False
+    if hasattr(service_discovery, "has_ever_seen_model"):
+        model_ever_existed = service_discovery.has_ever_seen_model(model)
+
+    request_endpoint = request.query_params.get("id") if request.query_params else None
+
+    if request_endpoint:
+        image_endpoints = [
+            ep
+            for ep in endpoints
+            if model in ep.model_names and ep.Id == request_endpoint and not ep.sleep
+        ]
+    else:
+        image_endpoints = [
+            ep for ep in endpoints if model in ep.model_names and not ep.sleep
+        ]
+
+    # Track all valid incoming requests
+    num_incoming_requests_total.labels(model=model).inc()
+
+    if not image_endpoints:
+        if not model_ever_existed:
+            end_span(span, status_code=404) if tracing_active else None
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"No backend available for model {model}"},
+                headers={"X-Request-Id": request_id},
+            )
+        else:
+            end_span(span, status_code=503) if tracing_active else None
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": f"Model '{model}' is temporarily unavailable. Please try again later."
+                },
+                headers={"X-Request-Id": request_id},
+            )
+
+    engine_stats = engine_stats_scraper.get_engine_stats()
+    request_stats = request_stats_monitor.get_request_stats(time.time())
+
+    if request_endpoint:
+        server_url = image_endpoints[0].url
+        logger.debug(
+            f"Routing request {request_id} to engine with Id: {image_endpoints[0].Id}"
+        )
+    else:
+        server_url = router.route_request(
+            image_endpoints,
+            engine_stats,
+            request_stats,
+            request,
+        )
+
+    if span is not None:
+        span.set_attribute("vllm.backend_url", server_url)
+        span.set_attribute("vllm.routing_logic", type(router).__name__)
+
+    curr_time = time.time()
+    logger.info(
+        f"Routing image edit request {request_id} for model {model} to {server_url} at {curr_time}, process time = {curr_time - in_router_time:.4f}"
+    )
+
+    # --- 5. Forward raw body directly — no re-parsing, no re-encoding ---
+    try:
+        client = request.app.state.aiohttp_client_wrapper()
+
+        # Forward headers as-is, preserving content-type with the original boundary
+        proxy_headers = {
+            k: v
+            for k, v in request.headers.items()
+            if k.lower() not in _HOP_BY_HOP_HEADERS
+        }
+        proxy_headers["X-Request-Id"] = request_id
+
+        # Inject trace context into outgoing headers
+        if tracing_active:
+            inject_context(proxy_headers, span_context)
+
+        backend_response = await client.post(
+            f"{server_url}{endpoint}",
+            data=body,
+            headers=proxy_headers,
+            timeout=aiohttp.ClientTimeout(total=600),
+        )
+
+        if span is not None:
+            span.set_attribute("http.status_code", backend_response.status)
+
+        response_content = await backend_response.json()
+
+        response_headers = {
+            k: v
+            for k, v in backend_response.headers.items()
+            if k.lower()
+            not in (
+                "content-length",
+                "content-encoding",
+                "transfer-encoding",
+                "connection",
+            )
+        }
+        response_headers["X-Request-Id"] = request_id
+
+        # post_request callback
+        if background_tasks and getattr(request.app.state, "callbacks", None):
+            import json as _json
+
+            background_tasks.add_task(
+                request.app.state.callbacks.post_request,
+                request,
+                _json.dumps(response_content).encode(),
+            )
+
+        end_span(span, status_code=backend_response.status) if tracing_active else None
+
+        return JSONResponse(
+            content=response_content,
+            status_code=backend_response.status,
+            headers=response_headers,
+        )
+
+    except aiohttp.ClientResponseError as e:
+        request_errors_total.labels(
+            server=server_url, model=model, error_type=type(e).__name__
+        ).inc()
+        end_span(span, error=e, status_code=e.status) if tracing_active else None
+        return JSONResponse(
+            status_code=e.status,
+            content={"error": e.message},
+            headers={"X-Request-Id": request_id},
+        )
+    except aiohttp.ClientError as e:
+        request_errors_total.labels(
+            server=server_url, model=model, error_type=type(e).__name__
+        ).inc()
+        end_span(span, error=e, status_code=503) if tracing_active else None
+        return JSONResponse(
+            status_code=503,
+            content={"error": f"Backend connection failed: {str(e)}"},
+            headers={"X-Request-Id": request_id},
+        )
+    except Exception as e:
+        request_errors_total.labels(
+            server=server_url, model=model, error_type=type(e).__name__
+        ).inc()
+        end_span(span, error=e, status_code=500) if tracing_active else None
+        logger.error(e, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal router error"},
+            headers={"X-Request-Id": request_id},
+        )
