@@ -400,6 +400,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--max-instance-failover-reroute-attempts",
+        type=int,
+        default=0,
+        help="Number of reroute attempts per failed request",
+    )
+
+    parser.add_argument(
         "--lmcache-health-check-interval",
         type=int,
         default=5,
