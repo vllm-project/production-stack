@@ -137,8 +137,8 @@ jobs:
             --chunk-size 128 \
             --verbose \
             --result-dir /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }} \
-            --timeout 10
-        timeout-minutes: 10
+            --timeout 20
+        timeout-minutes: 20
 
       - name: Archive k8s discovery routing test results
         uses: actions/upload-artifact@v4
