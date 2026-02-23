@@ -525,10 +525,10 @@ def initialize_routing_logic(
 ) -> RoutingInterface:
     if routing_logic == RoutingLogic.ROUND_ROBIN:
         logger.info("Initializing round-robin routing logic")
-        return RoundRobinRouter()
+        router = RoundRobinRouter()
     elif routing_logic == RoutingLogic.SESSION_BASED:
         logger.info(f"Initializing session-based routing logic with kwargs: {kwargs}")
-        return SessionRouter(kwargs.get("session_key"))
+        router = SessionRouter(kwargs.get("session_key"))
     elif routing_logic == RoutingLogic.KVAWARE:
         logger.info("Initializing kvaware routing logic")
         router = KvawareRouter(
@@ -539,17 +539,21 @@ def initialize_routing_logic(
             lmcache_worker_timeout=kwargs.get("lmcache_worker_timeout"),
         )
         router.start_kv_manager()
-        return router
     elif routing_logic == RoutingLogic.PREFIXAWARE:
         logger.info("Initializing prefix-aware routing logic")
-        return PrefixAwareRouter()
+        router = PrefixAwareRouter()
     elif routing_logic == RoutingLogic.DISAGGREGATED_PREFILL:
         logger.info("Initializing disaggregated prefill routing logic")
-        return DisaggregatedPrefillRouter(
+        router = DisaggregatedPrefillRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
+
+    router.max_instance_failover_reroute_attempts = kwargs.get(
+        "max_instance_failover_reroute_attempts", 0
+    )
+    return router
 
 
 def reconfigure_routing_logic(

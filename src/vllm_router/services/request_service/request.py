@@ -87,6 +87,13 @@ _HOP_BY_HOP_HEADERS = {
     "trailer",
 }
 
+_HEADERS_TO_STRIP_FROM_RESPONSE = {
+    "content-length",
+    "content-encoding",
+    "transfer-encoding",
+    "connection",
+}
+
 
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
@@ -415,9 +422,7 @@ async def route_general_request(
         f"Debug session extraction - Router type: {type(request.app.state.router).__name__}"
     )
     logger.debug(f"Debug session extraction - Session key config: {session_key}")
-
-    logger.debug("Debug session extraction - Request headers: %s", request.headers)
-
+    logger.debug(f"Debug session extraction - Request headers: {dict(request.headers)}")
     logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
 
     logger.info(
@@ -431,18 +436,67 @@ async def route_general_request(
             "vllm.routing_logic", type(request.app.state.router).__name__
         )
 
-    stream_generator = process_request(
-        request,
-        request_body,
-        server_url,
-        request_id,
-        endpoint,
-        background_tasks,
-        parent_span_context=span_context,
-    )
-    headers, status = await anext(stream_generator)
-    headers_dict = {key: value for key, value in headers.items()}
-    headers_dict["X-Request-Id"] = request_id
+    error_urls = set()
+    last_error = None
+    max_attempts = request.app.state.router.max_instance_failover_reroute_attempts + 1
+
+    for attempt in range(max_attempts):
+        if attempt > 0:
+            remaining = [ep for ep in endpoints if ep.url not in error_urls]
+            if not remaining:
+                break
+            if request_endpoint:
+                server_url = remaining[0].url
+            elif isinstance(
+                request.app.state.router,
+                (KvawareRouter, PrefixAwareRouter, SessionRouter),
+            ):
+                server_url = await request.app.state.router.route_request(
+                    remaining, engine_stats, request_stats, request, request_json
+                )
+            else:
+                server_url = request.app.state.router.route_request(
+                    remaining, engine_stats, request_stats, request
+                )
+            logger.info(
+                f"Routing request {request_id} to {server_url} "
+                f"(attempt {attempt + 1}/{max_attempts})"
+            )
+            if span is not None:
+                span.set_attribute("vllm.backend_url", server_url)
+
+        try:
+            stream_generator = process_request(
+                request,
+                request_body,
+                server_url,
+                request_id,
+                endpoint,
+                background_tasks,
+                parent_span_context=span_context,
+            )
+            headers, status = await anext(stream_generator)
+            headers_dict = {
+                key: value
+                for key, value in headers.items()
+                if key.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
+            }
+            headers_dict["X-Request-Id"] = request_id
+            last_error = None
+            break
+        except HTTPException:
+            raise
+        except Exception as e:
+            error_urls.add(server_url)
+            last_error = e
+            logger.warning(
+                f"Request {request_id} failed on {server_url} "
+                f"(attempt {attempt + 1}/{max_attempts}): {e}"
+            )
+
+    if last_error:
+        end_span(span, error=last_error, status_code=500) if tracing_active else None
+        raise last_error
 
     # Wrap the generator to end parent span when streaming completes
     async def traced_stream():
@@ -804,13 +858,7 @@ async def route_general_transcriptions(
         headers = {
             k: v
             for k, v in backend_response.headers.items()
-            if k.lower()
-            not in (
-                "content-length",
-                "content-encoding",
-                "transfer-encoding",
-                "connection",
-            )
+            if k.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
         }
 
         headers["X-Request-Id"] = request_id
