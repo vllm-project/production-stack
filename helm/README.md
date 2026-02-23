@@ -208,7 +208,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.k8sServiceDiscoveryType` | string | `"pod-ip"` | Service discovery Type ("pod-ip" or "service-name") if serviceDiscovery is "k8s" |
 | `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static" |
 | `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
-| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic ("roundrobin" or "session") |
+| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic ("roundrobin", "session", "priority", "kvaware", "prefixaware", or "disaggregated_prefill") |
 | `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic |
 | `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router |
 | `routerSpec.engineScrapeInterval` | integer | `15` | Interval in seconds to scrape metrics from the serving engine |
