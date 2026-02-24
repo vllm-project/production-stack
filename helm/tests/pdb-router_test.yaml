@@ -1,0 +1,105 @@
+suite: test Router PDB configuration
+templates:
+  - pdb-router.yaml
+tests:
+  - it: should not render a PDB when routerSpec.enableRouter is false
+    set:
+      routerSpec:
+        enableRouter: false
+        pdb:
+          enabled: true
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should not render a PDB when pdb.enabled is false
+    set:
+      routerSpec:
+        enableRouter: true
+        pdb:
+          enabled: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render a PDB with default values
+    set:
+      routerSpec:
+        pdb:
+          enabled: true
+    release:
+      name: vllm
+    asserts:
+    - hasDocuments:
+        count: 1
+    - equal:
+        path: metadata.name
+        value: vllm-pdb-router
+    - equal:
+        path: spec.minAvailable
+        value: 0
+    - notExists:
+        path: spec.maxUnavailable
+    - equal:
+        path: spec.selector.matchLabels
+        value:
+          app.kubernetes.io/name: router
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: router
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: router
+          release: router
+
+  - it: should render a PDB with custom values
+    set:
+      routerSpec:
+        pdb:
+          enabled: true
+          labels:
+            customLabel: customValue
+          annotations:
+            customAnnotation: customValue
+          minAvailable: 1
+    release:
+      name: vllm
+    asserts:
+    - equal:
+        path: metadata.labels
+        value:
+          customLabel: customValue
+    - equal:
+        path: metadata.annotations
+        value:
+          customAnnotation: customValue
+    - equal:
+        path: spec.minAvailable
+        value: 1
+    - notExists:
+        path: spec.maxUnavailable
+    - equal:
+        path: spec.selector.matchLabels
+        value:
+          app.kubernetes.io/name: router
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: router
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: router
+          release: router
+
+  - it: should not render minAvailable and maxUnavailable at the same time
+    set:
+      routerSpec:
+        pdb:
+          enabled: true
+          minAvailable: 1
+          maxUnavailable: 1
+    release:
+      name: vllm
+    asserts:
+    - equal:
+        path: spec.maxUnavailable
+        value: 1
+    - notExists:
+        path: spec.minAvailable
