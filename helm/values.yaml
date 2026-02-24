@@ -51,6 +51,7 @@ servingEngineSpec:
   # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
   # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
   # - pvcLabels: (Optional, map} The labels to add to the PVC, e.g., {label_excluded_from_alerts: "true"}
+  # - pvcAnnotations: (Optional, map} The annotations to add to the PVC
   # - extraVolumes: (Optional, list) Additional volumes to add to the pod, in Kubernetes volume format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volume-v1-core
   #   Example for an emptyDir volume:
   #   extraVolumes:
@@ -174,6 +175,8 @@ servingEngineSpec:
   #   pvcStorage: "50Gi"
   #   pvcLabels:
   #     label_excluded_from_alerts: "true"
+  #   pvcAnnotations:
+  #     annotation_example: "value"
   #   pvcAccessMode:
   #     - ReadWriteOnce
   #   pvcMatchLabels:
@@ -414,6 +417,9 @@ routerSpec:
 
   # -- session key if using "session" routing logic
   sessionKey: ""
+
+  # -- FastAPI root path for hosting under a subpath (e.g. /vllm)
+  rootPath: ""
 
   # -- extra router commandline arguments
   extraArgs: []
@@ -683,3 +689,6 @@ loraController:
   # -- Webhook configuration
   webhook:
     enabled: false
+
+# -- Array of extra K8s manifests to deploy. Supports use of custom Helm templates
+extraObjects: []

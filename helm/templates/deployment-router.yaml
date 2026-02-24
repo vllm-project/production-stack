@@ -126,6 +126,10 @@ spec:
           - "--session-key"
           - "{{ .Values.routerSpec.sessionKey }}"
           {{- end }}
+          {{- if .Values.routerSpec.rootPath }}
+          - "--root-path"
+          - "{{ .Values.routerSpec.rootPath }}"
+          {{- end }}
           {{- if .Values.routerSpec.engineScrapeInterval }}
           - "--engine-stats-interval"
           - "{{ .Values.routerSpec.engineScrapeInterval }}"

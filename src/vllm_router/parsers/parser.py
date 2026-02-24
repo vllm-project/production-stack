@@ -124,6 +124,12 @@ def parse_args():
         "--port", type=int, default=8001, help="The port to run the server on."
     )
     parser.add_argument(
+        "--root-path",
+        type=str,
+        default="",
+        help="FastAPI root path for hosting under a subpath (e.g. /vllm).",
+    )
+    parser.add_argument(
         "--service-discovery",
         type=str,
         choices=["static", "k8s"],
@@ -397,6 +403,13 @@ def parse_args():
         type=int,
         default=2000,
         help="The threshold for kv-aware routing.",
+    )
+
+    parser.add_argument(
+        "--max-instance-failover-reroute-attempts",
+        type=int,
+        default=0,
+        help="Number of reroute attempts per failed request",
     )
 
     parser.add_argument(
