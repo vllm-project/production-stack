@@ -416,6 +416,9 @@ routerSpec:
   # -- session key if using "session" routing logic
   sessionKey: ""
 
+  # -- FastAPI root path for hosting under a subpath (e.g. /vllm)
+  rootPath: ""
+
   # -- extra router commandline arguments
   extraArgs: []
   # -- extra service ports
