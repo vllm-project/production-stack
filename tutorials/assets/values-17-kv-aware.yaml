@@ -25,10 +25,9 @@ servingEngineSpec:
       p2pHost: "localhost"
       p2pInitPorts: "30081"
       workerHeartbeatTime: "30"
+      logLevel: "DEBUG"
 
     env:
-      - name: LMCACHE_LOG_LEVEL
-        value: "DEBUG"
       - name: VLLM_LOGGING_LEVEL
         value: "DEBUG"
       - name: HF_HOME
