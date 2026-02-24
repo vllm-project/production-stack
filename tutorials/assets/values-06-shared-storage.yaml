@@ -17,9 +17,8 @@ servingEngineSpec:
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "20"
-    env:
-      - name: LMCACHE_LOG_LEVEL
-        value: "DEBUG"
+      logLevel: "DEBUG"
+    env: []
 
     hf_token: <YOUR HF TOKEN>
 
