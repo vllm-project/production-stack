@@ -24,9 +24,8 @@ servingEngineSpec:
         workerPorts: "8001"
         p2pHost: "localhost"
         p2pInitPorts: "30081"
-      env:
-        - name: LMCACHE_LOG_LEVEL
-          value: "DEBUG"
+        logLevel: "DEBUG"
+      env: []
       chatTemplate: "chat.jinja2"
       chatTemplateConfigMap: |-
         {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}

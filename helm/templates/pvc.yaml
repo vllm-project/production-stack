@@ -12,6 +12,10 @@ metadata:
   labels:
     {{- toYaml $modelSpec.pvcLabels | nindent 4}}
   {{- end }}
+  {{- if not (empty $modelSpec.pvcAnnotations) }}
+  annotations:
+    {{- toYaml $modelSpec.pvcAnnotations | nindent 4}}
+  {{- end }}
 spec:
   accessModes:
     {{- if $modelSpec.pvcAccessMode }}
@@ -21,7 +25,7 @@ spec:
     {{- end }}
   resources:
     requests:
-      storage: {{ $modelSpec.pvcStorage | default "20Gi" }}  # Default to 20Gi if not set
+      storage: {{ $modelSpec.pvcStorage }}
   {{- if hasKey $modelSpec "storageClass" }}
   storageClassName: "{{ $modelSpec.storageClass }}"
   {{- end }}

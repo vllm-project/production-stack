@@ -253,6 +253,7 @@ def initialize_all(app: FastAPI, args):
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
         kv_aware_threshold=args.kv_aware_threshold,
+        max_instance_failover_reroute_attempts=args.max_instance_failover_reroute_attempts,
         lmcache_health_check_interval=args.lmcache_health_check_interval,
         lmcache_worker_timeout=args.lmcache_worker_timeout,
     )
@@ -354,6 +355,7 @@ def main():
         "host": args.host,
         "port": args.port,
         "log_level": args.log_level,
+        "root_path": args.root_path,
     }
     if args.log_format == "json":
         # Map 'trace' to 'DEBUG' since TRACE is not a standard Python
