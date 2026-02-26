@@ -193,7 +193,10 @@ class PriorityRouter(RoutingInterface):
         request_stats: Dict[str, RequestStats],
         request: Request,
     ) -> str:
-        return self._qps_routing(endpoints, request_stats)
+        url = self._qps_routing(endpoints, request_stats)
+        if url is None:
+            raise ValueError("No available endpoints to route to.")
+        return url
 
 
 class SessionRouter(RoutingInterface):
