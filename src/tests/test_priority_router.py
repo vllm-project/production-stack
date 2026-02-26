@@ -79,4 +79,4 @@ def test_priority_consistent_for_same_stats():
     request = Request({})
 
     url = router.route_request(endpoints, engine_stats, request_stats, request)
-    assert url in ("http://a", "http://b")
+    assert url == "http://a"
