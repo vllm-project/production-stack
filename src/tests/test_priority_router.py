@@ -22,7 +22,7 @@ class Request:
 
 class EngineStats:
     def __init__(self):
-        return
+        pass
 
 
 def test_priority_routes_to_lowest_qps():
