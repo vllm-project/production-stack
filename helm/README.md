@@ -38,6 +38,7 @@ This table documents all available configuration values for the Production Stack
 - [LoRA Adapters Configuration](#lora-adapters-configuration)
 - [LoRA Controller Configuration](#lora-controller-configuration)
 - [Shared Storage Configuration](#shared-storage-configuration)
+- [Other Configuration](#other-configuration)
 
 ### Serving Engine Configuration
 
@@ -100,6 +101,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].storageClass` | string | `""` | (Optional) The storage class of the PVC |
 | `servingEngineSpec.modelSpec[].pvcMatchLabels` | map | `{}` | (Optional) The labels to match the PVC, e.g., {model: "opt125m"} |
 | `servingEngineSpec.modelSpec[].pvcLabels` | map | `{}` | (Optional) The labels to add to the PVC, e.g., {label_excluded_from_alerts: "true"} |
+| `servingEngineSpec.modelSpec[].pvcAnnotations` | map | `{}` | (Optional) The annotations to add to the PVC |
 | `servingEngineSpec.modelSpec[].extraVolumes` | list | `[]` | (Optional) Additional volumes to add to the pod, in Kubernetes volume format |
 | `servingEngineSpec.modelSpec[].extraVolumeMounts` | list | `[]` | (Optional) Additional volume mounts to add to the container, in Kubernetes volumeMount format |
 | `servingEngineSpec.modelSpec[].serviceAccountName` | string | `""` | (Optional) The name of the service account to use for the deployment |
@@ -155,6 +157,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlPeerHost` | string | `"decode-service"` | NIXL peer host for KV transfer |
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlPeerPort` | string | `"55555"` | NIXL peer port for KV transfer |
 | `servingEngineSpec.modelSpec[].lmcacheConfig.nixlBufferSize` | string | `"1073741824"` | NIXL buffer size for KV transfer |
+| `servingEngineSpec.modelSpec[].lmcacheConfig.logLevel` | string | `"info"` | Log level for LMCache |
 
 #### KEDA Autoscaling Configuration
 
@@ -225,6 +228,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
 | `routerSpec.hf_token` | string | `""`| Hugging Face token for router |
 | `routerSpec.lmcacheControllerPort` | string |`"8000"`|LMCache controller port |
+| `routerSpec.lmcacheConfig.logLevel` | string | `"INFO"`| Log level for LMCache in the router when routingLogic is kwaware |
 | `routerSpec.livenessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's liveness probe |
 | `routerSpec.livenessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's liveness probe |
 | `routerSpec.livenessProbe.failureThreshold` | integer |`3`| Failure threshold for router's liveness probe |
@@ -344,3 +348,9 @@ This table documents all available configuration values for the Production Stack
 | `sharedStorage.hostPath` | string | `""` | Host path for the shared storage volume (for local testing only) |
 | `sharedStorage.nfs.server` | string | `""` | NFS server address for the shared storage volume |
 | `sharedStorage.nfs.path` | string | `""` | NFS export path for the shared storage volume |
+
+### Other Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `extraObjects` | list | `[]` | Array of extra K8s manifests to deploy. Supports use of custom Helm templates |

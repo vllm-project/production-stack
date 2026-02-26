@@ -53,8 +53,6 @@ spec:
                 value: /tmp
                 {{- end }}
               {{- with $modelSpec.vllmConfig}}
-              - name: LMCACHE_LOG_LEVEL
-                value: "DEBUG"
               {{- if hasKey . "v1" }}
               - name: VLLM_USE_V1
                 value: {{ $modelSpec.vllmConfig.v1 | quote }}
@@ -101,6 +99,8 @@ spec:
                 value: "True"
               - name: VLLM_RPC_TIMEOUT
                 value: "1000000"
+              - name: LMCACHE_LOG_LEVEL
+                value: {{ $modelSpec.lmcacheConfig.logLevel | default "INFO" | quote }}
               {{-   end }}
               {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
               - name: LMCACHE_LOCAL_CPU
@@ -278,8 +278,6 @@ spec:
                   value: /tmp
                   {{- end }}
                 {{- with $modelSpec.vllmConfig}}
-                - name: LMCACHE_LOG_LEVEL
-                  value: "DEBUG"
                 {{- if hasKey . "v1" }}
                 - name: VLLM_USE_V1
                   value: {{ $modelSpec.vllmConfig.v1 | quote }}
@@ -326,6 +324,8 @@ spec:
                   value: "True"
                 - name: VLLM_RPC_TIMEOUT
                   value: "1000000"
+                - name: LMCACHE_LOG_LEVEL
+                  value: {{ $modelSpec.lmcacheConfig.logLevel | default "INFO" | quote }}
                 {{-   end }}
                 {{-   if $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}
                 - name: LMCACHE_LOCAL_CPU
