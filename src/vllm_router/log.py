@@ -1,3 +1,4 @@
+import json
 import logging
 import sys
 from logging import Logger
@@ -5,6 +6,7 @@ from logging import Logger
 from starlette.datastructures import Headers, MutableHeaders
 
 _LOG_LEVEL = logging.INFO
+_LOG_FORMAT = "text"
 _loggers: list[Logger] = []
 
 _LEVEL_NAME_MAP = {
@@ -30,6 +32,21 @@ def set_log_level(level_str: str) -> None:
                 # handler at WARNING so errors always surface.
                 if handler.stream is sys.stdout:
                     handler.setLevel(_LOG_LEVEL)
+
+
+def set_log_format(format_str: str) -> None:
+    global _LOG_FORMAT
+    _LOG_FORMAT = format_str.lower()
+    if _LOG_FORMAT == "json":
+        formatter = JsonFormatter()
+    else:
+        formatter = CustomFormatter()
+    for logger in _loggers:
+        for handler in logger.handlers:
+            if _LOG_FORMAT == "json":
+                handler.setFormatter(formatter)
+            elif isinstance(handler.formatter, JsonFormatter):
+                handler.setFormatter(formatter)
 
 
 def build_format(color):
@@ -58,6 +75,23 @@ class CustomFormatter(logging.Formatter):
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
+
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "filename": record.filename,
+            "lineno": record.lineno,
+        }
+        if record.exc_info and record.exc_info[0] is not None:
+            log_record["exception"] = self.formatException(record.exc_info)
+        if record.stack_info:
+            log_record["stack_info"] = self.formatStack(record.stack_info)
+        return json.dumps(log_record, default=str)
 
 
 class MaxLevelFilter(logging.Filter):
@@ -161,19 +195,21 @@ def init_logger(name: str, log_level=None) -> Logger:
     if log_level is None:
         log_level = _LOG_LEVEL
 
+    formatter = JsonFormatter() if _LOG_FORMAT == "json" else CustomFormatter()
+
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
 
     stdout_stream = logging.StreamHandler(sys.stdout)
     stdout_stream.setLevel(log_level)
-    stdout_stream.setFormatter(CustomFormatter())
+    stdout_stream.setFormatter(formatter)
     stdout_stream.addFilter(MaxLevelFilter(logging.INFO))
     stdout_stream.addFilter(TokenRedactionFilter())
     logger.addHandler(stdout_stream)
 
     error_stream = logging.StreamHandler()
     error_stream.setLevel(logging.WARNING)
-    error_stream.setFormatter(CustomFormatter())
+    error_stream.setFormatter(formatter)
     logger.addHandler(error_stream)
     logger.propagate = False
 
