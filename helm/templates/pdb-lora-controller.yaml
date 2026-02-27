@@ -1,0 +1,25 @@
+{{- if and .Values.loraController.enableLoraController .Values.loraController.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: "{{ .Release.Name }}-pdb-lora-controller"
+  namespace: {{ .Release.Namespace }}
+  {{- with .Values.loraController.pdb.labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.loraController.pdb.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.loraController.pdb.maxUnavailable }}
+  maxUnavailable: {{ . }}
+  {{- else }}
+  minAvailable: {{ .Values.loraController.pdb.minAvailable | default 0 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: lora-controller
+      helm-release-name: {{ .Release.Name }}
+{{- end }}

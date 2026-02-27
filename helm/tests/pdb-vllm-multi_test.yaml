@@ -1,0 +1,192 @@
+suite: test per model PDB configuration
+templates:
+  - pdb-vllm-multi.yaml
+tests:
+  - it: should not render a PDB when servingEngineSpec.enableEngine is false
+    set:
+      servingEngineSpec:
+        enableEngine: false
+        pdb:
+          enabled: true
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should not render a PDB when pdb.enabled is not set
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "mistral"
+          repository: "lmcache/vllm-openai"
+          tag: "latest"
+          modelURL: "mistral"
+          runtimeClassName: "custom-runtime"
+          replicaCount: 1
+          requestCPU: 6
+          requestMemory: "16Gi"
+          requestGPU: 1
+          pvcStorage: "10Gi"
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should not render a PDB when pdb.enabled is false
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "mistral"
+          pdb:
+            enabled: false
+          repository: "lmcache/vllm-openai"
+          tag: "latest"
+          modelURL: "mistral"
+          runtimeClassName: "custom-runtime"
+          replicaCount: 1
+          requestCPU: 6
+          requestMemory: "16Gi"
+          requestGPU: 1
+          pvcStorage: "10Gi"
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render a PDB when pdb.enabled is true
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "mistral"
+          pdb:
+            enabled: true
+            labels:
+              customLabel: customValue
+            annotations:
+              customAnnotation: customValue
+          repository: "lmcache/vllm-openai"
+          tag: "latest"
+          modelURL: "mistral"
+          runtimeClassName: "custom-runtime"
+          replicaCount: 1
+          requestCPU: 6
+          requestMemory: "16Gi"
+          requestGPU: 1
+          pvcStorage: "10Gi"
+    release:
+      name: vllm
+    asserts:
+    - hasDocuments:
+        count: 1
+    - equal:
+        path: metadata.name
+        value: vllm-mistral-pdb-vllm
+    - equal:
+        path: metadata.labels
+        value:
+          customLabel: customValue
+    - equal:
+        path: metadata.annotations
+        value:
+          customAnnotation: customValue
+    - equal:
+        path: spec.minAvailable
+        value: 0
+    - notExists:
+        path: spec.maxUnavailable
+    - equal:
+        path: spec.selector.matchLabels
+        value:
+          model: mistral
+          helm-release-name: vllm
+          app.kubernetes.io/name: mistral
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: serving-engine
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: test
+          release: test
+
+  - it: should render a PDB per model when multiple models are defined
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "mistral"
+          pdb:
+            enabled: true
+          repository: "lmcache/vllm-openai"
+          tag: "latest"
+          modelURL: "mistral"
+          runtimeClassName: "custom-runtime"
+          replicaCount: 1
+          requestCPU: 6
+          requestMemory: "16Gi"
+          requestGPU: 1
+          pvcStorage: "10Gi"
+        - name: "opt125m"
+          pdb:
+            enabled: true
+            maxUnavailable: 1
+          repository: "lmcache/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          runtimeClassName: "custom-runtime"
+          replicaCount: 1
+          requestCPU: 6
+          requestMemory: "16Gi"
+          requestGPU: 1
+          pvcStorage: "10Gi"
+    release:
+      name: vllm
+    asserts:
+    - hasDocuments:
+        count: 2
+    - documentIndex: 0
+      equal:
+        path: metadata.name
+        value: vllm-mistral-pdb-vllm
+    - documentIndex: 0
+      equal:
+        path: spec.minAvailable
+        value: 0
+    - documentIndex: 0
+      notExists:
+        path: spec.maxUnavailable
+    - documentIndex: 0
+      equal:
+        path: spec.selector.matchLabels
+        value:
+          model: mistral
+          helm-release-name: vllm
+          app.kubernetes.io/name: mistral
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: serving-engine
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: test
+          release: test
+    - documentIndex: 1
+      equal:
+        path: metadata.name
+        value: vllm-opt125m-pdb-vllm
+    - documentIndex: 1
+      equal:
+        path: spec.maxUnavailable
+        value: 1
+    - documentIndex: 1
+      notExists:
+        path: spec.minAvailable
+    - documentIndex: 1
+      equal:
+        path: spec.selector.matchLabels
+        value:
+          model: opt125m
+          helm-release-name: vllm
+          app.kubernetes.io/name: opt125m
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: serving-engine
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: test
+          release: test

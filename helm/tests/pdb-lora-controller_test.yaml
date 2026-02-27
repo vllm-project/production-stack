@@ -1,0 +1,97 @@
+suite: test Lora Controller PDB configuration
+templates:
+  - pdb-lora-controller.yaml
+tests:
+  - it: should not render a PDB when loraController.enableLoraController is false
+    set:
+      loraController:
+        enableLoraController: false
+        pdb:
+          enabled: true
+    asserts:
+    - hasDocuments:
+        count: 0
+  - it: should not render a PDB when pdb.enabled is false
+    set:
+      loraController:
+        enableLoraController: true
+        pdb:
+          enabled: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render a PDB with default values
+    set:
+      loraController:
+        enableLoraController: true
+        pdb:
+          enabled: true
+    release:
+      name: vllm
+    asserts:
+    - hasDocuments:
+        count: 1
+    - equal:
+        path: metadata.name
+        value: vllm-pdb-lora-controller
+    - equal:
+        path: spec.minAvailable
+        value: 0
+    - notExists:
+        path: spec.maxUnavailable
+    - equal:
+        path: spec.selector.matchLabels
+        value:
+          app.kubernetes.io/component: lora-controller
+          helm-release-name: vllm
+
+  - it: should render a PDB with custom values
+    set:
+      loraController:
+        enableLoraController: true
+        pdb:
+          enabled: true
+          labels:
+            customLabel: customValue
+          annotations:
+            customAnnotation: customValue
+          minAvailable: 1
+    release:
+      name: vllm
+    asserts:
+    - equal:
+        path: metadata.labels
+        value:
+          customLabel: customValue
+    - equal:
+        path: metadata.annotations
+        value:
+          customAnnotation: customValue
+    - equal:
+        path: spec.minAvailable
+        value: 1
+    - notExists:
+        path: spec.maxUnavailable
+    - equal:
+        path: spec.selector.matchLabels
+        value:
+          app.kubernetes.io/component: lora-controller
+          helm-release-name: vllm
+
+  - it: should not render minAvailable and maxUnavailable at the same time
+    set:
+      loraController:
+        enableLoraController: true
+        pdb:
+          enabled: true
+          minAvailable: 1
+          maxUnavailable: 1
+    release:
+      name: vllm
+    asserts:
+    - equal:
+        path: spec.maxUnavailable
+        value: 1
+    - notExists:
+        path: spec.minAvailable
