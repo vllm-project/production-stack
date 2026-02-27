@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# --- Request Processing & Routing ---
 import json
 import os
 import time
@@ -20,6 +19,9 @@ import uuid
 from typing import Optional
 
 import aiohttp
+
+# --- Request Processing & Routing ---
+from aiohttp import FormData
 from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from requests import JSONDecodeError
@@ -739,8 +741,6 @@ async def route_general_transcriptions(
 ):
     """Handles audio transcription requests by parsing form data and proxying to backend."""
 
-    request_id = request.headers.get("X-Request-Id", str(uuid.uuid4()))
-
     # --- 1. Form parsing ---
     try:
         form = await request.form()
@@ -772,49 +772,6 @@ async def route_general_transcriptions(
         language,
     )
 
-    # --- 2. Service Discovery and Routing ---
-    # Access singletons via request.app.state for consistent style
-    service_discovery = (
-        get_service_discovery()
-    )  # This one is often still accessed directly via its get function
-    router = request.app.state.router  # Access router from app.state
-    engine_stats_scraper = (
-        request.app.state.engine_stats_scraper
-    )  # Access engine_stats_scraper from app.state
-    request_stats_monitor = (
-        request.app.state.request_stats_monitor
-    )  # Access request_stats_monitor from app.state
-
-    endpoints = service_discovery.get_endpoint_info()
-
-    # filter the endpoints url by model name
-    transcription_endpoints = []
-    for ep in endpoints:
-        for model_name in ep.model_names:
-            if model == model_name and not ep.sleep:
-                transcription_endpoints.append(ep)
-
-    if not transcription_endpoints:
-        logger.error("No transcription backend available for model %s", model)
-        return JSONResponse(
-            status_code=404,
-            content={"error": f"No transcription backend for model {model}"},
-        )
-
-    # grab the current engine and request stats
-    engine_stats = engine_stats_scraper.get_engine_stats()
-    request_stats = request_stats_monitor.get_request_stats(time.time())
-
-    # pick one using the router's configured logic (roundrobin, least-loaded, etc.)
-    chosen_url = router.route_request(
-        transcription_endpoints,
-        engine_stats,
-        request_stats,
-        request,
-    )
-
-    logger.debug("Proxying transcription request to %s", chosen_url)
-
     # --- 3. Prepare and Proxy the Request ---
     payload_bytes = await file.read()
     files = {"file": (file.filename, payload_bytes, file.content_type)}
@@ -830,26 +787,107 @@ async def route_general_transcriptions(
     if temperature is not None:
         data["temperature"] = str(temperature)
 
-    logger.info("Proxying transcription request for model %s to %s", model, chosen_url)
+    form_data = aiohttp.FormData()
 
+    # add file data
+    for key, (filename, content, content_type) in files.items():
+        form_data.add_field(key, content, filename=filename, content_type=content_type)
+
+    # add from data
+    for key, value in data.items():
+        form_data.add_field(key, value)
+
+    return await proxy_multipart_request(form_data, model, endpoint, request)
+
+
+async def route_image_edit_request(
+    request: Request,
+    endpoint: str,
+    background_tasks: BackgroundTasks,
+):
+    """Route OpenAI-compatible image edit requests (multipart/form-data)."""
+
+    body = await request.body()
+    try:
+        form = await request.form()
+        model: str = form.get("model")
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid multipart/form-data request"},
+        )
+
+    logger.debug("Routing image edit request with model %s", model)
+
+    return await proxy_multipart_request(body, model, endpoint, request)
+
+
+async def proxy_multipart_request(
+    form_data: bytes | FormData, model: str, endpoint: str, request: Request
+):
+    request_id = request.headers.get("X-Request-Id", str(uuid.uuid4()))
+
+    if not model:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: missing 'model' in form data."},
+            headers={"X-Request-Id": request_id},
+        )
+
+    # Access singletons via request.app.state for consistent style
+    service_discovery = (
+        get_service_discovery()
+    )  # This one is often still accessed directly via its get function
+    router = request.app.state.router  # Access router from app.state
+    engine_stats_scraper = (
+        request.app.state.engine_stats_scraper
+    )  # Access engine_stats_scraper from app.state
+    request_stats_monitor = (
+        request.app.state.request_stats_monitor
+    )  # Access request_stats_monitor from app.state
+
+    endpoints = service_discovery.get_endpoint_info()
+
+    # filter the endpoints url by model name
+    endpoints = [ep for ep in endpoints if model in ep.model_names and not ep.sleep]
+
+    if not endpoints:
+        logger.error("No backend available for model %s", model)
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"No backend for model {model}"},
+        )
+
+    # grab the current engine and request stats
+    engine_stats = engine_stats_scraper.get_engine_stats()
+    request_stats = request_stats_monitor.get_request_stats(time.time())
+
+    # pick one using the router's configured logic (roundrobin, least-loaded, etc.)
+    chosen_url = router.route_request(
+        endpoints,
+        engine_stats,
+        request_stats,
+        request,
+    )
+    logger.info(
+        "Proxying multi-part form request for model %s to %s", model, chosen_url
+    )
     try:
         client = request.app.state.aiohttp_client_wrapper()
 
-        form_data = aiohttp.FormData()
-
-        # add file data
-        for key, (filename, content, content_type) in files.items():
-            form_data.add_field(
-                key, content, filename=filename, content_type=content_type
-            )
-
-        # add from data
-        for key, value in data.items():
-            form_data.add_field(key, value)
+        headers = None
+        if isinstance(form_data, bytes):
+            headers = {
+                k: v
+                for k, v in request.headers.items()
+                if k.lower() not in _HOP_BY_HOP_HEADERS
+            }
+            headers["X-Request-Id"] = request_id
 
         backend_response = await client.post(
             f"{chosen_url}{endpoint}",
             data=form_data,
+            headers=headers,
             timeout=aiohttp.ClientTimeout(total=300),
         )
 
