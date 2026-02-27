@@ -102,7 +102,7 @@ spec:
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
                 python3.10 python3.10-venv python3.10-dev python3-pip \
                 ca-certificates curl dnsutils wget vim
-            
+
               update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
               python -m pip install --upgrade pip setuptools wheel
 
@@ -110,17 +110,17 @@ spec:
               # TODO: Update path to match your PVC structure
               echo "Extracting production-stack from /var/mdl/YOUR-DEPS-PATH/production-stack.tar.gz"
               tar -xzf /var/mdl/YOUR-DEPS-PATH/production-stack.tar.gz -C /tmp/
-              
+
               # Install production-stack router dependencies
               export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_VLLM_ROUTER=0.1.0
               cd /tmp/production-stack
               pip install -e .
-              
+
               # Also install aiohttp for the orchestrated router and kubernetes for k8s discovery
               pip install aiohttp uhashring kubernetes
 
               echo "Starting vLLM Production Stack Router with K8s pod discovery and disaggregated_prefill_orchestrated routing"
-              
+
               # Run the production-stack router with K8s pod discovery
               python -m vllm_router.app \
                 --host=0.0.0.0 \

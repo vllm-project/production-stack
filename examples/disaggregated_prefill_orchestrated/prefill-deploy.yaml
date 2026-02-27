@@ -122,14 +122,14 @@ spec:
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
                 python3.10 python3.10-venv python3.10-dev python3-pip \
                 ca-certificates curl dnsutils wget vim
-            
+
               update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
               python -m pip install --upgrade pip setuptools wheel
 
               # TODO: Install your vLLM version with KV transfer support
               # For NxDI on Trainium, this includes NxDI, vLLM-neuron, and nixl
               # pip install vllm  # or custom installation
-              
+
               # TODO: Install dependencies from PVC if needed
               # pip install /var/mdl/YOUR-DEPS-PATH/your-packages.whl
 
