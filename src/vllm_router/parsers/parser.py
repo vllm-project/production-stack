@@ -344,6 +344,14 @@ def parse_args():
         choices=["critical", "error", "warning", "info", "debug", "trace"],
         help="Log level for the router and uvicorn. Default is 'info'.",
     )
+    parser.add_argument(
+        "--log-format",
+        type=str,
+        default="text",
+        choices=["text", "json"],
+        help="Log output format. 'text' for human-readable colored output, "
+        "'json' for structured JSON logging. Default is 'text'.",
+    )
 
     parser.add_argument(
         "--sentry-dsn",

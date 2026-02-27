@@ -46,7 +46,10 @@ The router can be configured using command-line arguments. Below are the availab
 
 ### Logging Options
 
-- `--log-stats`: Log statistics every 30 seconds.
+- `--log-stats`: Log statistics periodically.
+- `--log-stats-interval`: The interval in seconds to log statistics. Default is `10`.
+- `--log-level`: Log level for the router and uvicorn. Options are `critical`, `error`, `warning`, `info`, `debug`, `trace`. Default is `info`.
+- `--log-format`: Log output format. Options are `text` (human-readable colored output) or `json` (structured JSON logging). Default is `text`.
 
 ### Dynamic Config Options
 
