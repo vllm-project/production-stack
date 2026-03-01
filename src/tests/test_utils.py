@@ -1,8 +1,9 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import pytest
-import requests
+from aiohttp import web
 from starlette.datastructures import MutableHeaders
 
 from vllm_router import utils
@@ -91,33 +92,34 @@ def test_get_all_fields_returns_list_of_strings() -> None:
     assert isinstance(fields[0], str)
 
 
-def test_is_model_healthy_when_requests_responds_with_status_code_200_returns_true(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.asyncio
+async def test_is_model_healthy_when_aiohttp_responds_with_status_code_200_returns_true(
+    make_mock_engine,
 ) -> None:
-    request_mock = MagicMock(return_value=MagicMock(status_code=200))
-    monkeypatch.setattr("requests.post", request_mock)
-    assert utils.is_model_healthy("http://localhost", "test", "chat") is True
+    mock_response = AsyncMock(return_value=web.json_response(status=200))
+    base_url = await make_mock_engine({"/v1/chat/completions": mock_response})
+    async with aiohttp.ClientSession() as session:
+        result = await utils.is_model_healthy(session, base_url, "test", "chat")
+    assert result is True
 
 
-def test_is_model_healthy_when_requests_raises_exception_returns_false(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.asyncio
+async def test_is_model_healthy_when_aiohttp_raises_exception_returns_false(
+    make_mock_engine,
 ) -> None:
-    request_mock = MagicMock(side_effect=requests.exceptions.ReadTimeout)
-    monkeypatch.setattr("requests.post", request_mock)
-    assert utils.is_model_healthy("http://localhost", "test", "chat") is False
+    mock_response = AsyncMock(side_effect=aiohttp.ConnectionTimeoutError())
+    base_url = await make_mock_engine({"/v1/chat/completions": mock_response})
+    async with aiohttp.ClientSession() as session:
+        result = await utils.is_model_healthy(session, base_url, "test", "chat")
+    assert result is False
 
 
-def test_is_model_healthy_when_requests_status_with_status_code_not_200_returns_false(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.asyncio
+async def test_is_model_healthy_when_aiohttp_status_with_status_code_not_200_returns_false(
+    make_mock_engine,
 ) -> None:
-
-    # Mock an internal server error response
-    mock_response = MagicMock(status_code=500)
-
-    # Tell the mock to raise an HTTP Error when raise_for_status() is called
-    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError
-
-    request_mock = MagicMock(return_value=mock_response)
-    monkeypatch.setattr("requests.post", request_mock)
-
-    assert utils.is_model_healthy("http://localhost", "test", "chat") is False
+    mock_response = AsyncMock(return_value=web.json_response(status=500))
+    base_url = await make_mock_engine({"/v1/chat/completions": mock_response})
+    async with aiohttp.ClientSession() as session:
+        result = await utils.is_model_healthy(session, base_url, "test", "chat")
+    assert result is False

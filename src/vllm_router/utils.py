@@ -7,7 +7,7 @@ import resource
 import wave
 from typing import Optional
 
-import requests
+import aiohttp
 from fastapi.requests import Request
 from starlette.datastructures import MutableHeaders
 
@@ -236,36 +236,44 @@ def update_content_length(request: Request, request_body: str):
     request._headers = headers
 
 
-def is_model_healthy(url: str, model: str, model_type: str) -> bool:
+async def is_model_healthy(
+    session: aiohttp.ClientSession, url: str, model: str, model_type: str
+) -> bool:
     model_url = ModelType.get_url(model_type)
 
     try:
         if model_type == "transcription":
             # for transcription, the backend expects multipart/form-data with a file
             # we will use pre-generated silent wav bytes
-            response = requests.post(
-                f"{url}{model_url}",
-                files=ModelType.get_test_payload(model_type),  # multipart/form-data
-                data={"model": model},
-                timeout=10,
+            test_payload = ModelType.get_test_payload(model_type)
+            form_data = aiohttp.FormData()
+            form_data.add_field(
+                "file",
+                test_payload["file"][1],
+                filename=test_payload["file"][0],
+                content_type=test_payload["file"][2],
             )
+            form_data.add_field("model", model)
+
+            async with session.post(
+                f"{url}{model_url}",
+                data=form_data,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as response:
+                response.raise_for_status()
+                return True
         else:
             # for other model types (chat, completion, etc.)
-            response = requests.post(
+            async with session.post(
                 f"{url}{model_url}",
                 headers={"Content-Type": "application/json"},
                 json={"model": model} | ModelType.get_test_payload(model_type),
-                timeout=10,
-            )
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as response:
+                response.raise_for_status()
+                await response.json()  # verify it's valid json for other model types
+                return True  # validation passed
 
-        response.raise_for_status()
-
-        if model_type == "transcription":
-            return True
-        else:
-            response.json()  # verify it's valid json for other model types
-            return True  # validation passed
-
-    except requests.exceptions.RequestException as e:
+    except aiohttp.ClientError as e:
         logger.debug(f"{model_type} Model {model} at {url} is not healthy: {e}")
         return False
