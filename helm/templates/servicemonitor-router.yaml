@@ -1,0 +1,34 @@
+{{- if and .Values.routerSpec.enableRouter .Values.routerSpec.serviceMonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: "{{ .Release.Name }}-router-servicemonitor"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
+    {{- include "chart.routerLabels" . | nindent 4 }}
+    {{- with .Values.routerSpec.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  endpoints:
+    - port: "router-sport"
+      honorLabels: {{ .Values.routerSpec.serviceMonitor.honorLabels }}
+      interval: {{ .Values.routerSpec.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.routerSpec.serviceMonitor.scrapeTimeout }}
+      {{- with .Values.routerSpec.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.routerSpec.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: router
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: router
+      app.kubernetes.io/part-of: {{ .Chart.Name }}
+      {{- include "chart.routerLabels" . | nindent 6 }}
+{{- end }}
