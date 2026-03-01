@@ -18,9 +18,11 @@ This helm chart lets users deploy multiple serving engines and a router into the
 helm install llmstack . -f values-example.yaml
 ```
 
-## Uninstall the deployment
+## Uninstall the chart
 
-run `helm uninstall llmstack`
+```bash
+helm uninstall llmstack
+```
 
 ## Configure the deployments
 
@@ -192,6 +194,18 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.metricType` | string | `"AverageValue"` | Metric type (AverageValue or Value) |
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.formula` | string | - | Formula to compose metrics together |
 
+#### Serving Engine Monitoring Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `servingEngineSpec.serviceMonitor.enabled` | boolean | `false` | Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics |
+| `servingEngineSpec.serviceMonitor.additionalLabels` | map | `{}` | Additional labels |
+| `servingEngineSpec.serviceMonitor.interval` | string | `30s` | Interval to scrape metrics |
+| `servingEngineSpec.serviceMonitor.scrapeTimeout` | string | `25s` | Timeout if metrics can't be retrieved in given time interval |
+| `servingEngineSpec.serviceMonitor.honorLabels` | boolean | `false` | Let prometheus add an exported_ prefix to conflicting labels |
+| `servingEngineSpec.serviceMonitor.metricRelabelings` | list | `[]` | Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs) |
+| `servingEngineSpec.serviceMonitor.relabelings` | list | `[]` | Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config) |
+
 ### Router Configuration
 
 | Field | Type | Default | Description |
@@ -249,6 +263,18 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.otel.endpoint` | string | `""` | OTLP endpoint for tracing (e.g., "otel-collector:4317"). Tracing is enabled when this is set. |
 | `routerSpec.otel.serviceName` | string | `"vllm-router"` | Service name for OpenTelemetry traces |
 | `routerSpec.otel.secure` | boolean | `false` | Use secure (TLS) connection for OTLP exporter |
+
+#### Router Monitoring Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `routerSpec.serviceMonitor.enabled` | boolean | `false` | Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics |
+| `routerSpec.serviceMonitor.additionalLabels` | map | `{}` | Additional labels |
+| `routerSpec.serviceMonitor.interval` | string | `30s` | Interval to scrape metrics |
+| `routerSpec.serviceMonitor.scrapeTimeout` | string | `25s` | Timeout if metrics can't be retrieved in given time interval |
+| `routerSpec.serviceMonitor.honorLabels` | boolean | `false` | Let prometheus add an exported_ prefix to conflicting labels |
+| `routerSpec.serviceMonitor.metricRelabelings` | list | `[]` | Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs) |
+| `routerSpec.serviceMonitor.relabelings` | list | `[]` | Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config) |
 
 #### Router Ingress Configuration
 
@@ -353,4 +379,123 @@ This table documents all available configuration values for the Production Stack
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `grafanaDashboards.enabled` | boolean | `false` | Whether to deploy grafana dashboards as configmaps. |
+| `grafanaDashboards.annotations` | map | `{}` | Annotations to add to the configmaps. |
+| `grafanaDashboards.labels` | map | `{grafana_dashboard: "1"}` | Labels for the configmaps |
 | `extraObjects` | list | `[]` | Array of extra K8s manifests to deploy. Supports use of custom Helm templates |
+
+## Observability
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/05766673-c449-4094-bdc8-dea6ac28cb79" alt="Grafana dashboard to monitor the deployment" width="80%"/>
+</p>
+
+### Deploy the observability stack
+
+#### On a cluster with prometheus operator installed
+
+Install the chart with the following helm values to create the `serviceMonitor` and grafana dashboards.
+
+```yaml
+servingEngineSpec:
+  serviceMonitor:
+    enabled: true
+routerSpec:
+  serviceMonitor:
+    enabled: true
+grafanaDashboards:
+  enabled: true
+```
+
+#### On an empty cluster
+
+The vllm-stack chart embeds kube-prometheus-stack as a subchart.
+Install the chart with the following helm values to deploy prometheus and grafana
+
+```yaml
+servingEngineSpec:
+  serviceMonitor:
+    enabled: true
+routerSpec:
+  serviceMonitor:
+    enabled: true
+grafanaDashboards:
+  enabled: true
+
+kube-prometheus-stack:
+  enabled: true
+```
+
+### Access the Grafana UI
+
+Forward the Grafana dashboard port to the local node-port
+
+```bash
+kubectl port-forward svc/<release-name>-grafana 8080:80
+```
+
+Open the webpage at `http://<IP of your node>:8080` to access the Grafana web page. The default user name is `admin` and the password can be configured in the values (default is generated by helm and stored in a secret `<release-name>-grafana`).
+
+### Use Prometheus Adapter to export vLLM metrics
+
+The vLLM router can export metrics to Prometheus using the [Prometheus Adapter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter).
+
+Install the chart with the following helm values to deploy prometheus-adapter
+
+```yaml
+prometheus-adapter:
+  enabled: true
+```
+
+We provide a minimal example of how to use the Prometheus Adapter to export vLLM metrics. See [values.yaml](values.yaml) for more details.
+
+The exported metrics can be used for different purposes, such as horizontal scaling of the vLLM deployments.
+
+To verify the metrics are being exported, you can use the following command:
+
+```bash
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq | grep vllm_num_requests_waiting -C 10
+```
+
+You should see something like the following:
+
+```json
+    {
+      "name": "namespaces/vllm_num_requests_waiting",
+      "singularName": "",
+      "namespaced": false,
+      "kind": "MetricValueList",
+      "verbs": [
+        "get"
+      ]
+    }
+```
+
+The following command will show the current value of the metric:
+
+```bash
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1/namespaces/default/metrics/vllm_num_requests_waiting | jq
+```
+
+The output should look like the following:
+
+```json
+{
+  "kind": "MetricValueList",
+  "apiVersion": "custom.metrics.k8s.io/v1beta1",
+  "metadata": {},
+  "items": [
+    {
+      "describedObject": {
+        "kind": "Namespace",
+        "name": "default",
+        "apiVersion": "/v1"
+      },
+      "metricName": "vllm_num_requests_waiting",
+      "timestamp": "2025-03-02T01:56:01Z",
+      "value": "0",
+      "selector": null
+    }
+  ]
+}
+```

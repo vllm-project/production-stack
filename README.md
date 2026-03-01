@@ -106,7 +106,7 @@ The Grafana dashboard provides the following insights:
 
 ### Configuration
 
-See the details in [`observability/README.md`](./observability/README.md)
+See the details in [`helm/README.md`](./helm/README.md#Observability)
 
 ## Router
 

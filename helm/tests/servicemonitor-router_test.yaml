@@ -1,0 +1,88 @@
+suite: test Router ServiceMonitor configuration
+templates:
+  - servicemonitor-router.yaml
+tests:
+  - it: should not render anything when router serviceMonitor is disabled
+    set:
+      routerSpec:
+        serviceMonitor:
+          enabled: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render serviceMonitor when router serviceMonitor is enabled
+    release:
+      name: vllm
+      namespace: default
+    set:
+      routerSpec:
+        serviceMonitor:
+          enabled: true
+          additionalLabels:
+            label1: value1
+          interval: 30s
+          scrapeTimeout: 10s
+          honorLabels: true
+          metricRelabelings:
+            - action: replace
+              regex: (.*)
+              replacement: $1
+              sourceLabels:
+              - exported_namespace
+              targetLabel: namespace
+          relabelings:
+            - sourceLabels: [__meta_kubernetes_pod_node_name]
+              separator: ;
+              regex: ^(.*)$
+              targetLabel: nodename
+              replacement: $1
+              action: replace
+    asserts:
+    - equal:
+        path: metadata.name
+        value: vllm-router-servicemonitor
+    - equal:
+        path: metadata.namespace
+        value: default
+    - equal:
+        path: metadata.labels
+        value:
+          app.kubernetes.io/name: router
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: router
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: router
+          release: router
+          label1: value1
+    - equal:
+        path: spec.endpoints[0]
+        value:
+          port: router-sport
+          honorLabels: true
+          interval: 30s
+          scrapeTimeout: 10s
+          metricRelabelings:
+            - action: replace
+              regex: (.*)
+              replacement: $1
+              sourceLabels:
+              - exported_namespace
+              targetLabel: namespace
+          relabelings:
+            - sourceLabels: [__meta_kubernetes_pod_node_name]
+              separator: ;
+              regex: ^(.*)$
+              targetLabel: nodename
+              replacement: $1
+              action: replace
+    - equal:
+        path: spec.selector.matchLabels
+        value:
+          app.kubernetes.io/name: router
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: router
+          app.kubernetes.io/part-of: vllm-stack
+          environment: router
+          release: router
