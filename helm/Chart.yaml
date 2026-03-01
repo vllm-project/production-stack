@@ -19,3 +19,13 @@ version: 0.1.10
 
 maintainers:
   - name: apostac
+
+dependencies:
+  - name: kube-prometheus-stack
+    version: 82.4.3
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: kube-prometheus-stack.enabled
+  - name: prometheus-adapter
+    version: 5.3.0
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus-adapter.enabled

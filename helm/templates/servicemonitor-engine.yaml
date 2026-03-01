@@ -1,0 +1,33 @@
+{{- if and .Values.servingEngineSpec.enableEngine .Values.servingEngineSpec.serviceMonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: "{{ .Release.Name }}-engine-servicemonitor"
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chart.engineCommonLabels" (dict "releaseName" $.Release.Name "chartName" $.Chart.Name) | nindent 4 }}
+    {{- include "chart.engineLabels" $ | nindent 4 }}
+    {{- with .Values.servingEngineSpec.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  endpoints:
+    - port: {{ include "chart.service-port-name" $}}
+      honorLabels: {{ .Values.servingEngineSpec.serviceMonitor.honorLabels }}
+      interval: {{ .Values.servingEngineSpec.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.servingEngineSpec.serviceMonitor.scrapeTimeout }}
+      {{- with .Values.servingEngineSpec.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.servingEngineSpec.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: serving-engine
+      app.kubernetes.io/part-of: {{ .Chart.Name }}
+      {{- include "chart.engineLabels" $ | nindent 6 }}
+{{- end }}

@@ -359,6 +359,40 @@ servingEngineSpec:
     image: "lmcache/lmstack-sidecar:latest"
     imagePullPolicy: "Always"
 
+  serviceMonitor:
+    # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
+    enabled: false
+
+    # -- Additional labels
+    additionalLabels: {}
+
+    # -- Interval to scrape metrics
+    interval: 30s
+
+    # -- Timeout if metrics can't be retrieved in given time interval
+    scrapeTimeout: 25s
+
+    # -- Let prometheus add an exported_ prefix to conflicting labels
+    honorLabels: false
+
+    # -- Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs)
+    metricRelabelings: []
+    # - action: replace
+    #   regex: (.*)
+    #   replacement: $1
+    #   sourceLabels:
+    #   - exported_namespace
+    #   targetLabel: namespace
+
+    # -- Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config)
+    relabelings: []
+    # - sourceLabels: [__meta_kubernetes_pod_node_name]
+    #   separator: ;
+    #   regex: ^(.*)$
+    #   targetLabel: nodename
+    #   replacement: $1
+    #   action: replace
+
 routerSpec:
   # -- The docker image of the router. The following values are defaults:
   repository: "lmcache/lmstack-router"
@@ -486,7 +520,7 @@ routerSpec:
           - path: /
             pathType: Prefix
 
-    # --  The tls configuration for hostnames to be covered with this ingress record.
+    # -- The tls configuration for hostnames to be covered with this ingress record.
     tls: []
     #  - secretName: vllm-router-tls
     #    hosts:
@@ -583,6 +617,40 @@ routerSpec:
   #  httpGet:
   #    # -- Path to access on the HTTP server
   #
+
+  serviceMonitor:
+    # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
+    enabled: false
+
+    # -- Additional labels
+    additionalLabels: {}
+
+    # -- Interval to scrape metrics
+    interval: 30s
+
+    # -- Timeout if metrics can't be retrieved in given time interval
+    scrapeTimeout: 25s
+
+    # -- Let prometheus add an exported_ prefix to conflicting labels
+    honorLabels: false
+
+    # -- Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs)
+    metricRelabelings: []
+    # - action: replace
+    #   regex: (.*)
+    #   replacement: $1
+    #   sourceLabels:
+    #   - exported_namespace
+    #   targetLabel: namespace
+
+    # -- Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config)
+    relabelings: []
+    # - sourceLabels: [__meta_kubernetes_pod_node_name]
+    #   separator: ;
+    #   regex: ^(.*)$
+    #   targetLabel: nodename
+    #   replacement: $1
+    #   action: replace
 
 # -- LoRA Adapter Configuration
 loraAdapters: []
@@ -692,3 +760,56 @@ loraController:
 
 # -- Array of extra K8s manifests to deploy. Supports use of custom Helm templates
 extraObjects: []
+
+# -- Set to true do deploy dashboards stored in the "dashboards" directory as configmaps. This requires the kube-prometheus-stack to be deployed with Grafana enabled and properly configured to pick up dashboards from configmaps.
+grafanaDashboards:
+  enabled: false
+  # -- Additional annotations to add to the dashboard configmaps
+  annotations: {}
+  # -- Additional labels to add to the dashboard configmaps
+  labels:
+    grafana_dashboard: "1"
+
+# -- Kube Prometheus Stack dependency chart configuration. More values can be found [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml).
+kube-prometheus-stack:
+  enabled: false
+
+  # -- Configure the Prometheus Operator to automatically discover and scrape metrics from the vLLM chart using ServiceMonitors.
+  prometheus:
+    prometheusSpec:
+      serviceMonitorSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: vllm-stack
+
+# -- Prometheus Adapter dependency chart configuration. More values can be found [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus-adapter/values.yaml).
+prometheus-adapter:
+  enabled: false
+
+  prometheus:
+    url: http://{{ .Release.Name }}-kube-prometheus-stack-prometheus
+    port: 9090
+
+  # rules:
+  #   default: true
+  #   custom:
+  #   # Example metric to export for HPA
+  #   - seriesQuery: '{__name__=~"^vllm:num_requests_waiting$"}'
+  #     resources:
+  #       overrides:
+  #         namespace:
+  #           resource: "namespace"
+  #     name:
+  #       matches: ""
+  #       as: "vllm_num_requests_waiting"
+  #     metricsQuery: sum by(namespace) (vllm:num_requests_waiting)
+
+  #   # Export num_incoming_requests_total by model name
+  #   - seriesQuery: '{__name__=~"^vllm:num_incoming_requests_total$"}'
+  #     resources:
+  #       overrides:
+  #         namespace:
+  #           resource: "namespace"
+  #     name:
+  #       matches: ""
+  #       as: "vllm_num_incoming_requests_total"
+  #     metricsQuery: sum by(namespace, model) (vllm:num_incoming_requests_total)

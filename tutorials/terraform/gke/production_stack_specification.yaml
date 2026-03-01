@@ -25,6 +25,8 @@ servingEngineSpec:
     pvcStorage: "10Gi"
     pvcAccessMode:
       - ReadWriteOnce
+  serviceMonitor:
+    enabled: true
 
 routerSpec:
   nodeSelector:
@@ -36,3 +38,38 @@ routerSpec:
     limits:
       cpu: 2
       memory: 8G
+  serviceMonitor:
+    enabled: true
+
+grafanaDashboards:
+  enabled: true
+
+kube-prometheus-stack:
+  enabled: true
+
+prometheus-adapter:
+  enabled: true
+  rules:
+    default: true
+    custom:
+    # Example metric to export for HPA
+    - seriesQuery: '{__name__=~"^vllm:num_requests_waiting$"}'
+      resources:
+        overrides:
+          namespace:
+            resource: "namespace"
+      name:
+        matches: ""
+        as: "vllm_num_requests_waiting"
+      metricsQuery: sum by(namespace) (vllm:num_requests_waiting)
+
+    # Export num_incoming_requests_total by model name
+    - seriesQuery: '{__name__=~"^vllm:num_incoming_requests_total$"}'
+      resources:
+        overrides:
+          namespace:
+            resource: "namespace"
+      name:
+        matches: ""
+        as: "vllm_num_incoming_requests_total"
+      metricsQuery: sum by(namespace, model) (vllm:num_incoming_requests_total)
