@@ -1,0 +1,154 @@
+# Prefill Pod for Disaggregated Prefill Orchestrated Mode
+# This pod runs vLLM with KV transfer support as the prefill endpoint
+#
+# Prerequisites:
+#   - vLLM with KV transfer support (e.g., NxDI for AWS Trainium)
+#   - Model artifacts on shared PVC
+#   - Accelerator nodes (e.g., AWS Trainium, GPUs)
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prefill-headless
+  namespace: default
+spec:
+  selector:
+    app: prefill
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: prefill
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prefill
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prefill
+  template:
+    metadata:
+      labels:
+        app: prefill
+        model: prefill   # Required for production-stack router discovery
+    spec:
+      nodeSelector:
+        # TODO: Replace with your accelerator node selector
+        # eks.amazonaws.com/nodegroup: <your-accelerator-nodegroup>
+        kubernetes.io/os: linux
+      # TODO: Add resource claims for accelerators if needed
+      # resourceClaims:
+      #   - name: accelerator
+      #     resourceClaimTemplateName: <your-resource-claim>
+      containers:
+        - name: app
+          image: ubuntu:22.04
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 30
+            timeoutSeconds: 50
+            failureThreshold: 570
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 5
+          resources:
+            # TODO: Adjust resources for your accelerator
+            requests:
+              cpu: 8
+              memory: "30Gi"
+            limits:
+              cpu: 8
+              memory: "30Gi"
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: shared-pvc
+              mountPath: /var/mdl
+          env:
+            # Prefill-specific: SEND=1 indicates this is the prefill (sender) node
+            - name: SEND
+              value: "1"
+            - name: PORT
+              value: "8000"
+            - name: MAX_SEQ_LEN
+              value: "512"
+            - name: VLLM_LOGGING_LEVEL
+              value: "DEBUG"
+            # TODO: Update model paths
+            - name: MODEL_ID
+              value: "/var/mdl/YOUR-MODEL-PATH"
+            - name: SERVED_MODEL_NAME
+              value: "YOUR-MODEL-NAME"
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: HF_TOKEN
+
+          command:
+            - /bin/bash
+            - "-exc"
+            - |
+              set -x
+
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                python3.10 python3.10-venv python3.10-dev python3-pip \
+                ca-certificates curl dnsutils wget vim
+
+              update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+              python -m pip install --upgrade pip setuptools wheel
+
+              # TODO: Install your vLLM version with KV transfer support
+              # For NxDI on Trainium, this includes NxDI, vLLM-neuron, and nixl
+              # pip install vllm  # or custom installation
+
+              # TODO: Install dependencies from PVC if needed
+              # pip install /var/mdl/YOUR-DEPS-PATH/your-packages.whl
+
+              # Start vLLM server with KV transfer enabled
+              # TODO: Update the server start command for your setup
+              python -m vllm.entrypoints.openai.api_server \
+                --host 0.0.0.0 \
+                --port ${PORT} \
+                --model ${MODEL_ID} \
+                --served-model-name ${SERVED_MODEL_NAME} \
+                --max-model-len ${MAX_SEQ_LEN}
+                # Add KV transfer configuration flags as needed for your backend
+
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 128Gi
+        # TODO: Replace with your PVC
+        - name: shared-pvc
+          persistentVolumeClaim:
+            claimName: YOUR-PVC-NAME
