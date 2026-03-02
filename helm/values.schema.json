@@ -92,6 +92,32 @@
               "replicaCount": {
                 "type": "integer"
               },
+              "pdb": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "minAvailable": {
+                    "type": "string"
+                  },
+                  "maxUnavailable": {
+                    "type": "string"
+                  }
+                }
+              },
               "resources": {
                 "type": "object",
                 "properties": {
@@ -658,6 +684,32 @@
       "properties": {
         "replicaCount": {
           "type": "integer"
+        },
+        "pdb": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "labels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "minAvailable": {
+              "type": "string"
+            },
+            "maxUnavailable": {
+              "type": "string"
+            }
+          }
         },
         "imagePullSecrets": {
           "type": "array",

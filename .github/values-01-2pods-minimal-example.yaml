@@ -9,7 +9,13 @@ servingEngineSpec:
     modelURL: "facebook/opt-125m"
 
     replicaCount: 2
-
+    pdb:
+      enabled: true
+      minAvailable: 1
+      labels:
+        model: "opt125m"
+      annotations:
+        model: "opt125m"
     requestCPU: 6
     requestMemory: "16Gi"
     requestGPU: 0.5
