@@ -8,6 +8,9 @@ servingEngineSpec:
       tag: "v0.3.9post2"
       modelURL: "facebook/opt-125m"
       replicaCount: 2
+      pdb:
+        enabled: true
+        minAvailable: 1
       requestCPU: 6
       requestMemory: "30Gi"
       requestGPU: 1

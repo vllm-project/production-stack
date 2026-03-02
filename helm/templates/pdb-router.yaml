@@ -1,0 +1,25 @@
+{{- if and .Values.routerSpec.enableRouter .Values.routerSpec.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: "{{ .Release.Name }}-pdb-router"
+  namespace: {{ .Release.Namespace }}
+  {{- with .Values.routerSpec.pdb.labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.routerSpec.pdb.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.routerSpec.pdb.maxUnavailable }}
+  maxUnavailable: {{ . }}
+  {{- else }}
+  minAvailable: {{ .Values.routerSpec.pdb.minAvailable | default 0 }}
+  {{- end }}
+  selector:
+    matchLabels:
+    {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 6 }}
+    {{- include "chart.routerLabels" . | nindent 6 }}
+{{- end }}

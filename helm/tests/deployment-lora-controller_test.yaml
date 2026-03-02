@@ -1,0 +1,186 @@
+suite: test Lora controller deployment configuration
+templates:
+  - deployment-lora-controller.yaml
+tests:
+  - it: should not render a PDB when loraController is disabled
+    set:
+      loraController:
+        enableLoraController: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render a deployment with custom values
+    release:
+      name: vllm
+      namespace: default
+    set:
+      loraController:
+        labels:
+          customLabel: customValue
+        annotations:
+          customAnnotation: customValue
+        kubernetesClusterDomain: "custom.domain"
+        enableLoraController: true
+        replicaCount: 2
+        image:
+          repository: "docker.io/lmcache/lmstack-lora-controller"
+          tag: "v1"
+          pullPolicy: "Always"
+        imagePullSecrets:
+          - name: my-registry-secret
+        podAnnotations:
+          customAnnotation: customValue
+        podLabels:
+          customLabel: customValue
+        podSecurityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        containerSecurityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+          requests:
+            cpu: "250m"
+            memory: "128Mi"
+        nodeSelector:
+          node-role.kubernetes.io/gpu: "true"
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 1
+                preference:
+                  matchExpressions:
+                    - key: "node-role.kubernetes.io/control-plane"
+                      operator: In
+                      values: [""]
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+        env:
+          - name: EXAMPLE_ENV_VAR
+            value: "exampleValue"
+        extraArgs:
+          - --example-arg=value
+        metrics:
+          enabled: true
+        webhook:
+          enabled: true
+    asserts:
+    # - equal:
+    #     path: metadata.labels
+    #     value:
+    #       app.kubernetes.io/component: lora-controller
+    #       helm-release-name: vllm
+    #       customLabel: customValue
+    # - equal:
+    #     path: metadata.annotations
+    #     value:
+    #       customAnnotation: customValue
+    - equal:
+        path: spec.replicas
+        value: 2
+    - equal:
+        path: spec.template.metadata.labels
+        value:
+          app.kubernetes.io/component: lora-controller
+          helm-release-name: vllm
+          customLabel: customValue
+    - equal:
+        path: spec.template.metadata.annotations
+        value:
+          customAnnotation: customValue
+    - equal:
+        path: spec.template.spec.imagePullSecrets
+        value:
+          - name: my-registry-secret
+    - equal:
+        path: spec.template.spec.securityContext
+        value:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+    - notExists:
+        path: spec.template.spec.initContainers
+    - equal:
+        path: spec.template.spec.containers[0].image
+        value: "docker.io/lmcache/lmstack-lora-controller:v1"
+    - equal:
+        path: spec.template.spec.containers[0].imagePullPolicy
+        value: "Always"
+    - equal:
+        path: spec.template.spec.containers[0].args
+        value:
+          - --leader-elect
+          - --health-probe-bind-address=:8081
+          - --metrics-bind-address=:8443
+          - --metrics-secure
+          - --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
+          - --example-arg=value
+    - equal:
+        path: spec.template.spec.containers[0].env
+        value:
+            - name: WATCH_NAMESPACE
+              value: default
+            - name: KUBERNETES_CLUSTER_DOMAIN
+              value: "custom.domain"
+            - name: EXAMPLE_ENV_VAR
+              value: "exampleValue"
+    - equal:
+        path: spec.template.spec.containers[0].ports
+        value:
+          - name: metrics
+            containerPort: 8443
+            protocol: TCP
+          - name: webhook-server
+            containerPort: 9443
+            protocol: TCP
+    - equal:
+        path: spec.template.spec.containers[0].resources
+        value:
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+          requests:
+            cpu: "250m"
+            memory: "128Mi"
+    - equal:
+        path: spec.template.spec.containers[0].volumeMounts
+        value:
+          - name: webhook-server-cert
+            mountPath: /tmp/k8s-webhook-server/serving-certs
+            readOnly: true
+    - equal:
+        path: spec.template.spec.volumes
+        value:
+          - name: webhook-server-cert
+            secret:
+              secretName: vllm-lora-controller-webhook-server-cert
+    - equal:
+        path: spec.template.spec.nodeSelector
+        value:
+          node-role.kubernetes.io/gpu: "true"
+    - equal:
+        path: spec.template.spec.affinity
+        value:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 1
+                preference:
+                  matchExpressions:
+                    - key: "node-role.kubernetes.io/control-plane"
+                      operator: In
+                      values: [""]
+    - equal:
+        path: spec.template.spec.tolerations
+        value:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
