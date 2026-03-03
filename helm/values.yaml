@@ -166,6 +166,12 @@ servingEngineSpec:
   #   tag: "latest"
   #   modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
   #   replicaCount: 1
+  #   pdb:
+  #     enabled: false
+  #     labels: {}
+  #     annotations: {}
+  #     minAvailable: ""
+  #     maxUnavailable: ""
   #   imagePullPolicy: "Always" # or "IfNotPresent"
   #
   #   requestCPU: 10
@@ -230,22 +236,21 @@ servingEngineSpec:
   #           threshold: '5'
 
 
-  #  extraVolumes:
-  #    - name: dev-fuse
-  #      hostPath:
-  #        path: /dev/fuse
-  #        type: CharDevice
-  #    - name: cache-dir
-  #      hostPath:
-  #        path: /var/cache/vllm
-
-  #    extraVolumeMounts:
-  #    - name: dev-fuse
-  #      mountPath: /dev/fuse
-  #      readOnly: true
-  #    - name: cache-dir
-  #      mountPath: /cache
-  #      readOnly: false
+  #   extraVolumes:
+  #     - name: dev-fuse
+  #       hostPath:
+  #         path: /dev/fuse
+  #         type: CharDevice
+  #     - name: cache-dir
+  #       hostPath:
+  #         path: /var/cache/vllm
+  #   extraVolumeMounts:
+  #   - name: dev-fuse
+  #     mountPath: /dev/fuse
+  #     readOnly: true
+  #   - name: cache-dir
+  #     mountPath: /cache
+  #     readOnly: false
 
   modelSpec: []
 
@@ -360,6 +365,8 @@ servingEngineSpec:
     imagePullPolicy: "Always"
 
 routerSpec:
+  # -- Whether to enable the router service
+  enableRouter: true
   # -- The docker image of the router. The following values are defaults:
   repository: "lmcache/lmstack-router"
   tag: "latest"
@@ -377,9 +384,6 @@ routerSpec:
   #   - name: my-registry-secret
   imagePullSecrets: []
 
-  # -- Whether to enable the router service
-  enableRouter: true
-
   # -- Number of replicas
   replicaCount: 1
 
@@ -389,6 +393,20 @@ routerSpec:
     minReplicas: 1
     maxReplicas: 3
     targetCPUUtilizationPercentage: 80
+
+  # -- Router Pod Disruption Budget
+  # -- Ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+  pdb:
+    # -- Deploy a PodDisruptionBudget for the router deployment
+    enabled: false
+    # -- Labels to be added to router pdb
+    labels: {}
+    # -- Annotations to be added to router pdb
+    annotations: {}
+    # -- Number of pods that are available after eviction as number or percentage (eg.: 50%)
+    minAvailable: ""
+    # -- Number of pods that are unavailable after eviction as number or percentage (eg.: 50%).
+    maxUnavailable: ""
 
   # -- Priority Class
   priorityClassName: ""
@@ -648,8 +666,17 @@ loraController:
   # -- Image pull secrets
   imagePullSecrets: []
 
+  # -- Deployment annotations
+  annotations: {}
+
+  # -- Deployment labels
+  labels: {}
+
   # -- Pod annotations
   podAnnotations: {}
+
+  # -- Pod labels
+  podLabels: {}
 
   # -- Pod security context
   podSecurityContext:
@@ -682,13 +709,27 @@ loraController:
   # -- Extra arguments for the lora controller
   extraArgs: []
 
-  # -- Metrics configuration
+  # -- Expose lora controller metrics
   metrics:
     enabled: true
 
   # -- Webhook configuration
   webhook:
     enabled: false
+
+  # -- loraController Pod Disruption Budget
+  # -- Ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+  pdb:
+    # -- Deploy a PodDisruptionBudget for the loraController deployment
+    enabled: false
+    # -- Labels to be added to loraController pdb
+    labels: {}
+    # -- Annotations to be added to loraController pdb
+    annotations: {}
+    # -- Number of pods that are available after eviction as number or percentage (eg.: 50%)
+    minAvailable: ""
+    # -- Number of pods that are unavailable after eviction as number or percentage (eg.: 50%).
+    maxUnavailable: ""
 
 # -- Array of extra K8s manifests to deploy. Supports use of custom Helm templates
 extraObjects: []

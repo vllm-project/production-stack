@@ -87,6 +87,11 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].modelURL` | string | `""` | The URL of the model, e.g., "facebook/opt-125m" |
 | `servingEngineSpec.modelSpec[].chatTemplate` | string | `null` | (Optional) Chat template (Jinja2) specifying tokenizer configuration |
 | `servingEngineSpec.modelSpec[].replicaCount` | integer | `1` | The number of replicas for the model |
+| `servingEngineSpec.modelSpec[].pdb.enabled`| boolean |  `false` | Whether to create a PodDisruptionBudget for the model |
+| `servingEngineSpec.modelSpec[].pdb.labels`| map | `{}` | Labels to add to the PodDisruptionBudget |
+| `servingEngineSpec.modelSpec[].pdb.annotations`| map | `{}` | Annotations to add to the PodDisruptionBudget |
+| `servingEngineSpec.modelSpec[].pdb.minAvailable`| string | `""` | Number of pods that are available after eviction as number or percentage (eg.: 50%) |
+| `servingEngineSpec.modelSpec[].pdb.maxUnavailable`| string | `""` | Number of pods that are unavailable after eviction as number or percentage (eg.: 50%). |
 | `servingEngineSpec.modelSpec[].resources` | object | `{}` | Standard Kubernetes resources block (requests/limits). If specified, this takes priority over and ignores simplified resource fields (requestCPU, requestMemory, requestGPU, etc.) |
 | `servingEngineSpec.modelSpec[].requestCPU` | integer | `0` | The number of CPUs requested for the model |
 | `servingEngineSpec.modelSpec[].requestMemory` | string | `""` | The amount of memory requested for the model, e.g., "16Gi" |
@@ -196,12 +201,17 @@ This table documents all available configuration values for the Production Stack
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `routerSpec.enableRouter` | boolean | `true` | Whether to enable the router service |
 | `routerSpec.repository` | string | `"lmcache/lmstack-router"` | Docker image repository for the router |
 | `routerSpec.tag` | string | `"latest"` | Docker image tag for the router |
 | `routerSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the router |
 | `routerSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
-| `routerSpec.enableRouter` | boolean | `true` | Whether to enable the router service |
 | `routerSpec.replicaCount` | integer | `1` | Number of replicas for the router pod |
+| `routerSpec.pdb.enabled`| boolean |  `false` | Whether to create a PodDisruptionBudget for the model |
+| `routerSpec.pdb.labels`| map | `{}` | Labels to add to the PodDisruptionBudget |
+| `routerSpec.pdb.annotations`| map | `{}` | Annotations to add to the PodDisruptionBudget |
+| `routerSpec.pdb.minAvailable`| string | `""` | Number of pods that are available after eviction as number or percentage (eg.: 50%) |
+| `routerSpec.pdb.maxUnavailable`| string | `""` | Number of pods that are unavailable after eviction as number or percentage (eg.: 50%). |
 | `routerSpec.priorityClassName` | string | `""` | Priority class for router |
 | `routerSpec.containerPort` | integer | `8000` | Port the router container is listening on |
 | `routerSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the router |
@@ -325,7 +335,10 @@ This table documents all available configuration values for the Production Stack
 | `loraController.image.tag` | string | `"latest"` | Docker image tag |
 | `loraController.image.pullPolicy` | string | `"IfNotPresent"` | Image pull policy |
 | `loraController.imagePullSecrets` | list | `[]` | Image pull secrets |
+| `loraController.annotations` | map | `{}` | Deployment annotations |
+| `loraController.labels` | map | `{}` | Deployment labels |
 | `loraController.podAnnotations` | map | `{}` | Pod annotations |
+| `loraController.podLabels` | map | `{}` | Pod labels |
 | `loraController.podSecurityContext.runAsNonRoot` | boolean | `true` | Run as non-root user |
 | `loraController.podSecurityContext.seccompProfile.type` | string | `RuntimeDefault` | Seccomp profile type |
 | `loraController.containerSecurityContext.allowPrivilegeEscalation` | boolean | `false` | Allow privilege escalation |
@@ -336,6 +349,12 @@ This table documents all available configuration values for the Production Stack
 | `loraController.tolerations` | list | `[]` | Tolerations configuration |
 | `loraController.env` | list | `[]` | Environment variables |
 | `loraController.extraArgs` | list | `[]` | Extra arguments for the controller |
+| `loraController.metrics.enabled` | boolean | `true` | Whether to expose lora controller metrics |
+| `loraController.pdb.enabled`| boolean |  `false` | Whether to create a PodDisruptionBudget for the loraController |
+| `loraController.pdb.labels`| map | `{}` | Labels to add to the PodDisruptionBudget |
+| `loraController.pdb.annotations`| map | `{}` | Annotations to add to the PodDisruptionBudget |
+| `loraController.pdb.minAvailable`| string | `""` | Number of pods that are available after eviction as number or percentage (eg.: 50%) |
+| `loraController.pdb.maxUnavailable`| string | `""` | Number of pods that are unavailable after eviction as number or percentage (eg.: 50%). |
 
 ### Shared Storage Configuration
 
