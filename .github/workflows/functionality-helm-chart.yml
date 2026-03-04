@@ -52,6 +52,11 @@ jobs:
             sleep 5
           done
           echo "All pods have terminated."
+      - name: Build Helm dependencies
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm dependency build helm/
       - name: Deploy via helm charts
         env:
           DOCKER_BUILDKIT: 1
@@ -105,6 +110,11 @@ jobs:
             sleep 5
           done
           echo "All pods have terminated."
+      - name: Build Helm dependencies
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm dependency build helm/
       - name: Deploy via helm charts
         run: |
           cd ${{ github.workspace }}
@@ -150,6 +160,11 @@ jobs:
             sleep 5
           done
           echo "All pods have terminated."
+      - name: Build Helm dependencies
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm dependency build helm/
       - name: Deploy via helm charts
         run: |
           helm install vllm ./helm -f .github/values-04-multiple-models.yaml
