@@ -1,6 +1,8 @@
 servingEngineSpec:
   serviceMonitor:
     enabled: true
+    interval: 5s
+    scrapeTimeout: 4s
   runtimeClassName: ""
   modelSpec:
   - name: "opt125m"
@@ -20,9 +22,15 @@ routerSpec:
   enableRouter: true
   serviceMonitor:
     enabled: true
+    interval: 5s
+    scrapeTimeout: 4s
 
 grafanaDashboards:
   enabled: true
 
 kube-prometheus-stack:
   enabled: true
+  prometheus:
+    prometheusSpec:
+      scrapeInterval: 5s
+      scrapeTimeout: 4s
