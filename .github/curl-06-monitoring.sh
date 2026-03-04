@@ -48,7 +48,7 @@ fi
 request_count=$(echo "$result_prom" | jq -r '.data.result[0].value[1]' 2>/dev/null)
 
 # Send a request to increment the counter
-result_query=$(curl --connect-timeout 5 -s -X POST http://"$1":"$2"/v1/completions \
+result_query=$(curl --connect-timeout 5 -s -X POST http://"$HOST":"$PORT"/v1/completions \
     -H "Content-Type: application/json" \
     -d '{"model": "facebook/opt-125m", "prompt": "Once upon a time,", "max_tokens": 10}' \
     | tee output-06-monitoring/query-06-monitoring.json)
