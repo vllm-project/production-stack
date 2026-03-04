@@ -184,3 +184,67 @@ jobs:
             helm uninstall vllm
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
+
+  Minimal-Example-With-Monitoring:
+    runs-on: self-hosted
+    steps:
+      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+      - name: Helm uninstall
+        run: |
+          releases=$(helm list -q)
+
+          if [ -n "$releases" ]; then
+            echo "Found releases: $releases"
+            for r in $releases; do
+              echo "Uninstalling $r..."
+              helm uninstall "$r"
+            done
+          else
+            echo "No Helm releases found; skipping uninstall."
+          fi
+
+          # Wait until no pods remain
+          echo "Waiting for all pods to terminate..."
+          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
+            sleep 5
+          done
+          echo "All pods have terminated."
+      - name: Build Helm dependencies
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm dependency build helm/
+      - name: Deploy via helm charts
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          cd ${{ github.workspace }}
+          kubectl config use-context minikube
+          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
+          sudo docker push localhost:5000/git-act-router
+          sudo sysctl fs.protected_regular=0
+          minikube image load localhost:5000/git-act-router
+          helm install vllm ./helm -f .github/values-11-monitoring.yaml
+      - name: Validate the installation and send query to the stack
+        run: |
+          bash .github/port-forward.sh curl-06-monitoring
+        timeout-minutes: 3
+      - name: Archive functionality results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: curl-06-monitoring
+          path: |
+            output-06-monitoring/
+      - name: Helm uninstall
+        run: |
+            helm uninstall vllm
+            sudo docker image prune -f
+        if: always()
+      - run: echo "🍏 This job's status is ${{ job.status }}."
