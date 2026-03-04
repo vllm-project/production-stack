@@ -54,8 +54,6 @@ jobs:
           echo "All pods have terminated."
       - name: Build Helm dependencies
         run: |
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo update prometheus-community
           helm dependency build helm/
           ls -la helm/charts
       - name: Deploy via helm charts
@@ -113,8 +111,6 @@ jobs:
           echo "All pods have terminated."
       - name: Build Helm dependencies
         run: |
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo update prometheus-community
           helm dependency build helm/
           ls -la helm/charts
       - name: Deploy via helm charts
@@ -164,8 +160,6 @@ jobs:
           echo "All pods have terminated."
       - name: Build Helm dependencies
         run: |
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo update prometheus-community
           helm dependency build helm/
           ls -la helm/charts
       - name: Deploy via helm charts
@@ -190,6 +184,7 @@ jobs:
 
   Minimal-Example-With-Monitoring:
     runs-on: self-hosted
+    needs: Secure-Minimal-Example
     steps:
       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
@@ -220,8 +215,6 @@ jobs:
           echo "All pods have terminated."
       - name: Build Helm dependencies
         run: |
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo update prometheus-community
           helm dependency build helm/
           ls -la helm/charts
       - name: Deploy via helm charts

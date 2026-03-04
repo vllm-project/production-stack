@@ -41,8 +41,6 @@ jobs:
       - name: Build Helm dependencies
         if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'all' }}
         run: |
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo update prometheus-community
           helm dependency build helm/
           ls -la helm/charts
 
