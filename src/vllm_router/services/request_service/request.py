@@ -18,6 +18,7 @@ import time
 import uuid
 from typing import Optional
 
+import asyncio
 import aiohttp
 
 # --- Request Processing & Routing ---
@@ -190,20 +191,47 @@ async def process_request(
             if span is not None:
                 span.set_attribute("http.status_code", backend_response.status)
 
-            # Yield headers and status code first.
-            yield backend_response.headers, backend_response.status
-            # Stream response content.
-            async for chunk in backend_response.content.iter_any():
-                total_len += len(chunk)
-                if not first_token:
-                    first_token = True
-                    request.app.state.request_stats_monitor.on_request_response(
-                        backend_url, request_id, time.time()
-                    )
-                # For non-streaming requests, collect the full response
-                if full_response is not None:
-                    full_response.extend(chunk)
-                yield chunk
+            # Start a background task that monitors client disconnection
+            # and closes the backend connection to propagate cancellation.
+            # This is critical for non-streaming requests where the backend
+            # may spend a long time processing before sending any response.
+            async def _disconnect_monitor():
+                try:
+                    while True:
+                        if await request.is_disconnected():
+                            logger.info(
+                                f"Client disconnected for request {request_id}, "
+                                f"aborting backend connection to {backend_url}"
+                            )
+                            backend_response.close()
+                            return
+                        await asyncio.sleep(1.0)
+                except asyncio.CancelledError:
+                    pass
+
+            disconnect_task = asyncio.create_task(_disconnect_monitor())
+
+            try:
+                # Yield headers and status code first.
+                yield backend_response.headers, backend_response.status
+                # Stream response content.
+                async for chunk in backend_response.content.iter_any():
+                    total_len += len(chunk)
+                    if not first_token:
+                        first_token = True
+                        request.app.state.request_stats_monitor.on_request_response(
+                            backend_url, request_id, time.time()
+                        )
+                    # For non-streaming requests, collect the full response
+                    if full_response is not None:
+                        full_response.extend(chunk)
+                    yield chunk
+            finally:
+                disconnect_task.cancel()
+                try:
+                    await disconnect_task
+                except asyncio.CancelledError:
+                    pass
 
         request.app.state.request_stats_monitor.on_request_complete(
             backend_url, request_id, time.time()
