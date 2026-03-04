@@ -121,3 +121,52 @@ def test_is_model_healthy_when_requests_status_with_status_code_not_200_returns_
     monkeypatch.setattr("requests.post", request_mock)
 
     assert utils.is_model_healthy("http://localhost", "test", "chat") is False
+
+
+def test_is_model_healthy_includes_api_key_header_when_env_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that VLLM_API_KEY env var is included as Authorization header."""
+    monkeypatch.setenv("VLLM_API_KEY", "test-secret-key")
+    request_mock = MagicMock(return_value=MagicMock(status_code=200))
+    monkeypatch.setattr("requests.post", request_mock)
+
+    assert utils.is_model_healthy("http://localhost", "test", "chat") is True
+
+    # Verify Authorization header was included
+    call_kwargs = request_mock.call_args
+    headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers", {})
+    assert "Authorization" in headers
+    assert headers["Authorization"] == "Bearer test-secret-key"
+
+
+def test_is_model_healthy_no_auth_header_when_env_not_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that no Authorization header is sent when VLLM_API_KEY is not set."""
+    monkeypatch.delenv("VLLM_API_KEY", raising=False)
+    request_mock = MagicMock(return_value=MagicMock(status_code=200))
+    monkeypatch.setattr("requests.post", request_mock)
+
+    assert utils.is_model_healthy("http://localhost", "test", "chat") is True
+
+    # Verify no Authorization header was included
+    call_kwargs = request_mock.call_args
+    headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers", {})
+    assert "Authorization" not in headers
+
+
+def test_is_model_healthy_transcription_includes_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that VLLM_API_KEY is included for transcription health checks."""
+    monkeypatch.setenv("VLLM_API_KEY", "test-key")
+    request_mock = MagicMock(return_value=MagicMock(status_code=200))
+    monkeypatch.setattr("requests.post", request_mock)
+
+    assert utils.is_model_healthy("http://localhost", "test", "transcription") is True
+
+    call_kwargs = request_mock.call_args
+    headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers")
+    assert headers is not None
+    assert headers["Authorization"] == "Bearer test-key"
