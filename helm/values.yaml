@@ -733,3 +733,28 @@ loraController:
 
 # -- Array of extra K8s manifests to deploy. Supports use of custom Helm templates
 extraObjects: []
+
+# -- Configuration for creating a ServiceMonitor resource for external Prometheus operators.
+# This allows teams with an existing Prometheus stack (e.g., kube-prometheus-stack) to scrape
+# vLLM metrics without deploying the bundled observability stack.
+externalPrometheus:
+  # -- Enable creation of a ServiceMonitor resource
+  enabled: false
+  # -- Namespace where the ServiceMonitor will be created (defaults to release namespace).
+  # Set this to the namespace where your Prometheus Operator watches for ServiceMonitors.
+  namespace: ""
+  # -- Additional labels to add to the ServiceMonitor (e.g., for Prometheus serviceMonitorSelector matching)
+  labels: {}
+  #   release: "kube-prometheus-stack"
+  # -- Custom selector to target vLLM services. Defaults to matching the Helm release instance labels.
+  serviceSelector: {}
+  #   matchLabels:
+  #     app.kubernetes.io/instance: my-release
+  # -- Name of the port in the Service to scrape (defaults to "service-port")
+  portName: "service-port"
+  # -- Metrics endpoint path (defaults to /metrics)
+  path: "/metrics"
+  # -- Scrape interval (defaults to 30s)
+  interval: "30s"
+  # -- Scrape timeout (optional)
+  scrapeTimeout: ""

@@ -1,0 +1,45 @@
+{{- if .Values.externalPrometheus }}
+{{- if .Values.externalPrometheus.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: "{{ .Release.Name }}-vllm-servicemonitor"
+  {{- if .Values.externalPrometheus.namespace }}
+  namespace: {{ .Values.externalPrometheus.namespace }}
+  {{- else }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/managed-by: helm
+    {{- with .Values.externalPrometheus.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.externalPrometheus.namespace }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  {{- end }}
+  selector:
+    {{- if .Values.externalPrometheus.serviceSelector }}
+    {{- toYaml .Values.externalPrometheus.serviceSelector | nindent 4 }}
+    {{- else }}
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/managed-by: helm
+    {{- end }}
+  endpoints:
+    - port: {{ .Values.externalPrometheus.portName | default "service-port" | quote }}
+      {{- if .Values.externalPrometheus.path }}
+      path: {{ .Values.externalPrometheus.path }}
+      {{- else }}
+      path: /metrics
+      {{- end }}
+      interval: {{ .Values.externalPrometheus.interval | default "30s" }}
+      {{- if .Values.externalPrometheus.scrapeTimeout }}
+      scrapeTimeout: {{ .Values.externalPrometheus.scrapeTimeout }}
+      {{- end }}
+{{- end }}
+{{- end }}
