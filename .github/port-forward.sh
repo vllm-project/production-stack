@@ -10,21 +10,23 @@ chmod -R 777 "output-$VAR"
 # Print router logs
 POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep '^vllm-deployment-router')
 kubectl wait --for=condition=ready pod/"$POD_NAME" --timeout=120s
-kubectl logs -f "$POD_NAME" 2>&1 | tee "output-$VAR/router.log" &
+# kubectl logs -f "$POD_NAME" 2>&1 | tee "output-$VAR/router.log" &
 
 # Loop to check if all llmstack-related pods are in the Running state
 while true; do
     # Get all pods containing "vllm" in their name and extract their STATUS column
     pod_status=$(kubectl get pods --no-headers | grep "vllm" | awk '{print $3}' | sort | uniq)
-    pod_ready=$(kubectl get pods --no-headers | grep "vllm" | awk '{print $2}' | sort | uniq)
+    # Collect any pod where ready count != total (e.g. 1/2) or status is not Running
+    not_ready=$(kubectl get pods --no-headers | grep "vllm" | awk '{split($2,a,"/"); if(a[1]!=a[2] || $3!="Running") print $0}')
 
-    # If the only unique status is "Running", break the loop and continue
-    if [[ "$pod_status" == "Running" ]] && [[ "$pod_ready" == "1/1" ]]; then
+    # Break when all pods are Running and every pod has X/X containers ready (handles 1/1, 2/2, 3/3, etc.)
+    if [[ "$pod_status" == "Running" ]] && [[ -z "$not_ready" ]]; then
         echo "All llmstack pods are now Ready and in Running state."
         break
     fi
 
     echo "Not all pods are ready yet. Checking again in 5 seconds..."
+    kubectl get pods
     sleep 5
 done
 

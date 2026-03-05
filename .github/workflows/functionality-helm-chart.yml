@@ -22,169 +22,169 @@ on:
       - 'helm/**'
   merge_group:
 jobs:
-  Secure-Minimal-Example:
-    runs-on: self-hosted
-    steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
-      - name: Helm uninstall
-        run: |
-          releases=$(helm list -q)
+  # Secure-Minimal-Example:
+  #   runs-on: self-hosted
+  #   steps:
+  #     - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+  #     - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+  #     - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+  #     - name: Check out repository code
+  #       uses: actions/checkout@v4
+  #     - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+  #     - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+  #     - name: Helm uninstall
+  #       run: |
+  #         releases=$(helm list -q)
 
-          if [ -n "$releases" ]; then
-            echo "Found releases: $releases"
-            for r in $releases; do
-              echo "Uninstalling $r..."
-              helm uninstall "$r"
-            done
-          else
-            echo "No Helm releases found; skipping uninstall."
-          fi
+  #         if [ -n "$releases" ]; then
+  #           echo "Found releases: $releases"
+  #           for r in $releases; do
+  #             echo "Uninstalling $r..."
+  #             helm uninstall "$r"
+  #           done
+  #         else
+  #           echo "No Helm releases found; skipping uninstall."
+  #         fi
 
-          # Wait until no pods remain
-          echo "Waiting for all pods to terminate..."
-          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
-            sleep 5
-          done
-          echo "All pods have terminated."
-      - name: Build Helm dependencies
-        run: |
-          helm dependency build helm/
-          ls -la helm/charts
-      - name: Deploy via helm charts
-        env:
-          DOCKER_BUILDKIT: 1
-        run: |
-          cd ${{ github.workspace }}
-          kubectl config use-context minikube
-          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
-          sudo docker push localhost:5000/git-act-router
-          sudo sysctl fs.protected_regular=0
-          minikube image load localhost:5000/git-act-router
-          helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-05-secure-vllm
-        timeout-minutes: 3
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-05-secure-vllm
-          path: |
-            output-05-secure-vllm/
-      - name: Helm uninstall
-        run: |
-            helm uninstall vllm
-            sudo docker image prune -f
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+  #         # Wait until no pods remain
+  #         echo "Waiting for all pods to terminate..."
+  #         while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
+  #           sleep 5
+  #         done
+  #         echo "All pods have terminated."
+  #     - name: Build Helm dependencies
+  #       run: |
+  #         helm dependency build helm/
+  #         ls -la helm/charts
+  #     - name: Deploy via helm charts
+  #       env:
+  #         DOCKER_BUILDKIT: 1
+  #       run: |
+  #         cd ${{ github.workspace }}
+  #         kubectl config use-context minikube
+  #         sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
+  #         sudo docker push localhost:5000/git-act-router
+  #         sudo sysctl fs.protected_regular=0
+  #         minikube image load localhost:5000/git-act-router
+  #         helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
+  #     - name: Validate the installation and send query to the stack
+  #       run: |
+  #         bash .github/port-forward.sh curl-05-secure-vllm
+  #       timeout-minutes: 3
+  #     - name: Archive functionality results
+  #       uses: actions/upload-artifact@v4
+  #       if: always()
+  #       with:
+  #         name: output-05-secure-vllm
+  #         path: |
+  #           output-05-secure-vllm/
+  #     - name: Helm uninstall
+  #       run: |
+  #           helm uninstall vllm
+  #           sudo docker image prune -f
+  #       if: always()
+  #     - run: echo "🍏 This job's status is ${{ job.status }}."
 
-  Two-Pods-Minimal-Example:
-    runs-on: self-hosted
-    needs: Secure-Minimal-Example
-    steps:
-      - name: Helm uninstall
-        run: |
-          releases=$(helm list -q)
+  # Two-Pods-Minimal-Example:
+  #   runs-on: self-hosted
+  #   needs: Secure-Minimal-Example
+  #   steps:
+  #     - name: Helm uninstall
+  #       run: |
+  #         releases=$(helm list -q)
 
-          if [ -n "$releases" ]; then
-            echo "Found releases: $releases"
-            for r in $releases; do
-              echo "Uninstalling $r..."
-              helm uninstall "$r"
-            done
-          else
-            echo "No Helm releases found; skipping uninstall."
-          fi
+  #         if [ -n "$releases" ]; then
+  #           echo "Found releases: $releases"
+  #           for r in $releases; do
+  #             echo "Uninstalling $r..."
+  #             helm uninstall "$r"
+  #           done
+  #         else
+  #           echo "No Helm releases found; skipping uninstall."
+  #         fi
 
-          # Wait until no pods remain
-          echo "Waiting for all pods to terminate..."
-          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
-            sleep 5
-          done
-          echo "All pods have terminated."
-      - name: Build Helm dependencies
-        run: |
-          helm dependency build helm/
-          ls -la helm/charts
-      - name: Deploy via helm charts
-        run: |
-          cd ${{ github.workspace }}
-          helm install vllm ./helm -f .github/values-01-2pods-minimal-example.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-02-two-pods
-        timeout-minutes: 3
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-02-two-pods
-          path: |
-            output-02-two-pods/
-      - name: Helm uninstall
-        run: |
-          helm uninstall vllm
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+  #         # Wait until no pods remain
+  #         echo "Waiting for all pods to terminate..."
+  #         while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
+  #           sleep 5
+  #         done
+  #         echo "All pods have terminated."
+  #     - name: Build Helm dependencies
+  #       run: |
+  #         helm dependency build helm/
+  #         ls -la helm/charts
+  #     - name: Deploy via helm charts
+  #       run: |
+  #         cd ${{ github.workspace }}
+  #         helm install vllm ./helm -f .github/values-01-2pods-minimal-example.yaml
+  #     - name: Validate the installation and send query to the stack
+  #       run: |
+  #         bash .github/port-forward.sh curl-02-two-pods
+  #       timeout-minutes: 3
+  #     - name: Archive functionality results
+  #       uses: actions/upload-artifact@v4
+  #       if: always()
+  #       with:
+  #         name: output-02-two-pods
+  #         path: |
+  #           output-02-two-pods/
+  #     - name: Helm uninstall
+  #       run: |
+  #         helm uninstall vllm
+  #       if: always()
+  #     - run: echo "🍏 This job's status is ${{ job.status }}."
 
-  Multiple-Models:
-    runs-on: self-hosted
-    needs: Two-Pods-Minimal-Example
-    steps:
-      - name: Helm uninstall
-        run: |
-          releases=$(helm list -q)
+  # Multiple-Models:
+  #   runs-on: self-hosted
+  #   needs: Two-Pods-Minimal-Example
+  #   steps:
+  #     - name: Helm uninstall
+  #       run: |
+  #         releases=$(helm list -q)
 
-          if [ -n "$releases" ]; then
-            echo "Found releases: $releases"
-            for r in $releases; do
-              echo "Uninstalling $r..."
-              helm uninstall "$r"
-            done
-          else
-            echo "No Helm releases found; skipping uninstall."
-          fi
+  #         if [ -n "$releases" ]; then
+  #           echo "Found releases: $releases"
+  #           for r in $releases; do
+  #             echo "Uninstalling $r..."
+  #             helm uninstall "$r"
+  #           done
+  #         else
+  #           echo "No Helm releases found; skipping uninstall."
+  #         fi
 
-          # Wait until no pods remain
-          echo "Waiting for all pods to terminate..."
-          while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
-            sleep 5
-          done
-          echo "All pods have terminated."
-      - name: Build Helm dependencies
-        run: |
-          helm dependency build helm/
-          ls -la helm/charts
-      - name: Deploy via helm charts
-        run: |
-          helm install vllm ./helm -f .github/values-04-multiple-models.yaml
-      - name: Validate the installation and send query to the stack
-        run: |
-          bash .github/port-forward.sh curl-04-multiple-models
-        timeout-minutes: 5
-      - name: Archive functionality results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: output-04-multiple-models
-          path: |
-            output-04-multiple-models/
-      - name: Helm uninstall
-        run: |
-            helm uninstall vllm
-        if: always()
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+  #         # Wait until no pods remain
+  #         echo "Waiting for all pods to terminate..."
+  #         while kubectl get pods --no-headers 2>/dev/null | grep -q .; do
+  #           sleep 5
+  #         done
+  #         echo "All pods have terminated."
+  #     - name: Build Helm dependencies
+  #       run: |
+  #         helm dependency build helm/
+  #         ls -la helm/charts
+  #     - name: Deploy via helm charts
+  #       run: |
+  #         helm install vllm ./helm -f .github/values-04-multiple-models.yaml
+  #     - name: Validate the installation and send query to the stack
+  #       run: |
+  #         bash .github/port-forward.sh curl-04-multiple-models
+  #       timeout-minutes: 5
+  #     - name: Archive functionality results
+  #       uses: actions/upload-artifact@v4
+  #       if: always()
+  #       with:
+  #         name: output-04-multiple-models
+  #         path: |
+  #           output-04-multiple-models/
+  #     - name: Helm uninstall
+  #       run: |
+  #           helm uninstall vllm
+  #       if: always()
+  #     - run: echo "🍏 This job's status is ${{ job.status }}."
 
   Minimal-Example-With-Monitoring:
     runs-on: self-hosted
-    needs: Secure-Minimal-Example
+    # needs: Secure-Minimal-Example
     steps:
       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
