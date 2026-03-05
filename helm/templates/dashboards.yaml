@@ -5,6 +5,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ $.Release.Name }}-grafana-{{ base $path | trimSuffix ".json" | lower | replace "_" "-" }}
+  namespace: {{ $.Release.Namespace }}
   {{- with $.Values.grafanaDashboards.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}

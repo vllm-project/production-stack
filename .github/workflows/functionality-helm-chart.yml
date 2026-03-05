@@ -55,7 +55,6 @@ jobs:
       - name: Build Helm dependencies
         run: |
           helm dependency build helm/
-          ls -la helm/charts
       - name: Deploy via helm charts
         env:
           DOCKER_BUILDKIT: 1
@@ -112,7 +111,6 @@ jobs:
       - name: Build Helm dependencies
         run: |
           helm dependency build helm/
-          ls -la helm/charts
       - name: Deploy via helm charts
         run: |
           cd ${{ github.workspace }}
@@ -161,7 +159,6 @@ jobs:
       - name: Build Helm dependencies
         run: |
           helm dependency build helm/
-          ls -la helm/charts
       - name: Deploy via helm charts
         run: |
           helm install vllm ./helm -f .github/values-04-multiple-models.yaml
@@ -216,7 +213,6 @@ jobs:
       - name: Build Helm dependencies
         run: |
           helm dependency build helm/
-          ls -la helm/charts
       - name: Deploy via helm charts
         env:
           DOCKER_BUILDKIT: 1
