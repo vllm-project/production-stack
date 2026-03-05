@@ -74,7 +74,6 @@ fi
 new_request_count=$(echo "$result_prom" | jq -r '.data.result[0].value[1]' 2>/dev/null)
 echo "New request count: $new_request_count"
 
-# Use awk for float comparison instead of bc (bc not available on runner)
 if ! awk "BEGIN {exit ($new_request_count > $request_count) ? 0 : 1}"; then
     echo "Error: vllm:num_incoming_requests_total did not increment. Previous: $request_count, New: $new_request_count"
     exit 1

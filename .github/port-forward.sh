@@ -10,7 +10,7 @@ chmod -R 777 "output-$VAR"
 # Print router logs
 POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep '^vllm-deployment-router')
 kubectl wait --for=condition=ready pod/"$POD_NAME" --timeout=120s
-# kubectl logs -f "$POD_NAME" 2>&1 | tee "output-$VAR/router.log" &
+kubectl logs -f "$POD_NAME" 2>&1 | tee "output-$VAR/router.log" &
 
 # Loop to check if all llmstack-related pods are in the Running state
 while true; do
