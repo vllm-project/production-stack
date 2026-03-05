@@ -1,0 +1,81 @@
+################################################################################
+# 📝 terraform.tfvars.template
+# Copy to terraform.tfvars and fill in the required values
+################################################################################
+################################################################################
+# 🔐 CORE PROVIDER CREDENTIALS AND REGION
+################################################################################
+# (required) - Fill your Coreweave token
+cw_token = ""
+# cw deployment region Change if needed, check available regions with `cwic regions list`
+region = "US-EAST-06"
+zone = "US-EAST-06A"
+# (required) - Fill your Coreweave organization ID (cwic auth whoami)
+org_id = ""
+# (optional) - replace with your CLI profile (cwic auth whoami)
+cwic_profile = "MyProfile"
+
+################################################################################
+# ☸️ Coreweave CKS Cluster Configuration
+################################################################################
+cluster_name = "vllm-cw-prod"
+# default: "1.35" - Kubernetes cluster version
+k8s_version = "1.34"
+
+###############################################
+# Networking
+###############################################
+public_endpoint = true
+vpc_name = "vllm-vpc"
+
+# vpc_host_cidr = "10.192.192.0/18"
+# service_cidr = "10.96.0.0/16"
+# pod_cidr = "10.244.0.0/16"
+# lb_cidr = "10.20.1.0/22"
+################################################################################
+# 🧠 VLLM INFERENCE STACK
+################################################################################
+# default: "false" # Set to "true" to deploy vLLM
+enable_vllm = true
+vllm_namespace = "vllm"
+hf_token = ""
+# gpu_vllm_helm_config = "config/llm-stack/helm/gpu/gpu-gpt-oss-20-cw.tpl" # gpu-llama-light-ingress-cw.tpl| gpu-gpt-qwn-gem-glm-cw.tpl
+# vllm_host_prefix = "vllm"
+###############################################
+# ⚙️ GPU/CPU / Nodegroup settings
+###############################################
+# default: "false"
+enable_nodepool_gpu = true
+# enable_nodepool_cpu = true
+gpu_nodepool_name = "gpu-pool"
+cpu_nodepool_name = "cpu-pool"
+# cpu_node_min = 1
+# cpu_node_max = 2
+# cpu_node_target = 1
+# CPU instance id for mixed nodegroups | please check your region/quota "cd-gp-i64-erapids"  # Intel Emerald Rapids
+# cpu_instance_id = "turin-gp"
+# gpu_node_min = 1
+# gpu_node_max = 2
+# gpu_node_target = 1
+# gpu_instance_type = "H100"
+# gpu_scale_down_strategy = "PreferIdle"
+# gpu_disable_unhealthy_node_eviction = true
+# cpu_scale_down_strategy = "PreferIdle"
+# cpu_disable_unhealthy_node_eviction = true
+
+################################################################################
+# 🔐 ADD-ONS & OBSERVABILITY
+################################################################################
+# Grafana admin password is sensitive; override via CI secret or tfvars
+# enable_metrics_server = false
+# change or leave blank for secret injection
+grafana_admin_password = "admin1234"
+# Replace with your email don't use example.com
+letsencrypt_email = "info@gmail.com"
+# grafana_host_prefix = "grafana"
+# Let's Encrypt
+# default: "false" - Use Let's Encrypt staging environment (for testing) or production (for real certs)
+# use_letsencrypt_staging = true 3 default false
+# prometheus_scrape_interval = "1m"
+# prometheus_retention = "15d"
+# prometheus_pv_size = "25Gi"
