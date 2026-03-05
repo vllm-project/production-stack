@@ -183,7 +183,7 @@ func (r *CacheServerReconciler) deploymentForCacheServer(cacheServer *production
 							Image:           image,
 							ImagePullPolicy: imagePullPolicy,
 							Command: []string{
-								"lmcache_experimental_server",
+								"/opt/venv/bin/lmcache_server",
 								"0.0.0.0",
 								fmt.Sprintf("%d", cacheServer.Spec.Port)},
 							Ports: []corev1.ContainerPort{
