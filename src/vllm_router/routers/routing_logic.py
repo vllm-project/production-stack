@@ -55,6 +55,7 @@ class RoutingLogic(str, enum.Enum):
     KVAWARE = "kvaware"
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
+    PRIORITY = "priority"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -177,6 +178,25 @@ class RoundRobinRouter(RoutingInterface):
         chosen = self.sorted_endpoints[self.req_id % len(self.sorted_endpoints)]
         self.req_id += 1
         return chosen.url
+
+
+class PriorityRouter(RoutingInterface):
+    """
+    Route to the endpoint with lowest QPS (least loaded), i.e. highest
+    effective priority for capacity.
+    """
+
+    def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+    ) -> str:
+        url = self._qps_routing(endpoints, request_stats)
+        if url is None:
+            raise ValueError("No available endpoints to route to.")
+        return url
 
 
 class SessionRouter(RoutingInterface):
@@ -547,6 +567,9 @@ def initialize_routing_logic(
         router = DisaggregatedPrefillRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
+    elif routing_logic == RoutingLogic.PRIORITY:
+        logger.info("Initializing priority routing logic (lowest QPS)")
+        return PriorityRouter()
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -572,6 +595,7 @@ def get_routing_logic() -> RoutingInterface:
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
+        PriorityRouter,
     ):
         if cls in SingletonABCMeta._instances:
             return cls()
@@ -586,6 +610,7 @@ def cleanup_routing_logic():
         KvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
+        PriorityRouter,
     ):
         if cls in SingletonABCMeta._instances:
             instance = cls()

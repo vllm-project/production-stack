@@ -215,6 +215,7 @@ def parse_args():
             "kvaware",
             "prefixaware",
             "disaggregated_prefill",
+            "priority",
         ],
         help="The routing logic to use",
     )

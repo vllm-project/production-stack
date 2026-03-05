@@ -23,7 +23,7 @@ Learn more: [vLLM Semantic Router](https://vllm-semantic-router.com/docs/intro)
 
 ## What are the benefits of integration?
 
-The vLLM Production Stack provides several deployment ways that spin up vLLM servers which can direct traffic to different models, perform service discovery and fault tolerance through the Kubernetes API, and support round‑robin, session‑based, prefix‑aware, KV-aware and disaggregated-prefill routing with LMCache native support. The Semantic Router adds a system‑intelligence layer that classifies each user request, selects the most suitable model from a pool, injects domain‑specific system prompts, performs semantic caching and enforces enterprise‑grade security checks such as PII and jailbreak detection.
+The vLLM Production Stack provides several deployment ways that spin up vLLM servers which can direct traffic to different models, perform service discovery and fault tolerance through the Kubernetes API, and support round‑robin, session‑based, priority (least-loaded), prefix‑aware, KV-aware and disaggregated-prefill routing with LMCache native support. The Semantic Router adds a system‑intelligence layer that classifies each user request, selects the most suitable model from a pool, injects domain‑specific system prompts, performs semantic caching and enforces enterprise‑grade security checks such as PII and jailbreak detection.
 
 By combining these two systems we obtain a unified inference stack. Semantic routing ensures that each request is answered by the best possible model. Production‑Stack routing maximizes infrastructure and inference efficiency, and exposes rich metrics.
 

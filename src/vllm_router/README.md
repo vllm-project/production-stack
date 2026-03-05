@@ -11,7 +11,8 @@ The source code for the request router.
 - Multiple different routing algorithms
   - Round-robin routing
   - Session-ID based routing
-  - (WIP) prefix-aware routing
+  - Priority routing (least-loaded / lowest QPS)
+  - Prefix-aware, KV-aware, and disaggregated-prefill routing
 
 ## Running the router
 
@@ -35,7 +36,7 @@ The router can be configured using command-line arguments. Below are the availab
 
 ### Routing Logic Options
 
-- `--routing-logic`: The routing logic to use. Options are `roundrobin` or `session`. This option is required.
+- `--routing-logic`: The routing logic to use. Options are `roundrobin`, `session`, `priority`, `kvaware`, `prefixaware`, or `disaggregated_prefill`. This option is required.
 - `--session-key`: The key (in the header) to identify a session.
 
 ### Monitoring Options
@@ -119,7 +120,7 @@ Currently, the dynamic config supports the following fields:
 **Required fields:**
 
 - `service_discovery`: The service discovery type. Options are `static` or `k8s`.
-- `routing_logic`: The routing logic to use. Options are `roundrobin` or `session`.
+- `routing_logic`: The routing logic to use. Options are `roundrobin`, `session`, `priority`, `kvaware`, `prefixaware`, or `disaggregated_prefill`.
 
 **Optional fields:**
 
