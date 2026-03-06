@@ -846,6 +846,51 @@
           }
         }
       }
+    },
+    "externalPrometheus": {
+      "type": "object",
+      "description": "Configuration for creating a ServiceMonitor resource for external Prometheus operators",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable creation of a ServiceMonitor resource",
+          "default": false
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Namespace where the ServiceMonitor will be created (defaults to release namespace)"
+        },
+        "labels": {
+          "type": "object",
+          "description": "Additional labels to add to the ServiceMonitor for Prometheus serviceMonitorSelector matching",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "serviceSelector": {
+          "type": "object",
+          "description": "Custom selector to target vLLM services"
+        },
+        "portName": {
+          "type": "string",
+          "description": "Name of the port in the Service to scrape",
+          "default": "service-port"
+        },
+        "path": {
+          "type": "string",
+          "description": "Metrics endpoint path",
+          "default": "/metrics"
+        },
+        "interval": {
+          "type": "string",
+          "description": "Scrape interval",
+          "default": "30s"
+        },
+        "scrapeTimeout": {
+          "type": "string",
+          "description": "Scrape timeout"
+        }
+      }
     }
   }
 }
