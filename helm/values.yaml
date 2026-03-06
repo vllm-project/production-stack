@@ -422,6 +422,15 @@ routerSpec:
   # -- Service port
   servicePort: 80
 
+  # -- NodePort configuration. Only used when serviceType is NodePort.
+  # Assigning explicit values prevents Kubernetes from reassigning ports on upgrades.
+  # Each field is optional; omit to let Kubernetes pick a random port.
+  nodePorts:
+    # -- NodePort for the router service port (router-sport)
+    router: ""
+    # -- NodePort for the lmcache port
+    lmcache: ""
+
   # -- Service discovery mode, supports "k8s" or "static". Defaults to "k8s" if not set.
   serviceDiscovery: "k8s"
   # -- Service discovery mode type, supports "pod-ip" or "service-name". Defaults to "pod-ip" if not set.
