@@ -1,0 +1,147 @@
+# vLLM Production Stack Router for Disaggregated Prefill Orchestrated Mode
+# Uses Kubernetes pod discovery for dynamic endpoint discovery
+#
+# Prerequisites:
+#   1. production-stack.tar.gz must be available on a shared PVC
+#   2. prefill and decode deployments must be running with labels:
+#      - app: prefill/decode
+#      - model: prefill/decode
+
+---
+# ServiceAccount for the router
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: router-sa
+  namespace: default
+---
+# ClusterRole to list/watch pods
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pod-reader
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+# Bind the ClusterRole to the ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: router-pod-reader
+subjects:
+  - kind: ServiceAccount
+    name: router-sa
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: router-headless
+  namespace: default
+spec:
+  selector:
+    app: router
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: router
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: router
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: router
+  template:
+    metadata:
+      labels:
+        app: router
+    spec:
+      serviceAccountName: router-sa
+      nodeSelector:
+        # TODO: Replace with your node selector
+        # eks.amazonaws.com/nodegroup: <your-nodegroup>
+        kubernetes.io/os: linux
+      containers:
+        - name: app
+          image: ubuntu:22.04
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: shared-pvc
+              mountPath: /var/mdl
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: VLLM_LOGGING_LEVEL
+              value: "DEBUG"
+
+          command:
+            - /bin/bash
+            - "-exc"
+            - |
+              set -x
+
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                python3.10 python3.10-venv python3.10-dev python3-pip \
+                ca-certificates curl dnsutils wget vim
+
+              update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+              python -m pip install --upgrade pip setuptools wheel
+
+              # Extract and install production-stack from PVC
+              # TODO: Update path to match your PVC structure
+              echo "Extracting production-stack from /var/mdl/YOUR-DEPS-PATH/production-stack.tar.gz"
+              tar -xzf /var/mdl/YOUR-DEPS-PATH/production-stack.tar.gz -C /tmp/
+
+              # Install production-stack router dependencies
+              export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_VLLM_ROUTER=0.1.0
+              cd /tmp/production-stack
+              pip install -e .
+
+              # Also install aiohttp for the orchestrated router and kubernetes for k8s discovery
+              pip install aiohttp uhashring kubernetes
+
+              echo "Starting vLLM Production Stack Router with K8s pod discovery and disaggregated_prefill_orchestrated routing"
+
+              # Run the production-stack router with K8s pod discovery
+              python -m vllm_router.app \
+                --host=0.0.0.0 \
+                --port=8000 \
+                --routing-logic=disaggregated_prefill_orchestrated \
+                --service-discovery=k8s \
+                --k8s-namespace=default \
+                --k8s-port=8000 \
+                --k8s-label-selector="app in (prefill,decode)" \
+                --prefill-model-labels=prefill \
+                --decode-model-labels=decode \
+                --log-level=debug \
+                --log-stats \
+                --log-stats-interval=30
+
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 128Gi
+        # TODO: Replace with your PVC
+        - name: shared-pvc
+          persistentVolumeClaim:
+            claimName: YOUR-PVC-NAME
