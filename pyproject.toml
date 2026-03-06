@@ -52,6 +52,7 @@ lmcache = [
 ]
 test = [
     "pytest>=8.3.4",
+    "pytest-aiohttp>=1.1.0",
     "pytest-asyncio>=0.25.3",
     "vllm==0.13.0"
 ]
@@ -74,5 +75,6 @@ lint = [
 ]
 test = [
     "pytest>=8.3.4",
-    "pytest-asyncio>=0.25.3"
+    "pytest-aiohttp>=1.1.0",
+    "pytest-asyncio>=0.25.3",
 ]
