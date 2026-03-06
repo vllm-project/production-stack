@@ -38,6 +38,11 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
+      - name: Build Helm dependencies
+        if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'all' }}
+        run: |
+          helm dependency build helm/
+
       - name: Run chart-releaser
         if: ${{ github.event_name == 'push' || github.event.inputs.release_type == 'helm_only' || github.event.inputs.release_type == 'all' }}
         uses: helm/chart-releaser-action@v1.7.0

@@ -81,9 +81,11 @@ deploy_helm_chart() {
     print_status "🚀 Deploying setup with helm using $values_file"
     if helm list -q | grep -q "^vllm$"; then
         print_status "📦 Upgrading existing vllm deployment"
+        helm dependency build helm/
         helm upgrade vllm ./helm -f "$values_file"
     else
         print_status "🚀 Installing new vllm deployment"
+        helm dependency build helm/
         helm install vllm ./helm -f "$values_file"
     fi
 }
