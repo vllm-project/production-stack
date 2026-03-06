@@ -98,6 +98,43 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
 }
 
 
+def _build_debug_headers(
+    server_url: str,
+    endpoints: list,
+    router=None,
+) -> dict:
+    """Build debug response headers with backend information.
+
+    These headers help operators identify which backend processed a request,
+    the routing logic used, and other useful debugging information.
+
+    Args:
+        server_url: The URL of the backend that handled the request.
+        endpoints: The list of EndpointInfo objects considered for routing.
+        router: The router instance (optional), used to extract routing logic name.
+
+    Returns:
+        A dict of debug headers to merge into the response headers.
+    """
+    headers = {
+        "X-Backend-Server": server_url,
+    }
+
+    # Find the endpoint that was used and add its metadata
+    for ep in endpoints:
+        if ep.url == server_url:
+            headers["X-Backend-Id"] = ep.Id
+            if ep.pod_name:
+                headers["X-Backend-Pod"] = ep.pod_name
+            break
+
+    # Add routing logic type
+    if router is not None:
+        headers["X-Routing-Logic"] = type(router).__name__
+
+    return headers
+
+
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
@@ -492,6 +529,12 @@ async def route_general_request(
                 if key.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
             }
             headers_dict["X-Request-Id"] = request_id
+            # Add debug headers with backend information
+            headers_dict.update(
+                _build_debug_headers(
+                    server_url, endpoints, router=request.app.state.router
+                )
+            )
             last_error = None
             break
         except HTTPException:
@@ -859,7 +902,17 @@ async def route_disaggregated_prefill_request(
     return StreamingResponse(
         generate_stream(),
         media_type="application/json",
-        headers={"X-Request-Id": request_id},
+        headers={
+            "X-Request-Id": request_id,
+            "X-Backend-Server-Prefill": str(
+                request.app.state.prefill_client._base_url
+            ),
+            "X-Backend-Server-Decode": str(
+                request.app.state.decode_client._base_url
+            ),
+            "X-Backend-Type": "disaggregated",
+            "X-Routing-Logic": "DisaggregatedPrefillRouter",
+        },
     )
 
 
@@ -935,10 +988,18 @@ async def route_sleep_wakeup_request(
             elif endpoint == "/wake_up":
                 service_discovery.remove_sleep_label(pod_name)
 
+            response_headers = {
+                "X-Request-Id": request_id,
+                "X-Backend-Server": server_url,
+                "X-Backend-Id": endpoints[0].Id,
+            }
+            if endpoints[0].pod_name:
+                response_headers["X-Backend-Pod"] = endpoints[0].pod_name
+
             return JSONResponse(
                 status_code=response_status,
                 content={"status": "success"},
-                headers={"X-Request-Id": request_id},
+                headers=response_headers,
             )
 
 
@@ -1108,6 +1169,12 @@ async def proxy_multipart_request(
         }
 
         headers["X-Request-Id"] = request_id
+        # Add debug headers with backend information
+        headers.update(
+            _build_debug_headers(
+                chosen_url, endpoints, router=request.app.state.router
+            )
+        )
 
         return JSONResponse(
             content=response_content,
