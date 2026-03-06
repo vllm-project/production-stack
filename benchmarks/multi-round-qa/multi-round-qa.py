@@ -126,6 +126,8 @@ class RequestExecutor:
         start_time = time.time()
         first_token_time = None
         words = ""
+        tokens_out = 0
+        tokens_prefill = 0
 
         response = await self.client.chat.completions.create(
             messages=messages,
@@ -138,20 +140,36 @@ class RequestExecutor:
         )
 
         async for tok in response:
-            if not tok.choices:
+            # 1. Handle Usage (Newer vLLM puts this in the last chunk)
+            if hasattr(tok, "usage") and tok.usage is not None:
+                tokens_out = tok.usage.completion_tokens
+                tokens_prefill = tok.usage.prompt_tokens
+
+            # 2. Skip chunks without content (like the final usage chunk)
+            if not tok.choices or len(tok.choices) == 0:
                 continue
-            chunk_message = tok.choices[0].delta.content
-            if chunk_message is not None:
-                if first_token_time is None and chunk_message != "":
+
+            # 3. Support both 'content' and 'reasoning_content'
+            delta = tok.choices[0].delta
+            chunk_message = getattr(delta, "content", None) or getattr(
+                delta, "reasoning_content", None
+            )
+
+            if chunk_message:
+                if first_token_time is None:
                     first_token_time = time.time()
                 words += chunk_message
-        tokens_out = tok.usage.completion_tokens
-        tokens_prefill = tok.usage.prompt_tokens
+
+        # 4. Final Math Safety (The Crash Fix)
+        # If the model failed to return tokens, we set TTFT to 0 to avoid NoneType errors
+        actual_first_token = (
+            first_token_time if first_token_time is not None else start_time
+        )
 
         return Response(
             body=words,
-            ttft=first_token_time - start_time,
-            generation_time=time.time() - first_token_time,
+            ttft=actual_first_token - start_time,
+            generation_time=time.time() - actual_first_token,
             prompt_tokens=tokens_prefill,
             generation_tokens=tokens_out,
             launch_time=start_time,
