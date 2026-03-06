@@ -145,6 +145,11 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         self.current_config = init_config
         self.app = app
 
+        # Flag to force reconfiguration on next successful parse,
+        # even if the config hasn't changed. This is needed to recover
+        # from scenarios where a previous parse or reconfigure failed.
+        self._force_reconfigure = False
+
         # Watcher thread
         self.running = True
         self.watcher_thread = threading.Thread(target=self._watch_worker)
@@ -236,12 +241,35 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
     def reconfigure_all(self, config: DynamicRouterConfig):
         """
         Reconfigures the router with the given config.
+
+        Each sub-reconfiguration is wrapped in its own try/except to ensure
+        that a failure in one subsystem does not prevent the others from
+        being reconfigured. If any subsystem fails, the error is logged
+        and the method raises the last encountered exception so the caller
+        knows reconfiguration was not fully successful.
         """
-        self.reconfigure_service_discovery(config)
-        self.reconfigure_routing_logic(config)
-        self.reconfigure_batch_api(config)
-        self.reconfigure_stats(config)
-        self.reconfigure_callbacks(config)
+        errors = []
+        subsystems = [
+            ("service_discovery", self.reconfigure_service_discovery),
+            ("routing_logic", self.reconfigure_routing_logic),
+            ("batch_api", self.reconfigure_batch_api),
+            ("stats", self.reconfigure_stats),
+            ("callbacks", self.reconfigure_callbacks),
+        ]
+        for name, reconfigure_fn in subsystems:
+            try:
+                reconfigure_fn(config)
+            except Exception as e:
+                logger.error(
+                    f"DynamicConfigWatcher: Failed to reconfigure {name}: {e}"
+                )
+                errors.append((name, e))
+
+        if errors:
+            failed_names = ", ".join(name for name, _ in errors)
+            raise RuntimeError(
+                f"DynamicConfigWatcher: Reconfiguration failed for: {failed_names}"
+            )
 
     def _sleep_or_break(self, check_interval: float = 1):
         """
@@ -258,8 +286,17 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         Watches the config file for changes and updates the DynamicRouterConfig accordingly.
         On every watch_interval, it will try loading the config file and compare the changes.
         If the config file has changed, it will reconfigure the system with the new config.
+
+        Recovery behavior:
+        - If the config file cannot be parsed, a force-reconfigure flag is set so that
+          the next successfully parsed config will trigger reconfiguration even if it
+          matches the current config. This handles the scenario where a user breaks the
+          config file (e.g., invalid JSON), then fixes it back to the same content.
+        - If reconfiguration partially fails, the force-reconfigure flag is also set
+          to ensure a retry on the next iteration.
         """
         while self.running:
+            # Step 1: Parse the config file
             try:
                 if self.config_file_type == "YAML":
                     config = DynamicRouterConfig.from_yaml(self.config_path)
@@ -267,15 +304,45 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                     config = DynamicRouterConfig.from_json(self.config_path)
                 else:
                     raise ValueError("Unsupported config file type.")
-                if config != self.current_config:
-                    logger.info(
-                        "DynamicConfigWatcher: Config changed, reconfiguring..."
-                    )
-                    self.reconfigure_all(config)
-                    logger.info("DynamicConfigWatcher: Config reconfiguration complete")
-                    self.current_config = config
             except Exception as e:
-                logger.warning(f"DynamicConfigWatcher: Error loading config file: {e}")
+                logger.warning(
+                    f"DynamicConfigWatcher: Error parsing config file: {e}"
+                )
+                # Force reconfigure on next successful parse to ensure
+                # the system recovers even if the fixed config is identical
+                # to the current config.
+                self._force_reconfigure = True
+                self._sleep_or_break()
+                continue
+
+            # Step 2: Check if reconfiguration is needed
+            config_changed = config != self.current_config
+            if not config_changed and not self._force_reconfigure:
+                self._sleep_or_break()
+                continue
+
+            # Step 3: Apply the new config
+            reason = (
+                "config changed"
+                if config_changed
+                else "retrying after previous error"
+            )
+            logger.info(
+                f"DynamicConfigWatcher: Reconfiguring ({reason})..."
+            )
+            try:
+                self.reconfigure_all(config)
+                logger.info(
+                    "DynamicConfigWatcher: Config reconfiguration complete"
+                )
+                self.current_config = config
+                self._force_reconfigure = False
+            except Exception as e:
+                logger.warning(
+                    f"DynamicConfigWatcher: Error during reconfiguration: {e}"
+                )
+                # Force retry on next iteration
+                self._force_reconfigure = True
 
             self._sleep_or_break()
 
