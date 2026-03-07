@@ -530,6 +530,12 @@
         "servicePort": {
           "type": "integer"
         },
+        "nodePort": {
+          "type": "integer",
+          "description": "Fixed NodePort for the router service when serviceType is NodePort. If unset, Kubernetes assigns a random port.",
+          "minimum": 30000,
+          "maximum": 32767
+        },
         "startupProbe": {
           "type": "object",
           "properties": {
