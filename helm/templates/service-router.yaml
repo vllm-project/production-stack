@@ -17,7 +17,7 @@ spec:
       port: {{ .Values.routerSpec.servicePort }}
       targetPort: {{ .Values.routerSpec.containerPort }}
       protocol: TCP
-      {{- if and (eq .Values.routerSpec.serviceType "NodePort") (hasKey .Values.routerSpec "nodePort") }}
+      {{- if and (eq .Values.routerSpec.serviceType "NodePort") .Values.routerSpec.nodePort }}
       nodePort: {{ .Values.routerSpec.nodePort }}
       {{- end }}
     - name: "lmcache-port"

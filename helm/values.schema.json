@@ -530,12 +530,6 @@
         "servicePort": {
           "type": "integer"
         },
-        "nodePort": {
-          "type": "integer",
-          "description": "Fixed NodePort for the router service when serviceType is NodePort. If unset, Kubernetes assigns a random port.",
-          "minimum": 30000,
-          "maximum": 32767
-        },
         "startupProbe": {
           "type": "object",
           "properties": {
@@ -765,6 +759,12 @@
         "servicePort": {
           "type": "integer"
         },
+        "nodePort": {
+          "type": "integer",
+          "description": "Fixed NodePort for the router service when serviceType is NodePort. If unset, Kubernetes assigns a random port.",
+          "minimum": 30000,
+          "maximum": 32767
+        },
         "serviceDiscovery": {
           "type": "string",
           "description": "Service discovery mode. Available values: k8s or static.",
@@ -852,6 +852,217 @@
           }
         }
       }
+    },
+    "cacheserverSpec": {
+      "type": "object",
+      "description": "Configuration for the LMCache cache server deployment",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "Docker image repository for the cache server"
+        },
+        "tag": {
+          "type": "string",
+          "description": "Docker image tag for the cache server"
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "description": "Image pull secrets for private container registries",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        },
+        "replicaCount": {
+          "type": "integer",
+          "description": "Number of replicas for the cache server pod"
+        },
+        "containerPort": {
+          "type": "integer",
+          "description": "Port the cache server container is listening on"
+        },
+        "servicePort": {
+          "type": "integer",
+          "description": "Port the cache server service will listen on"
+        },
+        "serviceType": {
+          "type": "string",
+          "description": "Kubernetes service type for the cache server"
+        },
+        "serde": {
+          "type": "string",
+          "description": "Serialization/deserialization format for the cache server"
+        },
+        "labels": {
+          "type": "object",
+          "description": "Customized labels for the cache server deployment",
+          "properties": {
+            "environment": {
+              "type": "string"
+            },
+            "release": {
+              "type": "string"
+            }
+          }
+        },
+        "podAnnotations": {
+          "type": "object",
+          "description": "Annotations to add to the cache server pods",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "strategy": {
+          "type": "object",
+          "description": "Deployment strategy for the cache server pods",
+          "additionalProperties": true
+        },
+        "maxUnavailablePodDisruptionBudget": {
+          "type": "string",
+          "description": "Configuration for the PodDisruptionBudget maxUnavailable field"
+        },
+        "tolerations": {
+          "type": "array",
+          "description": "Tolerations configuration for the cache server pods",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "nodeSelectorTerms": {
+          "type": "array",
+          "description": "Node selector terms. Ignored if affinity is specified.",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "runtimeClassName": {
+          "type": "string",
+          "description": "RuntimeClassName configuration for the cache server pods"
+        },
+        "schedulerName": {
+          "type": "string",
+          "description": "SchedulerName configuration for the cache server pods"
+        },
+        "priorityClassName": {
+          "type": "string",
+          "description": "Priority class for the cache server pods"
+        },
+        "securityContext": {
+          "type": "object",
+          "description": "Pod-level security context configuration",
+          "additionalProperties": true
+        },
+        "containerSecurityContext": {
+          "type": "object",
+          "description": "Container-level security context configuration",
+          "additionalProperties": true
+        },
+        "affinity": {
+          "type": "object",
+          "description": "Affinity configuration. If specified, takes precedence over nodeSelectorTerms.",
+          "additionalProperties": true
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource requests and limits for the cache server container",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string"
+                },
+                "memory": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "startupProbe": {
+          "type": "object",
+          "description": "Configuration for the startup probe",
+          "properties": {
+            "initialDelaySeconds": {
+              "type": "integer"
+            },
+            "periodSeconds": {
+              "type": "integer"
+            },
+            "failureThreshold": {
+              "type": "integer"
+            },
+            "timeoutSeconds": {
+              "type": "integer"
+            },
+            "httpGet": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "livenessProbe": {
+          "type": "object",
+          "description": "Configuration for the liveness probe",
+          "properties": {
+            "initialDelaySeconds": {
+              "type": "integer"
+            },
+            "periodSeconds": {
+              "type": "integer"
+            },
+            "failureThreshold": {
+              "type": "integer"
+            },
+            "timeoutSeconds": {
+              "type": "integer"
+            },
+            "httpGet": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "port": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "repository",
+        "tag",
+        "containerPort"
+      ]
     }
   }
 }
