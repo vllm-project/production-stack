@@ -223,7 +223,7 @@ async def process_request(
                     output_tokens_total.labels(
                         server=backend_url, model=model_name
                     ).inc(usage["completion_tokens"])
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
                 logger.debug("Cannot parse response as JSON, skipping token tracking")
 
         # Store in semantic cache if applicable
@@ -518,11 +518,12 @@ async def route_general_request(
             end_span(span, error=e, status_code=500) if tracing_active else None
             raise
 
+    media_type = headers_dict.pop("content-type", "text/event-stream")
     return StreamingResponse(
         traced_stream(),
         status_code=status,
         headers=headers_dict,
-        media_type="text/event-stream",
+        media_type=media_type,
     )
 
 
