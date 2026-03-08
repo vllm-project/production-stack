@@ -3,7 +3,7 @@ import sys
 from logging import Logger
 
 _LOG_LEVEL = logging.INFO
-_loggers: list[Logger] = []
+_loggers: set[Logger] = set()
 
 _LEVEL_NAME_MAP = {
     "critical": logging.CRITICAL,
@@ -75,17 +75,18 @@ def init_logger(name: str, log_level=None) -> Logger:
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
 
-    stdout_stream = logging.StreamHandler(sys.stdout)
-    stdout_stream.setLevel(log_level)
-    stdout_stream.setFormatter(CustomFormatter())
-    stdout_stream.addFilter(MaxLevelFilter(logging.INFO))
-    logger.addHandler(stdout_stream)
+    if not logger.handlers:
+        stdout_stream = logging.StreamHandler(sys.stdout)
+        stdout_stream.setLevel(log_level)
+        stdout_stream.setFormatter(CustomFormatter())
+        stdout_stream.addFilter(MaxLevelFilter(logging.INFO))
+        logger.addHandler(stdout_stream)
 
-    error_stream = logging.StreamHandler()
-    error_stream.setLevel(logging.WARNING)
-    error_stream.setFormatter(CustomFormatter())
-    logger.addHandler(error_stream)
-    logger.propagate = False
+        error_stream = logging.StreamHandler()
+        error_stream.setLevel(logging.WARNING)
+        error_stream.setFormatter(CustomFormatter())
+        logger.addHandler(error_stream)
+        logger.propagate = False
 
-    _loggers.append(logger)
+    _loggers.add(logger)
     return logger
