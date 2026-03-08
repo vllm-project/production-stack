@@ -215,10 +215,10 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.requestStatsWindow` | integer | `60` | Window size in seconds for calculating request statistics |
 | `routerSpec.strategy` | map | `{}` | Deployment strategy for the router pods |
 | `routerSpec.vllmApiKey` | string/map | `null` | (Optional) API key for securing vLLM models |
-| `routerSpec.resources.requests.cpu` | string | `"4"` | CPU requests for router |
-| `routerSpec.resources.requests.memory` | string | `"16G"` | Memory requests for router |
-| `routerSpec.resources.limits.cpu` | string | `"8"` | CPU limits for router |
-| `routerSpec.resources.limits.memory` | string | `"32G"` | Memory limits for router |
+| `routerSpec.resources.requests.cpu` | string | `"400m"` | CPU requests for router |
+| `routerSpec.resources.requests.memory` | string | `"1000Mi"` | Memory requests for router |
+| `routerSpec.resources.limits.cpu` | string | `""` | CPU limits for router (unset by default) |
+| `routerSpec.resources.limits.memory` | string | `"2000Mi"` | Memory limits for router |
 | `routerSpec.labels` | map | `{environment: "router", release: "router"}` | Customized labels for the router deployment |
 | `routerSpec.podAnnotations` | map | `{}` | (Optional) Annotations to add to the pod, e.g., {model: "opt125m"} |
 | `routerSpec.affinity` | map | {} | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
