@@ -159,7 +159,7 @@ async def process_request(
         request_json = json.loads(body)
         is_streaming = request_json.get("stream", False)
         model_name = request_json.get("model", "unknown")
-    except JSONDecodeError:
+    except (JSONDecodeError, UnicodeDecodeError, ValueError):
         # If we can't parse the body as JSON, assume it's not streaming
         raise HTTPException(status=400, detail="Request body is not JSON parsable.")
 
@@ -475,6 +475,7 @@ async def route_general_request(
             if span is not None:
                 span.set_attribute("vllm.backend_url", server_url)
 
+        media_type = "text/event-stream"
         try:
             stream_generator = process_request(
                 request,
@@ -486,10 +487,12 @@ async def route_general_request(
                 parent_span_context=span_context,
             )
             headers, status = await anext(stream_generator)
+            media_type = headers.get("content-type", "text/event-stream")
             headers_dict = {
                 key: value
                 for key, value in headers.items()
                 if key.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
+                and key.lower() != "content-type"
             }
             headers_dict["X-Request-Id"] = request_id
             last_error = None
@@ -518,7 +521,6 @@ async def route_general_request(
             end_span(span, error=e, status_code=500) if tracing_active else None
             raise
 
-    media_type = headers_dict.pop("content-type", "text/event-stream")
     return StreamingResponse(
         traced_stream(),
         status_code=status,
