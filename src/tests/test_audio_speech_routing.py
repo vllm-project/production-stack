@@ -28,8 +28,9 @@ class EndpointInfo:
 def _make_mock_headers(content_type: str):
     h = MagicMock()
     h.items.return_value = [("content-type", content_type)]
-    # Support dict-style access so headers_dict comprehension works
-    h.__iter__ = lambda self: iter([("content-type", content_type)])
+    h.get.side_effect = lambda key, default=None: (
+        content_type if str(key).lower() == "content-type" else default
+    )
     return h
 
 
@@ -144,7 +145,7 @@ async def test_fallback_to_event_stream_when_no_content_type(setup):
 
     h = MagicMock()
     h.items.return_value = []  # no content-type header
-    h.__iter__ = lambda self: iter([])
+    h.get.side_effect = lambda _, default=None: default
 
     async def no_ct_backend(*a, **kw):
         yield h, 200
