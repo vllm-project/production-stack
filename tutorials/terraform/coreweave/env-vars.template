@@ -1,0 +1,86 @@
+#!/bin/bash
+################################################################################
+# Notes
+################################################################################
+# This file is an Env template that sets environment variables for the Coreweave deployment
+# copy and customize the values accordingly (hf_token, grafana_admin_password, neb_project_id,..etc)
+# 1.  cp ./env-vars.template env-vars
+# 2.  vi env-vars -- adjust the values as needed and
+# 3. source ./env-vars
+################################################################################
+# 🔐 CORE PROVIDER CREDENTIALS AND REGION
+################################################################################
+export TF_VAR_cw_token=""                # (required) -  Fill your Coreweave token
+export TF_VAR_region="US-EAST-06"        # cw deployment region Change if needed, check available regions with `cwic regions list`
+export TF_VAR_zone="US-EAST-06A"         # (required) - cw zone
+export TF_VAR_org_id=""                  # (required) -  Fill your Coreweave organization ID (cwic auth whoami)
+export TF_VAR_cwic_profile="MyProfile" #  (optional) -  replace with your  CLI profile (cwic auth whoami)
+################################################################################
+# ☸️ Coreweave Cluster Configuration
+################################################################################
+#  Coreweave cluster basics
+export TF_VAR_cluster_name="vllm-cw-prod" # default: "vllm-eks-prod"
+export TF_VAR_k8s_version="1.34"       # default: "1.35" - Kubernetes cluster version
+################################################################################
+# Cluster / Networking
+################################################################################
+export TF_VAR_public_endpoint="true"   # "true" or "false"
+export TF_VAR_vpc_name="vllm-vpc"
+# export TF_VAR_vpc_host_cidr="10.192.192.0/18"
+# export TF_VAR_service_cidr="10.96.0.0/16"
+# export TF_VAR_pod_cidr="10.244.0.0/16"
+# export TF_VAR_lb_cidr="10.20.1.0/22"
+################################################################################
+# 🧠 VLLM INFERENCE STACK
+################################################################################
+export TF_VAR_enable_vllm="true"  # default: "false" # Set to "true" to deploy vLLM
+export TF_VAR_vllm_namespace="vllm"
+export TF_VAR_hf_token=""  # (required if vLLM enabled) - Hugging Face token for model download (if needed)
+# export TF_VAR_gpu_vllm_helm_config="config/llm-stack/helm/gpu/gpu-gpt-oss-20-cw.tpl" #  gpu-llama-light-ingress-cw.tpl| gpu-gpt-qwn-gem-glm-cw.tpl
+# export TF_VAR_vllm_host_prefix="vllm"
+################################################################################
+# ⚙️ GPU/CPU / Nodegroup settings
+################################################################################
+export TF_VAR_enable_nodepool_gpu="true"  # default: "false"
+# export TF_VAR_enable_nodepool_cpu="true"
+# GPU/CPU Nodegroup settings
+export TF_VAR_gpu_nodepool_name="gpu-pool"
+export TF_VAR_cpu_nodepool_name="cpu-pool"
+# export TF_VAR_gpu_node_min="1"
+# export TF_VAR_gpu_node_max="2"
+# export TF_VAR_gpu_node_target="1"
+# export TF_VAR_gpu_instance_type="H100"
+# export TF_VAR_cpu_node_min="1"
+# export TF_VAR_cpu_node_max="2"
+# export TF_VAR_cpu_node_target="1"
+# export TF_VAR_cpu_instance_id="turin-gp"  # CPU instance id for mixed nodegroups | please check your region/quota "cd-gp-i64-erapids"  # Intel Emerald Rapids
+# export TF_VAR_gpu_scale_down_strategy="PreferIdle"
+# export TF_VAR_gpu_disable_unhealthy_node_eviction="true"
+# export TF_VAR_cpu_scale_down_strategy="PreferIdle"
+# export TF_VAR_cpu_disable_unhealthy_node_eviction="true"
+################################################################################
+# 🔐 ADD-ONS & OBSERVABILITY
+################################################################################
+# Grafana admin password is sensitive; override via CI secret or tfvars
+# export TF_VAR_enable_metrics_server="true"
+export TF_VAR_grafana_admin_password="admin1234"  # change or leave blank for secret injection
+export TF_VAR_letsencrypt_email="info@gmail.com" # Replace with your email don't use example.com
+# export TF_VAR_grafana_host_prefix="grafana"
+# Let's Encrypt
+# export TF_VAR_use_letsencrypt_staging="true" # default: "false" - Use Let's Encrypt staging environment (for testing) or production (for real certs)
+# export TF_VAR_prometheus_scrape_interval="1m"
+# export TF_VAR_prometheus_retention="15d"
+# export TF_VAR_prometheus_pv_size="25Gi"
+################################################################################################################################################################
+# 📝 VALIDATION
+################################################################################
+echo "Environment variables loaded for vLLM CoreWeave stack"
+echo "Please verify:"
+echo "  ✓ TF_VAR_cw_token and TF_VAR_org_id are set"
+echo "  ✓ TF_VAR_hf_token is set if enable_vllm=true"
+echo "  ✓ TF_VAR_grafana_admin_password has been changed"
+echo "  ✓ TF_VAR_letsencrypt_email has been changed (example.com are banned by Let's Encrypt)"
+echo "  ✓ TF_VAR_gpu_vllm_helm_config is set if enable_vllm=true"
+echo "  ✓ TF_VAR_cpu_instance_id is available in the selected region and within your quota if enable_nodepool_cpu=true"
+
+echo "Environment variables loaded for vLLM CoreWeave stack"
