@@ -34,7 +34,6 @@ servingEngineSpec:
     vllmConfig:
       dtype:  "float16"   # Using float16 for broader compatibility, though L40S supports bfloat16.
       extraArgs:
-        - "--disable-log-requests"
         - "--gpu-memory-utilization=0.8"  # GPU-specific optimization
     env: []        # NEW: CPU env vars removed
     #   - name: VLLM_CPU_KVCACHE_SPACE
