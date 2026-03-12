@@ -418,6 +418,9 @@ routerSpec:
   serviceType: ClusterIP
   # -- Service annotations if you use a LoadBalancer or NodePort service type
   serviceAnnotations: {}
+  # -- Fixed NodePort for the router service when serviceType is NodePort.
+  # -- If not set, Kubernetes assigns a random port (range 30000-32767).
+  # nodePort: 30080
 
   # -- Service port
   servicePort: 80
