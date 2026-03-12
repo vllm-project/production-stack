@@ -164,7 +164,6 @@ Sample Configurations
        tensorParallelSize: 1
        gpuMemoryUtilization: "0.8"
        maxLoras: 4
-       extraArgs: ["--disable-log-requests"]
        v1: true
        port: 8000
        # Environment variables
