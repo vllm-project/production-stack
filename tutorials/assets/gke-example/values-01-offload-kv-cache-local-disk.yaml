@@ -28,7 +28,6 @@ servingEngineSpec:
       tensorParallelSize: 8
       dtype: "bfloat16"
       extraArgs:
-        - "--disable-log-requests"
         - "--max_num_batched_tokens"
         - "2048"
 

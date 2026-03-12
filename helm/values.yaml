@@ -86,7 +86,7 @@ servingEngineSpec:
   #   - gpuMemoryUtilization: (optional, float) The fraction of GPU memory to be used for the model executor, which can range from 0 to 1. e.g., 0.95
   #   - runner: (optional, string) The runner type for the model, can be "auto" or "pooling". e.g., "pooling"
   #   - convert: (optional, string) The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score". e.g., "embed"
-  #   - extraArgs: (optional, list) Extra command line arguments to pass to vLLM, e.g., ["--disable-log-requests"]
+  #   - extraArgs: (optional, list) Extra command line arguments to pass to vLLM, e.g., ["--gpu-memory-utilization", "0.4"]
   #
   # - lmcacheConfig: (optional, map) The configuration of the LMCache for KV offloading, supported options are:
   #   - enabled: (optional, bool) Enable LMCache, e.g., true
@@ -204,7 +204,7 @@ servingEngineSpec:
   #     maxNumSeqs: 32
   #     gpuMemoryUtilization: 0.95
   #     maxLoras: 4
-  #     extraArgs: ["--disable-log-requests", "--trust-remote-code"]
+  #     extraArgs: ["--trust-remote-code"]
   #
   #   lmcacheConfig:
   #     enabled: true
