@@ -44,7 +44,6 @@ servingEngineSpec:
       enablePrefixCaching: true
       dtype: "auto"
       extraArgs:
-        - "--disable-log-requests"      # "default quant_method": "mxfp4" is auto-detected by vLLM
         - "--gpu-memory-utilization=0.95"
         - "--tensor-parallel-size=2"   # Mandatory for 120B to run smoothly
     env:
@@ -100,7 +99,6 @@ servingEngineSpec:
       dtype: "bfloat16"
       maxModelLen: 8192
       extraArgs:
-        - "--disable-log-requests"
         - "--gpu-memory-utilization=0.80"
         - "--enforce-eager"
     lmcacheConfig:
@@ -243,7 +241,6 @@ servingEngineSpec:
 #       maxModelLen: 8192
 #       dtype: "bfloat16"
 #       extraArgs:
-#         - "--disable-log-requests"
 #         - "--gpu-memory-utilization=0.60"
 #         - "--trust-remote-code"
 #         - "--enable-auto-tool-choice"

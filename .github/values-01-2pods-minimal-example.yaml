@@ -26,7 +26,7 @@ servingEngineSpec:
 
     vllmConfig:
       maxModelLen: 1024
-      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.4"]
+      extraArgs: ["--gpu-memory-utilization", "0.4"]
 
 routerSpec:
   repository: "localhost:5000/git-act-router"

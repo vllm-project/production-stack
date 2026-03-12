@@ -143,7 +143,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].vllmConfig.gpuMemoryUtilization` | number | `0.9` | The fraction of GPU memory to be used for the model executor (0-1) |
 | `servingEngineSpec.modelSpec[].vllmConfig.runner` | string | `""` | The runner type for the model, can be "auto" or "pooling" |
 | `servingEngineSpec.modelSpec[].vllmConfig.convert` | string | `""` | The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score" |
-| `servingEngineSpec.modelSpec[].vllmConfig.extraArgs` | list | `["--disable-log-requests"]` | Extra command line arguments to pass to vLLM |
+| `servingEngineSpec.modelSpec[].vllmConfig.extraArgs` | list | `["--gpu-memory-utilization", "0.4"]` | Extra command line arguments to pass to vLLM |
 
 #### LMCache Configuration
 
