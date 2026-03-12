@@ -20,7 +20,7 @@ servingEngineSpec:
       enablePrefixCaching: false
       maxModelLen: 4096
       dtype: "bfloat16"
-      extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+      extraArgs: ["--gpu-memory-utilization", "0.8"]
 
     lmcacheConfig:
       enabled: true

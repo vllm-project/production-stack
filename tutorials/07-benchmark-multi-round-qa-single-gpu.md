@@ -48,7 +48,7 @@ servingEngineSpec:
       enablePrefixCaching: false
       maxModelLen: 32000
       dtype: "bfloat16"
-      extraArgs: ["--disable-log-requests", "--swap-space", 0]
+      extraArgs: ["--swap-space", 0]
     lmcacheConfig:
       enabled: true
       cpuOffloadingBufferSize: "60"
@@ -118,7 +118,7 @@ servingEngineSpec:
     vllmConfig:
       enableChunkedPrefill: false
       maxModelLen: 32000
-      extraArgs: ["--disable-log-requests", "--swap-space", 0]
+      extraArgs: [ "--swap-space", 0]
 
     lmcacheConfig:
       enabled: false

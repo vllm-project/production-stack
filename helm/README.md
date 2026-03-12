@@ -145,7 +145,7 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].vllmConfig.gpuMemoryUtilization` | number | `0.9` | The fraction of GPU memory to be used for the model executor (0-1) |
 | `servingEngineSpec.modelSpec[].vllmConfig.runner` | string | `""` | The runner type for the model, can be "auto" or "pooling" |
 | `servingEngineSpec.modelSpec[].vllmConfig.convert` | string | `""` | The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score" |
-| `servingEngineSpec.modelSpec[].vllmConfig.extraArgs` | list | `["--disable-log-requests"]` | Extra command line arguments to pass to vLLM |
+| `servingEngineSpec.modelSpec[].vllmConfig.extraArgs` | list | `["--trust-remote-code"]` | Extra command line arguments to pass to vLLM |
 
 #### LMCache Configuration
 
@@ -230,6 +230,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.containerPort` | integer | `8000` | Port the router container is listening on |
 | `routerSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the router |
 | `routerSpec.serviceAnnotations` | map | `{}` | Service annotations for LoadBalancer/NodePort |
+| `routerSpec.nodePort` | integer | `-` | (Optional) Fixed NodePort for the router service when `serviceType` is `NodePort`. If unset, Kubernetes assigns a random port (30000-32767). |
 | `routerSpec.servicePort` | integer | `80` | Port the router service will listen on |
 | `routerSpec.serviceDiscovery` | string | `"k8s"` | Service discovery mode ("k8s" or "static") |
 | `routerSpec.k8sServiceDiscoveryType` | string | `"pod-ip"` | Service discovery Type ("pod-ip" or "service-name") if serviceDiscovery is "k8s" |
