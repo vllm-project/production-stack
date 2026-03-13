@@ -25,7 +25,6 @@ docker run --runtime nvidia --gpus all \
     $IMAGE \
      meta-llama/Llama-3.1-8B-Instruct \
     --port 8100 \
-    --disable-log-requests \
     --enforce-eager \
     --kv-transfer-config \
     '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_producer","kv_connector_extra_config": {"discard_partial_chunks": false, "lmcache_rpc_port": "producer1"}}'

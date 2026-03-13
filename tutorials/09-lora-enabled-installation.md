@@ -330,7 +330,7 @@ servingEngineSpec:
         maxModelLen: 4096
         dtype: "bfloat16"
         v1: 1
-        extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+        extraArgs: ["--gpu-memory-utilization", "0.8"]
 
       # Mount Hugging Face credentials and configure LoRA settings
       env:
@@ -453,7 +453,7 @@ servingEngineSpec:
         maxModelLen: 4096
         dtype: "bfloat16"
         v1: 1
-        extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+        extraArgs: ["--gpu-memory-utilization", "0.8"]
 
       # Mount Hugging Face credentials and configure LoRA settings
       env:
@@ -543,7 +543,7 @@ servingEngineSpec:
         maxModelLen: 4096
         dtype: "bfloat16"
         v1: 1
-        extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+        extraArgs: ["--gpu-memory-utilization", "0.8"]
 
       # Mount Hugging Face credentials and configure LoRA settings
       env:
