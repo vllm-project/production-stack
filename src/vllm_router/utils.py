@@ -2,6 +2,7 @@ import abc
 import enum
 import io
 import json
+import os
 import re
 import resource
 import wave
@@ -239,6 +240,12 @@ def update_content_length(request: Request, request_body: str):
 def is_model_healthy(url: str, model: str, model_type: str) -> bool:
     model_url = ModelType.get_url(model_type)
 
+    # Include API key header if configured, matching the pattern used
+    # throughout the codebase (e.g., service_discovery.py)
+    auth_headers = {}
+    if VLLM_API_KEY := os.getenv("VLLM_API_KEY"):
+        auth_headers["Authorization"] = f"Bearer {VLLM_API_KEY}"
+
     try:
         if model_type == "transcription":
             # for transcription, the backend expects multipart/form-data with a file
@@ -247,13 +254,14 @@ def is_model_healthy(url: str, model: str, model_type: str) -> bool:
                 f"{url}{model_url}",
                 files=ModelType.get_test_payload(model_type),  # multipart/form-data
                 data={"model": model},
+                headers=auth_headers or None,
                 timeout=10,
             )
         else:
             # for other model types (chat, completion, etc.)
             response = requests.post(
                 f"{url}{model_url}",
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", **auth_headers},
                 json={"model": model} | ModelType.get_test_payload(model_type),
                 timeout=10,
             )
