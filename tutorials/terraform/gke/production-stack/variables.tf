@@ -23,16 +23,3 @@ variable "setup_yaml" {
   type = string
   default = "../production_stack_specification.yaml"
 }
-
-
-variable "prom_stack_yaml" {
-  description = "default prom stack yaml file"
-  type = string
-  default = "../../../../observability/kube-prom-stack.yaml"
-}
-
-variable "prom_adapter_yaml" {
-  description = "default prom adapter yaml file"
-  type = string
-  default = "../../../../observability/prom-adapter.yaml"
-}
