@@ -188,12 +188,20 @@ spec:
                   memory:
                     type: string
                 type: object
+              lmcacheControllerPort:
+                default: 9000
+                description: LmcacheControllerPort is the port of the LMCache controller
+                  (used with kvaware routing)
+                format: int32
+                type: integer
               routingLogic:
                 default: roundrobin
                 description: RoutingLogic specifies the routing strategy
                 enum:
                 - roundrobin
                 - session
+                - prefixaware
+                - kvaware
                 type: string
               serviceAccountName:
                 description: ServiceAccountName for the router pod
