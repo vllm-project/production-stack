@@ -326,15 +326,35 @@ class UserSession:
             return
 
     def summary(self) -> pd.DataFrame:
+        # Take a snapshot of all result lists to avoid race conditions with
+        # concurrent _update_result() callbacks that may append to some lists
+        # but not others, causing DataFrame column length mismatches.
+        prompt_lengths = list(self.prompt_lengths)
+        generation_lengths = list(self.generation_lengths)
+        ttfts = list(self.ttfts)
+        generation_times = list(self.generation_times)
+        launch_times = list(self.launch_times)
+        finish_times = list(self.finish_times)
+
+        # Use the minimum length across all lists to ensure consistency
+        n = min(
+            len(prompt_lengths),
+            len(generation_lengths),
+            len(ttfts),
+            len(generation_times),
+            len(launch_times),
+            len(finish_times),
+        )
+
         df = pd.DataFrame()
-        df["prompt_tokens"] = self.prompt_lengths
-        df["generation_tokens"] = self.generation_lengths
-        df["ttft"] = self.ttfts
-        df["generation_time"] = self.generation_times
+        df["prompt_tokens"] = prompt_lengths[:n]
+        df["generation_tokens"] = generation_lengths[:n]
+        df["ttft"] = ttfts[:n]
+        df["generation_time"] = generation_times[:n]
         df["user_id"] = self.user_config.user_id
-        df["question_id"] = range(1, len(self.prompt_lengths) + 1)
-        df["launch_time"] = self.launch_times
-        df["finish_time"] = self.finish_times
+        df["question_id"] = range(1, n + 1)
+        df["launch_time"] = launch_times[:n]
+        df["finish_time"] = finish_times[:n]
         return df
 
 
