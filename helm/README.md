@@ -15,6 +15,7 @@ This helm chart lets users deploy multiple serving engines and a router into the
 ## Install the helm chart
 
 ```bash
+helm dependency build
 helm install llmstack . -f values-example.yaml
 ```
 
