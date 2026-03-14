@@ -514,7 +514,7 @@ routerSpec:
     logLevel: "INFO"
 
   # -- Set lmcache port for the router deployment
-  lmcacheControllerPort: ""
+  lmcacheControllerPort: "" # @schema type:[integer, string]
 
   # -- router resource requests and limits
   resources:
