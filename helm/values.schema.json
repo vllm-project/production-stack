@@ -527,7 +527,10 @@
                 },
                 "lmcacheControllerPort": {
                     "description": "Set lmcache port for the router deployment",
-                    "type": "string"
+                    "type": [
+                        "integer",
+                        "string"
+                    ]
                 },
                 "nodePort": {
                     "description": "Fixed NodePort for the router service when serviceType is NodePort.",
