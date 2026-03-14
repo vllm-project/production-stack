@@ -55,7 +55,6 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.servicePort` | integer | `80` | Port the service will listen on |
 | `servingEngineSpec.configs` | map | `{}` | Set other environment variables from a config map |
 | `servingEngineSpec.strategy` | map | `{}` | Deployment strategy for the serving engine pods |
-| `servingEngineSpec.maxUnavailablePodDisruptionBudget` | string | `""` | Configuration for the PodDisruptionBudget for the serving engine pods |
 | `servingEngineSpec.tolerations` | list | `[]` | Tolerations configuration for the serving engine pods (when there are taints on nodes) |
 | `servingEngineSpec.runtimeClassName` | string | `"nvidia"` | RuntimeClassName configuration (set to "nvidia" if using GPU) |
 | `servingEngineSpec.schedulerName` | string | `""` | SchedulerName configuration for the serving engine pods |
@@ -301,24 +300,19 @@ This table documents all available configuration values for the Production Stack
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `cacheserverSpec.enableServer` | boolean | `false` | Whether to enable the cache server deployment |
+| `cacheserverSpec.enabled` | boolean | `false` | Whether to enable the cache server deployment |
 | `cacheserverSpec.image.repository` | string | `"lmcache/lmstack-cache-server"` | Docker image repository for the cache server |
 | `cacheserverSpec.image.tag` | string | `"latest"` | Docker image tag for the cache server |
-| `cacheserverSpec.image.pullPolicy` | string | `"Always"` | Image pull policy for the cache server |
+| `cacheserverSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the cache server |
 | `cacheserverSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
 | `cacheserverSpec.replicaCount` | integer | `1` | Number of replicas for the cache server pod |
 | `cacheserverSpec.containerPort` | integer | `8000` | Port the cache server container is listening on |
 | `cacheserverSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the cache server |
 | `cacheserverSpec.servicePort` | integer | `80` | Port the cache server service will listen on |
-| `cacheserverSpec.resources.requests.cpu` | string | `"1"` | CPU requests for cache server |
-| `cacheserverSpec.resources.requests.memory` | string | `"2G"` | Memory requests for cache server |
-| `cacheserverSpec.resources.limits.cpu` | string | `"2"` | CPU limits for cache server |
-| `cacheserverSpec.resources.limits.memory` | string | `"4G"` | Memory limits for cache server |
+| `cacheserverSpec.resources` | map | `{}` | Resource requests and limits |
 | `cacheserverSpec.labels` | map | `{environment: "cache", release: "cache"}` | Customized labels for the cache server deployment |
 | `cacheserverSpec.strategy` | map | `{}` | Deployment strategy for the cache server pods |
-| `cacheserverSpec.startupProbe` | map | `{initialDelaySeconds: 15, periodSeconds: 10, failureThreshold: 60, httpGet: {path: /health, port: 8000}}` | Configuration for the startup probe |
 | `cacheserverSpec.livenessProbe` | map | `{initialDelaySeconds: 15, periodSeconds: 10, failureThreshold: 3, httpGet: {path: /health, port: 8000}}` | Configuration for the liveness probe |
-| `cacheserverSpec.maxUnavailablePodDisruptionBudget` | string | `""` | Configuration for the PodDisruptionBudget |
 | `cacheserverSpec.tolerations` | list | `[]` | Tolerations configuration for the cache server pods |
 | `cacheserverSpec.runtimeClassName` | string | `""` | RuntimeClassName configuration for the cache server pods |
 | `cacheserverSpec.schedulerName` | string | `""` | SchedulerName configuration for the cache server pods |
@@ -326,7 +320,7 @@ This table documents all available configuration values for the Production Stack
 | `cacheserverSpec.containerSecurityContext` | map | `{runAsNonRoot: false}` | Container-level security context configuration |
 | `cacheserverSpec.priorityClassName` | string | - | Priority class for cache server |
 | `cacheserverSpec.affinity` | map | - | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
-| `cacheserverSpec.nodeSelectorTerms` | list | - | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
+| `cacheserverSpec.nodeSelector` | map | - | (Optional) nodeSelector for the cache pods. |
 | `cacheserverSpec.serde` | string | - | Serialization/deserialization format |
 
 > `cacheserverSpec.resources` is passed through directly to the pod container resources block, so you can use extended resource keys (for example `rdma/ib`) in addition to cpu/memory.
@@ -389,13 +383,13 @@ This table documents all available configuration values for the Production Stack
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `sharedStorage.enabled` | boolean | `false` | Whether to enable shared storage for the models |
-| `sharedStorage.size` | string | `"100Gi"` | Size of the shared storage volume |
-| `sharedStorage.accessModes` | list | `["ReadWriteOnce"]` | Access modes for the shared storage volume |
-| `sharedStorage.storageClass` | string | `"standard"` | Storage class name for the shared storage volume |
-| `sharedStorage.hostPath` | string | `""` | Host path for the shared storage volume (for local testing only) |
-| `sharedStorage.nfs.server` | string | `""` | NFS server address for the shared storage volume |
-| `sharedStorage.nfs.path` | string | `""` | NFS export path for the shared storage volume |
+| `sharedPvcStorage.enabled` | boolean | `false` | Whether to enable shared storage for the models |
+| `sharedPvcStorage.size` | string | `"100Gi"` | Size of the shared storage volume |
+| `sharedPvcStorage.accessModes` | list | `["ReadWriteMany"]` | Access modes for the shared storage volume |
+| `sharedPvcStorage.storageClass` | string | `""` | Storage class name for the shared storage volume |
+| `sharedPvcStorage.hostPath` | string | `""` | Host path for the shared storage volume. Specifying a hostPath of nfs server will create a PersistentVolume. These fields should be omitted to rely on dynamic provisioning of PersistentVolumeClaims. |
+| `sharedPvcStorage.nfs.server` | string | `""` | NFS server address for the shared storage volume |
+| `sharedPvcStorage.nfs.path` | string | `""` | NFS export path for the shared storage volume |
 
 ### Other Configuration
 
@@ -404,7 +398,7 @@ This table documents all available configuration values for the Production Stack
 | `grafanaDashboards.enabled` | boolean | `false` | Whether to deploy grafana dashboards as configmaps. |
 | `grafanaDashboards.annotations` | map | `{}` | Annotations to add to the configmaps. |
 | `grafanaDashboards.labels` | map | `{grafana_dashboard: "1"}` | Labels for the configmaps |
-| `extraObjects` | list | `[]` | Array of extra K8s manifests to deploy. Supports use of custom Helm templates |
+| `extraObjects` | list | `[]` | Array of extra Kubernetes objects to deploy. Each object should be a valid Kubernetes manifest in YAML format. This can be used to deploy additional resources such as ConfigMaps, Secrets, or custom resources that are not directly supported by the chart's built-in configuration. Supports use of custom Helm templates. |
 
 ## Observability
 
