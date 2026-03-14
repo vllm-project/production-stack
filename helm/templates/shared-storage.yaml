@@ -1,4 +1,5 @@
-{{- if .Values.sharedPvcStorage }}
+{{- if .Values.sharedPvcStorage.enabled }}
+{{- if or (.Values.sharedPvcStorage.hostPath) (and .Values.sharedPvcStorage.nfs.server .Values.sharedPvcStorage.nfs.path) }}
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -9,14 +10,14 @@ metadata:
     app: {{ .Release.Name }}
     component: shared-pvc-storage
 spec:
-  storageClassName: {{ .Values.sharedPvcStorage.storageClass | default "standard" }}
+  {{- if .Values.sharedPvcStorage.storageClass }}
+  storageClassName: {{ .Values.sharedPvcStorage.storageClass }}
+  {{- end }}
   capacity:
-    storage: {{ .Values.sharedPvcStorage.size | default "100Gi" }}
+    storage: {{ .Values.sharedPvcStorage.size }}
   accessModes:
-  {{- if .Values.sharedPvcStorage.accessModes }}
-    {{- toYaml .Values.sharedPvcStorage.accessModes | nindent 4 }}
-  {{- else }}
-    - ReadWriteMany
+  {{- with .Values.sharedPvcStorage.accessModes }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- if .Values.sharedPvcStorage.hostPath }}
   hostPath:
@@ -26,6 +27,7 @@ spec:
     server: {{ required "A valid .Values.sharedPvcStorage.nfs.server is required" .Values.sharedPvcStorage.nfs.server }}
     path: {{ required "A valid .Values.sharedPvcStorage.nfs.path is required" .Values.sharedPvcStorage.nfs.path }}
   {{- end }}
+{{- end }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -36,14 +38,17 @@ metadata:
     app: {{ .Release.Name }}
     component: shared-pvc-storage
 spec:
-  storageClassName: {{ .Values.sharedPvcStorage.storageClass | default "standard" }}
+  {{- if .Values.sharedPvcStorage.storageClass }}
+  storageClassName: {{ .Values.sharedPvcStorage.storageClass }}
+  {{- end}}
   accessModes:
-  {{- if .Values.sharedPvcStorage.accessModes }}
-    {{- toYaml .Values.sharedPvcStorage.accessModes | nindent 4 }}
-  {{- else }}
-    - ReadWriteMany
+  {{- with .Values.sharedPvcStorage.accessModes }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   resources:
     requests:
-      storage: {{ .Values.sharedPvcStorage.size | default "100Gi" }}
+      storage: {{ .Values.sharedPvcStorage.size }}
+  {{- if or (.Values.sharedPvcStorage.hostPath) (and .Values.sharedPvcStorage.nfs.server .Values.sharedPvcStorage.nfs.path) }}
+  volumeName: {{ .Release.Name }}-shared-pvc-storage
+  {{- end }}
 {{- end }}
