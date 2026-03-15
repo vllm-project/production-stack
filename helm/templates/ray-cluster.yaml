@@ -24,9 +24,9 @@ spec:
           {{- include "chart.engineLabels" . | nindent 10 }}
       spec:
         terminationGracePeriodSeconds: 0
-        {{- if .Values.servingEngineSpec.securityContext }}
+        {{- with .Values.servingEngineSpec.securityContext }}
         securityContext:
-          {{- toYaml .Values.servingEngineSpec.securityContext | nindent 10 }}
+          {{- toYaml . | nindent 10 }}
         {{- end }}
         containers:
           - name: vllm-ray-head
@@ -257,11 +257,12 @@ spec:
           labels:
             model: {{ $modelSpec.name }}
             helm-release-name: {{ .Release.Name }}
-        {{- if .Values.servingEngineSpec.securityContext }}
-        securityContext:
-          {{- toYaml .Values.servingEngineSpec.securityContext | nindent 10 }}
-        {{- end }}
+            {{- include "chart.engineLabels" . | nindent 12 }}
         spec:
+          {{- with .Values.servingEngineSpec.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           containers:
             - name: vllm-ray-worker
               image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"

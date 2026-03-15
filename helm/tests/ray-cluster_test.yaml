@@ -1,0 +1,100 @@
+suite: test RayCluster configuration
+templates:
+  - ray-cluster.yaml
+tests:
+  - it: should not render anything when RayCluster is disabled
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+    asserts:
+    - hasDocuments:
+        count: 0
+
+
+  - it: should render a custom RayCluster when enabled
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        labels:
+          custom-label: custom-value
+        securityContext:
+          runAsNonRoot: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      equal:
+        path: metadata.labels
+        value:
+          model: test-model
+          helm-release-name: vllm
+          custom-label: custom-value
+          environment: test
+          release: test
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.metadata.labels
+        value:
+          model: test-model
+          helm-release-name: vllm
+          custom-label: custom-value
+          environment: test
+          release: test
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.securityContext
+        value:
+          runAsNonRoot: true
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.containers[0].image
+        value: "vllm/vllm-openai:latest"
+
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.metadata.labels
+        value:
+          model: test-model
+          helm-release-name: vllm
+          custom-label: custom-value
+          environment: test
+          release: test
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.securityContext
+        value:
+          runAsNonRoot: true
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].image
+        value: "vllm/vllm-openai:latest"
