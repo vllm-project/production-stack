@@ -4,6 +4,7 @@
 # -- Serving engine configuratoon
 servingEngineSpec:
   enableEngine: true
+  # @schema skipProperties:true
   # -- Customized labels for the serving engine deployment
   labels:
     environment: "test"
@@ -279,7 +280,7 @@ servingEngineSpec:
       # -- Path to access on the HTTP server
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
-      port: 8000
+      port: 8000  # @schema type:[integer, string]
 
   # -- Liveness probe configuration
   livenessProbe:
@@ -294,7 +295,7 @@ servingEngineSpec:
       # -- Path to access on the HTTP server
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
-      port: 8000
+      port: 8000  # @schema type:[integer, string]
 
   # -- Readiness probe configuration
   readinessProbe:
@@ -309,10 +310,7 @@ servingEngineSpec:
       # -- Path to access on the HTTP server
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
-      port: 8000
-
-  # -- Disruption Budget Configuration
-  maxUnavailablePodDisruptionBudget: ""
+      port: 8000  # @schema type:[integer, string]
 
   # -- Tolerations configuration (when there are taints on nodes)
   # Example:
@@ -361,16 +359,58 @@ servingEngineSpec:
 
   # -- Sidecar configuration
   sidecar:
+    # -- Docker image repository and tag for the sidecar
     image: "lmcache/lmstack-sidecar:latest"
-    imagePullPolicy: "Always"
+    # -- image pull policy for the sidecar
+    imagePullPolicy: "Always" # @schema enum:[Always,IfNotPresent,Never]
+
+  # -- ServiceMonitor configuration to collect servng engine metrics
+  serviceMonitor:
+    # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
+    enabled: false
+
+    # -- Additional labels
+    additionalLabels: {}
+
+    # -- Interval to scrape metrics
+    interval: 30s
+
+    # -- Timeout if metrics can't be retrieved in given time interval
+    scrapeTimeout: 25s
+
+    # -- Let prometheus add an exported_ prefix to conflicting labels
+    honorLabels: false
+
+    # -- Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs)
+    metricRelabelings: []
+    # - action: replace
+    #   regex: (.*)
+    #   replacement: $1
+    #   sourceLabels:
+    #   - exported_namespace
+    #   targetLabel: namespace
+
+    # -- Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config)
+    relabelings: []
+    # - sourceLabels: [__meta_kubernetes_pod_node_name]
+    #   separator: ;
+    #   regex: ^(.*)$
+    #   targetLabel: nodename
+    #   replacement: $1
+    #   action: replace
 
 routerSpec:
   # -- Whether to enable the router service
   enableRouter: true
   # -- The docker image of the router. The following values are defaults:
   repository: "lmcache/lmstack-router"
+  # -- docker tag for the router pod
   tag: "latest"
-  imagePullPolicy: "Always"
+  # -- image pull policy for the router pod
+  imagePullPolicy: "Always" # @schema enum:[Always,IfNotPresent,Never]
+
+  # -- Hugging Face token configuration
+  hf_token: ""
 
   # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
   securityContext: {}
@@ -390,8 +430,8 @@ routerSpec:
   # -- autoscaling configuration
   autoscaling:
     enabled: false
-    minReplicas: 1
-    maxReplicas: 3
+    minReplicas: 1 # @schema minimum:0
+    maxReplicas: 3 # @schema minimum:0
     targetCPUUtilizationPercentage: 80
 
   # -- Router Pod Disruption Budget
@@ -404,9 +444,9 @@ routerSpec:
     # -- Annotations to be added to router pdb
     annotations: {}
     # -- Number of pods that are available after eviction as number or percentage (eg.: 50%)
-    minAvailable: ""
+    minAvailable: # @schema type:[string, integer, null];minimum:0
     # -- Number of pods that are unavailable after eviction as number or percentage (eg.: 50%).
-    maxUnavailable: ""
+    maxUnavailable:  # @schema type:[string, integer, null];minimum:0
 
   # -- Priority Class
   priorityClassName: ""
@@ -415,20 +455,20 @@ routerSpec:
   containerPort: 8000
 
   # -- Service type
-  serviceType: ClusterIP
+  serviceType: ClusterIP # @schema enum:[ClusterIP,NodePort,LoadBalancer,ExternalName]
   # -- Service annotations if you use a LoadBalancer or NodePort service type
   serviceAnnotations: {}
   # -- Fixed NodePort for the router service when serviceType is NodePort.
   # -- If not set, Kubernetes assigns a random port (range 30000-32767).
-  # nodePort: 30080
+  nodePort: # @schema type:[integer, null];minimum:30000;maximum:32767
 
   # -- Service port
   servicePort: 80
 
   # -- Service discovery mode, supports "k8s" or "static". Defaults to "k8s" if not set.
-  serviceDiscovery: "k8s"
+  serviceDiscovery: "k8s" # @schema enum:[k8s,static]
   # -- Service discovery mode type, supports "pod-ip" or "service-name". Defaults to "pod-ip" if not set.
-  k8sServiceDiscoveryType: "pod-ip"
+  k8sServiceDiscoveryType: "pod-ip" # @schema enum:[pod-ip,service-name]
   # -- If serviceDiscovery is set to "static", the comma-separated values below are required. There needs to be the same number of backends and models
   staticBackends: ""
   staticModels: ""
@@ -466,9 +506,20 @@ routerSpec:
   # -- deployment strategy
   strategy: {}
 
-  # vllmApiKey: (optional) api key for securing the vLLM models. Must be an object referencing an existing secret
-  #   secretName: "my-existing-secret"
-  #   secretKey: "vllm-api-key"
+  # -- API key for securing the vLLM models. Must be an object referencing an existing secret. .Values.servingEngineSpec.vllmApiKey takes priority.
+  vllmApiKey:
+    # -- Name of the existing Kubernetes secret that contains the vLLM API key
+    secretName: ""
+    # -- Key within the secret that contains the vLLM API key
+    secretKey: ""
+
+  # -- lmcache configuration for the router deployment
+  lmcacheConfig:
+    # -- LMCache log level for the router deployment.
+    logLevel: "INFO"
+
+  # -- Set lmcache port for the router deployment
+  lmcacheControllerPort: "" # @schema type:[integer, string]
 
   # -- router resource requests and limits
   resources:
@@ -478,6 +529,7 @@ routerSpec:
     limits:
       memory: 1000Mi
 
+  # @schema skipProperties:true
   # -- Customized labels for the router deployment
   labels:
     environment: "router"
@@ -494,8 +546,7 @@ routerSpec:
     className: ""
 
     # -- Additional annotations for the Ingress resource
-    annotations:
-      {}
+    annotations: {}
       # kubernetes.io/ingress.class: alb
       # kubernetes.io/ingress.class: nginx
       # kubernetes.io/tls-acme: "true"
@@ -507,7 +558,7 @@ routerSpec:
           - path: /
             pathType: Prefix
 
-    # --  The tls configuration for hostnames to be covered with this ingress record.
+    # -- The tls configuration for hostnames to be covered with this ingress record.
     tls: []
     #  - secretName: vllm-router-tls
     #    hosts:
@@ -568,42 +619,153 @@ routerSpec:
   # Router probes configuration
   # <probe>.httpGet.port will automatically be set to .Values.routerSpec.containerPort
 
-  # Liveness probe configuration.
+  # -- Liveness probe configuration for the router pod.
   livenessProbe:
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 30
+    # -- How often (in seconds) to perform the liveness probe
     periodSeconds: 5
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive
     failureThreshold: 3
+    # -- Configuration of the Kubelet http request on the server
     httpGet:
+      # -- Path to access on the HTTP server
       path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: router-port # @schema type:[integer, string]
 
-  # Startup probe configuration.
+  # Startup probe configuration  for the router pod.
   startupProbe:
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 5
+    # -- How often (in seconds) to perform the startup probe
     periodSeconds: 5
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready
     failureThreshold: 3
+    # -- Configuration of the Kubelet http request on the server
     httpGet:
+      # -- Path to access on the HTTP server
       path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: router-port # @schema type:[integer, string]
 
-  # Readiness probe configuration.
+  # Readiness probe configuration for the router pod.
   readinessProbe:
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 30
+    # -- How often (in seconds) to perform the readiness probe
     periodSeconds: 5
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive
     failureThreshold: 3
+    # -- Configuration of the Kubelet http request on the server
     httpGet:
+      # -- Path to access on the HTTP server
       path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: router-port # @schema type:[integer, string]
 
-  # -- TODO: Readiness probe configuration
-  #startupProbe:
-  #  # -- Number of seconds after the container has started before startup probe is initiated
-  #  initialDelaySeconds: 5
-  #  # -- How often (in seconds) to perform the startup probe
-  #  periodSeconds: 5
-  #  # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready
-  #  failureThreshold: 100
-  #   # -- Configuration of the Kubelet http request on the server
-  #  httpGet:
-  #    # -- Path to access on the HTTP server
-  #
+  # -- ServiceMonitor configuration to collect router metrics
+  serviceMonitor:
+    # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
+    enabled: false
+
+    # -- Additional labels
+    additionalLabels: {}
+
+    # -- Interval to scrape metrics
+    interval: 30s
+
+    # -- Timeout if metrics can't be retrieved in given time interval
+    scrapeTimeout: 25s
+
+    # -- Let prometheus add an exported_ prefix to conflicting labels
+    honorLabels: false
+
+    # -- Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs)
+    metricRelabelings: []
+    # - action: replace
+    #   regex: (.*)
+    #   replacement: $1
+    #   sourceLabels:
+    #   - exported_namespace
+    #   targetLabel: namespace
+
+    # -- Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config)
+    relabelings: []
+    # - sourceLabels: [__meta_kubernetes_pod_node_name]
+    #   separator: ;
+    #   regex: ^(.*)$
+    #   targetLabel: nodename
+    #   replacement: $1
+    #   action: replace
+
+# -- Configuration for the LMCache cache server deployment
+cacheserverSpec:
+  # -- Whether to enable the cache server
+  enabled: false
+  image:
+    # -- Docker image repository for the cache server
+    repository: "lmcache/lmstack-cache-server"
+    # -- Docker image tag for the cache server
+    tag: "latest"
+  # -- Image pull policy for the cache server
+  imagePullPolicy: "IfNotPresent" # @schema enum:[Always,IfNotPresent,Never]
+  # -- Image pull secrets for private container registries
+  imagePullSecrets: []
+  # -- Number of replicas for the cache server pod
+  replicaCount: 1
+  # -- Port the cache server container is listening on
+  containerPort: 8000
+  # -- Kubernetes service type for the cache server
+  serviceType: ClusterIP # @schema enum:[ClusterIP,NodePort,LoadBalancer,ExternalName]
+  # -- Port the cache server service will listen on
+  servicePort: 80
+  # -- Service annotations for the cache server service
+  serviceAnnotations: {}
+  # -- Resource requests and limits for the cache server container
+  resources: {}
+  # -- Customized annotations for the cache server deployment
+  annotations: {}
+  # -- Customized labels for the cache server deployment and service
+  labels: {}
+  # -- Deployment strategy for the cache server pods
+  strategy:  # @schema additionalProperties: false
+    # -- Customize updateStrategy of the cache server deployment.
+    type: RollingUpdate # @schema enum:[RollingUpdate, Recreate]
+    rollingUpdate:
+      maxUnavailable: 0  # @schema type:[integer, string, null]
+      maxSurge: 1        # @schema type:[integer, string, null]
+
+  # -- Configuration for the liveness probe
+  livenessProbe: # @schema additionalProperties: false
+    # -- The number of seconds to wait before starting the first probe.
+    initialDelaySeconds: 30
+    # -- The number of seconds to wait between consecutive probes.
+    periodSeconds: 10
+    # -- The number of consecutive failures allowed before considering the probe as failed.
+    failureThreshold: 3
+    # -- The number of seconds to wait for a probe response before considering it as failed.
+    timeoutSeconds: 5
+  # -- Tolerations configuration for the cache server pods
+  tolerations: []
+  # -- RuntimeClassName configuration for the cache server pods
+  runtimeClassName: ""
+  # -- SchedulerName configuration for the cache server pods
+  schedulerName: ""
+  # -- Pod-level security context configuration
+  securityContext: {}
+  # @schema skipProperties:true
+  # -- Container-level security context configuration
+  containerSecurityContext:
+    runAsNonRoot: false
+  # -- Priority class for the cache server pods
+  priorityClassName: ""
+  # -- Node selector for the cache server pods
+  nodeSelector: {}
+  # -- Affinity configuration. If specified, takes precedence over nodeSelectorTerms.
+  affinity: {}
+  # -- Serialization/deserialization format for the cache server
+  serde: ""
 
 # -- LoRA Adapter Configuration
 loraAdapters: []
@@ -681,12 +843,14 @@ loraController:
   # -- Pod labels
   podLabels: {}
 
+  # @schema skipProperties:true
   # -- Pod security context
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:
       type: RuntimeDefault
 
+  # @schema skipProperties:true
   # -- Container security context
   containerSecurityContext:
     allowPrivilegeEscalation: false
@@ -712,12 +876,14 @@ loraController:
   # -- Extra arguments for the lora controller
   extraArgs: []
 
-  # -- Expose lora controller metrics
+  # -- Lora Controller metrics configuration
   metrics:
+    # -- Expose lora controller metrics
     enabled: true
 
-  # -- Webhook configuration
+  # -- loraController Webhook configuration
   webhook:
+    # -- Deploy a webhook inside lora controller
     enabled: false
 
   # -- loraController Pod Disruption Budget
@@ -730,9 +896,85 @@ loraController:
     # -- Annotations to be added to loraController pdb
     annotations: {}
     # -- Number of pods that are available after eviction as number or percentage (eg.: 50%)
-    minAvailable: ""
+    minAvailable: # @schema type:[string, integer, null];minimum:0
     # -- Number of pods that are unavailable after eviction as number or percentage (eg.: 50%).
-    maxUnavailable: ""
+    maxUnavailable: # @schema type:[string, integer, null];minimum:0
 
-# -- Array of extra K8s manifests to deploy. Supports use of custom Helm templates
+# -- Configuration for a shared PVC that can be mounted to multiple model deployments.
+sharedPvcStorage:
+  # -- Whether to enable shared storage for the models
+  enabled: false
+  # -- Size of the shared storage volume
+  size: "100Gi"
+  # -- Access modes for the shared storage volume
+  accessModes:
+    - ReadWriteMany
+  # -- Storage class name for the shared storage volume
+  storageClass: ""
+  # -- Host path for the shared storage volume. Specifying a hostPath of nfs server will create a PersistentVolume. These fields should be omitted to rely on dynamic provisioning of PersistentVolumeClaims.
+  hostPath: ""
+  # -- NFS configuration for the shared storage volume
+  nfs:
+    # -- NFS server address for the shared storage volume
+    server: ""
+    # -- NFS export path for the shared storage volume
+    path: ""
+
+# -- Array of extra Kubernetes objects to deploy. Each object should be a valid Kubernetes manifest in YAML format. This can be used to deploy additional resources such as ConfigMaps, Secrets, or custom resources that are not directly supported by the chart's built-in configuration. Supports use of custom Helm templates.
 extraObjects: []
+
+# -- Set to true do deploy dashboards stored in the "dashboards" directory as configmaps. This requires the kube-prometheus-stack to be deployed with Grafana enabled and properly configured to pick up dashboards from configmaps.
+grafanaDashboards:
+  enabled: false
+  # -- Additional annotations to add to the dashboard configmaps
+  annotations: {}
+  # @schema skipProperties:true
+  # -- Additional labels to add to the dashboard configmaps
+  labels:
+    grafana_dashboard: "1"
+
+# @schema skipProperties:true
+# -- Kube Prometheus Stack dependency chart configuration. More values can be found [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml).
+kube-prometheus-stack:
+  enabled: false
+
+  # -- Configure the Prometheus Operator to automatically discover and scrape metrics from the vLLM chart using ServiceMonitors.
+  prometheus:
+    prometheusSpec:
+      serviceMonitorSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: vllm-stack
+
+# @schema skipProperties:true
+# -- Prometheus Adapter dependency chart configuration. More values can be found [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus-adapter/values.yaml).
+prometheus-adapter:
+  enabled: false
+
+  prometheus:
+    url: http://{{ .Release.Name }}-kube-prometheus-stack-prometheus
+    port: 9090
+
+  # rules:
+  #   default: true
+  #   custom:
+  #   # Example metric to export for HPA
+  #   - seriesQuery: '{__name__=~"^vllm:num_requests_waiting$"}'
+  #     resources:
+  #       overrides:
+  #         namespace:
+  #           resource: "namespace"
+  #     name:
+  #       matches: ""
+  #       as: "vllm_num_requests_waiting"
+  #     metricsQuery: sum by(namespace) (vllm:num_requests_waiting)
+
+  #   # Export num_incoming_requests_total by model name
+  #   - seriesQuery: '{__name__=~"^vllm:num_incoming_requests_total$"}'
+  #     resources:
+  #       overrides:
+  #         namespace:
+  #           resource: "namespace"
+  #     name:
+  #       matches: ""
+  #       as: "vllm_num_incoming_requests_total"
+  #     metricsQuery: sum by(namespace, model) (vllm:num_incoming_requests_total)

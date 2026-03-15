@@ -1,0 +1,142 @@
+suite: test Router deployment configuration
+templates:
+  - deployment-router.yaml
+tests:
+  - it: should not render anything when Router is disabled
+    set:
+      routerSpec:
+        enableRouter: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render a deployment with custom values
+    release:
+      name: vllm
+      namespace: default
+    set:
+      routerSpec:
+        enableRouter: true
+        repository: "custom-repo/lmstack-router"
+        tag: "v1"
+        imagePullPolicy: IfNotPresent
+        hf_token: "random_token"
+        securityContext:
+          runAsUser: 1000
+        containerSecurityContext:
+          runAsNonRoot: true
+        imagePullSecrets:
+          - name: my-registry-secret
+        replicaCount: 2
+        priorityClassName: "system-cluster-critical"
+        lmcacheConfig:
+          logLevel: DEBUG
+        resources:
+          requests:
+            cpu: "1"
+            memory: 2Gi
+          limits:
+            memory: 3Gi
+        podAnnotations:
+          custom-annotation: custom-value
+    asserts:
+    - equal:
+        path: metadata.labels
+        value:
+          app.kubernetes.io/name: router
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: router
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: router
+          release: router
+    - equal:
+        path: spec.replicas
+        value: 2
+    - equal:
+        path: spec.selector.matchLabels
+        value:
+          app.kubernetes.io/name: router
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: router
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: router
+          release: router
+    - equal:
+        path: spec.template.metadata.labels
+        value:
+          app.kubernetes.io/name: router
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: router
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: router
+          release: router
+    - equal:
+        path: spec.template.metadata.annotations
+        value:
+          custom-annotation: custom-value
+    - equal:
+        path: spec.template.spec.priorityClassName
+        value: "system-cluster-critical"
+    - equal:
+        path: spec.template.spec.imagePullSecrets
+        value:
+          - name: my-registry-secret
+    - equal:
+        path: spec.template.spec.securityContext
+        value:
+          runAsUser: 1000
+    - equal:
+        path: spec.template.spec.containers[0].image
+        value: custom-repo/lmstack-router:v1
+    - equal:
+        path: spec.template.spec.containers[0].securityContext
+        value:
+          runAsNonRoot: true
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: HF_TOKEN
+          value: "random_token"
+    - contains:
+        path: spec.template.spec.containers[0].env
+        content:
+          name: LMCACHE_LOG_LEVEL
+          value: "DEBUG"
+    - equal:
+        path: spec.template.spec.containers[0].resources
+        value:
+          requests:
+            cpu: "1"
+            memory: 2Gi
+          limits:
+            memory: 3Gi
+    - equal:
+        path: spec.template.spec.containers[0].livenessProbe
+        value:
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: router-port
+    - equal:
+        path: spec.template.spec.containers[0].startupProbe
+        value:
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: router-port
+    - equal:
+        path: spec.template.spec.containers[0].readinessProbe
+        value:
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: router-port

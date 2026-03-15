@@ -1,0 +1,36 @@
+servingEngineSpec:
+  serviceMonitor:
+    enabled: true
+    interval: 5s
+    scrapeTimeout: 4s
+  runtimeClassName: ""
+  modelSpec:
+  - name: "opt125m"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "facebook/opt-125m"
+
+    replicaCount: 1
+
+    requestCPU: 6
+    requestMemory: "16Gi"
+    requestGPU: 1
+
+routerSpec:
+  repository: "localhost:5000/git-act-router"
+  imagePullPolicy: "IfNotPresent"
+  enableRouter: true
+  serviceMonitor:
+    enabled: true
+    interval: 5s
+    scrapeTimeout: 4s
+
+grafanaDashboards:
+  enabled: true
+
+kube-prometheus-stack:
+  enabled: true
+  prometheus:
+    prometheusSpec:
+      scrapeInterval: 5s
+      scrapeTimeout: 4s

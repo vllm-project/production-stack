@@ -9,7 +9,8 @@
 {{- $kv_role = $modelSpec.lmcacheConfig.kvRole }}
 {{- end }}
 {{- end }}
-{{- with $ -}}
+{{- with $ }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -68,7 +69,7 @@ spec:
           env:
             - name: RELEASE_NAME
               value: {{ $.Release.Name }}
-            {{- if and (hasKey $.Values "cacheserverSpec") (hasKey $.Values.cacheserverSpec "servicePort") }}
+            {{- if and $.Values.cacheserverSpec.enabled $.Values.cacheserverSpec.servicePort }}
             - name: LMCACHE_SERVER_SERVICE_PORT
               value: {{ $.Values.cacheserverSpec.servicePort | quote }}
             {{- end }}
@@ -326,7 +327,7 @@ spec:
           - name: LMCACHE_MAX_LOCAL_DISK_SIZE
             value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
           {{-   end }}
-          {{-   if .Values.cacheserverSpec }}
+          {{-   if .Values.cacheserverSpec.enabled }}
           - name: LMCACHE_REMOTE_URL
             value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
           - name: LMCACHE_REMOTE_SERDE
@@ -415,7 +416,7 @@ spec:
           {{- if hasKey $modelSpec "extraVolumeMounts" }}
           {{- toYaml $modelSpec.extraVolumeMounts | nindent 10 }}
           {{- end }}
-          {{- if hasKey $.Values "sharedPvcStorage" }}
+          {{- if $.Values.sharedPvcStorage.enabled }}
           - name: {{ .Release.Name }}-shared-pvc-storage
             mountPath: /data/shared-pvc-storage
           {{- end }}
@@ -436,7 +437,7 @@ spec:
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}
       {{- end }}
-      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") (hasKey $.Values "sharedPvcStorage") }}
+      {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") ($.Values.sharedPvcStorage.enabled) }}
       volumes:
       {{- end}}
         {{- if hasKey $modelSpec "pvcStorage" }}
@@ -449,7 +450,7 @@ spec:
             claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
         {{- end }}
         {{- end }}
-        {{- if hasKey $.Values "sharedPvcStorage" }}
+        {{- if $.Values.sharedPvcStorage.enabled }}
         - name: {{ .Release.Name }}-shared-pvc-storage
           persistentVolumeClaim:
             claimName: "{{ .Release.Name }}-shared-pvc-storage-claim"
@@ -516,7 +517,6 @@ data:
 {{ $modelSpec.chatTemplateConfigMap | nindent 4 }}
 {{- end }}
 {{- end }}
----
 {{- end }}
 {{- end }}
 {{- end }}

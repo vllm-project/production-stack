@@ -1,4 +1,4 @@
-{{- if .Values.cacheserverSpec -}}
+{{- if .Values.cacheserverSpec.enabled -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,8 +7,16 @@ metadata:
   labels:
   {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.cacheserverLabels" . | nindent 4 }}
+  {{- with .Values.cacheserverSpec.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.cacheserverSpec.replicaCount }}
+  {{- with .Values.cacheserverSpec.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
     {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 6 }}
@@ -19,20 +27,30 @@ spec:
       {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 8 }}
       {{- include "chart.cacheserverLabels" . | nindent 8 }}
     spec:
-      {{- if .Values.cacheserverSpec.priorityClassName}}
-      priorityClassName: {{ .Values.cacheserverSpec.priorityClassName | quote }}
+      {{- if .Values.cacheserverSpec.priorityClassName }}
+      priorityClassName: {{ .Values.cacheserverSpec.priorityClassName }}
       {{- end }}
-      {{- if not (empty .Values.cacheserverSpec.affinity) }}
+      {{- if .Values.cacheserverSpec.runtimeClassName }}
+      runtimeClassName: {{ .Values.cacheserverSpec.runtimeClassName }}
+      {{- end }}
+      {{- if .Values.cacheserverSpec.schedulerName }}
+      schedulerName: {{ .Values.cacheserverSpec.schedulerName }}
+      {{- end }}
+      {{- with .Values.cacheserverSpec.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.cacheserverSpec.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.cacheserverSpec.affinity }}
       affinity:
-        {{- toYaml .Values.cacheserverSpec.affinity | nindent 8 }}
-      {{- else if .Values.cacheserverSpec.nodeSelectorTerms}}
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            {{- with .Values.cacheserverSpec.nodeSelectorTerms }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.cacheserverSpec.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- with .Values.cacheserverSpec.imagePullSecrets }}
       imagePullSecrets:
@@ -40,28 +58,19 @@ spec:
       {{- end }}
       containers:
         - name: "lmcache-server"
-          image: "{{ required "Required value 'cacheserverSpec.repository' must be defined !" .Values.cacheserverSpec.repository }}:{{ required "Required value 'cacheserverSpec.tag' must be defined !" .Values.cacheserverSpec.tag }}"
+          image: "{{ .Values.cacheserverSpec.image.repository }}:{{ .Values.cacheserverSpec.image.tag }}"
           command:
           - "/opt/venv/bin/lmcache_server"
           - "0.0.0.0"
           - "{{ .Values.cacheserverSpec.containerPort }}"
-          {{- if .Values.cacheserverSpec.resources }}
+          {{- with .Values.cacheserverSpec.resources }}
           resources:
-            {{- if .Values.cacheserverSpec.resources.requests }}
-            requests:
-              cpu: "{{ .Values.cacheserverSpec.resources.requests.cpu }}"
-              memory: "{{ .Values.cacheserverSpec.resources.requests.memory }}"
-            {{- end }}
-            {{- if .Values.cacheserverSpec.resources.limits }}
-            limits:
-              cpu: "{{ .Values.cacheserverSpec.resources.limits.cpu }}"
-              memory: "{{ .Values.cacheserverSpec.resources.limits.memory }}"
-            {{- end }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           ports:
             - name: "caserver-cport"
               containerPort: {{ .Values.cacheserverSpec.containerPort }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ .Values.cacheserverSpec.imagePullPolicy }}
           {{- if .Values.cacheserverSpec.livenessProbe }}
           livenessProbe:
             initialDelaySeconds: {{ .Values.cacheserverSpec.livenessProbe.initialDelaySeconds | default 30 }}
@@ -74,5 +83,9 @@ spec:
               - "/workspace/LMCache/examples/kubernetes/health_probe.py"
               - "127.0.0.1"
               - "{{ .Values.cacheserverSpec.containerPort }}"
+          {{- end }}
+          {{- with .Values.cacheserverSpec.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
           {{- end }}
 {{- end -}}

@@ -15,12 +15,15 @@ This helm chart lets users deploy multiple serving engines and a router into the
 ## Install the helm chart
 
 ```bash
+helm dependency build
 helm install llmstack . -f values-example.yaml
 ```
 
-## Uninstall the deployment
+## Uninstall the chart
 
-run `helm uninstall llmstack`
+```bash
+helm uninstall llmstack
+```
 
 ## Configure the deployments
 
@@ -52,7 +55,6 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.servicePort` | integer | `80` | Port the service will listen on |
 | `servingEngineSpec.configs` | map | `{}` | Set other environment variables from a config map |
 | `servingEngineSpec.strategy` | map | `{}` | Deployment strategy for the serving engine pods |
-| `servingEngineSpec.maxUnavailablePodDisruptionBudget` | string | `""` | Configuration for the PodDisruptionBudget for the serving engine pods |
 | `servingEngineSpec.tolerations` | list | `[]` | Tolerations configuration for the serving engine pods (when there are taints on nodes) |
 | `servingEngineSpec.runtimeClassName` | string | `"nvidia"` | RuntimeClassName configuration (set to "nvidia" if using GPU) |
 | `servingEngineSpec.schedulerName` | string | `""` | SchedulerName configuration for the serving engine pods |
@@ -197,6 +199,18 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.metricType` | string | `"AverageValue"` | Metric type (AverageValue or Value) |
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.formula` | string | - | Formula to compose metrics together |
 
+#### Serving Engine Monitoring Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `servingEngineSpec.serviceMonitor.enabled` | boolean | `false` | Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics |
+| `servingEngineSpec.serviceMonitor.additionalLabels` | map | `{}` | Additional labels |
+| `servingEngineSpec.serviceMonitor.interval` | string | `30s` | Interval to scrape metrics |
+| `servingEngineSpec.serviceMonitor.scrapeTimeout` | string | `25s` | Timeout if metrics can't be retrieved in given time interval |
+| `servingEngineSpec.serviceMonitor.honorLabels` | boolean | `false` | Let prometheus add an exported_ prefix to conflicting labels |
+| `servingEngineSpec.serviceMonitor.metricRelabelings` | list | `[]` | Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs) |
+| `servingEngineSpec.serviceMonitor.relabelings` | list | `[]` | Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config) |
+
 ### Router Configuration
 
 | Field | Type | Default | Description |
@@ -261,6 +275,18 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.otel.serviceName` | string | `"vllm-router"` | Service name for OpenTelemetry traces |
 | `routerSpec.otel.secure` | boolean | `false` | Use secure (TLS) connection for OTLP exporter |
 
+#### Router Monitoring Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `routerSpec.serviceMonitor.enabled` | boolean | `false` | Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics |
+| `routerSpec.serviceMonitor.additionalLabels` | map | `{}` | Additional labels |
+| `routerSpec.serviceMonitor.interval` | string | `30s` | Interval to scrape metrics |
+| `routerSpec.serviceMonitor.scrapeTimeout` | string | `25s` | Timeout if metrics can't be retrieved in given time interval |
+| `routerSpec.serviceMonitor.honorLabels` | boolean | `false` | Let prometheus add an exported_ prefix to conflicting labels |
+| `routerSpec.serviceMonitor.metricRelabelings` | list | `[]` | Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs) |
+| `routerSpec.serviceMonitor.relabelings` | list | `[]` | Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config) |
+
 #### Router Ingress Configuration
 
 | Field | Type | Default | Description |
@@ -275,24 +301,19 @@ This table documents all available configuration values for the Production Stack
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `cacheserverSpec.enableServer` | boolean | `false` | Whether to enable the cache server deployment |
+| `cacheserverSpec.enabled` | boolean | `false` | Whether to enable the cache server deployment |
 | `cacheserverSpec.image.repository` | string | `"lmcache/lmstack-cache-server"` | Docker image repository for the cache server |
 | `cacheserverSpec.image.tag` | string | `"latest"` | Docker image tag for the cache server |
-| `cacheserverSpec.image.pullPolicy` | string | `"Always"` | Image pull policy for the cache server |
+| `cacheserverSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the cache server |
 | `cacheserverSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
 | `cacheserverSpec.replicaCount` | integer | `1` | Number of replicas for the cache server pod |
 | `cacheserverSpec.containerPort` | integer | `8000` | Port the cache server container is listening on |
 | `cacheserverSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the cache server |
 | `cacheserverSpec.servicePort` | integer | `80` | Port the cache server service will listen on |
-| `cacheserverSpec.resources.requests.cpu` | string | `"1"` | CPU requests for cache server |
-| `cacheserverSpec.resources.requests.memory` | string | `"2G"` | Memory requests for cache server |
-| `cacheserverSpec.resources.limits.cpu` | string | `"2"` | CPU limits for cache server |
-| `cacheserverSpec.resources.limits.memory` | string | `"4G"` | Memory limits for cache server |
+| `cacheserverSpec.resources` | map | `{}` | Resource requests and limits |
 | `cacheserverSpec.labels` | map | `{environment: "cache", release: "cache"}` | Customized labels for the cache server deployment |
 | `cacheserverSpec.strategy` | map | `{}` | Deployment strategy for the cache server pods |
-| `cacheserverSpec.startupProbe` | map | `{initialDelaySeconds: 15, periodSeconds: 10, failureThreshold: 60, httpGet: {path: /health, port: 8000}}` | Configuration for the startup probe |
 | `cacheserverSpec.livenessProbe` | map | `{initialDelaySeconds: 15, periodSeconds: 10, failureThreshold: 3, httpGet: {path: /health, port: 8000}}` | Configuration for the liveness probe |
-| `cacheserverSpec.maxUnavailablePodDisruptionBudget` | string | `""` | Configuration for the PodDisruptionBudget |
 | `cacheserverSpec.tolerations` | list | `[]` | Tolerations configuration for the cache server pods |
 | `cacheserverSpec.runtimeClassName` | string | `""` | RuntimeClassName configuration for the cache server pods |
 | `cacheserverSpec.schedulerName` | string | `""` | SchedulerName configuration for the cache server pods |
@@ -300,7 +321,7 @@ This table documents all available configuration values for the Production Stack
 | `cacheserverSpec.containerSecurityContext` | map | `{runAsNonRoot: false}` | Container-level security context configuration |
 | `cacheserverSpec.priorityClassName` | string | - | Priority class for cache server |
 | `cacheserverSpec.affinity` | map | - | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
-| `cacheserverSpec.nodeSelectorTerms` | list | - | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
+| `cacheserverSpec.nodeSelector` | map | - | (Optional) nodeSelector for the cache pods. |
 | `cacheserverSpec.serde` | string | - | Serialization/deserialization format |
 
 ### LoRA Adapters Configuration
@@ -361,16 +382,135 @@ This table documents all available configuration values for the Production Stack
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `sharedStorage.enabled` | boolean | `false` | Whether to enable shared storage for the models |
-| `sharedStorage.size` | string | `"100Gi"` | Size of the shared storage volume |
-| `sharedStorage.accessModes` | list | `["ReadWriteOnce"]` | Access modes for the shared storage volume |
-| `sharedStorage.storageClass` | string | `"standard"` | Storage class name for the shared storage volume |
-| `sharedStorage.hostPath` | string | `""` | Host path for the shared storage volume (for local testing only) |
-| `sharedStorage.nfs.server` | string | `""` | NFS server address for the shared storage volume |
-| `sharedStorage.nfs.path` | string | `""` | NFS export path for the shared storage volume |
+| `sharedPvcStorage.enabled` | boolean | `false` | Whether to enable shared storage for the models |
+| `sharedPvcStorage.size` | string | `"100Gi"` | Size of the shared storage volume |
+| `sharedPvcStorage.accessModes` | list | `["ReadWriteMany"]` | Access modes for the shared storage volume |
+| `sharedPvcStorage.storageClass` | string | `""` | Storage class name for the shared storage volume |
+| `sharedPvcStorage.hostPath` | string | `""` | Host path for the shared storage volume. Specifying a hostPath of nfs server will create a PersistentVolume. These fields should be omitted to rely on dynamic provisioning of PersistentVolumeClaims. |
+| `sharedPvcStorage.nfs.server` | string | `""` | NFS server address for the shared storage volume |
+| `sharedPvcStorage.nfs.path` | string | `""` | NFS export path for the shared storage volume |
 
 ### Other Configuration
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `extraObjects` | list | `[]` | Array of extra K8s manifests to deploy. Supports use of custom Helm templates |
+| `grafanaDashboards.enabled` | boolean | `false` | Whether to deploy grafana dashboards as configmaps. |
+| `grafanaDashboards.annotations` | map | `{}` | Annotations to add to the configmaps. |
+| `grafanaDashboards.labels` | map | `{grafana_dashboard: "1"}` | Labels for the configmaps |
+| `extraObjects` | list | `[]` | Array of extra Kubernetes objects to deploy. Each object should be a valid Kubernetes manifest in YAML format. This can be used to deploy additional resources such as ConfigMaps, Secrets, or custom resources that are not directly supported by the chart's built-in configuration. Supports use of custom Helm templates. |
+
+## Observability
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/05766673-c449-4094-bdc8-dea6ac28cb79" alt="Grafana dashboard to monitor the deployment" width="80%"/>
+</p>
+
+### Deploy the observability stack
+
+#### On a cluster with prometheus operator installed
+
+Install the chart with the following helm values to create the `serviceMonitor` and grafana dashboards.
+
+```yaml
+servingEngineSpec:
+  serviceMonitor:
+    enabled: true
+routerSpec:
+  serviceMonitor:
+    enabled: true
+grafanaDashboards:
+  enabled: true
+```
+
+#### On an empty cluster
+
+The vllm-stack chart embeds kube-prometheus-stack as a subchart.
+Install the chart with the following helm values to deploy prometheus and grafana
+
+```yaml
+servingEngineSpec:
+  serviceMonitor:
+    enabled: true
+routerSpec:
+  serviceMonitor:
+    enabled: true
+grafanaDashboards:
+  enabled: true
+
+kube-prometheus-stack:
+  enabled: true
+```
+
+### Access the Grafana UI
+
+Forward the Grafana dashboard port to the local node-port
+
+```bash
+kubectl port-forward svc/<release-name>-grafana 8080:80
+```
+
+Open the webpage at `http://<IP of your node>:8080` to access the Grafana web page. The default user name is `admin` and the password can be configured in the values (default is generated by helm and stored in a secret `<release-name>-grafana`).
+
+### Use Prometheus Adapter to export vLLM metrics
+
+The vLLM router can export metrics to Prometheus using the [Prometheus Adapter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter).
+
+Install the chart with the following helm values to deploy prometheus-adapter
+
+```yaml
+prometheus-adapter:
+  enabled: true
+```
+
+We provide a minimal example of how to use the Prometheus Adapter to export vLLM metrics. See [values.yaml](values.yaml) for more details.
+
+The exported metrics can be used for different purposes, such as horizontal scaling of the vLLM deployments.
+
+To verify the metrics are being exported, you can use the following command:
+
+```bash
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq | grep vllm_num_requests_waiting -C 10
+```
+
+You should see something like the following:
+
+```json
+    {
+      "name": "namespaces/vllm_num_requests_waiting",
+      "singularName": "",
+      "namespaced": false,
+      "kind": "MetricValueList",
+      "verbs": [
+        "get"
+      ]
+    }
+```
+
+The following command will show the current value of the metric:
+
+```bash
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1/namespaces/default/metrics/vllm_num_requests_waiting | jq
+```
+
+The output should look like the following:
+
+```json
+{
+  "kind": "MetricValueList",
+  "apiVersion": "custom.metrics.k8s.io/v1beta1",
+  "metadata": {},
+  "items": [
+    {
+      "describedObject": {
+        "kind": "Namespace",
+        "name": "default",
+        "apiVersion": "/v1"
+      },
+      "metricName": "vllm_num_requests_waiting",
+      "timestamp": "2025-03-02T01:56:01Z",
+      "value": "0",
+      "selector": null
+    }
+  ]
+}
+```
