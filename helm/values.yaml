@@ -280,7 +280,7 @@ servingEngineSpec:
       # -- Path to access on the HTTP server
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
-      port: 8000
+      port: 8000  # @schema type:[integer, string]
 
   # -- Liveness probe configuration
   livenessProbe:
@@ -295,7 +295,7 @@ servingEngineSpec:
       # -- Path to access on the HTTP server
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
-      port: 8000
+      port: 8000  # @schema type:[integer, string]
 
   # -- Readiness probe configuration
   readinessProbe:
@@ -310,7 +310,7 @@ servingEngineSpec:
       # -- Path to access on the HTTP server
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
-      port: 8000
+      port: 8000  # @schema type:[integer, string]
 
   # -- Tolerations configuration (when there are taints on nodes)
   # Example:
@@ -359,9 +359,12 @@ servingEngineSpec:
 
   # -- Sidecar configuration
   sidecar:
+    # -- Docker image repository and tag for the sidecar
     image: "lmcache/lmstack-sidecar:latest"
+    # -- image pull policy for the sidecar
     imagePullPolicy: "Always" # @schema enum:[Always,IfNotPresent,Never]
 
+  # -- ServiceMonitor configuration to collect servng engine metrics
   serviceMonitor:
     # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
     enabled: false
@@ -401,7 +404,9 @@ routerSpec:
   enableRouter: true
   # -- The docker image of the router. The following values are defaults:
   repository: "lmcache/lmstack-router"
+  # -- docker tag for the router pod
   tag: "latest"
+  # -- image pull policy for the router pod
   imagePullPolicy: "Always" # @schema enum:[Always,IfNotPresent,Never]
 
   # -- Hugging Face token configuration
@@ -614,43 +619,52 @@ routerSpec:
   # Router probes configuration
   # <probe>.httpGet.port will automatically be set to .Values.routerSpec.containerPort
 
-  # Liveness probe configuration.
+  # -- Liveness probe configuration for the router pod.
   livenessProbe:
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 30
+    # -- How often (in seconds) to perform the liveness probe
     periodSeconds: 5
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive
     failureThreshold: 3
+    # -- Configuration of the Kubelet http request on the server
     httpGet:
+      # -- Path to access on the HTTP server
       path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: router-port # @schema type:[integer, string]
 
-  # Startup probe configuration.
+  # Startup probe configuration  for the router pod.
   startupProbe:
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 5
+    # -- How often (in seconds) to perform the startup probe
     periodSeconds: 5
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready
     failureThreshold: 3
+    # -- Configuration of the Kubelet http request on the server
     httpGet:
+      # -- Path to access on the HTTP server
       path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: router-port # @schema type:[integer, string]
 
-  # Readiness probe configuration.
+  # Readiness probe configuration for the router pod.
   readinessProbe:
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 30
+    # -- How often (in seconds) to perform the readiness probe
     periodSeconds: 5
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive
     failureThreshold: 3
+    # -- Configuration of the Kubelet http request on the server
     httpGet:
+      # -- Path to access on the HTTP server
       path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: router-port # @schema type:[integer, string]
 
-  # -- TODO: Readiness probe configuration
-  #startupProbe:
-  #  # -- Number of seconds after the container has started before startup probe is initiated
-  #  initialDelaySeconds: 5
-  #  # -- How often (in seconds) to perform the startup probe
-  #  periodSeconds: 5
-  #  # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready
-  #  failureThreshold: 100
-  #   # -- Configuration of the Kubelet http request on the server
-  #  httpGet:
-  #    # -- Path to access on the HTTP server
-  #
-
+  # -- ServiceMonitor configuration to collect router metrics
   serviceMonitor:
     # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
     enabled: false
@@ -829,12 +843,14 @@ loraController:
   # -- Pod labels
   podLabels: {}
 
+  # @schema skipProperties:true
   # -- Pod security context
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:
       type: RuntimeDefault
 
+  # @schema skipProperties:true
   # -- Container security context
   containerSecurityContext:
     allowPrivilegeEscalation: false
@@ -860,12 +876,14 @@ loraController:
   # -- Extra arguments for the lora controller
   extraArgs: []
 
-  # -- Expose lora controller metrics
+  # -- Lora Controller metrics configuration
   metrics:
+    # -- Expose lora controller metrics
     enabled: true
 
-  # -- Webhook configuration
+  # -- loraController Webhook configuration
   webhook:
+    # -- Deploy a webhook inside lora controller
     enabled: false
 
   # -- loraController Pod Disruption Budget
@@ -881,8 +899,6 @@ loraController:
     minAvailable: # @schema type:[string, integer, null];minimum:0
     # -- Number of pods that are unavailable after eviction as number or percentage (eg.: 50%).
     maxUnavailable: # @schema type:[string, integer, null];minimum:0
-
-# -- Array of extra K8s manifests to deploy. Supports use of custom Helm templates
 
 # -- Configuration for a shared PVC that can be mounted to multiple model deployments.
 sharedPvcStorage:

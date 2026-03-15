@@ -212,23 +212,7 @@
                 },
                 "containerSecurityContext": {
                     "description": "Container security context",
-                    "type": "object",
-                    "properties": {
-                        "allowPrivilegeEscalation": {
-                            "type": "boolean"
-                        },
-                        "capabilities": {
-                            "type": "object",
-                            "properties": {
-                                "drop": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    "type": "object"
                 },
                 "enableLoraController": {
                     "type": "boolean"
@@ -269,10 +253,11 @@
                     "type": "object"
                 },
                 "metrics": {
-                    "description": "Expose lora controller metrics",
+                    "description": "Lora Controller metrics configuration",
                     "type": "object",
                     "properties": {
                         "enabled": {
+                            "description": "Expose lora controller metrics",
                             "type": "boolean"
                         }
                     }
@@ -327,20 +312,7 @@
                 },
                 "podSecurityContext": {
                     "description": "Pod security context",
-                    "type": "object",
-                    "properties": {
-                        "runAsNonRoot": {
-                            "type": "boolean"
-                        },
-                        "seccompProfile": {
-                            "type": "object",
-                            "properties": {
-                                "type": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
+                    "type": "object"
                 },
                 "replicaCount": {
                     "description": "Number of lora controller replicas",
@@ -355,10 +327,11 @@
                     "type": "array"
                 },
                 "webhook": {
-                    "description": "Webhook configuration",
+                    "description": "loraController Webhook configuration",
                     "type": "object",
                     "properties": {
                         "enabled": {
+                            "description": "Deploy a webhook inside lora controller",
                             "type": "boolean"
                         }
                     }
@@ -424,6 +397,7 @@
                     "type": "string"
                 },
                 "imagePullPolicy": {
+                    "description": "image pull policy for the router pod",
                     "type": "string",
                     "enum": [
                         "Always",
@@ -494,23 +468,36 @@
                     "type": "object"
                 },
                 "livenessProbe": {
+                    "description": "Liveness probe configuration for the router pod.",
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
+                            "description": "Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive",
                             "type": "integer"
                         },
                         "httpGet": {
+                            "description": "Configuration of the Kubelet http request on the server",
                             "type": "object",
                             "properties": {
                                 "path": {
+                                    "description": "Path to access on the HTTP server",
                                     "type": "string"
+                                },
+                                "port": {
+                                    "description": "Name or number of the port to access on the container, on which the server is listening",
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
                                 }
                             }
                         },
                         "initialDelaySeconds": {
+                            "description": "Number of seconds after the container has started before liveness probe is initiated",
                             "type": "integer"
                         },
                         "periodSeconds": {
+                            "description": "How often (in seconds) to perform the liveness probe",
                             "type": "integer"
                         }
                     }
@@ -610,20 +597,32 @@
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
+                            "description": "Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive",
                             "type": "integer"
                         },
                         "httpGet": {
+                            "description": "Configuration of the Kubelet http request on the server",
                             "type": "object",
                             "properties": {
                                 "path": {
+                                    "description": "Path to access on the HTTP server",
                                     "type": "string"
+                                },
+                                "port": {
+                                    "description": "Name or number of the port to access on the container, on which the server is listening",
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
                                 }
                             }
                         },
                         "initialDelaySeconds": {
+                            "description": "Number of seconds after the container has started before liveness probe is initiated",
                             "type": "integer"
                         },
                         "periodSeconds": {
+                            "description": "How often (in seconds) to perform the readiness probe",
                             "type": "integer"
                         }
                     }
@@ -754,7 +753,7 @@
                     ]
                 },
                 "serviceMonitor": {
-                    "description": "TODO: Readiness probe configuration startupProbe: initialDelaySeconds: 5 periodSeconds: 5 failureThreshold: 100 httpGet:  ",
+                    "description": "ServiceMonitor configuration to collect router metrics",
                     "type": "object",
                     "properties": {
                         "additionalLabels": {
@@ -809,20 +808,32 @@
                     "type": "object",
                     "properties": {
                         "failureThreshold": {
+                            "description": "Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready",
                             "type": "integer"
                         },
                         "httpGet": {
+                            "description": "Configuration of the Kubelet http request on the server",
                             "type": "object",
                             "properties": {
                                 "path": {
+                                    "description": "Path to access on the HTTP server",
                                     "type": "string"
+                                },
+                                "port": {
+                                    "description": "Name or number of the port to access on the container, on which the server is listening",
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
                                 }
                             }
                         },
                         "initialDelaySeconds": {
+                            "description": "Number of seconds after the container has started before liveness probe is initiated",
                             "type": "integer"
                         },
                         "periodSeconds": {
+                            "description": "How often (in seconds) to perform the startup probe",
                             "type": "integer"
                         }
                     }
@@ -839,6 +850,7 @@
                     "type": "object"
                 },
                 "tag": {
+                    "description": "docker tag for the router pod",
                     "type": "string"
                 },
                 "vllmApiKey": {
@@ -908,7 +920,10 @@
                                 },
                                 "port": {
                                     "description": "Name or number of the port to access on the container, on which the server is listening",
-                                    "type": "integer"
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
                                 }
                             }
                         },
@@ -943,7 +958,10 @@
                                 },
                                 "port": {
                                     "description": "Name or number of the port to access on the container, on which the server is listening",
-                                    "type": "integer"
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
                                 }
                             }
                         },
@@ -970,6 +988,7 @@
                     "type": "object"
                 },
                 "serviceMonitor": {
+                    "description": "ServiceMonitor configuration to collect servng engine metrics",
                     "type": "object",
                     "properties": {
                         "additionalLabels": {
@@ -1011,9 +1030,11 @@
                     "type": "object",
                     "properties": {
                         "image": {
+                            "description": "Docker image repository and tag for the sidecar",
                             "type": "string"
                         },
                         "imagePullPolicy": {
+                            "description": "image pull policy for the sidecar",
                             "type": "string",
                             "enum": [
                                 "Always",
@@ -1041,7 +1062,10 @@
                                 },
                                 "port": {
                                     "description": "Name or number of the port to access on the container, on which the server is listening",
-                                    "type": "integer"
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
                                 }
                             }
                         },
