@@ -14,7 +14,7 @@ Make sure to have:
 
 - A running Kubernetes (K8s) environment with GPUs
   - Run `cd utils && bash install-minikube-cluster.sh`
-  - Or follow our [tutorial](tutorials/00-install-kubernetes-env.md)
+  - Or follow our [tutorial](../tutorials/00-install-kubernetes-env.md)
 
 After that you can run:
 
