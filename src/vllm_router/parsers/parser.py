@@ -408,6 +408,16 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--routing-threshold",
+        type=int,
+        default=0,
+        help="Token count threshold for conditional disaggregation. Requests with estimated "
+        "input tokens above this threshold go through DPD (prefill then decode). Requests "
+        "at or below this threshold are sent directly to decoder for local prefill. "
+        "Default 0 means always disaggregate (original behavior). Recommended: 4096.",
+    )
+
+    parser.add_argument(
         "--kv-aware-threshold",
         type=int,
         default=2000,

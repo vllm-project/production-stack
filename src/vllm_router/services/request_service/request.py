@@ -529,11 +529,27 @@ async def route_general_request(
 async def send_request_to_prefiller(
     client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
 ):
-    """Send a request to a prefiller service."""
+    """Send a request to a prefiller service.
+
+    Supports both LMCache-based DPD (ZMQ side-channel) and NixlConnector-based DPD
+    (kv_transfer_params in request/response). Returns the prefill response JSON so
+    the caller can extract kv_transfer_params if present.
+    """
     req_data = req_data.copy()
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
         req_data["max_completion_tokens"] = 1
+
+    # For NixlConnector: signal that this is a DPD prefill request
+    if "kv_transfer_params" not in req_data:
+        req_data["kv_transfer_params"] = {
+            "do_remote_decode": True,
+            "do_remote_prefill": False,
+        }
+
+    # Force non-streaming for prefill (need full response for kv_transfer_params)
+    req_data["stream"] = False
+    req_data.pop("stream_options", None)
 
     headers = {
         "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
@@ -770,6 +786,18 @@ async def route_disaggregated_prefill_request(
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
 
+    # Check conditional disaggregation: short inputs bypass DPD
+    router = request.app.state.router
+    if not router.should_disaggregate(request_json):
+        # Direct-to-decoder path: send as normal request (local chunked prefill)
+        logger.info(
+            f"{request_id} below routing threshold, sending directly to decoder"
+        )
+        return await _route_direct_to_decoder(
+            request, endpoint, request_json, request_id, background_tasks
+        )
+
+    # DPD path: prefill on prefiller, then stream from decoder
     # Save original request for decode phase
     orig_request_json = request_json.copy()
 
@@ -781,7 +809,7 @@ async def route_disaggregated_prefill_request(
 
     st = time.time()
     try:
-        await send_request_to_prefiller(
+        prefill_response = await send_request_to_prefiller(
             request.app.state.prefill_client, endpoint, request_json, request_id
         )
         et = time.time()
@@ -791,6 +819,12 @@ async def route_disaggregated_prefill_request(
         )
         # Use original request for decode phase
         request_json = orig_request_json
+
+        # Forward kv_transfer_params from prefiller to decoder (NixlConnector support)
+        kv_transfer_params = prefill_response.get("kv_transfer_params")
+        if kv_transfer_params:
+            request_json["kv_transfer_params"] = kv_transfer_params
+            logger.info(f"{request_id} forwarding kv_transfer_params to decoder")
     except aiohttp.ClientResponseError as e:
         logger.error(f"HTTP error in prefiller: {e}", exc_info=True)
         return JSONResponse(
@@ -854,6 +888,61 @@ async def route_disaggregated_prefill_request(
     curr_time = time.time()
     logger.info(
         f"Routing request {request_id} with session id None to {request.app.state.decode_client._base_url} at {curr_time}, process time = {curr_time - et:.4f}"
+    )
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="application/json",
+        headers={"X-Request-Id": request_id},
+    )
+
+
+async def _route_direct_to_decoder(
+    request: Request,
+    endpoint: str,
+    request_json: dict,
+    request_id: str,
+    background_tasks: BackgroundTasks,
+):
+    """Route request directly to decoder, bypassing DPD.
+
+    Used for short-input requests where local chunked prefill on the decoder
+    is faster than remote prefill + KV transfer.
+    """
+    st = time.time()
+
+    async def generate_stream():
+        try:
+            async for chunk in send_request_to_decode(
+                request.app.state.decode_client, endpoint, request_json, request_id
+            ):
+                yield chunk
+        except aiohttp.ClientResponseError as e:
+            logger.error(f"HTTP error in direct-to-decoder: {e}", exc_info=True)
+            error_response = {
+                "error": {
+                    "message": f"Decoder error: {e.message}",
+                    "type": "decoder_error",
+                    "code": e.status,
+                }
+            }
+            yield json.dumps(error_response).encode("utf-8")
+        except Exception as e:
+            logger.error(f"Unexpected error in direct-to-decoder: {e}", exc_info=True)
+            error_response = {
+                "error": {
+                    "message": f"Decoder error: {str(e)}",
+                    "type": "decoder_error",
+                    "code": 500,
+                }
+            }
+            yield json.dumps(error_response).encode("utf-8")
+
+    curr_time = time.time()
+    logger.info(
+        f"Direct-to-decoder request {request_id} to "
+        f"{request.app.state.decode_client._base_url} at {curr_time}, "
+        f"process time = {curr_time - st:.4f}"
     )
 
     return StreamingResponse(
