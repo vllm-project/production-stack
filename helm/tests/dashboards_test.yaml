@@ -1,0 +1,52 @@
+suite: test grafana dashboards configuration
+templates:
+  - dashboards.yaml
+tests:
+  - it: should not render anything when grafanaDashboards is disabled
+    set:
+      grafanaDashboards:
+          enabled: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render dashboards when grafanaDashboards is enabled
+    release:
+      name: vllm
+    set:
+      grafanaDashboards:
+        enabled: true
+        annotations:
+          app: grafana
+    asserts:
+    - hasDocuments:
+        count: 2
+    - documentIndex: 0
+      equal:
+        path: metadata.name
+        value: vllm-grafana-lmcache-dashboard
+    - documentIndex: 0
+      equal:
+        path: metadata.labels
+        value:
+          grafana_dashboard: "1"
+    - documentIndex: 0
+      equal:
+        path: metadata.annotations
+        value:
+          app: grafana
+    - documentIndex: 0
+      exists:
+        path: data["lmcache-dashboard.json"]
+    - documentIndex: 1
+      equal:
+        path: metadata.name
+        value: vllm-grafana-vllm-dashboard
+    - documentIndex: 1
+      exists:
+        path: data["vllm-dashboard.json"]
+    - documentIndex: 1
+      equal:
+        path: metadata.labels
+        value:
+          grafana_dashboard: "1"
