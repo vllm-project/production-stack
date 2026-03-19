@@ -1,5 +1,8 @@
 # Observability dashboard
 
+> [!WARNING]
+> This tutorial is deprecated. The observability stack is now included in the vllm-stack helm chart alongside `serviceMonitor`, grafana dashboards and `kube-prometheus-stack` as a sub chart, see our [tutorial](../helm/README.md#observability)
+
 <p align="center">
   <img src="https://github.com/user-attachments/assets/05766673-c449-4094-bdc8-dea6ac28cb79" alt="Grafana dashboard to monitor the deployment" width="80%"/>
 </p>
@@ -14,7 +17,7 @@ Make sure to have:
 
 - A running Kubernetes (K8s) environment with GPUs
   - Run `cd utils && bash install-minikube-cluster.sh`
-  - Or follow our [tutorial](tutorials/00-install-kubernetes-env.md)
+  - Or follow our [tutorial](../tutorials/00-install-kubernetes-env.md)
 
 After that you can run:
 
