@@ -387,7 +387,7 @@ This table documents all available configuration values for the Production Stack
 | `sharedPvcStorage.size` | string | `"100Gi"` | Size of the shared storage volume |
 | `sharedPvcStorage.accessModes` | list | `["ReadWriteMany"]` | Access modes for the shared storage volume |
 | `sharedPvcStorage.storageClass` | string | `""` | Storage class name for the shared storage volume |
-| `sharedPvcStorage.hostPath` | string | `""` | Host path for the shared storage volume. Specifying a hostPath of nfs server will create a PersistentVolume. These fields should be omitted to rely on dynamic provisioning of PersistentVolumeClaims. |
+| `sharedPvcStorage.hostPath` | string | `""` | Host path for the shared storage volume. Specifying a hostPath or nfs server will create a PersistentVolume. These fields should be omitted to rely on dynamic provisioning of PersistentVolumeClaims. |
 | `sharedPvcStorage.nfs.server` | string | `""` | NFS server address for the shared storage volume |
 | `sharedPvcStorage.nfs.path` | string | `""` | NFS export path for the shared storage volume |
 

@@ -67,30 +67,25 @@ spec:
             value: "123"
           - name: LMCACHE_LOG_LEVEL
             value: {{ .Values.routerSpec.lmcacheConfig.logLevel | quote }}
-          {{- if .Values.servingEngineSpec.enableEngine -}}
-          {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
-          {{- if $vllmApiKey }}
+          {{- if and .Values.routerSpec.vllmApiKey.secretName .Values.routerSpec.vllmApiKey.secretKey }}
           - name: VLLM_API_KEY
-            {{- if kindIs "string" $vllmApiKey }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.routerSpec.vllmApiKey.secretName }}
+                key: {{ .Values.routerSpec.vllmApiKey.secretKey }}
+          {{- else if and .Values.servingEngineSpec.enableEngine }}
+          {{- if kindIs "string" .Values.servingEngineSpec.vllmApiKey }}
+          - name: VLLM_API_KEY
             valueFrom:
               secretKeyRef:
                 name: {{ .Release.Name }}-secrets
                 key: vllmApiKey
-            {{- else }}
-            valueFrom:
-              secretKeyRef:
-                name: {{ $vllmApiKey.secretName }}
-                key: {{ $vllmApiKey.secretKey }}
-            {{- end }}
-          {{- end }}
-          {{- else }}
-          {{- $vllmApiKey := $.Values.routerSpec.vllmApiKey }}
-          {{- if $vllmApiKey }}
+          {{- else if and .Values.servingEngineSpec.vllmApiKey.secretName .Values.servingEngineSpec.vllmApiKey.secretKey }}
           - name: VLLM_API_KEY
             valueFrom:
               secretKeyRef:
-                name: {{ $vllmApiKey.secretName }}
-                key: {{ $vllmApiKey.secretKey }}
+                name: {{ .Values.servingEngineSpec.vllmApiKey.secretName }}
+                key: {{ .Values.servingEngineSpec.vllmApiKey.secretKey }}
           {{- end }}
           {{- end }}
         args:

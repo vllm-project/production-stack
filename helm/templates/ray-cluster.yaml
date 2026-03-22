@@ -1,7 +1,9 @@
 {{- if .Values.servingEngineSpec.enableEngine }}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
-{{- if (hasKey $modelSpec "raySpec") }}
-{{- with $ -}}
+{{- if ne $modelSpec.enabled false }}
+{{- if and (hasKey $modelSpec "raySpec") $modelSpec.raySpec.enabled }}
+{{- with $ }}
+---
 apiVersion: ray.io/v1
 kind: RayCluster
 metadata:
@@ -75,20 +77,18 @@ spec:
                     key: {{ $modelSpec.hf_token.secretKey }}
                 {{- end }}
               {{- end }}
-              {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
-              {{- if $vllmApiKey }}
+              {{- if and (kindIs "string" $.Values.servingEngineSpec.vllmApiKey) $.Values.servingEngineSpec.vllmApiKey }}
               - name: VLLM_API_KEY
-                {{- if kindIs "string" $vllmApiKey }}
                 valueFrom:
                   secretKeyRef:
                     name: {{ .Release.Name }}-secrets
                     key: vllmApiKey
-                {{- else }}
+              {{- else if and (kindIs "map" $.Values.servingEngineSpec.vllmApiKey) $.Values.servingEngineSpec.vllmApiKey.secretName $.Values.servingEngineSpec.vllmApiKey.secretKey }}
+              - name: VLLM_API_KEY
                 valueFrom:
                   secretKeyRef:
-                    name: {{ $vllmApiKey.secretName }}
-                    key: {{ $vllmApiKey.secretKey }}
-                {{- end }}
+                    name: {{ $.Values.servingEngineSpec.vllmApiKey.secretName }}
+                    key: {{ $.Values.servingEngineSpec.vllmApiKey.secretKey }}
               {{- end }}
               {{- with $modelSpec.env }}
               {{- toYaml . | nindent 14 }}
@@ -117,8 +117,10 @@ spec:
               {{-   if .Values.cacheserverSpec.enabled }}
               - name: LMCACHE_REMOTE_URL
                 value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
+              {{- if .Values.cacheserverSpec.serde }}
               - name: LMCACHE_REMOTE_SERDE
                 value: "{{ .Values.cacheserverSpec.serde }}"
+              {{- end }}
               {{-   end }}
               {{-   if hasKey $modelSpec.lmcacheConfig "enableController" }}
               - name: LMCACHE_ENABLE_CONTROLLER
@@ -166,7 +168,7 @@ spec:
                 mountPath: /scripts
               - name: vllm-script
                 mountPath: /entrypoint
-              {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
+              {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") $modelSpec.extraVolumeMounts }}
               {{- if hasKey $modelSpec "pvcStorage" }}
               - name: {{ .Release.Name }}-storage
                 mountPath: /data
@@ -181,8 +183,8 @@ spec:
               - name: vllm-templates
                 mountPath: /templates
               {{- end }}
-              {{- if hasKey $modelSpec "extraVolumeMounts" }}
-              {{- toYaml $modelSpec.extraVolumeMounts | nindent 14 }}
+              {{- with $modelSpec.extraVolumeMounts }}
+              {{- toYaml . | nindent 14 }}
               {{- end }}
               {{- end }}
         volumes:
@@ -192,7 +194,7 @@ spec:
           - name: vllm-script
             configMap:
               name: "{{$modelSpec.name}}-vllm-start-script"
-          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
+          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") $modelSpec.extraVolumes }}
           {{- if hasKey $modelSpec "pvcStorage" }}
           - name: {{ .Release.Name }}-storage
             persistentVolumeClaim:
@@ -217,8 +219,8 @@ spec:
               claimName: vllm-templates-pvc
           {{- end }}
           {{- end}}
-          {{- if hasKey $modelSpec "extraVolumes" }}
-          {{- toYaml $modelSpec.extraVolumes | nindent 10 }}
+          {{- with $modelSpec.extraVolumes }}
+          {{- toYaml . | nindent 10 }}
           {{- end}}
         {{- end}}
         {{- if $modelSpec.imagePullSecret }}
@@ -301,20 +303,18 @@ spec:
                       key: {{ $modelSpec.hf_token.secretKey }}
                   {{- end }}
                 {{- end }}
-                {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
-                {{- if $vllmApiKey }}
+                {{- if and (kindIs "string" $.Values.servingEngineSpec.vllmApiKey) $.Values.servingEngineSpec.vllmApiKey }}
                 - name: VLLM_API_KEY
-                  {{- if kindIs "string" $vllmApiKey }}
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Release.Name }}-secrets
                       key: vllmApiKey
-                  {{- else }}
+                {{- else if and (kindIs "map" $.Values.servingEngineSpec.vllmApiKey) $.Values.servingEngineSpec.vllmApiKey.secretName $.Values.servingEngineSpec.vllmApiKey.secretKey }}
+                - name: VLLM_API_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: {{ $vllmApiKey.secretName }}
-                      key: {{ $vllmApiKey.secretKey }}
-                  {{- end }}
+                      name: {{ $.Values.servingEngineSpec.vllmApiKey.secretName }}
+                      key: {{ $.Values.servingEngineSpec.vllmApiKey.secretKey }}
                 {{- end }}
                 {{- with $modelSpec.env }}
                 {{- toYaml . | nindent 16 }}
@@ -343,8 +343,10 @@ spec:
                 {{-   if .Values.cacheserverSpec.enabled }}
                 - name: LMCACHE_REMOTE_URL
                   value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print .Release.Name "-cache-server-service") "port" .Values.cacheserverSpec.servicePort) }}"
+                {{- if .Values.cacheserverSpec.serde }}
                 - name: LMCACHE_REMOTE_SERDE
                   value: "{{ .Values.cacheserverSpec.serde }}"
+                {{- end }}
                 {{-   end }}
                 {{-   if hasKey $modelSpec.lmcacheConfig "enableController" }}
                 - name: LMCACHE_ENABLE_CONTROLLER
@@ -375,7 +377,7 @@ spec:
                 exec:
                   command: ["/bin/bash", "-c", "echo TBD"]
               resources: {{- include "chart.resources" $modelSpec | nindent 16 }}
-              {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
+              {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") $modelSpec.extraVolumeMounts }}
               volumeMounts:
               {{- end }}
               {{- if hasKey $modelSpec "pvcStorage" }}
@@ -392,8 +394,8 @@ spec:
               - name: vllm-templates
                 mountPath: /templates
               {{- end }}
-              {{- if hasKey $modelSpec "extraVolumeMounts" }}
-              {{- toYaml $modelSpec.extraVolumeMounts | nindent 14 }}
+              {{- with $modelSpec.extraVolumeMounts }}
+              {{- toYaml . | nindent 14 }}
               {{- end }}
           volumes:
             - name: wait-script
@@ -402,7 +404,7 @@ spec:
             - name: vllm-script
               configMap:
                 name: "{{$modelSpec.name}}-vllm-start-script"
-            {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") }}
+            {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumes") $modelSpec.extraVolumes }}
             {{- if hasKey $modelSpec "pvcStorage" }}
             - name: {{ .Release.Name }}-storage
               persistentVolumeClaim:
@@ -427,8 +429,8 @@ spec:
                 claimName: vllm-templates-pvc
             {{- end }}
             {{- end}}
-            {{- if hasKey $modelSpec "extraVolumes" }}
-            {{- toYaml $modelSpec.extraVolumes | nindent 12 }}
+            {{- with $modelSpec.extraVolumes }}
+            {{- toYaml .| nindent 12 }}
             {{- end}}
           {{- end}}
           {{- if $modelSpec.imagePullSecret }}
@@ -459,7 +461,6 @@ spec:
                 {{- toYaml . | nindent 16 }}
                 {{- end }}
           {{- end }}
-
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -600,7 +601,6 @@ data:
     echo "Executing: ${ARGS[@]}"
     exec "${ARGS[@]}"
 
-
 {{- if and $modelSpec.chatTemplate (hasKey $modelSpec "chatTemplateConfigMap") }}
 ---
 apiVersion: v1
@@ -613,7 +613,7 @@ data:
     {{ $modelSpec.chatTemplateConfigMap }}
 {{- end }}
 {{- end }}
----
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

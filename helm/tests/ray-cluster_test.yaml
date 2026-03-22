@@ -20,6 +20,82 @@ tests:
     - hasDocuments:
         count: 0
 
+  - it: should not render anything when model is disabled
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        labels:
+          custom-label: custom-value
+        securityContext:
+          runAsNonRoot: true
+        modelSpec:
+          - name: "test-model"
+            enabled: false
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render two rayClusters
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        labels:
+          custom-label: custom-value
+        securityContext:
+          runAsNonRoot: true
+        modelSpec:
+          - name: "test-model"
+            enabled: true
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+          - name: "test-model-2"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - hasDocuments:
+        count: 6
 
   - it: should render a custom RayCluster when enabled
     release:
@@ -98,3 +174,285 @@ tests:
       equal:
         path: spec.workerGroupSpecs[0].template.spec.containers[0].image
         value: "vllm/vllm-openai:latest"
+
+  - it: should not render VLLM_API_KEY
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      notContains:
+        path: spec.headGroupSpec.template.spec.containers[0].env
+        content:
+          name: VLLM_API_KEY
+        any: true
+    - documentIndex: 0
+      notContains:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].env
+        content:
+          name: VLLM_API_KEY
+        any: true
+
+  - it: should not render VLLM_API_KEY when empty string
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        vllmApiKey: ""
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      notContains:
+        path: spec.headGroupSpec.template.spec.containers[0].env
+        content:
+          name: VLLM_API_KEY
+        any: true
+    - documentIndex: 0
+      notContains:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].env
+        content:
+          name: VLLM_API_KEY
+        any: true
+
+  - it: should render vllmApiKey from default secret
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        vllmApiKey: "test"
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      contains:
+        path: spec.headGroupSpec.template.spec.containers[0].env
+        content:
+          name: VLLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vllm-secrets
+              key: vllmApiKey
+    - documentIndex: 0
+      contains:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].env
+        content:
+          name: VLLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vllm-secrets
+              key: vllmApiKey
+
+  - it: should render vllmApiKey from referenced secret
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        vllmApiKey:
+          secretName: custom-secret
+          secretKey: custom-key
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      contains:
+        path: spec.headGroupSpec.template.spec.containers[0].env
+        content:
+          name: VLLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: custom-secret
+              key: custom-key
+    - documentIndex: 0
+      contains:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].env
+        content:
+          name: VLLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: custom-secret
+              key: custom-key
+
+  - it: should render LMCACHE env vars
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        vllmApiKey: ""
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+            lmcacheConfig:
+              enabled: true
+            vllmConfig:
+              v1: 1
+      cacheserverSpec:
+        enabled: true
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      contains:
+        path: spec.headGroupSpec.template.spec.containers[0].env
+        content:
+          name: LMCACHE_REMOTE_URL
+          value: lm://vllm-cache-server-service:80
+        any: true
+    - documentIndex: 0
+      contains:
+        path: spec.headGroupSpec.template.spec.containers[0].env
+        content:
+          name: LMCACHE_USE_EXPERIMENTAL
+          value: "True"
+        any: true
+    - documentIndex: 0
+      contains:
+        path: spec.headGroupSpec.template.spec.containers[0].env
+        content:
+          name: LMCACHE_LOG_LEVEL
+          value: INFO
+        any: true
+    - documentIndex: 0
+      notContains:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].env
+        content:
+          name: LMCACHE_REMOTE_SERDE
+        any: true
+
+  - it: should render LMCACHE_REMOTE_SERDE env var
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        vllmApiKey: ""
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+            lmcacheConfig:
+              enabled: true
+            vllmConfig:
+              v1: 1
+      cacheserverSpec:
+        enabled: true
+        serde: naive
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      contains:
+        path: spec.headGroupSpec.template.spec.containers[0].env
+        content:
+          name: LMCACHE_REMOTE_SERDE
+          value: naive
+        any: true

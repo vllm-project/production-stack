@@ -140,3 +140,96 @@ tests:
           httpGet:
             path: /health
             port: router-port
+
+  - it: should not render VLLM_API_KEY
+    set:
+      routerSpec:
+        enabledRouter: true
+    asserts:
+      - template: deployment-router.yaml
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VLLM_API_KEY
+
+  - it: should render value from routerSpec.vllmApiKey using referenced secret
+    set:
+      routerSpec:
+        enabledRouter: true
+        vllmApiKey:
+          secretName: apikey-secret
+          secretKey: apikey
+      servingEngineSpec:
+        vllmApiKey: custom_api_key
+    asserts:
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VLLM_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: apikey-secret
+                key: apikey
+
+  - it: should render value from routerSpec.vllmApiKey using referenced secret
+    set:
+      routerSpec:
+        enabledRouter: true
+        vllmApiKey:
+          secretName: apikey-secret
+          secretKey: apikey
+      servingEngineSpec:
+        vllmApiKey:
+          secretName: apikey-secret
+          secretKey: apikey
+    asserts:
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VLLM_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: apikey-secret
+                key: apikey
+
+  - it: should render value from servingEngineSpec.vllmApiKey using generated secret
+    release:
+      name: vllm
+    set:
+      routerSpec:
+        enabledRouter: true
+      servingEngineSpec:
+        enableEngine: true
+        vllmApiKey: custom_api_key
+    asserts:
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VLLM_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: vllm-secrets
+                key: vllmApiKey
+
+  - it: should render value from servingEngineSpec.vllmApiKey using referenced secret
+    set:
+      routerSpec:
+        enabledRouter: true
+      servingEngineSpec:
+        enableEngine: true
+        vllmApiKey:
+          secretName: custom-secret
+          secretKey: custom-apikey
+    asserts:
+      - template: deployment-router.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VLLM_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: custom-secret
+                key: custom-apikey

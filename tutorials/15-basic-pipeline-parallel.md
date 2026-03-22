@@ -93,6 +93,7 @@ servingEngineSpec:
     shmSize: "20Gi"
 
     raySpec:
+      enabled: true
       headNode:
         requestCPU: 2
         requestMemory: "20Gi"

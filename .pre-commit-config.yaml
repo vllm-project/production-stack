@@ -33,6 +33,7 @@ repos:
     rev: v2.3.1
     hooks:
       - id: helm-schema
+        stages: [manual] # Only run in CI, add to .github/workflows/pre-commit.yml
         args: ["-f", "helm/values.yaml", "-o", "helm/values.schema.json", "--use-helm-docs"]
         files: ^helm/values\.yaml$
   - repo: https://github.com/psf/black
