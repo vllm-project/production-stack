@@ -527,27 +527,38 @@ async def route_general_request(
 
 
 async def send_request_to_prefiller(
-    client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
+    client: aiohttp.ClientSession,
+    endpoint: str,
+    req_data: dict,
+    request_id: str,
+    disagg_connector_type: str = "nixl",
+    disagg_spec: dict = None,
+    base_url: str = None,
 ):
     """Send a request to a prefiller service.
 
-    Supports both LMCache-based DPD (ZMQ side-channel) and NixlConnector-based DPD
-    (kv_transfer_params in request/response). Returns the prefill response JSON so
-    the caller can extract kv_transfer_params if present.
+    Supports both LMCache-based DPD (disagg_spec + ret_first_tok) and NixlConnector-based
+    DPD (kv_transfer_params with do_remote_decode).
     """
     req_data = req_data.copy()
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
         req_data["max_completion_tokens"] = 1
 
-    # For NixlConnector: signal that this is a DPD prefill request
-    if "kv_transfer_params" not in req_data:
+    if disagg_connector_type == "lmcache" and disagg_spec is not None:
+        spec = disagg_spec.copy()
+        spec["req_id"] = request_id
+        req_data["kv_transfer_params"] = {
+            "ret_first_tok": True,
+            "disagg_spec": spec,
+        }
+        req_data.pop("min_tokens", None)
+    elif "kv_transfer_params" not in req_data:
         req_data["kv_transfer_params"] = {
             "do_remote_decode": True,
             "do_remote_prefill": False,
         }
 
-    # Force non-streaming for prefill (need full response for kv_transfer_params)
     req_data["stream"] = False
     req_data.pop("stream_options", None)
 
@@ -556,13 +567,19 @@ async def send_request_to_prefiller(
         "X-Request-Id": request_id,
     }
 
-    async with client.post(endpoint, json=req_data, headers=headers) as response:
+    url = f"{base_url}{endpoint}" if base_url else endpoint
+
+    async with client.post(url, json=req_data, headers=headers) as response:
         response.raise_for_status()
         return await response.json()
 
 
 async def send_request_to_decode(
-    client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
+    client: aiohttp.ClientSession,
+    endpoint: str,
+    req_data: dict,
+    request_id: str,
+    base_url: str = None,
 ):
     """Asynchronously stream the response from a service using a persistent client."""
     headers = {
@@ -570,10 +587,29 @@ async def send_request_to_decode(
         "X-Request-Id": request_id,
     }
 
-    async with client.post(endpoint, json=req_data, headers=headers) as response:
+    url = f"{base_url}{endpoint}" if base_url else endpoint
+
+    async with client.post(url, json=req_data, headers=headers) as response:
         response.raise_for_status()
         async for chunk in response.content.iter_any():
             yield chunk
+
+
+def _build_disagg_spec(app_state, disagg_connector_type: str, decode_base_url: str) -> dict:
+    """Build disagg_spec for the selected decoder endpoint.
+
+    For LMCache connector, constructs a disagg_spec with the selected decoder's
+    NIXL metadata. Supports both static (legacy) and dynamic (xPyD) modes.
+    For NixlConnector, returns None.
+    """
+    if disagg_connector_type != "lmcache":
+        return None
+
+    decoder_registry = getattr(app_state, "decoder_registry", None)
+    if decoder_registry and decode_base_url in decoder_registry:
+        return decoder_registry[decode_base_url].copy()
+
+    return getattr(app_state, "disagg_spec", None)
 
 
 async def route_orchestrated_disaggregated_request(
@@ -782,49 +818,97 @@ async def route_disaggregated_prefill_request(
     background_tasks: BackgroundTasks,
 ):
     in_router_time = time.time()
-    # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
 
-    # Check conditional disaggregation: short inputs bypass DPD
+    # Use router to select prefill and decode endpoints
     router = request.app.state.router
+    service_discovery = get_service_discovery()
+    endpoints = service_discovery.get_endpoint_info()
+    engine_stats = getattr(request.app.state, "engine_stats", {})
+
+    prefiller_endpoints = [
+        e for e in endpoints if e.model_label in router.prefill_model_labels
+    ]
+    decoder_endpoints = [
+        e for e in endpoints if e.model_label in router.decode_model_labels
+    ]
+
+    decode_base_url = router._select_decode_endpoint(decoder_endpoints, engine_stats)
+
+    # Check conditional disaggregation: short inputs bypass DPD
     if not router.should_disaggregate(request_json):
-        # Direct-to-decoder path: send as normal request (local chunked prefill)
         logger.info(
-            f"{request_id} below routing threshold, sending directly to decoder"
+            f"{request_id} below routing threshold, sending directly to decoder {decode_base_url}"
         )
         return await _route_direct_to_decoder(
-            request, endpoint, request_json, request_id, background_tasks
+            request, endpoint, request_json, request_id, background_tasks,
+            decode_base_url=decode_base_url,
         )
 
-    # DPD path: prefill on prefiller, then stream from decoder
-    # Save original request for decode phase
-    orig_request_json = request_json.copy()
+    prefill_base_url = router._select_prefill_endpoint(prefiller_endpoints, engine_stats)
 
-    # Prepare prefill request: set max_tokens=1 and remove max_completion_tokens
-    # (max_completion_tokens takes precedence over max_tokens in OpenAI API,
-    # so we must remove it to ensure prefill generates only 1 token)
+    disagg_connector_type = getattr(request.app.state, "disagg_connector_type", "nixl")
+    disagg_spec = _build_disagg_spec(request.app.state, disagg_connector_type, decode_base_url)
+
+    # DPD path
+    orig_request_json = request_json.copy()
+    orig_max_tokens = request_json.get("max_tokens", 0)
+    orig_min_tokens = request_json.get("min_tokens", None)
+
     request_json["max_tokens"] = 1
     request_json.pop("max_completion_tokens", None)
 
     st = time.time()
     try:
         prefill_response = await send_request_to_prefiller(
-            request.app.state.prefill_client, endpoint, request_json, request_id
+            request.app.state.prefill_client,
+            endpoint,
+            request_json,
+            request_id,
+            disagg_connector_type=disagg_connector_type,
+            disagg_spec=disagg_spec,
+            base_url=prefill_base_url,
         )
         et = time.time()
         logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
         logger.info(
-            f"Routing request {request_id} with session id None to {request.app.state.prefill_client._base_url} at {et}, process time = {et - in_router_time:.4f}"
+            f"Routing request {request_id} to {prefill_base_url} at {et}, "
+            f"process time = {et - in_router_time:.4f}"
         )
-        # Use original request for decode phase
         request_json = orig_request_json
+        request_json["max_tokens"] = orig_max_tokens
 
-        # Forward kv_transfer_params from prefiller to decoder (NixlConnector support)
-        kv_transfer_params = prefill_response.get("kv_transfer_params")
-        if kv_transfer_params:
-            request_json["kv_transfer_params"] = kv_transfer_params
-            logger.info(f"{request_id} forwarding kv_transfer_params to decoder")
+        if disagg_connector_type == "lmcache":
+            kv_params = prefill_response.get("kv_transfer_params", {})
+            first_tok = kv_params.get("first_tok")
+
+            prompt = request_json.get("prompt", None)
+            if isinstance(prompt, list) and len(prompt) > 0 and isinstance(prompt[0], int):
+                token_ids = prompt
+            else:
+                token_ids = prompt if isinstance(prompt, list) else []
+
+            if first_tok is not None:
+                token_ids = list(token_ids) + [first_tok]
+                request_json["prompt"] = token_ids
+                request_json["max_tokens"] = orig_max_tokens - 1
+                if orig_min_tokens is not None and orig_min_tokens > 1:
+                    request_json["min_tokens"] = orig_min_tokens - 1
+                logger.info(
+                    f"{request_id} LMCache: appended first_tok={first_tok}, "
+                    f"prompt now {len(token_ids)} tokens"
+                )
+            else:
+                logger.warning(f"{request_id} LMCache: no first_tok in prefill response")
+
+            request_json.pop("kv_transfer_params", None)
+            request_json.pop("messages", None)
+        else:
+            kv_transfer_params = prefill_response.get("kv_transfer_params")
+            if kv_transfer_params:
+                request_json["kv_transfer_params"] = kv_transfer_params
+                logger.info(f"{request_id} forwarding kv_transfer_params to decoder")
     except aiohttp.ClientResponseError as e:
         logger.error(f"HTTP error in prefiller: {e}", exc_info=True)
         return JSONResponse(
@@ -855,19 +939,15 @@ async def route_disaggregated_prefill_request(
     async def generate_stream():
         try:
             async for chunk in send_request_to_decode(
-                request.app.state.decode_client, endpoint, request_json, request_id
+                request.app.state.decode_client, endpoint, request_json, request_id,
+                base_url=decode_base_url,
             ):
                 yield chunk
         except aiohttp.ClientResponseError as e:
             logger.error(f"HTTP error in decoder: {e}", exc_info=True)
-            try:
-                error_text = e.message
-            except Exception:
-                error_text = f"HTTP {e.status}"
-            # Yield error as JSON response
             error_response = {
                 "error": {
-                    "message": f"Decoder error: {error_text}",
+                    "message": f"Decoder error: {e.message}",
                     "type": "decoder_error",
                     "code": e.status,
                 }
@@ -875,7 +955,6 @@ async def route_disaggregated_prefill_request(
             yield json.dumps(error_response).encode("utf-8")
         except Exception as e:
             logger.error(f"Unexpected error in decoder: {e}", exc_info=True)
-            # Yield error as JSON response
             error_response = {
                 "error": {
                     "message": f"Decoder error: {str(e)}",
@@ -887,7 +966,8 @@ async def route_disaggregated_prefill_request(
 
     curr_time = time.time()
     logger.info(
-        f"Routing request {request_id} with session id None to {request.app.state.decode_client._base_url} at {curr_time}, process time = {curr_time - et:.4f}"
+        f"Routing request {request_id} to decoder {decode_base_url} at {curr_time}, "
+        f"process time = {curr_time - et:.4f}"
     )
 
     return StreamingResponse(
@@ -903,18 +983,16 @@ async def _route_direct_to_decoder(
     request_json: dict,
     request_id: str,
     background_tasks: BackgroundTasks,
+    decode_base_url: str = None,
 ):
-    """Route request directly to decoder, bypassing DPD.
-
-    Used for short-input requests where local chunked prefill on the decoder
-    is faster than remote prefill + KV transfer.
-    """
+    """Route request directly to decoder, bypassing DPD."""
     st = time.time()
 
     async def generate_stream():
         try:
             async for chunk in send_request_to_decode(
-                request.app.state.decode_client, endpoint, request_json, request_id
+                request.app.state.decode_client, endpoint, request_json, request_id,
+                base_url=decode_base_url,
             ):
                 yield chunk
         except aiohttp.ClientResponseError as e:
@@ -940,8 +1018,7 @@ async def _route_direct_to_decoder(
 
     curr_time = time.time()
     logger.info(
-        f"Direct-to-decoder request {request_id} to "
-        f"{request.app.state.decode_client._base_url} at {curr_time}, "
+        f"Direct-to-decoder request {request_id} to {decode_base_url} at {curr_time}, "
         f"process time = {curr_time - st:.4f}"
     )
 

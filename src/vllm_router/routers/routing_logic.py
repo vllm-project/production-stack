@@ -494,10 +494,12 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         prefill_model_labels: List[str],
         decode_model_labels: List[str],
         routing_threshold: int = 0,
+        load_balancing_strategy: str = "round_robin",
     ):
         self.prefill_model_labels = prefill_model_labels
         self.decode_model_labels = decode_model_labels
         self.routing_threshold = routing_threshold
+        self.load_balancing_strategy = load_balancing_strategy
         self.request_cache = {}  # Cache to store prefill results
         self._prefill_rr_idx = 0
         self._decode_rr_idx = 0
@@ -526,19 +528,69 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             return total_chars // 4
         return 0
 
-    def _select_prefill_endpoint(self, prefiller_endpoints: List[EndpointInfo]) -> str:
-        """Round-robin selection among prefill endpoints."""
+    def _select_least_loaded(
+        self,
+        candidates: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+    ) -> Optional[str]:
+        """Select endpoint with fewest running + queued requests.
+
+        Returns None (caller uses round-robin) if stats are unavailable.
+        """
+        if not candidates:
+            raise ValueError("No endpoints available")
+
+        best_url = None
+        best_load = float("inf")
+
+        for ep in candidates:
+            stats = engine_stats.get(ep.url)
+            if stats is None:
+                logger.debug(
+                    "Engine stats incomplete, falling back to round-robin"
+                )
+                return None
+            load = stats.num_running_requests + stats.num_queuing_requests
+            if load < best_load:
+                best_load = load
+                best_url = ep.url
+
+        logger.debug(f"Least-loaded: chose {best_url} with load={best_load}")
+        return best_url
+
+    def _select_prefill_endpoint(
+        self,
+        prefiller_endpoints: List[EndpointInfo],
+        engine_stats: Optional[Dict[str, EngineStats]] = None,
+    ) -> str:
+        """Select prefill endpoint using configured strategy."""
         if not prefiller_endpoints:
             raise ValueError("No prefill endpoints available")
+
+        if self.load_balancing_strategy == "least_loaded" and engine_stats:
+            url = self._select_least_loaded(prefiller_endpoints, engine_stats)
+            if url is not None:
+                return url
+
         sorted_eps = sorted(prefiller_endpoints, key=lambda e: e.url)
         idx = self._prefill_rr_idx % len(sorted_eps)
         self._prefill_rr_idx += 1
         return sorted_eps[idx].url
 
-    def _select_decode_endpoint(self, decoder_endpoints: List[EndpointInfo]) -> str:
-        """Round-robin selection among decode endpoints."""
+    def _select_decode_endpoint(
+        self,
+        decoder_endpoints: List[EndpointInfo],
+        engine_stats: Optional[Dict[str, EngineStats]] = None,
+    ) -> str:
+        """Select decode endpoint using configured strategy."""
         if not decoder_endpoints:
             raise ValueError("No decode endpoints available")
+
+        if self.load_balancing_strategy == "least_loaded" and engine_stats:
+            url = self._select_least_loaded(decoder_endpoints, engine_stats)
+            if url is not None:
+                return url
+
         sorted_eps = sorted(decoder_endpoints, key=lambda e: e.url)
         idx = self._decode_rr_idx % len(sorted_eps)
         self._decode_rr_idx += 1
@@ -554,7 +606,7 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         if self.routing_threshold <= 0:
             return True
         estimated_tokens = self._estimate_input_tokens(request_json)
-        should_dpd = estimated_tokens > self.routing_threshold
+        should_dpd = estimated_tokens >= self.routing_threshold
         logger.info(
             f"Conditional routing: estimated_tokens={estimated_tokens}, "
             f"threshold={self.routing_threshold}, disaggregate={should_dpd}"
@@ -589,9 +641,9 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             e for e in endpoints if e.model_label in self.decode_model_labels
         ]
         if is_prefill:
-            return self._select_prefill_endpoint(prefiller_endpoints)
+            return self._select_prefill_endpoint(prefiller_endpoints, engine_stats)
         else:
-            return self._select_decode_endpoint(decoder_endpoints)
+            return self._select_decode_endpoint(decoder_endpoints, engine_stats)
 
 
 class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
@@ -731,6 +783,7 @@ def initialize_routing_logic(
             kwargs.get("prefill_model_labels"),
             kwargs.get("decode_model_labels"),
             routing_threshold=kwargs.get("routing_threshold", 0),
+            load_balancing_strategy=kwargs.get("load_balancing_strategy", "round_robin"),
         )
     elif routing_logic == RoutingLogic.DISAGGREGATED_PREFILL_ORCHESTRATED:
         logger.info("Initializing disaggregated prefill orchestrated routing logic")

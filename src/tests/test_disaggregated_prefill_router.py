@@ -261,3 +261,57 @@ def test_route_request_backward_compatible():
     # Decode request
     url = router.route_request(endpoints, {}, {}, req, {"max_tokens": 256})
     assert url == "http://decode1:8000"
+
+
+# --- Gap 5: Least-loaded selection tests ---
+
+
+class MockEngineStats:
+    def __init__(self, num_running_requests: int = 0, num_queuing_requests: int = 0):
+        self.num_running_requests = num_running_requests
+        self.num_queuing_requests = num_queuing_requests
+
+
+def test_least_loaded_selects_lowest_load():
+    router = DisaggregatedPrefillRouter(
+        ["prefill"], ["decode"], load_balancing_strategy="least_loaded"
+    )
+    endpoints = [
+        EndpointInfo("http://prefill1:8000", "prefill"),
+        EndpointInfo("http://prefill2:8000", "prefill"),
+    ]
+    engine_stats = {
+        "http://prefill1:8000": MockEngineStats(5, 2),
+        "http://prefill2:8000": MockEngineStats(1, 0),
+    }
+    assert router._select_prefill_endpoint(endpoints, engine_stats) == "http://prefill2:8000"
+
+
+def test_least_loaded_fallback_when_stats_missing():
+    router = DisaggregatedPrefillRouter(
+        ["prefill"], ["decode"], load_balancing_strategy="least_loaded"
+    )
+    endpoints = [
+        EndpointInfo("http://prefill1:8000", "prefill"),
+        EndpointInfo("http://prefill2:8000", "prefill"),
+    ]
+    engine_stats = {"http://prefill1:8000": MockEngineStats(5, 2)}
+    url1 = router._select_prefill_endpoint(endpoints, engine_stats)
+    url2 = router._select_prefill_endpoint(endpoints, engine_stats)
+    assert url1 == "http://prefill1:8000"
+    assert url2 == "http://prefill2:8000"
+
+
+def test_round_robin_ignores_engine_stats():
+    router = DisaggregatedPrefillRouter(
+        ["prefill"], ["decode"], load_balancing_strategy="round_robin"
+    )
+    endpoints = [
+        EndpointInfo("http://prefill1:8000", "prefill"),
+        EndpointInfo("http://prefill2:8000", "prefill"),
+    ]
+    engine_stats = {
+        "http://prefill1:8000": MockEngineStats(100, 50),
+        "http://prefill2:8000": MockEngineStats(0, 0),
+    }
+    assert router._select_prefill_endpoint(endpoints, engine_stats) == "http://prefill1:8000"
