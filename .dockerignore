@@ -18,3 +18,7 @@ build/
 # Test artifacts
 .pytest_cache/
 .coverage
+
+# Docker build files
+.dockerignore
+docker/Dockerfile*
