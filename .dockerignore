@@ -1,0 +1,20 @@
+# Test and example files
+src/tests/
+src/examples/
+src/gateway_inference_extension/
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+
+# Test artifacts
+.pytest_cache/
+.coverage
