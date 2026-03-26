@@ -214,6 +214,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         model_types: List[str] | None = None,
         static_backend_health_checks: bool = False,
         static_backend_health_check_interval: int = 60,
+        static_backend_health_check_timeout_seconds: int = 10,
         prefill_model_labels: List[str] | None = None,
         decode_model_labels: List[str] | None = None,
     ):
@@ -229,6 +230,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.unhealthy_endpoint_hashes = []
         self._running = True
         self.health_check_interval = static_backend_health_check_interval
+        self.health_check_timeout = static_backend_health_check_timeout_seconds
         if static_backend_health_checks:
             self.start_health_check_task()
         self.prefill_model_labels = prefill_model_labels
@@ -240,7 +242,9 @@ class StaticServiceDiscovery(ServiceDiscovery):
             for url, model, model_type in zip(
                 self.urls, self.models, self.model_types, strict=True
             ):
-                if utils.is_model_healthy(url, model, model_type):
+                if utils.is_model_healthy(
+                    url, model, model_type, self.health_check_timeout
+                ):
                     logger.debug(f"{model} at {url} is healthy")
                 else:
                     logger.warning(f"{model} at {url} not healthy!")

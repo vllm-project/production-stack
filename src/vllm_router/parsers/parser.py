@@ -183,6 +183,12 @@ def parse_args():
         help="Interval in seconds between static backend health checks (default: 60).",
     )
     parser.add_argument(
+        "--static-backend-health-check-timeout-seconds",
+        type=int,
+        default=10,
+        help="Timeout in seconds for static backend health check requests (default: 10).",
+    )
+    parser.add_argument(
         "--k8s-port",
         type=int,
         default=8000,

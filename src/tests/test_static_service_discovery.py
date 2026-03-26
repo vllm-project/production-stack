@@ -92,7 +92,9 @@ def test_get_unhealthy_endpoint_hashes_when_healthy_and_unhealthy_models_exist_r
 ) -> None:
     unhealthy_model = "bge-m3"
 
-    def mock_is_model_healthy(url: str, model: str, model_type: str) -> bool:
+    def mock_is_model_healthy(
+        url: str, model: str, model_type: str, timeout: int = 10
+    ) -> bool:
         return model != unhealthy_model
 
     monkeypatch.setattr("vllm_router.utils.is_model_healthy", mock_is_model_healthy)

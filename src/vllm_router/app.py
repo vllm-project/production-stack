@@ -199,6 +199,7 @@ def initialize_all(app: FastAPI, args):
             ),
             static_backend_health_checks=args.static_backend_health_checks,
             static_backend_health_check_interval=args.static_backend_health_check_interval,
+            static_backend_health_check_timeout_seconds=args.static_backend_health_check_timeout_seconds,
             prefill_model_labels=args.prefill_model_labels,
             decode_model_labels=args.decode_model_labels,
         )
