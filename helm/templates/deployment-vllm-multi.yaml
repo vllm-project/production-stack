@@ -479,15 +479,13 @@ spec:
       {{- $globalTolerations := .Values.servingEngineSpec.tolerations | default list }}
       {{- $modelTolerations := $modelSpec.tolerations | default list }}
       {{- $tolerationsPolicy := $modelSpec.tolerationsPolicy | default "append" }}
-      {{- $effectiveTolerations := list }}
+      {{- $effectiveTolerations := $globalTolerations }}
       {{- if $modelTolerations }}
         {{- if eq $tolerationsPolicy "override" }}
           {{- $effectiveTolerations = $modelTolerations }}
         {{- else }}
           {{- $effectiveTolerations = concat $globalTolerations $modelTolerations }}
         {{- end }}
-      {{- else }}
-        {{- $effectiveTolerations = $globalTolerations }}
       {{- end }}
       {{- if $effectiveTolerations }}
       tolerations:
