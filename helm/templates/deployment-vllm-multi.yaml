@@ -476,11 +476,22 @@ spec:
         {{- if hasKey $modelSpec "extraVolumes" }}
         {{- toYaml $modelSpec.extraVolumes | nindent 8 }}
         {{- end}}
-      {{- if .Values.servingEngineSpec.tolerations }}
-      {{-   with .Values.servingEngineSpec.tolerations }}
+      {{- $globalTolerations := .Values.servingEngineSpec.tolerations | default list }}
+      {{- $modelTolerations := $modelSpec.tolerations | default list }}
+      {{- $tolerationsPolicy := $modelSpec.tolerationsPolicy | default "append" }}
+      {{- $effectiveTolerations := list }}
+      {{- if $modelTolerations }}
+        {{- if eq $tolerationsPolicy "override" }}
+          {{- $effectiveTolerations = $modelTolerations }}
+        {{- else }}
+          {{- $effectiveTolerations = concat $globalTolerations $modelTolerations }}
+        {{- end }}
+      {{- else }}
+        {{- $effectiveTolerations = $globalTolerations }}
+      {{- end }}
+      {{- if $effectiveTolerations }}
       tolerations:
-        {{-   toYaml . | nindent 8 }}
-      {{-   end }}
+        {{- toYaml $effectiveTolerations | nindent 8 }}
       {{- end }}
 
       {{- with (ternary $modelSpec.runtimeClassName .Values.servingEngineSpec.runtimeClassName (hasKey $modelSpec "runtimeClassName")) }}
