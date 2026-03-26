@@ -213,6 +213,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         model_labels: List[str] | None = None,
         model_types: List[str] | None = None,
         static_backend_health_checks: bool = False,
+        static_backend_health_check_interval: int = 60,
         prefill_model_labels: List[str] | None = None,
         decode_model_labels: List[str] | None = None,
     ):
@@ -227,6 +228,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.added_timestamp = int(time.time())
         self.unhealthy_endpoint_hashes = []
         self._running = True
+        self.health_check_interval = static_backend_health_check_interval
         if static_backend_health_checks:
             self.start_health_check_task()
         self.prefill_model_labels = prefill_model_labels
@@ -254,7 +256,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         while self._running:
             try:
                 self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
-                await asyncio.sleep(60)
+                await asyncio.sleep(self.health_check_interval)
             except asyncio.CancelledError:
                 logger.debug("Health check task cancelled")
                 break

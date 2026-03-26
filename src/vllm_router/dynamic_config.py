@@ -58,6 +58,7 @@ class DynamicRouterConfig:
     static_model_labels: Optional[str] = None
     static_model_types: Optional[str] = None
     static_backend_health_checks: Optional[bool] = False
+    static_backend_health_check_interval: Optional[int] = 60
     prefill_model_labels: Optional[str] = None
     decode_model_labels: Optional[str] = None
     k8s_port: Optional[int] = None
@@ -92,6 +93,8 @@ class DynamicRouterConfig:
             static_models=args.static_models,
             static_model_types=args.static_model_types,
             static_aliases=args.static_aliases,
+            static_backend_health_checks=args.static_backend_health_checks,
+            static_backend_health_check_interval=args.static_backend_health_check_interval,
             k8s_port=args.k8s_port,
             k8s_namespace=args.k8s_namespace,
             k8s_label_selector=args.k8s_label_selector,
@@ -172,6 +175,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 model_labels=parse_comma_separated_args(config.static_model_labels),
                 model_types=parse_comma_separated_args(config.static_model_types),
                 static_backend_health_checks=config.static_backend_health_checks,
+                static_backend_health_check_interval=config.static_backend_health_check_interval,
                 prefill_model_labels=parse_comma_separated_args(
                     config.prefill_model_labels
                 ),

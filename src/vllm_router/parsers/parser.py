@@ -177,6 +177,12 @@ def parse_args():
         help="Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.",
     )
     parser.add_argument(
+        "--static-backend-health-check-interval",
+        type=int,
+        default=60,
+        help="Interval in seconds between static backend health checks (default: 60).",
+    )
+    parser.add_argument(
         "--k8s-port",
         type=int,
         default=8000,
