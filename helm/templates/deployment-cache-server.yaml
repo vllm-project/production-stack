@@ -47,16 +47,7 @@ spec:
           - "{{ .Values.cacheserverSpec.containerPort }}"
           {{- if .Values.cacheserverSpec.resources }}
           resources:
-            {{- if .Values.cacheserverSpec.resources.requests }}
-            requests:
-              cpu: "{{ .Values.cacheserverSpec.resources.requests.cpu }}"
-              memory: "{{ .Values.cacheserverSpec.resources.requests.memory }}"
-            {{- end }}
-            {{- if .Values.cacheserverSpec.resources.limits }}
-            limits:
-              cpu: "{{ .Values.cacheserverSpec.resources.limits.cpu }}"
-              memory: "{{ .Values.cacheserverSpec.resources.limits.memory }}"
-            {{- end }}
+            {{- toYaml .Values.cacheserverSpec.resources | nindent 12 }}
           {{- end }}
           ports:
             - name: "caserver-cport"
