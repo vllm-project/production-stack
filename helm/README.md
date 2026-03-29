@@ -330,7 +330,7 @@ This table documents all available configuration values for the Production Stack
 | `cacheserverSpec.nodeSelectorTerms` | list | - | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
 | `cacheserverSpec.serde` | string | - | Serialization/deserialization format |
 
-`cacheserverSpec.resources` is passed through directly to the pod container resources block, so you can use extended resource keys (for example `rdma/ib`) in addition to cpu/memory.
+> `cacheserverSpec.resources` is passed through directly to the pod container resources block, so you can use extended resource keys (for example `rdma/ib`) in addition to cpu/memory.
 
 ### LoRA Adapters Configuration
 
