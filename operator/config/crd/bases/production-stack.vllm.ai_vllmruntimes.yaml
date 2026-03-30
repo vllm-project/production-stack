@@ -41,6 +41,54 @@ spec:
           spec:
             description: VLLMRuntimeSpec defines the desired state of VLLMRuntime
             properties:
+              autoscalingConfig:
+                description: Autoscaling configuration
+                properties:
+                  cooldownPeriod:
+                    description: CooldownPeriod is the wait time before scaling to
+                      zero (seconds)
+                    format: int32
+                    type: integer
+                  enabled:
+                    description: Enabled enables autoscaling
+                    type: boolean
+                  generationTokensThreshold:
+                    description: GenerationTokensThreshold is the per-pod generation
+                      tokens/s threshold for scaling
+                    type: string
+                  maxReplicas:
+                    description: MaxReplicas is the maximum number of replicas
+                    format: int32
+                    type: integer
+                  minReplicas:
+                    description: MinReplicas is the minimum number of replicas (0
+                      enables scale-to-zero)
+                    format: int32
+                    type: integer
+                  pollingInterval:
+                    description: PollingInterval is how often KEDA checks metrics
+                      (seconds)
+                    format: int32
+                    type: integer
+                  promptTokensThreshold:
+                    description: PromptTokensThreshold is the per-pod prompt tokens/s
+                      threshold for scaling
+                    type: string
+                  requestsRunningThreshold:
+                    description: RequestsRunningThreshold is the per-pod concurrent
+                      requests threshold for scaling
+                    type: string
+                  scaleDownStabilizationWindowSeconds:
+                    description: ScaleDownStabilizationWindowSeconds is the HPA stabilization
+                      window for scaling down
+                    format: int32
+                    type: integer
+                  scaleUpStabilizationWindowSeconds:
+                    description: ScaleUpStabilizationWindowSeconds is the HPA stabilization
+                      window for scaling up
+                    format: int32
+                    type: integer
+                type: object
               deploymentConfig:
                 description: Deployment configuration
                 properties:
@@ -441,9 +489,21 @@ spec:
               modelStatus:
                 description: Model status
                 type: string
+              replicas:
+                description: Current replica count (used by scale subresource)
+                format: int32
+                type: integer
+              selector:
+                description: Label selector for pods (used by scale subresource for
+                  HPA AverageValue)
+                type: string
             type: object
         type: object
     served: true
     storage: true
     subresources:
+      scale:
+        labelSelectorPath: .status.selector
+        specReplicasPath: .spec.deploymentConfig.replicas
+        statusReplicasPath: .status.replicas
       status: {}

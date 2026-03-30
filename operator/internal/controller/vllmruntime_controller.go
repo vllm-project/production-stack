@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -52,6 +53,8 @@ type VLLMRuntimeReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=keda.sh,resources=scaledobjects,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=vllmruntimes/scale,verbs=get;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -321,6 +324,14 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 		}
 		// Deployment updated successfully - return and requeue
 		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Create or update KEDA ScaledObject
+	if vllmRuntime.Spec.AutoscalingConfig != nil && vllmRuntime.Spec.AutoscalingConfig.Enabled {
+		if err := r.reconcileScaledObject(ctx, vllmRuntime); err != nil {
+			log.Error(err, "Failed to reconcile ScaledObject")
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Update the status
@@ -1031,8 +1042,161 @@ func (r *VLLMRuntimeReconciler) updateStatus(
 			latestVR.Status.ModelStatus = "Unknown"
 		}
 
+		// Set replica count and selector for the scale subresource (required by HPA for AverageValue metrics)
+		latestVR.Status.Replicas = *dep.Spec.Replicas
+		latestVR.Status.Selector = metav1.FormatLabelSelector(dep.Spec.Selector)
+
 		return r.Status().Update(ctx, latestVR)
 	})
+}
+
+// reconcileScaledObject creates or updates the KEDA ScaledObject for autoscaling
+func (r *VLLMRuntimeReconciler) reconcileScaledObject(
+	ctx context.Context,
+	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
+) error {
+	cfg := vllmRuntime.Spec.AutoscalingConfig
+	jobName := vllmRuntime.Name
+
+	scaledObject := &unstructured.Unstructured{}
+	scaledObject.SetAPIVersion("keda.sh/v1alpha1")
+	scaledObject.SetKind("ScaledObject")
+	scaledObject.SetName(vllmRuntime.Name + "-scaledobject")
+	scaledObject.SetNamespace(vllmRuntime.Namespace)
+	scaledObject.SetOwnerReferences([]metav1.OwnerReference{
+		*metav1.NewControllerRef(vllmRuntime, productionstackv1alpha1.GroupVersion.WithKind("VLLMRuntime")),
+	})
+
+	prometheusAddr := "http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090"
+	servedModelName := vllmRuntime.Spec.Model.ModelURL
+
+	spec := map[string]interface{}{
+		"scaleTargetRef": map[string]interface{}{
+			"apiVersion": "production-stack.vllm.ai/v1alpha1",
+			"kind":       "VLLMRuntime",
+			"name":       vllmRuntime.Name,
+		},
+		"minReplicaCount": getMinReplicas(cfg),
+		"maxReplicaCount": cfg.MaxReplicas,
+		"pollingInterval": getPollingInterval(cfg),
+		"cooldownPeriod":  getCooldownPeriod(cfg),
+		"advanced": map[string]interface{}{
+			"horizontalPodAutoscalerConfig": map[string]interface{}{
+				"behavior": map[string]interface{}{
+					"scaleUp": map[string]interface{}{
+						"stabilizationWindowSeconds": getScaleUpWindow(cfg),
+						"policies": []map[string]interface{}{
+							{"type": "Pods", "value": 1, "periodSeconds": 60},
+						},
+					},
+					"scaleDown": map[string]interface{}{
+						"stabilizationWindowSeconds": getScaleDownWindow(cfg),
+						"policies": []map[string]interface{}{
+							{"type": "Pods", "value": 1, "periodSeconds": 60},
+						},
+					},
+				},
+			},
+		},
+		"triggers": []map[string]interface{}{
+			{
+				"type":       "prometheus",
+				"metricType": "Value",
+				"metadata": map[string]string{
+					"serverAddress": prometheusAddr,
+					"metricName":    "vllm_incoming_keepalive",
+					"query":         fmt.Sprintf(`sum(rate(vllm:num_incoming_requests_total{namespace="%s", model="%s"}[1m]) > bool 0)`, vllmRuntime.Namespace, servedModelName),
+					"threshold":     "1",
+				},
+			},
+			{
+				"type": "prometheus",
+				"metadata": map[string]string{
+					"serverAddress": prometheusAddr,
+					"metricName":    "vllm_requests_running",
+					"query":         fmt.Sprintf(`sum(vllm:num_requests_running{job="%s"})`, jobName),
+					"threshold":     getRequestsRunningThreshold(cfg),
+				},
+			},
+			{
+				"type": "prometheus",
+				"metadata": map[string]string{
+					"serverAddress": prometheusAddr,
+					"metricName":    "vllm_generation_tokens_rate",
+					"query":         fmt.Sprintf(`sum(rate(vllm:generation_tokens_total{job="%s"}[1m]))`, jobName),
+					"threshold":     getGenerationTokensThreshold(cfg),
+				},
+			},
+			{
+				"type": "prometheus",
+				"metadata": map[string]string{
+					"serverAddress": prometheusAddr,
+					"metricName":    "vllm_prompt_tokens_rate",
+					"query":         fmt.Sprintf(`sum(rate(vllm:prompt_tokens_total{job="%s"}[1m]))`, jobName),
+					"threshold":     getPromptTokensThreshold(cfg),
+				},
+			},
+		},
+	}
+
+	scaledObject.Object["spec"] = spec
+	return r.Client.Patch(ctx, scaledObject, client.Apply, client.FieldOwner("vllmruntime-controller"))
+}
+
+func getMinReplicas(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
+	if cfg.MinReplicas != nil {
+		return *cfg.MinReplicas
+	}
+	return 0
+}
+
+func getPollingInterval(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
+	if cfg.PollingInterval != nil {
+		return *cfg.PollingInterval
+	}
+	return 15
+}
+
+func getCooldownPeriod(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
+	if cfg.CooldownPeriod != nil {
+		return *cfg.CooldownPeriod
+	}
+	return 1800
+}
+
+func getScaleUpWindow(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
+	if cfg.ScaleUpStabilizationWindowSeconds != nil {
+		return *cfg.ScaleUpStabilizationWindowSeconds
+	}
+	return 0
+}
+
+func getScaleDownWindow(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
+	if cfg.ScaleDownStabilizationWindowSeconds != nil {
+		return *cfg.ScaleDownStabilizationWindowSeconds
+	}
+	return 300
+}
+
+func getRequestsRunningThreshold(cfg *productionstackv1alpha1.AutoscalingConfig) string {
+	if cfg.RequestsRunningThreshold != "" {
+		return cfg.RequestsRunningThreshold
+	}
+	return "5"
+}
+
+func getGenerationTokensThreshold(cfg *productionstackv1alpha1.AutoscalingConfig) string {
+	if cfg.GenerationTokensThreshold != "" {
+		return cfg.GenerationTokensThreshold
+	}
+	return "100"
+}
+
+func getPromptTokensThreshold(cfg *productionstackv1alpha1.AutoscalingConfig) string {
+	if cfg.PromptTokensThreshold != "" {
+		return cfg.PromptTokensThreshold
+	}
+	return "100"
 }
 
 // serviceForVLLMRuntime returns a VLLMRuntime Service object

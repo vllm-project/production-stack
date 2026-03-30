@@ -51,6 +51,39 @@ type DeploymentConfig struct {
 	SidecarConfig SidecarConfig `json:"sidecarConfig,omitempty"`
 }
 
+// AutoscalingConfig defines the KEDA autoscaling configuration
+type AutoscalingConfig struct {
+	// Enabled enables autoscaling
+	Enabled bool `json:"enabled,omitempty"`
+
+	// MinReplicas is the minimum number of replicas (0 enables scale-to-zero)
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+
+	// MaxReplicas is the maximum number of replicas
+	MaxReplicas int32 `json:"maxReplicas,omitempty"`
+
+	// RequestsRunningThreshold is the per-pod concurrent requests threshold for scaling
+	RequestsRunningThreshold string `json:"requestsRunningThreshold,omitempty"`
+
+	// GenerationTokensThreshold is the per-pod generation tokens/s threshold for scaling
+	GenerationTokensThreshold string `json:"generationTokensThreshold,omitempty"`
+
+	// PromptTokensThreshold is the per-pod prompt tokens/s threshold for scaling
+	PromptTokensThreshold string `json:"promptTokensThreshold,omitempty"`
+
+	// PollingInterval is how often KEDA checks metrics (seconds)
+	PollingInterval *int32 `json:"pollingInterval,omitempty"`
+
+	// CooldownPeriod is the wait time before scaling to zero (seconds)
+	CooldownPeriod *int32 `json:"cooldownPeriod,omitempty"`
+
+	// ScaleUpStabilizationWindowSeconds is the HPA stabilization window for scaling up
+	ScaleUpStabilizationWindowSeconds *int32 `json:"scaleUpStabilizationWindowSeconds,omitempty"`
+
+	// ScaleDownStabilizationWindowSeconds is the HPA stabilization window for scaling down
+	ScaleDownStabilizationWindowSeconds *int32 `json:"scaleDownStabilizationWindowSeconds,omitempty"`
+}
+
 // VLLMRuntimeSpec defines the desired state of VLLMRuntime
 type VLLMRuntimeSpec struct {
 	// Model configuration
@@ -67,6 +100,9 @@ type VLLMRuntimeSpec struct {
 
 	// Deployment configuration
 	DeploymentConfig DeploymentConfig `json:"deploymentConfig"`
+
+	// Autoscaling configuration
+	AutoscalingConfig *AutoscalingConfig `json:"autoscalingConfig,omitempty"`
 }
 
 // VLLMConfig defines the vLLM server configuration
@@ -231,10 +267,17 @@ type VLLMRuntimeStatus struct {
 
 	// Last updated timestamp
 	LastUpdated metav1.Time `json:"lastUpdated,omitempty"`
+
+	// Current replica count (used by scale subresource)
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// Label selector for pods (used by scale subresource for HPA AverageValue)
+	Selector string `json:"selector,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.deploymentConfig.replicas,statuspath=.status.replicas,selectorpath=.status.selector
 // +kubebuilder:resource:shortName=vr
 
 // VLLMRuntime is the Schema for the vllmruntimes API
