@@ -57,7 +57,8 @@ spec:
                       tokens/s threshold for scaling
                     type: string
                   maxReplicas:
-                    description: MaxReplicas is the maximum number of replicas
+                    description: MaxReplicas is the maximum number of replicas (if
+                      not set, defaults to MinReplicas)
                     format: int32
                     type: integer
                   minReplicas:
@@ -88,6 +89,8 @@ spec:
                       window for scaling up
                     format: int32
                     type: integer
+                required:
+                - minReplicas
                 type: object
               deploymentConfig:
                 description: Deployment configuration

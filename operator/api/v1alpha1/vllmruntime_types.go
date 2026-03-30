@@ -57,10 +57,10 @@ type AutoscalingConfig struct {
 	Enabled bool `json:"enabled,omitempty"`
 
 	// MinReplicas is the minimum number of replicas (0 enables scale-to-zero)
-	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	MinReplicas int32 `json:"minReplicas"`
 
-	// MaxReplicas is the maximum number of replicas
-	MaxReplicas int32 `json:"maxReplicas,omitempty"`
+	// MaxReplicas is the maximum number of replicas (if not set, defaults to MinReplicas)
+	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
 
 	// RequestsRunningThreshold is the per-pod concurrent requests threshold for scaling
 	RequestsRunningThreshold string `json:"requestsRunningThreshold,omitempty"`

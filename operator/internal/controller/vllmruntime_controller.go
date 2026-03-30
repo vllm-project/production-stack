@@ -1077,7 +1077,7 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 			"name":       vllmRuntime.Name,
 		},
 		"minReplicaCount": getMinReplicas(cfg),
-		"maxReplicaCount": cfg.MaxReplicas,
+		"maxReplicaCount": getMaxReplicas(cfg),
 		"pollingInterval": getPollingInterval(cfg),
 		"cooldownPeriod":  getCooldownPeriod(cfg),
 		"advanced": map[string]interface{}{
@@ -1144,10 +1144,14 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 }
 
 func getMinReplicas(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
-	if cfg.MinReplicas != nil {
-		return *cfg.MinReplicas
+	return cfg.MinReplicas
+}
+
+func getMaxReplicas(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
+	if cfg.MaxReplicas != nil {
+		return *cfg.MaxReplicas
 	}
-	return 0
+	return cfg.MinReplicas
 }
 
 func getPollingInterval(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
