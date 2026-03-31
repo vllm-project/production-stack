@@ -231,13 +231,12 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.containerPort` | integer | `8000` | Port the router container is listening on |
 | `routerSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the router |
 | `routerSpec.serviceAnnotations` | map | `{}` | Service annotations for LoadBalancer/NodePort |
-| `routerSpec.nodePort` | integer | `-` | (Optional) Fixed NodePort for the router service when `serviceType` is `NodePort`. If unset, Kubernetes assigns a random port (30000-32767). |
 | `routerSpec.servicePort` | integer | `80` | Port the router service will listen on |
 | `routerSpec.serviceDiscovery` | string | `"k8s"` | Service discovery mode ("k8s" or "static") |
 | `routerSpec.k8sServiceDiscoveryType` | string | `"pod-ip"` | Service discovery Type ("pod-ip" or "service-name") if serviceDiscovery is "k8s" |
 | `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static" |
 | `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
-| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic ("roundrobin" or "session") |
+| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic: `"roundrobin"`, `"session"`, `"prefixaware"`, or `"kvaware"` |
 | `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic |
 | `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router |
 | `routerSpec.engineScrapeInterval` | integer | `15` | Interval in seconds to scrape metrics from the serving engine |
@@ -253,8 +252,8 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.affinity` | map | {} | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
 | `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
 | `routerSpec.hf_token` | string | `""`| Hugging Face token for router |
-| `routerSpec.lmcacheControllerPort` | string |`"8000"`|LMCache controller port |
-| `routerSpec.lmcacheConfig.logLevel` | string | `"INFO"`| Log level for LMCache in the router when routingLogic is kwaware |
+| `routerSpec.lmcacheControllerPort` | integer | `""` | LMCache controller port, used when `routingLogic` is `"kvaware"` (e.g. `9000`) |
+| `routerSpec.lmcacheConfig.logLevel` | string | `"INFO"`| Log level for LMCache in the router when routingLogic is kvaware |
 | `routerSpec.livenessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's liveness probe |
 | `routerSpec.livenessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's liveness probe |
 | `routerSpec.livenessProbe.failureThreshold` | integer |`3`| Failure threshold for router's liveness probe |
