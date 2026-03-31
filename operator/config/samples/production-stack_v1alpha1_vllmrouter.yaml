@@ -18,7 +18,7 @@ spec:
   # Label selector for vLLM runtime pods
   k8sLabelSelector: "app=vllmruntime-sample"
 
-  # Routing strategy (roundrobin or session)
+  # Routing strategy (roundrobin, session, prefixaware, or kvaware)
   routingLogic: roundrobin
 
   # Engine statistics collection interval

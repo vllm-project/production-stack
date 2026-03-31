@@ -85,6 +85,13 @@ spec:
                 description: K8sLabelSelector specifies the label selector for vLLM
                   runtime pods when using k8s service discovery
                 type: string
+              lmcacheControllerPort:
+                description: |-
+                  LmcacheControllerPort is the port of the LMCache controller (used with kvaware routing).
+                  Set explicitly when routingLogic is "kvaware" (typical value: 9000).
+                format: int32
+                maximum: 65535
+                type: integer
               nodeSelectorTerms:
                 description: NodeSelectorTerms for pod scheduling
                 items:
@@ -194,6 +201,8 @@ spec:
                 enum:
                 - roundrobin
                 - session
+                - prefixaware
+                - kvaware
                 type: string
               serviceAccountName:
                 description: ServiceAccountName for the router pod
