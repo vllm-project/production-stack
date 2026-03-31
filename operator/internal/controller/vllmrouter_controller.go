@@ -287,6 +287,9 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 	if router.Spec.SessionKey != "" {
 		args = append(args, "--session-key", router.Spec.SessionKey)
 	}
+	if router.Spec.RoutingLogic == "kvaware" && router.Spec.LmcacheControllerPort != 0 {
+		args = append(args, "--lmcache-controller-port", fmt.Sprintf("%d", router.Spec.LmcacheControllerPort))
+	}
 	if router.Spec.EngineScrapeInterval != 0 {
 		args = append(args, "--engine-stats-interval", fmt.Sprintf("%d", router.Spec.EngineScrapeInterval))
 	}
@@ -371,6 +374,11 @@ func (r *VLLMRouterReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, rou
 	// Generate the expected deployment
 	expectedDep := r.deploymentForVLLMRouter(router)
 
+	// Guard against deployments with no containers (e.g. hand-edited or corrupted).
+	if len(expectedDep.Spec.Template.Spec.Containers) == 0 || len(dep.Spec.Template.Spec.Containers) == 0 {
+		return true
+	}
+
 	// Compare image
 	if expectedDep.Spec.Template.Spec.Containers[0].Image != dep.Spec.Template.Spec.Containers[0].Image {
 		return true
@@ -380,6 +388,11 @@ func (r *VLLMRouterReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, rou
 	expectedResources := expectedDep.Spec.Template.Spec.Containers[0].Resources
 	actualResources := dep.Spec.Template.Spec.Containers[0].Resources
 	if !reflect.DeepEqual(expectedResources, actualResources) {
+		return true
+	}
+
+	// Compare container args
+	if !reflect.DeepEqual(expectedDep.Spec.Template.Spec.Containers[0].Args, dep.Spec.Template.Spec.Containers[0].Args) {
 		return true
 	}
 

@@ -467,11 +467,14 @@ routerSpec:
   staticBackends: ""
   staticModels: ""
 
-  # -- routing logic, could be "roundrobin" or "session"
+  # -- routing logic, supports "roundrobin", "session", "prefixaware", or "kvaware"
   routingLogic: "roundrobin"
 
   # -- session key if using "session" routing logic
   sessionKey: ""
+
+  # -- lmcache controller port, used when routingLogic is "kvaware"
+  lmcacheControllerPort: ""
 
   # -- FastAPI root path for hosting under a subpath (e.g. /vllm)
   rootPath: ""
