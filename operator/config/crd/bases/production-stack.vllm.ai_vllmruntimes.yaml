@@ -71,6 +71,11 @@ spec:
                       (seconds)
                     format: int32
                     type: integer
+                  prometheusAddress:
+                    default: http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090
+                    description: PrometheusAddress is the Prometheus server address
+                      for metric queries
+                    type: string
                   promptTokensThreshold:
                     description: PromptTokensThreshold is the per-pod prompt tokens/s
                       threshold for scaling

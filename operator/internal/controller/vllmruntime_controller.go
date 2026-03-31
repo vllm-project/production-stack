@@ -326,10 +326,20 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Create or update KEDA ScaledObject
+	// Create, update or delete KEDA ScaledObject
 	if vllmRuntime.Spec.AutoscalingConfig != nil && vllmRuntime.Spec.AutoscalingConfig.Enabled {
 		if err := r.reconcileScaledObject(ctx, vllmRuntime); err != nil {
 			log.Error(err, "Failed to reconcile ScaledObject")
+			return ctrl.Result{}, err
+		}
+	} else {
+		scaledObject := &unstructured.Unstructured{}
+		scaledObject.SetAPIVersion("keda.sh/v1alpha1")
+		scaledObject.SetKind("ScaledObject")
+		scaledObject.SetName(vllmRuntime.Name + "-scaledobject")
+		scaledObject.SetNamespace(vllmRuntime.Namespace)
+		if err := r.Delete(ctx, scaledObject); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "Failed to delete ScaledObject")
 			return ctrl.Result{}, err
 		}
 	}
@@ -1043,7 +1053,7 @@ func (r *VLLMRuntimeReconciler) updateStatus(
 		}
 
 		// Set replica count and selector for the scale subresource (required by HPA for AverageValue metrics)
-		latestVR.Status.Replicas = *dep.Spec.Replicas
+		latestVR.Status.Replicas = dep.Status.Replicas
 		latestVR.Status.Selector = metav1.FormatLabelSelector(dep.Spec.Selector)
 
 		return r.Status().Update(ctx, latestVR)
@@ -1067,7 +1077,7 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 		*metav1.NewControllerRef(vllmRuntime, productionstackv1alpha1.GroupVersion.WithKind("VLLMRuntime")),
 	})
 
-	prometheusAddr := "http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090"
+	prometheusAddr := getPrometheusAddress(cfg)
 	servedModelName := vllmRuntime.Spec.Model.ModelURL
 
 	spec := map[string]interface{}{
@@ -1201,6 +1211,13 @@ func getPromptTokensThreshold(cfg *productionstackv1alpha1.AutoscalingConfig) st
 		return cfg.PromptTokensThreshold
 	}
 	return "100"
+}
+
+func getPrometheusAddress(cfg *productionstackv1alpha1.AutoscalingConfig) string {
+	if cfg.PrometheusAddress != "" {
+		return cfg.PrometheusAddress
+	}
+	return "http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090"
 }
 
 // serviceForVLLMRuntime returns a VLLMRuntime Service object

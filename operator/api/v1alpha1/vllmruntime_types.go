@@ -82,6 +82,10 @@ type AutoscalingConfig struct {
 
 	// ScaleDownStabilizationWindowSeconds is the HPA stabilization window for scaling down
 	ScaleDownStabilizationWindowSeconds *int32 `json:"scaleDownStabilizationWindowSeconds,omitempty"`
+
+	// PrometheusAddress is the Prometheus server address for metric queries
+	// +kubebuilder:default="http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090"
+	PrometheusAddress string `json:"prometheusAddress,omitempty"`
 }
 
 // VLLMRuntimeSpec defines the desired state of VLLMRuntime
