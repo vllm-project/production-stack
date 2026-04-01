@@ -327,6 +327,17 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 
 	// Create, update or delete KEDA ScaledObject
 	if vllmRuntime.Spec.AutoscalingConfig != nil && vllmRuntime.Spec.AutoscalingConfig.Enabled {
+		cfg := vllmRuntime.Spec.AutoscalingConfig
+		if *cfg.MinReplicas > cfg.MaxReplicas {
+			log.Error(nil, "Invalid autoscaling config: minReplicas must be <= maxReplicas",
+				"minReplicas", *cfg.MinReplicas, "maxReplicas", cfg.MaxReplicas)
+			return ctrl.Result{}, fmt.Errorf("minReplicas (%d) must be <= maxReplicas (%d)", *cfg.MinReplicas, cfg.MaxReplicas)
+		}
+		if cfg.MaxReplicas < vllmRuntime.Spec.DeploymentConfig.Replicas {
+			log.Error(nil, "Invalid autoscaling config: maxReplicas must be >= deploymentConfig.replicas",
+				"maxReplicas", cfg.MaxReplicas, "replicas", vllmRuntime.Spec.DeploymentConfig.Replicas)
+			return ctrl.Result{}, fmt.Errorf("maxReplicas (%d) must be >= deploymentConfig.replicas (%d)", cfg.MaxReplicas, vllmRuntime.Spec.DeploymentConfig.Replicas)
+		}
 		if err := r.reconcileScaledObject(ctx, vllmRuntime); err != nil {
 			log.Error(err, "Failed to reconcile ScaledObject")
 			return ctrl.Result{}, err
@@ -1076,7 +1087,7 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 		*metav1.NewControllerRef(vllmRuntime, productionstackv1alpha1.GroupVersion.WithKind("VLLMRuntime")),
 	})
 
-	prometheusAddr := getPrometheusAddress(cfg)
+	prometheusAddr := cfg.Triggers.PrometheusAddress
 	servedModelName := vllmRuntime.Spec.Model.ModelURL
 
 	spec := map[string]interface{}{
@@ -1085,23 +1096,23 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 			"kind":       "VLLMRuntime",
 			"name":       vllmRuntime.Name,
 		},
-		"minReplicaCount": getMinReplicas(cfg),
-		"maxReplicaCount": getMaxReplicas(cfg),
-		"pollingInterval": getPollingInterval(cfg),
-		"cooldownPeriod":  getCooldownPeriod(cfg),
+		"minReplicaCount": *cfg.MinReplicas,
+		"maxReplicaCount": cfg.MaxReplicas,
+		"pollingInterval": *cfg.PollingInterval,
+		"cooldownPeriod":  *cfg.ScaleDownPolicy.ScaleToZeroDelaySeconds,
 		"advanced": map[string]interface{}{
 			"horizontalPodAutoscalerConfig": map[string]interface{}{
 				"behavior": map[string]interface{}{
 					"scaleUp": map[string]interface{}{
-						"stabilizationWindowSeconds": getScaleUpWindow(cfg),
+						"stabilizationWindowSeconds": *cfg.ScaleUpPolicy.StabilizationWindowSeconds,
 						"policies": []map[string]interface{}{
-							{"type": "Pods", "value": 1, "periodSeconds": 60},
+							{"type": "Pods", "value": *cfg.ScaleUpPolicy.PodValue, "periodSeconds": *cfg.ScaleUpPolicy.PeriodSeconds},
 						},
 					},
 					"scaleDown": map[string]interface{}{
-						"stabilizationWindowSeconds": getScaleDownWindow(cfg),
+						"stabilizationWindowSeconds": *cfg.ScaleDownPolicy.StabilizationWindowSeconds,
 						"policies": []map[string]interface{}{
-							{"type": "Pods", "value": 1, "periodSeconds": 60},
+							{"type": "Pods", "value": *cfg.ScaleDownPolicy.PodValue, "periodSeconds": *cfg.ScaleDownPolicy.PeriodSeconds},
 						},
 					},
 				},
@@ -1124,7 +1135,7 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 					"serverAddress": prometheusAddr,
 					"metricName":    "vllm_requests_running",
 					"query":         fmt.Sprintf(`sum(vllm:num_requests_running{job="%s"})`, jobName),
-					"threshold":     getRequestsRunningThreshold(cfg),
+					"threshold":     fmt.Sprintf("%d", *cfg.Triggers.RequestsRunningThreshold),
 				},
 			},
 			{
@@ -1133,7 +1144,7 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 					"serverAddress": prometheusAddr,
 					"metricName":    "vllm_generation_tokens_rate",
 					"query":         fmt.Sprintf(`sum(rate(vllm:generation_tokens_total{job="%s"}[1m]))`, jobName),
-					"threshold":     getGenerationTokensThreshold(cfg),
+					"threshold":     fmt.Sprintf("%d", *cfg.Triggers.GenerationTokensThreshold),
 				},
 			},
 			{
@@ -1142,7 +1153,7 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 					"serverAddress": prometheusAddr,
 					"metricName":    "vllm_prompt_tokens_rate",
 					"query":         fmt.Sprintf(`sum(rate(vllm:prompt_tokens_total{job="%s"}[1m]))`, jobName),
-					"threshold":     getPromptTokensThreshold(cfg),
+					"threshold":     fmt.Sprintf("%d", *cfg.Triggers.PromptTokensThreshold),
 				},
 			},
 		},
@@ -1150,73 +1161,6 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 
 	scaledObject.Object["spec"] = spec
 	return r.Client.Patch(ctx, scaledObject, client.Apply, client.FieldOwner("vllmruntime-controller"))
-}
-
-func getMinReplicas(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
-	return cfg.MinReplicas
-}
-
-func getMaxReplicas(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
-	if cfg.MaxReplicas != nil {
-		return *cfg.MaxReplicas
-	}
-	return cfg.MinReplicas
-}
-
-func getPollingInterval(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
-	if cfg.PollingInterval != nil {
-		return *cfg.PollingInterval
-	}
-	return 15
-}
-
-func getCooldownPeriod(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
-	if cfg.CooldownPeriod != nil {
-		return *cfg.CooldownPeriod
-	}
-	return 1800
-}
-
-func getScaleUpWindow(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
-	if cfg.ScaleUpStabilizationWindowSeconds != nil {
-		return *cfg.ScaleUpStabilizationWindowSeconds
-	}
-	return 0
-}
-
-func getScaleDownWindow(cfg *productionstackv1alpha1.AutoscalingConfig) int32 {
-	if cfg.ScaleDownStabilizationWindowSeconds != nil {
-		return *cfg.ScaleDownStabilizationWindowSeconds
-	}
-	return 300
-}
-
-func getRequestsRunningThreshold(cfg *productionstackv1alpha1.AutoscalingConfig) string {
-	if cfg.RequestsRunningThreshold != "" {
-		return cfg.RequestsRunningThreshold
-	}
-	return "5"
-}
-
-func getGenerationTokensThreshold(cfg *productionstackv1alpha1.AutoscalingConfig) string {
-	if cfg.GenerationTokensThreshold != "" {
-		return cfg.GenerationTokensThreshold
-	}
-	return "100"
-}
-
-func getPromptTokensThreshold(cfg *productionstackv1alpha1.AutoscalingConfig) string {
-	if cfg.PromptTokensThreshold != "" {
-		return cfg.PromptTokensThreshold
-	}
-	return "100"
-}
-
-func getPrometheusAddress(cfg *productionstackv1alpha1.AutoscalingConfig) string {
-	if cfg.PrometheusAddress != "" {
-		return cfg.PrometheusAddress
-	}
-	return "http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090"
 }
 
 // serviceForVLLMRuntime returns a VLLMRuntime Service object

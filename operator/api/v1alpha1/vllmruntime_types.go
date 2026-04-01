@@ -51,41 +51,94 @@ type DeploymentConfig struct {
 	SidecarConfig SidecarConfig `json:"sidecarConfig,omitempty"`
 }
 
+// ScaleUpPolicy defines the HPA scaling behavior when scaling up
+type ScaleUpPolicy struct {
+	// StabilizationWindowSeconds is the HPA stabilization window for scaling up
+	// +kubebuilder:default=0
+	StabilizationWindowSeconds *int32 `json:"stabilizationWindowSeconds,omitempty"`
+
+	// PodValue is the max pods to add per period
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	PodValue *int32 `json:"podValue,omitempty"`
+
+	// PeriodSeconds is the period for the scale up policy
+	// +kubebuilder:default=60
+	// +kubebuilder:validation:Minimum=1
+	PeriodSeconds *int32 `json:"periodSeconds,omitempty"`
+}
+
+// ScaleDownPolicy defines the HPA scaling behavior when scaling down
+type ScaleDownPolicy struct {
+	// StabilizationWindowSeconds is the HPA stabilization window for scaling down
+	// +kubebuilder:default=300
+	StabilizationWindowSeconds *int32 `json:"stabilizationWindowSeconds,omitempty"`
+
+	// PodValue is the max pods to remove per period
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	PodValue *int32 `json:"podValue,omitempty"`
+
+	// PeriodSeconds is the period for the scale down policy
+	// +kubebuilder:default=60
+	// +kubebuilder:validation:Minimum=1
+	PeriodSeconds *int32 `json:"periodSeconds,omitempty"`
+
+	// ScaleToZeroDelaySeconds is the wait time before scaling to zero (seconds).
+	// Only applicable when minReplicas is set to 0.
+	// +kubebuilder:default=1800
+	ScaleToZeroDelaySeconds *int32 `json:"scaleToZeroDelaySeconds,omitempty"`
+}
+
+// TriggerConfig defines the metric thresholds for autoscaling triggers
+type TriggerConfig struct {
+	// PrometheusAddress is the Prometheus server address for metric queries
+	// +kubebuilder:default="http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090"
+	PrometheusAddress string `json:"prometheusAddress,omitempty"`
+
+	// RequestsRunningThreshold is the per-pod concurrent requests threshold for scaling
+	// +kubebuilder:default=5
+	// +kubebuilder:validation:Minimum=1
+	RequestsRunningThreshold *int32 `json:"requestsRunningThreshold,omitempty"`
+
+	// GenerationTokensThreshold is the per-pod generation tokens/s threshold for scaling
+	// +kubebuilder:default=100
+	// +kubebuilder:validation:Minimum=1
+	GenerationTokensThreshold *int32 `json:"generationTokensThreshold,omitempty"`
+
+	// PromptTokensThreshold is the per-pod prompt tokens/s threshold for scaling
+	// +kubebuilder:default=100
+	// +kubebuilder:validation:Minimum=1
+	PromptTokensThreshold *int32 `json:"promptTokensThreshold,omitempty"`
+}
+
 // AutoscalingConfig defines the KEDA autoscaling configuration
 type AutoscalingConfig struct {
 	// Enabled enables autoscaling
 	Enabled bool `json:"enabled,omitempty"`
 
-	// MinReplicas is the minimum number of replicas (0 enables scale-to-zero)
-	MinReplicas int32 `json:"minReplicas"`
+	// MinReplicas is the minimum number of replicas (defaults to 1, set to 0 to enable scale-to-zero)
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=0
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
 
-	// MaxReplicas is the maximum number of replicas (if not set, defaults to MinReplicas)
-	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
-
-	// RequestsRunningThreshold is the per-pod concurrent requests threshold for scaling
-	RequestsRunningThreshold string `json:"requestsRunningThreshold,omitempty"`
-
-	// GenerationTokensThreshold is the per-pod generation tokens/s threshold for scaling
-	GenerationTokensThreshold string `json:"generationTokensThreshold,omitempty"`
-
-	// PromptTokensThreshold is the per-pod prompt tokens/s threshold for scaling
-	PromptTokensThreshold string `json:"promptTokensThreshold,omitempty"`
+	// MaxReplicas is the maximum number of replicas
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=1
+	MaxReplicas int32 `json:"maxReplicas"`
 
 	// PollingInterval is how often KEDA checks metrics (seconds)
+	// +kubebuilder:default=15
 	PollingInterval *int32 `json:"pollingInterval,omitempty"`
 
-	// CooldownPeriod is the wait time before scaling to zero (seconds)
-	CooldownPeriod *int32 `json:"cooldownPeriod,omitempty"`
+	// ScaleUpPolicy defines the scaling behavior when scaling up
+	ScaleUpPolicy ScaleUpPolicy `json:"scaleUpPolicy,omitempty"`
 
-	// ScaleUpStabilizationWindowSeconds is the HPA stabilization window for scaling up
-	ScaleUpStabilizationWindowSeconds *int32 `json:"scaleUpStabilizationWindowSeconds,omitempty"`
+	// ScaleDownPolicy defines the scaling behavior when scaling down
+	ScaleDownPolicy ScaleDownPolicy `json:"scaleDownPolicy,omitempty"`
 
-	// ScaleDownStabilizationWindowSeconds is the HPA stabilization window for scaling down
-	ScaleDownStabilizationWindowSeconds *int32 `json:"scaleDownStabilizationWindowSeconds,omitempty"`
-
-	// PrometheusAddress is the Prometheus server address for metric queries
-	// +kubebuilder:default="http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090"
-	PrometheusAddress string `json:"prometheusAddress,omitempty"`
+	// Triggers defines the metric thresholds for autoscaling
+	Triggers TriggerConfig `json:"triggers,omitempty"`
 }
 
 // VLLMRuntimeSpec defines the desired state of VLLMRuntime

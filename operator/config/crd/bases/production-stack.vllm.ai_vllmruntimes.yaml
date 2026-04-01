@@ -44,58 +44,114 @@ spec:
               autoscalingConfig:
                 description: Autoscaling configuration
                 properties:
-                  cooldownPeriod:
-                    description: CooldownPeriod is the wait time before scaling to
-                      zero (seconds)
-                    format: int32
-                    type: integer
                   enabled:
                     description: Enabled enables autoscaling
                     type: boolean
-                  generationTokensThreshold:
-                    description: GenerationTokensThreshold is the per-pod generation
-                      tokens/s threshold for scaling
-                    type: string
                   maxReplicas:
-                    description: MaxReplicas is the maximum number of replicas (if
-                      not set, defaults to MinReplicas)
+                    description: MaxReplicas is the maximum number of replicas
                     format: int32
+                    minimum: 1
                     type: integer
                   minReplicas:
-                    description: MinReplicas is the minimum number of replicas (0
-                      enables scale-to-zero)
+                    default: 1
+                    description: MinReplicas is the minimum number of replicas (defaults
+                      to 1, set to 0 to enable scale-to-zero)
                     format: int32
+                    minimum: 0
                     type: integer
                   pollingInterval:
+                    default: 15
                     description: PollingInterval is how often KEDA checks metrics
                       (seconds)
                     format: int32
                     type: integer
-                  prometheusAddress:
-                    default: http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090
-                    description: PrometheusAddress is the Prometheus server address
-                      for metric queries
-                    type: string
-                  promptTokensThreshold:
-                    description: PromptTokensThreshold is the per-pod prompt tokens/s
-                      threshold for scaling
-                    type: string
-                  requestsRunningThreshold:
-                    description: RequestsRunningThreshold is the per-pod concurrent
-                      requests threshold for scaling
-                    type: string
-                  scaleDownStabilizationWindowSeconds:
-                    description: ScaleDownStabilizationWindowSeconds is the HPA stabilization
-                      window for scaling down
-                    format: int32
-                    type: integer
-                  scaleUpStabilizationWindowSeconds:
-                    description: ScaleUpStabilizationWindowSeconds is the HPA stabilization
-                      window for scaling up
-                    format: int32
-                    type: integer
+                  scaleDownPolicy:
+                    description: ScaleDownPolicy defines the scaling behavior when
+                      scaling down
+                    properties:
+                      periodSeconds:
+                        default: 60
+                        description: PeriodSeconds is the period for the scale down
+                          policy
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      podValue:
+                        default: 1
+                        description: PodValue is the max pods to remove per period
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      scaleToZeroDelaySeconds:
+                        default: 1800
+                        description: |-
+                          ScaleToZeroDelaySeconds is the wait time before scaling to zero (seconds).
+                          Only applicable when minReplicas is set to 0.
+                        format: int32
+                        type: integer
+                      stabilizationWindowSeconds:
+                        default: 300
+                        description: StabilizationWindowSeconds is the HPA stabilization
+                          window for scaling down
+                        format: int32
+                        type: integer
+                    type: object
+                  scaleUpPolicy:
+                    description: ScaleUpPolicy defines the scaling behavior when scaling
+                      up
+                    properties:
+                      periodSeconds:
+                        default: 60
+                        description: PeriodSeconds is the period for the scale up
+                          policy
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      podValue:
+                        default: 1
+                        description: PodValue is the max pods to add per period
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      stabilizationWindowSeconds:
+                        default: 0
+                        description: StabilizationWindowSeconds is the HPA stabilization
+                          window for scaling up
+                        format: int32
+                        type: integer
+                    type: object
+                  triggers:
+                    description: Triggers defines the metric thresholds for autoscaling
+                    properties:
+                      generationTokensThreshold:
+                        default: 100
+                        description: GenerationTokensThreshold is the per-pod generation
+                          tokens/s threshold for scaling
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      prometheusAddress:
+                        default: http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090
+                        description: PrometheusAddress is the Prometheus server address
+                          for metric queries
+                        type: string
+                      promptTokensThreshold:
+                        default: 100
+                        description: PromptTokensThreshold is the per-pod prompt tokens/s
+                          threshold for scaling
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      requestsRunningThreshold:
+                        default: 5
+                        description: RequestsRunningThreshold is the per-pod concurrent
+                          requests threshold for scaling
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    type: object
                 required:
-                - minReplicas
+                - maxReplicas
                 type: object
               deploymentConfig:
                 description: Deployment configuration
