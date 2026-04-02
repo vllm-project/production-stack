@@ -257,6 +257,7 @@ spec:
           labels:
             model: {{ $modelSpec.name }}
             helm-release-name: {{ .Release.Name }}
+            {{- include "chart.engineLabels" . | nindent 12 }}
         {{- if .Values.servingEngineSpec.securityContext }}
         securityContext:
           {{- toYaml .Values.servingEngineSpec.securityContext | nindent 10 }}
