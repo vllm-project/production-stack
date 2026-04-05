@@ -117,11 +117,15 @@ async def lifespan(app: FastAPI):
     if hasattr(service_discovery, "initialize_client_sessions"):
         await service_discovery.initialize_client_sessions()
 
-    # only start the ZMQ task if the routing logic is RoutingLogic.DISAGGREGATED_PREFILL
-    if isinstance(app.state.router, DisaggregatedPrefillRouter):
+    use_nixl = (
+        isinstance(app.state.router, DisaggregatedPrefillRouter)
+        and hasattr(app.state.args, "nixl_proxy_host")
+        and app.state.args.nixl_proxy_host is not None
+    )
+    if use_nixl:
         logger.info(
             "Starting ZMQ task because the routing logic is"
-            " RoutingLogic.DISAGGREGATED_PREFILL"
+            " RoutingLogic.DISAGGREGATED_PREFILL and nixl_proxy_host is configured"
         )
         app.state.zmq_proxy = ZmqProxy()
         await app.state.zmq_proxy.start(

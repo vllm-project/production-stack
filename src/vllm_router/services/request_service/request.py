@@ -267,9 +267,13 @@ async def route_general_request(
         StreamingResponse: A response object that streams data from the backend server to the client.
     """
     if isinstance(request.app.state.router, DisaggregatedPrefillRouter):
-        # Use NIXL point-to-point KV transfer if ZMQ proxy is available,
-        # otherwise fall back to LMCache shared storage mode
-        if hasattr(request.app.state, "zmq_proxy"):
+        use_nixl = (
+            hasattr(request.app.state, "zmq_proxy")
+            and hasattr(request.app.state, "args")
+            and hasattr(request.app.state.args, "nixl_peer_host")
+            and request.app.state.args.nixl_peer_host is not None
+        )
+        if use_nixl:
             response = await route_disaggregated_prefill_nixl_request(
                 request, endpoint, background_tasks
             )
