@@ -887,6 +887,101 @@ async def route_disaggregated_prefill_request(
     )
 
 
+async def _prepare_nixl_prefill_request(request, request_json, request_id):
+    """Handle tokenization, build disagg_spec, inject kv_transfer_params.
+
+    Mutates request_json in place: replaces prompt with tokens, sets
+    max_tokens=1, injects kv_transfer_params, and sets stream=False.
+    Returns the tokenize output (not used by caller today, but available).
+    """
+    # Tokenize the prompt
+    if "messages" in request_json:
+        tokenize_payload = {"messages": request_json["messages"]}
+    else:
+        tokenize_payload = {"prompt": request_json["prompt"]}
+    tokenize_output = await send_request_to_tokenizer(
+        request.app.state.prefill_client,
+        "/tokenize",
+        tokenize_payload,
+        request_id,
+    )
+    # Update request with tokenized prompt
+    request_json["prompt"] = tokenize_output["tokens"]
+    request_json["max_tokens"] = 1
+
+    # Create disagg_spec for KV transfer
+    decode_base_url = (
+        request.app.state.decode_client._base_url
+        if hasattr(request.app.state.decode_client, "_base_url")
+        else str(request.app.state.decode_client.base_url)
+    )
+    import re
+
+    ip_match = re.search(r"://([^:]+)", str(decode_base_url))
+    receiver_host = (
+        ip_match.group(1) if ip_match else request.app.state.args.nixl_peer_host
+    )
+
+    disagg_spec = {
+        "req_id": request_id,
+        "receiver_host": receiver_host,
+        "receiver_init_port": [request.app.state.args.nixl_peer_init_port],
+        "receiver_alloc_port": [request.app.state.args.nixl_peer_alloc_port],
+    }
+
+    request_json["kv_transfer_params"] = {
+        "ret_first_tok": True,
+        "disagg_spec": disagg_spec,
+    }
+    request_json["stream"] = False
+
+    return tokenize_output
+
+
+def _convert_completion_chunk_to_chat(chunk_data):
+    """Convert a single /v1/completions chunk dict to chat.completion.chunk format.
+
+    Returns the converted dict.
+    """
+    return {
+        "id": chunk_data["id"],
+        "object": "chat.completion.chunk",
+        "created": chunk_data["created"],
+        "model": chunk_data["model"],
+        "choices": [
+            {
+                "index": 0,
+                "delta": {"content": chunk_data["choices"][0]["text"]},
+                "logprobs": chunk_data["choices"][0].get("logprobs"),
+                "finish_reason": chunk_data["choices"][0].get("finish_reason"),
+            }
+        ],
+    }
+
+
+def _clean_completion_chunk(chunk_data):
+    """Strip extra fields (prompt_token_ids, token_ids) from a completion chunk.
+
+    Returns a cleaned dict containing only the standard completion fields.
+    """
+    return {
+        "id": chunk_data["id"],
+        "object": "text_completion",
+        "created": chunk_data["created"],
+        "model": chunk_data["model"],
+        "choices": [
+            {
+                "index": 0,
+                "text": chunk_data["choices"][0]["text"],
+                "logprobs": chunk_data["choices"][0].get("logprobs"),
+                "finish_reason": chunk_data["choices"][0].get("finish_reason"),
+                "stop_reason": chunk_data["choices"][0].get("stop_reason"),
+            }
+        ],
+        "usage": chunk_data.get("usage"),
+    }
+
+
 async def route_disaggregated_prefill_nixl_request(
     request: Request,
     endpoint: str,
@@ -902,46 +997,7 @@ async def route_disaggregated_prefill_nixl_request(
 
     st = time.time()
     try:
-        # Tokenize the prompt
-        if "messages" in request_json:
-            tokenize_payload = {"messages": request_json["messages"]}
-        else:
-            tokenize_payload = {"prompt": request_json["prompt"]}
-        tokenize_output = await send_request_to_tokenizer(
-            request.app.state.prefill_client,
-            "/tokenize",
-            tokenize_payload,
-            request_id,
-        )
-        # Update request with tokenized prompt
-        request_json["prompt"] = tokenize_output["tokens"]
-        request_json["max_tokens"] = 1
-
-        # Create disagg_spec for KV transfer
-        decode_base_url = (
-            request.app.state.decode_client._base_url
-            if hasattr(request.app.state.decode_client, "_base_url")
-            else str(request.app.state.decode_client.base_url)
-        )
-        import re
-
-        ip_match = re.search(r"://([^:]+)", str(decode_base_url))
-        receiver_host = (
-            ip_match.group(1) if ip_match else request.app.state.args.nixl_peer_host
-        )
-
-        disagg_spec = {
-            "req_id": request_id,
-            "receiver_host": receiver_host,
-            "receiver_init_port": [request.app.state.args.nixl_peer_init_port],
-            "receiver_alloc_port": [request.app.state.args.nixl_peer_alloc_port],
-        }
-
-        request_json["kv_transfer_params"] = {
-            "ret_first_tok": True,
-            "disagg_spec": disagg_spec,
-        }
-        request_json["stream"] = False
+        await _prepare_nixl_prefill_request(request, request_json, request_id)
 
         # Send to prefiller
         prefill_output = await send_request_to_prefiller(
@@ -1052,97 +1108,29 @@ async def route_disaggregated_prefill_nixl_request(
                 request_json,
                 request_id,
             ):
-                if is_chat_completion:
-                    # Convert completion chunks to chat completion format (same logic as reference)
-                    chunk_str = chunk.decode("utf-8")
-                    if chunk_str.startswith("data: ") and not chunk_str.startswith(
-                        "data: [DONE]"
-                    ):
-                        try:
-                            json_str = chunk_str[6:].strip()  # Remove 'data: ' prefix
-                            if json_str:
-                                completion_data = json.loads(json_str)
-                                chat_completion_data = {
-                                    "id": completion_data["id"],
-                                    "object": "chat.completion.chunk",
-                                    "created": completion_data["created"],
-                                    "model": completion_data["model"],
-                                    "choices": [
-                                        {
-                                            "index": 0,
-                                            "delta": {
-                                                "content": completion_data["choices"][
-                                                    0
-                                                ]["text"]
-                                            },
-                                            "logprobs": completion_data["choices"][
-                                                0
-                                            ].get("logprobs"),
-                                            "finish_reason": completion_data["choices"][
-                                                0
-                                            ].get("finish_reason"),
-                                        }
-                                    ],
-                                }
-                                converted_chunk = (
-                                    "data: "
-                                    + json.dumps(
-                                        chat_completion_data, separators=(",", ":")
-                                    )
-                                    + "\n\n"
-                                ).encode()
-                                yield converted_chunk
-                        except (json.JSONDecodeError, KeyError):
-                            yield chunk
-                    else:
+                chunk_str = chunk.decode("utf-8")
+                if chunk_str.startswith("data: ") and not chunk_str.startswith(
+                    "data: [DONE]"
+                ):
+                    try:
+                        json_str = chunk_str[6:].strip()  # Remove 'data: ' prefix
+                        if json_str:
+                            completion_data = json.loads(json_str)
+                            if is_chat_completion:
+                                converted = _convert_completion_chunk_to_chat(
+                                    completion_data
+                                )
+                            else:
+                                converted = _clean_completion_chunk(completion_data)
+                            yield (
+                                "data: "
+                                + json.dumps(converted, separators=(",", ":"))
+                                + "\n\n"
+                            ).encode()
+                    except (json.JSONDecodeError, KeyError):
                         yield chunk
                 else:
-                    # For completions, filter out extra fields(prompt_token_ids, token_ids) from decode service
-                    chunk_str = chunk.decode("utf-8")
-                    if chunk_str.startswith("data: ") and not chunk_str.startswith(
-                        "data: [DONE]"
-                    ):
-                        try:
-                            json_str = chunk_str[6:].strip()  # Remove 'data: ' prefix
-                            if json_str:
-                                completion_data = json.loads(json_str)
-                                # Clean completion chunk without extra fields
-                                clean_completion_data = {
-                                    "id": completion_data["id"],
-                                    "object": "text_completion",
-                                    "created": completion_data["created"],
-                                    "model": completion_data["model"],
-                                    "choices": [
-                                        {
-                                            "index": 0,
-                                            "text": completion_data["choices"][0][
-                                                "text"
-                                            ],
-                                            "logprobs": completion_data["choices"][
-                                                0
-                                            ].get("logprobs"),
-                                            "finish_reason": completion_data["choices"][
-                                                0
-                                            ].get("finish_reason"),
-                                            "stop_reason": completion_data["choices"][
-                                                0
-                                            ].get("stop_reason"),
-                                        }
-                                    ],
-                                    "usage": completion_data.get("usage"),
-                                }
-                                cleaned_chunk = (
-                                    "data: "
-                                    + json.dumps(
-                                        clean_completion_data, separators=(",", ":")
-                                    )
-                                    + "\n\n"
-                                ).encode()
-                                yield cleaned_chunk
-                        except (json.JSONDecodeError, KeyError):
-                            yield chunk
-                    else:
-                        yield chunk
+                    yield chunk
         except aiohttp.ClientResponseError as e:
             logger.error(f"HTTP error in decoder: {e}", exc_info=True)
             try:
