@@ -906,6 +906,7 @@ async def _prepare_nixl_prefill_request(request, request_json, request_id):
         request_id,
     )
     # Update request with tokenized prompt
+    request_json.pop("messages", None)
     request_json["prompt"] = tokenize_output["tokens"]
     request_json["max_tokens"] = 1
 
@@ -994,6 +995,7 @@ async def route_disaggregated_prefill_nixl_request(
 
     orig_max_tokens = request_json.get("max_tokens", 0)
     stream_options = request_json.pop("stream_options", None)
+    is_chat_completion = "messages" in request_json
 
     try:
         await _prepare_nixl_prefill_request(request, request_json, request_id)
@@ -1037,8 +1039,7 @@ async def route_disaggregated_prefill_nixl_request(
 
     async def generate_stream():
         try:
-            # Check if this is for chat completions based on original request having messages
-            is_chat_completion = "messages" in request_json
+            # Check if original request was chat completions
 
             if is_chat_completion:
                 # For chat completions, yield initial chunk with role
