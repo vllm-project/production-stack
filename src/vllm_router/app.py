@@ -94,7 +94,7 @@ try:
 except ImportError:
     otel_available = False
 
-logger = logging.getLogger("uvicorn")
+logger = init_logger(__name__)
 
 
 @asynccontextmanager

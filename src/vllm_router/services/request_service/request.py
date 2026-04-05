@@ -267,9 +267,16 @@ async def route_general_request(
         StreamingResponse: A response object that streams data from the backend server to the client.
     """
     if isinstance(request.app.state.router, DisaggregatedPrefillRouter):
-        response = await route_disaggregated_prefill_request(
-            request, endpoint, background_tasks
-        )
+        # Use NIXL point-to-point KV transfer if ZMQ proxy is available,
+        # otherwise fall back to LMCache shared storage mode
+        if hasattr(request.app.state, "zmq_proxy"):
+            response = await route_disaggregated_prefill_nixl_request(
+                request, endpoint, background_tasks
+            )
+        else:
+            response = await route_disaggregated_prefill_request(
+                request, endpoint, background_tasks
+            )
         return response
 
     # Handle orchestrated disaggregated inference (NxDI pattern)
@@ -780,6 +787,107 @@ async def route_orchestrated_disaggregated_request(
 
 
 async def route_disaggregated_prefill_request(
+    request: Request,
+    endpoint: str,
+    background_tasks: BackgroundTasks,
+):
+    """Route disaggregated prefill request using LMCache shared storage mode."""
+    in_router_time = time.time()
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+    request_json = await request.json()
+
+    # Save original request for decode phase
+    orig_request_json = request_json.copy()
+
+    # Prepare prefill request: set max_tokens=1 and remove max_completion_tokens
+    # (max_completion_tokens takes precedence over max_tokens in OpenAI API,
+    # so we must remove it to ensure prefill generates only 1 token)
+    request_json["max_tokens"] = 1
+    request_json.pop("max_completion_tokens", None)
+
+    st = time.time()
+    try:
+        await send_request_to_prefiller(
+            request.app.state.prefill_client, endpoint, request_json, request_id
+        )
+        et = time.time()
+        logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
+        logger.info(
+            f"Routing request {request_id} with session id None to {request.app.state.prefill_client._base_url} at {et}, process time = {et - in_router_time:.4f}"
+        )
+        # Use original request for decode phase
+        request_json = orig_request_json
+    except aiohttp.ClientResponseError as e:
+        logger.error(f"HTTP error in prefiller: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=e.status,
+            content={
+                "error": {
+                    "message": f"Prefiller error: {e.message}",
+                    "type": "prefiller_error",
+                    "code": e.status,
+                }
+            },
+            headers={"X-Request-Id": request_id},
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in prefiller: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "message": f"Prefiller error: {str(e)}",
+                    "type": "prefiller_error",
+                    "code": 500,
+                }
+            },
+            headers={"X-Request-Id": request_id},
+        )
+
+    async def generate_stream():
+        try:
+            async for chunk in send_request_to_decode(
+                request.app.state.decode_client, endpoint, request_json, request_id
+            ):
+                yield chunk
+        except aiohttp.ClientResponseError as e:
+            logger.error(f"HTTP error in decoder: {e}", exc_info=True)
+            try:
+                error_text = e.message
+            except Exception:
+                error_text = f"HTTP {e.status}"
+            error_response = {
+                "error": {
+                    "message": f"Decoder error: {error_text}",
+                    "type": "decoder_error",
+                    "code": e.status,
+                }
+            }
+            yield json.dumps(error_response).encode("utf-8")
+        except Exception as e:
+            logger.error(f"Unexpected error in decoder: {e}", exc_info=True)
+            error_response = {
+                "error": {
+                    "message": f"Decoder error: {str(e)}",
+                    "type": "decoder_error",
+                    "code": 500,
+                }
+            }
+            yield json.dumps(error_response).encode("utf-8")
+
+    curr_time = time.time()
+    logger.info(
+        f"Routing request {request_id} with session id None to {request.app.state.decode_client._base_url} at {curr_time}, process time = {curr_time - et:.4f}"
+    )
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="application/json",
+        headers={"X-Request-Id": request_id},
+    )
+
+
+async def route_disaggregated_prefill_nixl_request(
     request: Request,
     endpoint: str,
     background_tasks: BackgroundTasks,
