@@ -995,7 +995,6 @@ async def route_disaggregated_prefill_nixl_request(
     orig_max_tokens = request_json.get("max_tokens", 0)
     stream_options = request_json.pop("stream_options", None)
 
-    st = time.time()
     try:
         await _prepare_nixl_prefill_request(request, request_json, request_id)
 
