@@ -19,8 +19,8 @@ spec:
   # Image configuration
   image:
     registry: docker.io
-    name: lmcache/lmstack-router:latest
-    pullPolicy: IfNotPresent
+    name: xueey7/lmstack-router:latest
+    pullPolicy: Always
 
   # Resource requirements
   resources:
