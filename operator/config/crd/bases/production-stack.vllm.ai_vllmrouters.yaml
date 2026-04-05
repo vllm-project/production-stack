@@ -203,6 +203,7 @@ spec:
                 - session
                 - prefixaware
                 - kvaware
+                - disaggregated_prefill
                 type: string
               serviceAccountName:
                 description: ServiceAccountName for the router pod
