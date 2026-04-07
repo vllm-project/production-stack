@@ -105,7 +105,10 @@ def validate_args(args):
         raise ValueError(
             "Session key must be provided when using session routing logic."
         )
-    if getattr(args, "enable_router_queue", False) is True and args.routing_logic != "roundrobin":
+    if (
+        getattr(args, "enable_router_queue", False) is True
+        and args.routing_logic != "roundrobin"
+    ):
         raise ValueError(
             "Router queue is only supported with roundrobin routing in phase 1."
         )
