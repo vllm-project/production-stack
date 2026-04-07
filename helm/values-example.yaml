@@ -32,3 +32,20 @@ servingEngineSpec:
         effect: "NoSchedule"
     # tolerationsPolicy: "append"  # default: union of global + model tolerations
     # tolerationsPolicy: "override" # replaces global tolerations entirely for this model
+cacheserverSpec:
+  repository: "lmcache/vllm-openai"
+  tag: "latest-nightly"
+  containerPort: 8000
+  servicePort: 80
+  serde: "naive"
+  resources:
+    requests:
+      cpu: "4"
+      memory: "8Gi"
+      # Example InfiniBand/RDMA extended resource
+      rdma/ib: "1"
+    limits:
+      cpu: "4"
+      memory: "10Gi"
+      # Example InfiniBand/RDMA extended resource
+      rdma/ib: "1"

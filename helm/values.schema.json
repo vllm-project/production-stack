@@ -1009,6 +1009,9 @@
           "properties": {
             "requests": {
               "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
               "properties": {
                 "cpu": {
                   "type": "string"
@@ -1020,6 +1023,9 @@
             },
             "limits": {
               "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
               "properties": {
                 "cpu": {
                   "type": "string"

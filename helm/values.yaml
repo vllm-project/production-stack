@@ -408,6 +408,26 @@ servingEngineSpec:
     #   replacement: $1
     #   action: replace
 
+# Optional cache server configuration.
+# When set, resources accepts any Kubernetes resource keys (for example `rdma/ib`).
+#
+# Example:
+# cacheserverSpec:
+#   repository: "lmcache/vllm-openai"
+#   tag: "latest-nightly"
+#   containerPort: 8000
+#   servicePort: 80
+#   serde: "naive"
+#   resources:
+#     requests:
+#       cpu: "4"
+#       memory: "8Gi"
+#       rdma/ib: "1"
+#     limits:
+#       cpu: "4"
+#       memory: "10Gi"
+#       rdma/ib: "1"
+
 routerSpec:
   # -- Whether to enable the router service
   enableRouter: true
@@ -477,11 +497,14 @@ routerSpec:
   staticBackends: ""
   staticModels: ""
 
-  # -- routing logic, could be "roundrobin" or "session"
+  # -- routing logic, supports "roundrobin", "session", "prefixaware", or "kvaware"
   routingLogic: "roundrobin"
 
   # -- session key if using "session" routing logic
   sessionKey: ""
+
+  # -- lmcache controller port, used when routingLogic is "kvaware"
+  lmcacheControllerPort: ""
 
   # -- FastAPI root path for hosting under a subpath (e.g. /vllm)
   rootPath: ""
