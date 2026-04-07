@@ -147,6 +147,7 @@ class RoundRobinRouter(RoutingInterface):
         self.sorted_endpoints = []
         self.last_endpoints_id = None
         self.last_endpoints_hash = None
+        self._lock = threading.Lock()
         self._initialized = True
 
     def _refresh_sorted_endpoints(self, endpoints: List[EndpointInfo]) -> None:
@@ -163,19 +164,20 @@ class RoundRobinRouter(RoutingInterface):
         endpoints: List[EndpointInfo],
         is_admissible,
     ) -> Optional[EndpointInfo]:
-        self._refresh_sorted_endpoints(endpoints)
-        if not self.sorted_endpoints:
-            return None
+        with self._lock:
+            self._refresh_sorted_endpoints(endpoints)
+            if not self.sorted_endpoints:
+                return None
 
-        start_index = self.req_id % len(self.sorted_endpoints)
-        for offset in range(len(self.sorted_endpoints)):
-            endpoint = self.sorted_endpoints[
-                (start_index + offset) % len(self.sorted_endpoints)
-            ]
-            if is_admissible(endpoint):
-                self.req_id += offset + 1
-                return endpoint
-        return None
+            start_index = self.req_id % len(self.sorted_endpoints)
+            for offset in range(len(self.sorted_endpoints)):
+                endpoint = self.sorted_endpoints[
+                    (start_index + offset) % len(self.sorted_endpoints)
+                ]
+                if is_admissible(endpoint):
+                    self.req_id += offset + 1
+                    return endpoint
+            return None
 
     def route_request(
         self,

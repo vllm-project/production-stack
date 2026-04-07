@@ -13,7 +13,7 @@
 # limitations under the License.
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Dict, Optional
 
 import requests
@@ -135,18 +135,15 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             url (str): The URL of the serving engine (does not contain endpoint)
         """
         try:
+            timeout = (
+                self.admission_scrape_interval if queue_only else self.scrape_interval
+            )
             response = requests.get(
                 url + "/metrics",
-                timeout=min(self.scrape_interval, self.admission_scrape_interval),
+                timeout=timeout,
             )
             response.raise_for_status()
-            if queue_only:
-                current_stats = self.get_engine_stats().get(url, EngineStats())
-                queue_stats = EngineStats.from_vllm_scrape(response.text)
-                current_stats.num_queuing_requests = queue_stats.num_queuing_requests
-                engine_stats = current_stats
-            else:
-                engine_stats = EngineStats.from_vllm_scrape(response.text)
+            engine_stats = EngineStats.from_vllm_scrape(response.text)
         except Exception as e:
             logger.error(f"Failed to scrape metrics from {url}: {e}")
             return None
@@ -177,7 +174,13 @@ class EngineStatsScraper(metaclass=SingletonMeta):
                 if old_url not in collected_engine_stats:
                     del self.engine_stats[old_url]
             for url, stats in collected_engine_stats.items():
-                self.engine_stats[url] = stats
+                if queue_only and url in self.engine_stats:
+                    self.engine_stats[url] = replace(
+                        self.engine_stats[url],
+                        num_queuing_requests=stats.num_queuing_requests,
+                    )
+                else:
+                    self.engine_stats[url] = stats
 
     def _scrape_worker(self):
         """
