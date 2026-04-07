@@ -83,6 +83,10 @@ def validate_static_model_types(model_types: str | None) -> None:
 
 # --- Argument Parsing and Initialization ---
 def validate_args(args):
+    def _get_numeric_arg(name: str, default):
+        value = getattr(args, name, default)
+        return value if isinstance(value, (int, float)) else default
+
     verify_required_args_provided(args)
     if args.service_discovery == "static":
         if args.static_backends is None:
@@ -100,6 +104,22 @@ def validate_args(args):
     if args.routing_logic == "session" and args.session_key is None:
         raise ValueError(
             "Session key must be provided when using session routing logic."
+        )
+    if getattr(args, "enable_router_queue", False) is True and args.routing_logic != "roundrobin":
+        raise ValueError(
+            "Router queue is only supported with roundrobin routing in phase 1."
+        )
+    if _get_numeric_arg("router_max_queued_requests", 256) <= 0:
+        raise ValueError("Router max queued requests must be greater than 0.")
+    if _get_numeric_arg("router_max_queue_wait_seconds", 5.0) <= 0:
+        raise ValueError("Router max queue wait seconds must be greater than 0.")
+    if _get_numeric_arg("router_waiting_threshold_per_endpoint", 1) <= 0:
+        raise ValueError(
+            "Router waiting threshold per endpoint must be greater than 0."
+        )
+    if _get_numeric_arg("router_admission_scrape_interval_seconds", 1.0) <= 0:
+        raise ValueError(
+            "Router admission scrape interval seconds must be greater than 0."
         )
     if args.log_stats and args.log_stats_interval <= 0:
         raise ValueError("Log stats interval must be greater than 0.")
@@ -246,6 +266,35 @@ def parse_args():
         choices=["noop"],
         help="The request rewriter to use. Default is 'noop' (no rewriting).",
     )
+    parser.add_argument(
+        "--enable-router-queue",
+        action="store_true",
+        help="Enable router-side request queueing (phase 1 supports roundrobin only).",
+    )
+    parser.add_argument(
+        "--router-max-queued-requests",
+        type=int,
+        default=256,
+        help="Maximum number of requests that can wait in the router queue.",
+    )
+    parser.add_argument(
+        "--router-max-queue-wait-seconds",
+        type=float,
+        default=5.0,
+        help="Maximum time a request may wait in the router queue.",
+    )
+    parser.add_argument(
+        "--router-waiting-threshold-per-endpoint",
+        type=int,
+        default=1,
+        help="Maximum backend waiting depth per endpoint before router queueing kicks in.",
+    )
+    parser.add_argument(
+        "--router-admission-scrape-interval-seconds",
+        type=float,
+        default=1.0,
+        help="Admission-oriented metrics refresh interval when router queueing is enabled.",
+    )
 
     # Batch API
     # TODO(gaocegege): Make these batch api related arguments to a separate config.
@@ -363,14 +412,14 @@ def parse_args():
         "--sentry-traces-sample-rate",
         type=float,
         default=0.1,
-        help="The sample rate for Sentry traces. Default is 0.1 (10%)",
+        help="The sample rate for Sentry traces. Default is 0.1 (10%%)",
     )
 
     parser.add_argument(
         "--sentry-profile-session-sample-rate",
         type=float,
         default=1.0,
-        help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%)",
+        help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%%)",
     )
 
     # OpenTelemetry tracing arguments

@@ -34,7 +34,6 @@ from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
 from vllm_router.routers.routing_logic import (
     cleanup_routing_logic,
-    get_routing_logic,
     initialize_routing_logic,
 )
 from vllm_router.service_discovery import (
@@ -219,7 +218,15 @@ def initialize_all(app: FastAPI, args):
         raise ValueError(f"Invalid service discovery type: {args.service_discovery}")
 
     # Initialize singletons via custom functions.
-    initialize_engine_stats_scraper(args.engine_stats_interval)
+    app.state.admission_controller = None
+    initialize_engine_stats_scraper(
+        args.engine_stats_interval,
+        admission_scrape_interval=(
+            args.router_admission_scrape_interval_seconds
+            if args.enable_router_queue
+            else None
+        ),
+    )
     initialize_request_stats_monitor(args.request_stats_window)
 
     if args.enable_batch_api:
