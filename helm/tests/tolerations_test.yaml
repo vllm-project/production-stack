@@ -1,7 +1,12 @@
 suite: test per-model tolerations configuration
 templates:
   - deployment-vllm-multi.yaml
+  - ray-cluster.yaml
 tests:
+  # ---------------------------------------------------------------------------
+  # deployment-vllm-multi.yaml tests
+  # ---------------------------------------------------------------------------
+
   - it: should apply global tolerations when no per-model tolerations are set
     set:
       servingEngineSpec:
@@ -20,7 +25,8 @@ tests:
             requestMemory: "1Gi"
             requestGPU: 1
     asserts:
-      - equal:
+      - template: deployment-vllm-multi.yaml
+        equal:
           path: spec.template.spec.tolerations
           value:
             - key: "gpu-node"
@@ -41,7 +47,8 @@ tests:
             requestMemory: "1Gi"
             requestGPU: 1
     asserts:
-      - notExists:
+      - template: deployment-vllm-multi.yaml
+        notExists:
           path: spec.template.spec.tolerations
 
   - it: should append per-model tolerations to global tolerations by default
@@ -67,7 +74,8 @@ tests:
                 value: "test-model"
                 effect: "NoSchedule"
     asserts:
-      - equal:
+      - template: deployment-vllm-multi.yaml
+        equal:
           path: spec.template.spec.tolerations
           value:
             - key: "gpu-node"
@@ -102,7 +110,8 @@ tests:
                 effect: "NoSchedule"
             tolerationsPolicy: "append"
     asserts:
-      - equal:
+      - template: deployment-vllm-multi.yaml
+        equal:
           path: spec.template.spec.tolerations
           value:
             - key: "gpu-node"
@@ -137,7 +146,8 @@ tests:
                 effect: "NoSchedule"
             tolerationsPolicy: "override"
     asserts:
-      - equal:
+      - template: deployment-vllm-multi.yaml
+        equal:
           path: spec.template.spec.tolerations
           value:
             - key: "dedicated"
@@ -164,7 +174,8 @@ tests:
                 value: "test-model"
                 effect: "NoSchedule"
     asserts:
-      - equal:
+      - template: deployment-vllm-multi.yaml
+        equal:
           path: spec.template.spec.tolerations
           value:
             - key: "dedicated"
@@ -204,7 +215,8 @@ tests:
             requestMemory: "1Gi"
             requestGPU: 1
     asserts:
-      - documentIndex: 0
+      - template: deployment-vllm-multi.yaml
+        documentIndex: 0
         equal:
           path: spec.template.spec.tolerations
           value:
@@ -212,10 +224,232 @@ tests:
               operator: "Equal"
               value: "model-a"
               effect: "NoSchedule"
-      - documentIndex: 1
+      - template: deployment-vllm-multi.yaml
+        documentIndex: 1
         equal:
           path: spec.template.spec.tolerations
           value:
             - key: "gpu-node"
               operator: "Exists"
+              effect: "NoSchedule"
+
+  # ---------------------------------------------------------------------------
+  # Ray cluster tests
+  # ---------------------------------------------------------------------------
+
+  - it: ray - should apply global tolerations to head and worker when no per-model tolerations are set
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        tolerations:
+          - key: "gpu-node"
+            operator: "Exists"
+            effect: "NoSchedule"
+        modelSpec:
+          - name: "ray-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 2
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.headGroupSpec.template.spec.tolerations
+          value:
+            - key: "gpu-node"
+              operator: "Exists"
+              effect: "NoSchedule"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.workerGroupSpecs[0].template.spec.tolerations
+          value:
+            - key: "gpu-node"
+              operator: "Exists"
+              effect: "NoSchedule"
+
+  - it: ray - should not set tolerations when neither global nor per-model tolerations are set
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "ray-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 2
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        notExists:
+          path: spec.headGroupSpec.template.spec.tolerations
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        notExists:
+          path: spec.workerGroupSpecs[0].template.spec.tolerations
+
+  - it: ray - should append per-model tolerations to global tolerations by default
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        tolerations:
+          - key: "gpu-node"
+            operator: "Exists"
+            effect: "NoSchedule"
+        modelSpec:
+          - name: "ray-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 2
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            tolerations:
+              - key: "dedicated"
+                operator: "Equal"
+                value: "ray-model"
+                effect: "NoSchedule"
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.headGroupSpec.template.spec.tolerations
+          value:
+            - key: "gpu-node"
+              operator: "Exists"
+              effect: "NoSchedule"
+            - key: "dedicated"
+              operator: "Equal"
+              value: "ray-model"
+              effect: "NoSchedule"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.workerGroupSpecs[0].template.spec.tolerations
+          value:
+            - key: "gpu-node"
+              operator: "Exists"
+              effect: "NoSchedule"
+            - key: "dedicated"
+              operator: "Equal"
+              value: "ray-model"
+              effect: "NoSchedule"
+
+  - it: ray - should override global tolerations when policy is override
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        tolerations:
+          - key: "gpu-node"
+            operator: "Exists"
+            effect: "NoSchedule"
+        modelSpec:
+          - name: "ray-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 2
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            tolerations:
+              - key: "dedicated"
+                operator: "Equal"
+                value: "ray-model"
+                effect: "NoSchedule"
+            tolerationsPolicy: "override"
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.headGroupSpec.template.spec.tolerations
+          value:
+            - key: "dedicated"
+              operator: "Equal"
+              value: "ray-model"
+              effect: "NoSchedule"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.workerGroupSpecs[0].template.spec.tolerations
+          value:
+            - key: "dedicated"
+              operator: "Equal"
+              value: "ray-model"
+              effect: "NoSchedule"
+
+  - it: ray - should use only per-model tolerations when there are no global tolerations
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "ray-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 2
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            tolerations:
+              - key: "dedicated"
+                operator: "Equal"
+                value: "ray-model"
+                effect: "NoSchedule"
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.headGroupSpec.template.spec.tolerations
+          value:
+            - key: "dedicated"
+              operator: "Equal"
+              value: "ray-model"
+              effect: "NoSchedule"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.workerGroupSpecs[0].template.spec.tolerations
+          value:
+            - key: "dedicated"
+              operator: "Equal"
+              value: "ray-model"
               effect: "NoSchedule"
