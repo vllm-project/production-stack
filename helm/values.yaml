@@ -120,19 +120,19 @@ servingEngineSpec:
   #
   # - affinity: (optional, map) Affinity configuration
   # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes. When both affinity and nodeSelectorTerms are defined, nodeSelectorTerms will be ignored.
-   # - nodeName: (optional) Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
-   # - tolerations: (optional, list) Per-model tolerations. Interacts with servingEngineSpec.tolerations according to tolerationsPolicy.
-   #   Example:
-   #   tolerations:
-   #     - key: "dedicated"
-   #       operator: "Equal"
-   #       value: "gpu-model-a"
-   #       effect: "NoSchedule"
-   # - tolerationsPolicy: (optional, string) How per-model tolerations interact with global servingEngineSpec.tolerations.
-   #   - "append" (default): model tolerations are appended to the global tolerations (union of both lists).
-   #   - "override": model tolerations replace the global tolerations entirely for this model.
-   # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
-   # - enableLoRA: (optional, bool) Whether to enable LoRA, e.g., true
+  # - nodeName: (optional) Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
+  # - tolerations: (optional, list) Per-model tolerations. Interacts with servingEngineSpec.tolerations according to tolerationsPolicy.
+  #   Example:
+  #   tolerations:
+  #     - key: "dedicated"
+  #       operator: "Equal"
+  #       value: "gpu-model-a"
+  #       effect: "NoSchedule"
+  # - tolerationsPolicy: (optional, string) How per-model tolerations interact with global servingEngineSpec.tolerations.
+  #   - "append" (default): model tolerations are appended to the global tolerations (union of both lists).
+  #   - "override": model tolerations replace the global tolerations entirely for this model.
+  # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
+  # - enableLoRA: (optional, bool) Whether to enable LoRA, e.g., true
   #
   # - keda: (optional, map) KEDA autoscaling configuration for this model deployment. Requires KEDA to be installed in the cluster.
   #   - enabled: (optional, bool) Whether to enable KEDA autoscaling for this model, e.g., true
