@@ -506,10 +506,10 @@
                     }
                   }
                 },
-                   "required": [
-                   "enabled"
-                 ]
-               },
+                "required": [
+                  "enabled"
+                ]
+              },
               "tolerations": {
                 "type": "array",
                 "description": "Per-model tolerations. Interacts with servingEngineSpec.tolerations according to tolerationsPolicy.",
