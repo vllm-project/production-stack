@@ -34,6 +34,7 @@ from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
 from vllm_router.routers.routing_logic import (
     cleanup_routing_logic,
+    get_routing_logic,
     initialize_routing_logic,
 )
 from vllm_router.service_discovery import (
