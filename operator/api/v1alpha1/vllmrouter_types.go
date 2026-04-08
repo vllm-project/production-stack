@@ -52,7 +52,7 @@ type VLLMRouterSpec struct {
 	StaticModels string `json:"staticModels,omitempty"`
 
 	// RoutingLogic specifies the routing strategy
-	// +kubebuilder:validation:Enum=roundrobin;session
+	// +kubebuilder:validation:Enum=roundrobin;session;prefixaware;kvaware
 	// +kubebuilder:default=roundrobin
 	RoutingLogic string `json:"routingLogic,omitempty"`
 
@@ -60,6 +60,11 @@ type VLLMRouterSpec struct {
 	// +kubebuilder:validation:RequiredWhen=RoutingLogic=session
 	// +kubebuilder:default=""
 	SessionKey string `json:"sessionKey,omitempty"`
+
+	// LmcacheControllerPort is the port of the LMCache controller (used with kvaware routing).
+	// Set explicitly when routingLogic is "kvaware" (typical value: 9000).
+	// +kubebuilder:validation:Maximum=65535
+	LmcacheControllerPort int32 `json:"lmcacheControllerPort,omitempty"`
 
 	// EngineScrapeInterval for collecting engine statistics
 	EngineScrapeInterval int32 `json:"engineScrapeInterval,omitempty"`
