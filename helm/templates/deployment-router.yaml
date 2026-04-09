@@ -143,6 +143,14 @@ spec:
           - "--lmcache-controller-port"
           - "{{ .Values.routerSpec.lmcacheControllerPort }}"
           {{- end }}
+          {{- if .Values.routerSpec.lmcacheControllerReplyPort }}
+          - "--lmcache-controller-reply-port"
+          - "{{ .Values.routerSpec.lmcacheControllerReplyPort }}"
+          {{- end }}
+          {{- if .Values.routerSpec.lmcacheControllerHeartbeatPort }}
+          - "--lmcache-controller-heartbeat-port"
+          - "{{ .Values.routerSpec.lmcacheControllerHeartbeatPort }}"
+          {{- end }}
           {{- if .Values.routerSpec.otel.endpoint }}
           - "--otel-endpoint"
           - "{{ .Values.routerSpec.otel.endpoint }}"

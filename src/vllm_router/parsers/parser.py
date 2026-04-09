@@ -235,7 +235,21 @@ def parse_args():
         "--lmcache-controller-port",
         type=int,
         default=9000,
-        help="The port of the LMCache controller.",
+        help="The port of the LMCache controller (PULL socket).",
+    )
+    parser.add_argument(
+        "--lmcache-controller-reply-port",
+        type=int,
+        default=None,
+        help="The port of the LMCache controller ROUTER socket for "
+        "req/reply (e.g., worker registration). Disabled if not set.",
+    )
+    parser.add_argument(
+        "--lmcache-controller-heartbeat-port",
+        type=int,
+        default=None,
+        help="The port of the LMCache controller ROUTER socket for "
+        "worker heartbeats. Disabled if not set.",
     )
     parser.add_argument(
         "--session-key",
