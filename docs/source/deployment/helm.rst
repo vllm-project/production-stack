@@ -73,7 +73,7 @@ Example Snippet
          enablePrefixCaching: false
          maxModelLen: 16384
          dtype: "bfloat16"
-         extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+         extraArgs: ["--gpu-memory-utilization", "0.8"]
 
        hf_token: <YOUR HF TOKEN>
 
@@ -182,7 +182,7 @@ So far, you have configured and deployed a vLLM serving engine with a single GPU
          maxModelLen: 4096
          tensorParallelSize: 2
          dtype: "bfloat16"
-         extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+         extraArgs: ["--gpu-memory-utilization", "0.8"]
        hf_token: <YOUR HF TOKEN>
        shmSize: "20Gi"
 

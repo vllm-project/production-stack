@@ -39,7 +39,6 @@ servingEngineSpec:
     vllmConfig:
       dtype:  "float16"  # Changed from "bfloat16" not supported by Tesla T4 GPU (compute capability 7.5)
       extraArgs:
-        - "--disable-log-requests"
         - "--gpu-memory-utilization=0.8"  # GPU-specific optimization
     env: []        # NEW: CPU env vars removed
     #   - name: VLLM_CPU_KVCACHE_SPACE

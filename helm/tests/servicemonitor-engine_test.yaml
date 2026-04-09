@@ -1,0 +1,86 @@
+suite: test Engine ServiceMonitor configuration
+templates:
+  - servicemonitor-engine.yaml
+tests:
+  - it: should not render anything when engine serviceMonitor is disabled
+    set:
+      servingEngineSpec:
+        serviceMonitor:
+          enabled: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render serviceMonitor when engine serviceMonitor is enabled
+    release:
+      name: vllm
+      namespace: default
+    set:
+      servingEngineSpec:
+        serviceMonitor:
+          enabled: true
+          additionalLabels:
+            label1: value1
+          interval: 30s
+          scrapeTimeout: 10s
+          honorLabels: true
+          metricRelabelings:
+            - action: replace
+              regex: (.*)
+              replacement: $1
+              sourceLabels:
+              - exported_namespace
+              targetLabel: namespace
+          relabelings:
+            - sourceLabels: [__meta_kubernetes_pod_node_name]
+              separator: ;
+              regex: ^(.*)$
+              targetLabel: nodename
+              replacement: $1
+              action: replace
+    asserts:
+    - equal:
+        path: metadata.name
+        value: vllm-engine-servicemonitor
+    - equal:
+        path: metadata.namespace
+        value: default
+    - equal:
+        path: metadata.labels
+        value:
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: serving-engine
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          environment: test
+          release: test
+          label1: value1
+    - equal:
+        path: spec.endpoints[0]
+        value:
+          port: service-port
+          honorLabels: true
+          interval: 30s
+          scrapeTimeout: 10s
+          metricRelabelings:
+            - action: replace
+              regex: (.*)
+              replacement: $1
+              sourceLabels:
+              - exported_namespace
+              targetLabel: namespace
+          relabelings:
+            - sourceLabels: [__meta_kubernetes_pod_node_name]
+              separator: ;
+              regex: ^(.*)$
+              targetLabel: nodename
+              replacement: $1
+              action: replace
+    - equal:
+        path: spec.selector.matchLabels
+        value:
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: serving-engine
+          app.kubernetes.io/part-of: vllm-stack
+          environment: test
+          release: test

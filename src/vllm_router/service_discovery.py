@@ -344,6 +344,14 @@ class StaticServiceDiscovery(ServiceDiscovery):
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
 
+    def has_ever_seen_model(self, model_name: str) -> bool:
+        """Check if the model is in the static list of models."""
+        return (
+            model_name in self.models
+            or (self.aliases and model_name in self.aliases)
+            or False
+        )
+
     def close(self):
         """
         Close the service discovery module and clean up health check resources.

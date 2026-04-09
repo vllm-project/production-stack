@@ -15,4 +15,3 @@ servingEngineSpec:
     vllmConfig:
       maxModelLen: 1024
       gpuMemoryUtilization: 0.4
-      extraArgs: ["--disable-log-requests"]

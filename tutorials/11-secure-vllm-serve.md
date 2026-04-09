@@ -84,7 +84,7 @@ servingEngineSpec:
         enablePrefixCaching: false
         maxModelLen: 16384
         dtype: "bfloat16"
-        extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+        extraArgs: ["--gpu-memory-utilization", "0.8"]
 
       hf_token: <YOUR HF TOKEN>
 ```

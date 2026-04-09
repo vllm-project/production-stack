@@ -255,15 +255,23 @@ lm://{{ .service_name }}:{{ .port }}
 {{- end -}}
 
 {{/*
+  Define common Kubernetes labels for every model listed in modelSpec, which is a subset of standard labels without modelName
+  Usage: include "chart.engineCommonLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name)
+*/}}
+{{- define "chart.engineCommonLabels" -}}
+app.kubernetes.io/instance: {{ .releaseName }}
+app.kubernetes.io/component: serving-engine
+app.kubernetes.io/part-of: {{ .chartName }}
+app.kubernetes.io/managed-by: helm
+{{- end -}}
+
+{{/*
   Define standard Kubernetes labels for serving engine
   Usage: include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name)
 */}}
 {{- define "chart.engineStandardLabels" -}}
 app.kubernetes.io/name: {{ .modelName }}
-app.kubernetes.io/instance: {{ .releaseName }}
-app.kubernetes.io/component: serving-engine
-app.kubernetes.io/part-of: {{ .chartName }}
-app.kubernetes.io/managed-by: helm
+{{- include "chart.engineCommonLabels" . | nindent 0 }}
 {{- end -}}
 
 {{/*
