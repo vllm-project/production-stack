@@ -28,6 +28,7 @@ from kubernetes import client, config, watch
 
 from vllm_router import utils
 from vllm_router.log import init_logger
+from vllm_router.utils import AliasConfig, normalize_alias_config
 
 logger = init_logger(__name__)
 
@@ -226,7 +227,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         app,
         urls: List[str],
         models: List[str],
-        aliases: List[str] | None = None,
+        aliases: dict[str, str | AliasConfig] | None = None,
         model_labels: List[str] | None = None,
         model_types: List[str] | None = None,
         static_backend_health_checks: bool = False,
@@ -239,7 +240,14 @@ class StaticServiceDiscovery(ServiceDiscovery):
         assert len(urls) == len(models), "URLs and models should have the same length"
         self.urls = urls
         self.models = models
-        self.aliases = aliases
+        self.aliases = (
+            {
+                alias: normalize_alias_config(alias, value)
+                for alias, value in aliases.items()
+            }
+            if aliases is not None
+            else None
+        )
         self.model_labels = model_labels
         self.model_types = model_types
         self.engines_id = [str(uuid.uuid4()) for i in range(0, len(urls))]
