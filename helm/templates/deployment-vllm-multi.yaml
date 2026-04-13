@@ -356,6 +356,10 @@ spec:
           - name: LMCACHE_CONTROLLER_PULL_URL
             value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
           {{-   end }}
+          {{-   if hasKey $modelSpec.lmcacheConfig "controllerReplyPort" }}
+          - name: LMCACHE_CONTROLLER_REPLY_URL
+            value: "{{ .Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerReplyPort }}"
+          {{-   end }}
           {{-   if hasKey $modelSpec.lmcacheConfig "workerPorts" }}
           - name: LMCACHE_LMCACHE_WORKER_PORTS
             value: {{ $modelSpec.lmcacheConfig.workerPorts | quote }}
