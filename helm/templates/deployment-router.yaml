@@ -52,8 +52,8 @@ spec:
       {{- end }}
       containers:
       - name: router-container
-        image: "{{ .Values.routerSpec.repository | default "lmcache/lmstack-router" }}:{{ .Values.routerSpec.tag | default "latest" }}"
-        imagePullPolicy: "{{ .Values.routerSpec.imagePullPolicy | default "Always" }}"
+        image: "{{ .Values.routerSpec.repository }}:{{ .Values.routerSpec.tag }}"
+        imagePullPolicy: "{{ .Values.routerSpec.imagePullPolicy }}"
         {{- if .Values.routerSpec.containerSecurityContext }}
         securityContext:
           {{- toYaml .Values.routerSpec.containerSecurityContext | nindent 10 }}
@@ -65,34 +65,27 @@ spec:
           {{- end }}
           - name: PYTHONHASHSEED
             value: "123"
-          {{- if .Values.routerSpec.lmcacheConfig }}
           - name: LMCACHE_LOG_LEVEL
-            value: {{ .Values.routerSpec.lmcacheConfig.logLevel | default "INFO" | quote }}
-          {{- end }}
-          {{- if .Values.servingEngineSpec.enableEngine -}}
-          {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
-          {{- if $vllmApiKey }}
+            value: {{ .Values.routerSpec.lmcacheConfig.logLevel | quote }}
+          {{- if and .Values.routerSpec.vllmApiKey.secretName .Values.routerSpec.vllmApiKey.secretKey }}
           - name: VLLM_API_KEY
-            {{- if kindIs "string" $vllmApiKey }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.routerSpec.vllmApiKey.secretName }}
+                key: {{ .Values.routerSpec.vllmApiKey.secretKey }}
+          {{- else if and .Values.servingEngineSpec.enableEngine }}
+          {{- if kindIs "string" .Values.servingEngineSpec.vllmApiKey }}
+          - name: VLLM_API_KEY
             valueFrom:
               secretKeyRef:
                 name: {{ .Release.Name }}-secrets
                 key: vllmApiKey
-            {{- else }}
-            valueFrom:
-              secretKeyRef:
-                name: {{ $vllmApiKey.secretName }}
-                key: {{ $vllmApiKey.secretKey }}
-            {{- end }}
-          {{- end }}
-          {{- else }}
-          {{- $vllmApiKey := $.Values.routerSpec.vllmApiKey }}
-          {{- if $vllmApiKey }}
+          {{- else if and .Values.servingEngineSpec.vllmApiKey.secretName .Values.servingEngineSpec.vllmApiKey.secretKey }}
           - name: VLLM_API_KEY
             valueFrom:
               secretKeyRef:
-                name: {{ $vllmApiKey.secretName }}
-                key: {{ $vllmApiKey.secretKey }}
+                name: {{ .Values.servingEngineSpec.vllmApiKey.secretName }}
+                key: {{ .Values.servingEngineSpec.vllmApiKey.secretKey }}
           {{- end }}
           {{- end }}
         args:
@@ -160,47 +153,25 @@ spec:
           - "--otel-secure"
           {{- end }}
           {{- end }}
-        {{- if .Values.routerSpec.resources }}
+        {{- with .Values.routerSpec.resources }}
         resources:
-          {{- if .Values.routerSpec.resources.requests }}
-          requests:
-            cpu: "{{ .Values.routerSpec.resources.requests.cpu }}"
-            memory: "{{ .Values.routerSpec.resources.requests.memory }}"
-          {{- end }}
-          {{- if .Values.routerSpec.resources.limits }}
-          limits:
-            {{- if .Values.routerSpec.resources.limits.cpu }}
-            cpu: "{{ .Values.routerSpec.resources.limits.cpu }}"
-            {{- end }}
-            {{- if .Values.routerSpec.resources.limits.memory }}
-            memory: "{{ .Values.routerSpec.resources.limits.memory }}"
-            {{- end }}
-          {{- end }}
+          {{- toYaml . | nindent 10 }}
         {{- end }}
         ports:
-          - name: "router-cport"
+          - name: "router-port"
             containerPort: {{ .Values.routerSpec.containerPort }}
           - name: "lmcache-port"
             containerPort: 9000
+        {{- with .Values.routerSpec.livenessProbe }}
         livenessProbe:
-          initialDelaySeconds: {{ .Values.routerSpec.livenessProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.routerSpec.livenessProbe.periodSeconds }}
-          failureThreshold: {{ .Values.routerSpec.livenessProbe.failureThreshold }}
-          httpGet:
-            path: {{ .Values.routerSpec.livenessProbe.httpGet.path }}
-            port: {{ .Values.routerSpec.containerPort }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.routerSpec.startupProbe }}
         startupProbe:
-          initialDelaySeconds: {{ .Values.routerSpec.startupProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.routerSpec.startupProbe.periodSeconds }}
-          failureThreshold: {{ .Values.routerSpec.startupProbe.failureThreshold }}
-          httpGet:
-            path: {{ .Values.routerSpec.startupProbe.httpGet.path }}
-            port: {{ .Values.routerSpec.containerPort }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.routerSpec.readinessProbe }}
         readinessProbe:
-          initialDelaySeconds: {{ .Values.routerSpec.readinessProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.routerSpec.readinessProbe.periodSeconds }}
-          failureThreshold: {{ .Values.routerSpec.readinessProbe.failureThreshold }}
-          httpGet:
-            path: {{ .Values.routerSpec.readinessProbe.httpGet.path }}
-            port: {{ .Values.routerSpec.containerPort }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
 {{- end }}

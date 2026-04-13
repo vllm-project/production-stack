@@ -74,16 +74,16 @@ tests:
         webhook:
           enabled: true
     asserts:
-    # - equal:
-    #     path: metadata.labels
-    #     value:
-    #       app.kubernetes.io/component: lora-controller
-    #       helm-release-name: vllm
-    #       customLabel: customValue
-    # - equal:
-    #     path: metadata.annotations
-    #     value:
-    #       customAnnotation: customValue
+    - equal:
+        path: metadata.labels
+        value:
+          app.kubernetes.io/component: lora-controller
+          helm-release-name: vllm
+          customLabel: customValue
+    - equal:
+        path: metadata.annotations
+        value:
+          customAnnotation: customValue
     - equal:
         path: spec.replicas
         value: 2
@@ -184,3 +184,36 @@ tests:
           - key: nvidia.com/gpu
             operator: Exists
             effect: NoSchedule
+
+  - it: should render a deployment with custom conf for the shared PVC
+    release:
+      name: vllm
+      namespace: default
+    set:
+      loraController:
+        enableLoraController: true
+      sharedPvcStorage:
+        enabled: true
+        image:
+          repository: docker.io/busybox
+          tag: "latest"
+    asserts:
+    - equal:
+        path: spec.template.spec.initContainers[0].image
+        value: docker.io/busybox:latest
+    - equal:
+        path: spec.template.spec.initContainers[0].volumeMounts
+        value:
+          - name: vllm-shared-pvc-storage
+            mountPath: /data/shared-pvc-storage
+    - equal:
+        path: spec.template.spec.containers[0].volumeMounts
+        value:
+          - name: vllm-shared-pvc-storage
+            mountPath: /data/shared-pvc-storage
+    - equal:
+        path: spec.template.spec.volumes
+        value:
+        - name: vllm-shared-pvc-storage
+          persistentVolumeClaim:
+            claimName: "vllm-shared-pvc-storage-claim"

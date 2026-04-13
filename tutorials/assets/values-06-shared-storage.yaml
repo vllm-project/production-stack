@@ -39,6 +39,7 @@ servingEngineSpec:
 
 
 cacheserverSpec:
+  enabled: true
   # -- Number of replicas
   replicaCount: 1
 
