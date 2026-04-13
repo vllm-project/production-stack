@@ -236,7 +236,7 @@ def update_content_length(request: Request, request_body: str):
     request._headers = headers
 
 
-def is_model_healthy(url: str, model: str, model_type: str) -> bool:
+def is_model_healthy(url: str, model: str, model_type: str, timeout: int = 10) -> bool:
     model_url = ModelType.get_url(model_type)
 
     try:
@@ -247,7 +247,7 @@ def is_model_healthy(url: str, model: str, model_type: str) -> bool:
                 f"{url}{model_url}",
                 files=ModelType.get_test_payload(model_type),  # multipart/form-data
                 data={"model": model},
-                timeout=10,
+                timeout=timeout,
             )
         else:
             # for other model types (chat, completion, etc.)
@@ -255,7 +255,7 @@ def is_model_healthy(url: str, model: str, model_type: str) -> bool:
                 f"{url}{model_url}",
                 headers={"Content-Type": "application/json"},
                 json={"model": model} | ModelType.get_test_payload(model_type),
-                timeout=10,
+                timeout=timeout,
             )
 
         response.raise_for_status()

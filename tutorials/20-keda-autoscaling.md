@@ -102,7 +102,7 @@ This means that at the given timestamp, there were 0 pending requests in the que
 
 ### 5. Configure the ScaledObject
 
-The following `ScaledObject` configuration is provided in `tutorials/assets/values-20-keda.yaml`. Review its contents:
+The following `ScaledObject` configuration is provided in `tutorials/assets/keda-scaled-object.yaml`. Review its contents:
 
 ```yaml
 apiVersion: keda.sh/v1alpha1
@@ -130,7 +130,7 @@ Apply the ScaledObject:
 
 ```bash
 cd ../tutorials
-kubectl apply -f assets/values-20-keda.yaml
+kubectl apply -f assets/keda-scaled-object.yaml
 ```
 
 This tells KEDA to:
@@ -183,7 +183,7 @@ Sometimes you want to scale down to zero replicas when there's no traffic. This 
 * **Resource efficiency**: Free up GPU resources for other workloads
 * **Cold start scenarios**: Scale up only when requests arrive
 
-We provide this capability through a dual-trigger configuration. To configure it, modify the `tutorials/assets/values-20-keda.yaml`:
+We provide this capability through a dual-trigger configuration. To configure it, modify the `tutorials/assets/keda-scaled-object.yaml`:
 
 ```yaml
 # KEDA ScaledObject for vLLM deployment with scale-to-zero capability
@@ -235,7 +235,7 @@ spec:
 Apply the updated configuration:
 
 ```bash
-kubectl apply -f assets/values-20-keda.yaml
+kubectl apply -f assets/keda-scaled-object.yaml
 ```
 
 **Test the scale-to-zero behavior:**
@@ -282,7 +282,7 @@ kubectl apply -f assets/values-20-keda.yaml
 To remove KEDA configuration and observability components:
 
 ```bash
-kubectl delete -f assets/values-20-keda.yaml
+kubectl delete -f assets/keda-scaled-object.yaml
 helm uninstall keda -n keda
 kubectl delete namespace keda
 

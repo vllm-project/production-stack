@@ -21,9 +21,11 @@ servingEngineSpec:
         cpuOffloadingBufferSize: "10"
         enableController: true
         controllerPort: 9000
+        controllerReplyPort: 9001
         workerPorts: "8001"
         p2pHost: "localhost"
         p2pInitPorts: "30081"
+        workerHeartbeatTime: "30"
         logLevel: "DEBUG"
       env: []
       chatTemplate: "chat.jinja2"
@@ -57,3 +59,5 @@ routerSpec:
     - "--log-level"
     - "info"
   lmcacheControllerPort: 9000
+  lmcacheControllerReplyPort: 9001
+  lmcacheControllerHeartbeatPort: 9002

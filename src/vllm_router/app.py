@@ -198,6 +198,8 @@ def initialize_all(app: FastAPI, args):
                 else None
             ),
             static_backend_health_checks=args.static_backend_health_checks,
+            static_backend_health_check_interval=args.static_backend_health_check_interval,
+            static_backend_health_check_timeout_seconds=args.static_backend_health_check_timeout_seconds,
             prefill_model_labels=args.prefill_model_labels,
             decode_model_labels=args.decode_model_labels,
         )
@@ -250,6 +252,8 @@ def initialize_all(app: FastAPI, args):
         args.routing_logic,
         session_key=args.session_key,
         lmcache_controller_port=args.lmcache_controller_port,
+        lmcache_controller_reply_port=args.lmcache_controller_reply_port,
+        lmcache_controller_heartbeat_port=args.lmcache_controller_heartbeat_port,
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
         kv_aware_threshold=args.kv_aware_threshold,

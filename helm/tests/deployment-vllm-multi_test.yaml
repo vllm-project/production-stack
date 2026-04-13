@@ -1,0 +1,318 @@
+suite: test Model deployment configuration
+templates:
+  - deployment-vllm-multi.yaml
+tests:
+  - it: should not render anything when modelSpec is empty
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec: []
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should not render anything when model is disabled
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "test-model"
+          enabled: false
+          repository: "vllm/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          imagePullSecret: "model-secret"
+          replicaCount: 1
+          requestCPU: 1
+          requestMemory: "1Gi"
+          requestGPU: 1
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render a basic model with custom values
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        labels:
+          custom-label: custom-value
+        imagePullPolicy: Always
+        modelSpec:
+        - name: "test-model"
+          annotations:
+            custom-key: custom-value
+          repository: "vllm/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          imagePullSecret: "model-secret"
+          replicaCount: 1
+          requestCPU: 1
+          requestMemory: "1Gi"
+          requestGPU: 1
+    asserts:
+    - hasDocuments:
+        count: 1
+    - documentIndex: 0
+      equal:
+        path: metadata.name
+        value: vllm-test-model-deployment-vllm
+    - documentIndex: 0
+      equal:
+        path: metadata.annotations
+        value:
+          custom-key: custom-value
+    - documentIndex: 0
+      equal:
+        path: metadata.labels
+        value:
+          model: test-model
+          helm-release-name: vllm
+          app.kubernetes.io/name: test-model
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: serving-engine
+          app.kubernetes.io/part-of: vllm-stack
+          custom-label: custom-value
+          app.kubernetes.io/managed-by: helm
+          environment: test
+          release: test
+    - documentIndex: 0
+      equal:
+        path: spec.replicas
+        value: 1
+    - documentIndex: 0
+      equal:
+        path: spec.selector.matchLabels
+        value:
+          model: test-model
+          helm-release-name: vllm
+          app.kubernetes.io/name: test-model
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: serving-engine
+          app.kubernetes.io/part-of: vllm-stack
+          custom-label: custom-value
+          app.kubernetes.io/managed-by: helm
+          environment: test
+          release: test
+    - documentIndex: 0
+      equal:
+        path: spec.template.metadata.labels
+        value:
+          model: test-model
+          helm-release-name: vllm
+          app.kubernetes.io/name: test-model
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: serving-engine
+          app.kubernetes.io/part-of: vllm-stack
+          custom-label: custom-value
+          app.kubernetes.io/managed-by: helm
+          environment: test
+          release: test
+    - documentIndex: 0
+      equal:
+        path: spec.replicas
+        value: 1
+    - documentIndex: 0
+      notExists:
+        path: spec.template.spec.priorityClassName
+    - documentIndex: 0
+      notExists:
+        path: spec.template.spec.initContainers
+    - documentIndex: 0
+      notExists:
+        path: spec.template.spec.securityContext
+    - documentIndex: 0
+      notExists:
+        path: spec.template.spec.serviceAccountName
+    - documentIndex: 0
+      notExists:
+        path: spec.template.spec.hostIPC
+    - documentIndex: 0
+      notExists:
+        path: spec.template.spec.hostPID
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.hostname
+        value: vllm-test-model-vllm-stack
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.subdomain
+        value: vllm-test-model-engine-service
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.containers[0].image
+        value: "vllm/vllm-openai:latest"
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.containers[0].securityContext
+        value:
+          runAsNonRoot: false
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.containers[0].command
+        value:
+          - "vllm"
+          - "serve"
+          - "facebook/opt-125m"
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "8000"
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.containers[0].imagePullPolicy
+        value: Always
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.containers[0].env
+        value:
+          - name: PYTHONHASHSEED
+            value: "123"
+          - name: HF_HOME
+            value: /tmp
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+
+  - it: should render two models, one with chat templates
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "test-model"
+          repository: "vllm/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          imagePullSecret: "model-secret"
+          replicaCount: 1
+          requestCPU: 1
+          requestMemory: "1Gi"
+          requestGPU: 1
+        - name: "test-model-2"
+          repository: "vllm/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          imagePullSecret: "model-secret"
+          replicaCount: 1
+          requestCPU: 1
+          requestMemory: "1Gi"
+          requestGPU: 1
+          chatTemplate: "chat.jinja2"
+          chatTemplateConfigMap: |-
+            {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
+            {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
+    asserts:
+    - hasDocuments:
+        count: 3
+    - documentIndex: 2
+      equal:
+        path: kind
+        value: ConfigMap
+    - documentIndex: 2
+      equal:
+        path: metadata.name
+        value: vllm-test-model-2-chat-templates
+    - documentIndex: 2
+      equal:
+        path: data
+        value:
+          chat.jinja2: |-
+
+            {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
+            {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
+
+  - it: should render a model with custom vllmConfig and lmcache
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "opt125m"
+          repository: "lmcache/vllm-openai"
+          tag: "v0.3.9post2"
+          modelURL: "facebook/opt-125m"
+          replicaCount: 2
+          pdb:
+            enabled: true
+            minAvailable: 1
+          requestCPU: 6
+          requestMemory: "30Gi"
+          requestGPU: 1
+          pvcStorage: "50Gi"
+          vllmConfig:
+            enablePrefixCaching: true
+            maxModelLen: 1024
+            gpuMemoryUtilization: 0.8
+          lmcacheConfig:
+            enabled: true
+            cpuOffloadingBufferSize: "10"
+            enableController: true
+            controllerPort: 9000
+            workerPorts: "8001"
+            p2pHost: "localhost"
+            p2pInitPorts: "30081"
+            logLevel: "DEBUG"
+    asserts:
+    - hasDocuments:
+        count: 1
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.containers[0].command
+        value:
+          - "/opt/venv/bin/vllm"
+          - "serve"
+          - "facebook/opt-125m"
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "8000"
+          - "--enable-prefix-caching"
+          - "--max-model-len"
+          - "1024"
+          - "--gpu_memory_utilization"
+          - "0.8"
+          - "--kv-transfer-config"
+          - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.containers[0].env
+        value:
+          - name: PYTHONHASHSEED
+            value: "123"
+          - name: HF_HOME
+            value: /data
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: PROMETHEUS_MULTIPROC_DIR
+            value: "/tmp"
+          - name: LMCACHE_USE_EXPERIMENTAL
+            value: "True"
+          - name: VLLM_RPC_TIMEOUT
+            value: "1000000"
+          - name: LMCACHE_LOG_LEVEL
+            value: "DEBUG"
+          - name: LMCACHE_LOCAL_CPU
+            value: "True"
+          - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+            value: "10"
+          - name: LMCACHE_ENABLE_CONTROLLER
+            value: "True"
+          - name: LMCACHE_LMCACHE_INSTANCE_ID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: LMCACHE_CONTROLLER_PULL_URL
+            value: "vllm-router-service:9000"
+          - name: LMCACHE_LMCACHE_WORKER_PORTS
+            value: "8001"
+          - name: LMCACHE_P2P_HOST
+            value: "localhost"
+          - name: LMCACHE_P2P_INIT_PORTS
+            value: "30081"
