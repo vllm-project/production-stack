@@ -106,6 +106,7 @@ In the following example, we configure a total of two Ray nodes each equipped wi
        shmSize: "20Gi"
 
        raySpec:
+         enabled: true
          headNode:
            requestCPU: 2
            requestMemory: "20Gi"
