@@ -2,6 +2,12 @@ servingEngineSpec:
   # Global runtime class for all models (can be overridden per model)
   runtimeClassName: "nvidia"
 
+  # Global tolerations applied to all model deployments
+  tolerations:
+    - key: "gpu-node"
+      operator: "Exists"
+      effect: "NoSchedule"
+
   modelSpec:
   - name: "opt125m"
     repository: "lmcache/vllm-openai"
@@ -18,6 +24,14 @@ servingEngineSpec:
 
     pvcStorage: "10Gi"
 
+    # Per-model tolerations: appended to the global tolerations (default policy)
+    tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "opt125m"
+        effect: "NoSchedule"
+    # tolerationsPolicy: "append"  # default: union of global + model tolerations
+    # tolerationsPolicy: "override" # replaces global tolerations entirely for this model
 cacheserverSpec:
   repository: "lmcache/vllm-openai"
   tag: "latest-nightly"
