@@ -27,7 +27,9 @@ metadata:
   {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.engineLabels" . | nindent 4 }}
 spec:
+{{- if not (and $modelSpec.keda $modelSpec.keda.enabled) }}
   replicas: {{ $modelSpec.replicaCount }}
+{{- end }}
   {{- include "chart.engineStrategy" . | nindent 2 }}
   selector:
     matchLabels:
