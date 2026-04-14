@@ -41,6 +41,118 @@ spec:
           spec:
             description: VLLMRuntimeSpec defines the desired state of VLLMRuntime
             properties:
+              autoscalingConfig:
+                description: Autoscaling configuration
+                properties:
+                  enabled:
+                    description: Enabled enables autoscaling
+                    type: boolean
+                  maxReplicas:
+                    description: MaxReplicas is the maximum number of replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  minReplicas:
+                    default: 1
+                    description: MinReplicas is the minimum number of replicas (defaults
+                      to 1, set to 0 to enable scale-to-zero)
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  pollingInterval:
+                    default: 15
+                    description: PollingInterval is how often KEDA checks metrics
+                      (seconds)
+                    format: int32
+                    type: integer
+                  scaleDownPolicy:
+                    description: ScaleDownPolicy defines the scaling behavior when
+                      scaling down
+                    properties:
+                      periodSeconds:
+                        default: 60
+                        description: PeriodSeconds is the period for the scale down
+                          policy
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      podValue:
+                        default: 1
+                        description: PodValue is the max pods to remove per period
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      scaleToZeroDelaySeconds:
+                        default: 1800
+                        description: |-
+                          ScaleToZeroDelaySeconds is the wait time before scaling to zero (seconds).
+                          Only applicable when minReplicas is set to 0.
+                        format: int32
+                        type: integer
+                      stabilizationWindowSeconds:
+                        default: 300
+                        description: StabilizationWindowSeconds is the HPA stabilization
+                          window for scaling down
+                        format: int32
+                        type: integer
+                    type: object
+                  scaleUpPolicy:
+                    description: ScaleUpPolicy defines the scaling behavior when scaling
+                      up
+                    properties:
+                      periodSeconds:
+                        default: 60
+                        description: PeriodSeconds is the period for the scale up
+                          policy
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      podValue:
+                        default: 1
+                        description: PodValue is the max pods to add per period
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      stabilizationWindowSeconds:
+                        default: 0
+                        description: StabilizationWindowSeconds is the HPA stabilization
+                          window for scaling up
+                        format: int32
+                        type: integer
+                    type: object
+                  triggers:
+                    description: Triggers defines the metric thresholds for autoscaling
+                    properties:
+                      generationTokensThreshold:
+                        default: 100
+                        description: GenerationTokensThreshold is the per-pod generation
+                          tokens/s threshold for scaling
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      prometheusAddress:
+                        default: http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090
+                        description: PrometheusAddress is the Prometheus server address
+                          for metric queries
+                        type: string
+                      promptTokensThreshold:
+                        default: 100
+                        description: PromptTokensThreshold is the per-pod prompt tokens/s
+                          threshold for scaling
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      requestsRunningThreshold:
+                        default: 5
+                        description: RequestsRunningThreshold is the per-pod concurrent
+                          requests threshold for scaling
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    type: object
+                required:
+                - maxReplicas
+                type: object
               deploymentConfig:
                 description: Deployment configuration
                 properties:
@@ -441,9 +553,21 @@ spec:
               modelStatus:
                 description: Model status
                 type: string
+              replicas:
+                description: Current replica count (used by scale subresource)
+                format: int32
+                type: integer
+              selector:
+                description: Label selector for pods (used by scale subresource for
+                  HPA AverageValue)
+                type: string
             type: object
         type: object
     served: true
     storage: true
     subresources:
+      scale:
+        labelSelectorPath: .status.selector
+        specReplicasPath: .spec.deploymentConfig.replicas
+        statusReplicasPath: .status.replicas
       status: {}
