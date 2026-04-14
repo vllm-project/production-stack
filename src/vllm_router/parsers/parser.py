@@ -177,6 +177,18 @@ def parse_args():
         help="Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.",
     )
     parser.add_argument(
+        "--static-backend-health-check-interval",
+        type=int,
+        default=60,
+        help="Interval in seconds between static backend health checks (default: 60).",
+    )
+    parser.add_argument(
+        "--static-backend-health-check-timeout-seconds",
+        type=int,
+        default=10,
+        help="Timeout in seconds for static backend health check requests (default: 10).",
+    )
+    parser.add_argument(
         "--k8s-port",
         type=int,
         default=8000,
@@ -223,7 +235,21 @@ def parse_args():
         "--lmcache-controller-port",
         type=int,
         default=9000,
-        help="The port of the LMCache controller.",
+        help="The port of the LMCache controller (PULL socket).",
+    )
+    parser.add_argument(
+        "--lmcache-controller-reply-port",
+        type=int,
+        default=None,
+        help="The port of the LMCache controller ROUTER socket for "
+        "req/reply (e.g., worker registration). Disabled if not set.",
+    )
+    parser.add_argument(
+        "--lmcache-controller-heartbeat-port",
+        type=int,
+        default=None,
+        help="The port of the LMCache controller ROUTER socket for "
+        "worker heartbeats. Disabled if not set.",
     )
     parser.add_argument(
         "--session-key",

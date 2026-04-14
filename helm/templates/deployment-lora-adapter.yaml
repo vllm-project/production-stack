@@ -1,5 +1,5 @@
-{{- if .Values.loraAdapters }}
 {{- range .Values.loraAdapters }}
+{{- if ne .enabled false }}
 ---
 apiVersion: production-stack.vllm.ai/v1alpha1
 kind: LoraAdapter
@@ -9,16 +9,23 @@ metadata:
   labels:
     app.kubernetes.io/component: lora-adapter
     helm-release-name: {{ $.Release.Name }}
+    {{- with .labels }}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   baseModel: {{ .baseModel | quote }}
-  {{- if and (not .vllmApiKey) ($.Values.servingEngineSpec.vllmApiKey) }}
-  vllmApiKey:
-    secretName: {{ $.Release.Name }}-secrets
-    secretKey: vllmApiKey
-  {{- else if .vllmApiKey }}
+  {{- if and .vllmApiKey .vllmApiKey.secretName .vllmApiKey.secretKey }}
   vllmApiKey:
     secretName: {{ .vllmApiKey.secretName | quote }}
     secretKey: {{ .vllmApiKey.secretKey | quote }}
+  {{- else if and (kindIs "string" $.Values.servingEngineSpec.vllmApiKey) $.Values.servingEngineSpec.vllmApiKey }}
+  vllmApiKey:
+    secretName: {{ $.Release.Name }}-secrets
+    secretKey: vllmApiKey
+  {{- else if and (kindIs "map" $.Values.servingEngineSpec.vllmApiKey) $.Values.servingEngineSpec.vllmApiKey.secretName $.Values.servingEngineSpec.vllmApiKey.secretKey }}
+  vllmApiKey:
+    secretName: {{ $.Values.servingEngineSpec.vllmApiKey.secretName }}
+    secretKey: {{ $.Values.servingEngineSpec.vllmApiKey.secretKey }}
   {{- end }}
   adapterSource:
     type: {{ .adapterSource.type | quote }}

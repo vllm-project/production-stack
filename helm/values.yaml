@@ -1,258 +1,260 @@
 # -- Default values for llmstack helm chart
 # -- Declare variables to be passed into your templates.
 
-# -- Serving engine configuratoon
+# -- Serving engine configuration
 servingEngineSpec:
+  # -- Whether to enable the serving engine
   enableEngine: true
+  # @schema skipProperties:true
   # -- Customized labels for the serving engine deployment
   labels:
     environment: "test"
     release: "test"
   # -- Extra service ports for models
   extraPorts: []
-  # vllmApiKey: (optional) api key for securing the vLLM models. Can be either:
-  #   - A string containing the token directly (will be stored in a generated secret)
-  #   - An object referencing an existing secret:
-  #     secretName: "my-existing-secret"
-  #     secretKey: "vllm-api-key"
-  #
-  # modelSpec - configuring multiple serving engines deployments that runs different models
-  # Each entry in the modelSpec array should contain the following fields:
-  # - annotations: (Optional, map) The annotations to add to the deployment, e.g., {model: "opt125m"}
-  # - serviceAccountName: (Optional, string) The name of the service account to use for the deployment, e.g., "vllm-service-account"
-  # - priorityClassName: (Optional, string) The name of the priority class name for the deployment, e.g., "high-priority"
-  # - runtimeClassName: (Optional, string) Runtime class for the pod, e.g., "nvidia". If not specified, falls back to servingEngineSpec.runtimeClassName
-  # - podAnnotations: (Optional, map) The annotations to add to the pod, e.g., {model: "opt125m"}
-  # - name: (string) The name of the model, e.g., "example-model"
-  # - repository: (string) The repository of the model, e.g., "vllm/vllm-openai"
-  # - tag: (string) The tag of the model, e.g., "latest"
-  # - imagePullSecret: (Optional, string) Name of secret with credentials to private container repository, e.g. "secret"
-  # - modelURL: (string) The URL of the model, e.g., "facebook/opt-125m"
-  # - chatTemplate: (Optional, string) Chat template (Jinga2) specifying tokenizer configuration, e.g. "{% for message in messages %}\n{% if message['role'] == 'user' %}\n{{ 'Question:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'system' %}\n{{ 'System:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'assistant' %}{{ 'Answer:\n'  + message['content'] + '\n\n' }}{% endif %}\n{% if loop.last and add_generation_prompt %}\n{{ 'Answer:\n' }}{% endif %}{% endfor %}"
-  #
-  # - replicaCount: (int) The number of replicas for the model, e.g. 1
-  # - resources: (object) a resources block containing requests and limits. If specified, this takes priority over simplified resource fields (requestCPU, etc.).
-  # - requestCPU: (int) The number of CPUs requested for the model, e.g. 6
-  # - requestMemory: (string) The amount of memory requested for the model, e.g., "16Gi"
-  # - requestGPU: (int) The number of GPUs requested for the model, e.g., 1
-  # - requestGPUType: (Optional, string) The type of GPU requested, e.g., "nvidia.com/mig-4g.71gb". If not specified, defaults to "nvidia.com/gpu"
-  # - requestGPUMem: (Optional, string) Requires HAMi. The amount of GPU memory requested, e.g., 3000. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage
-  # - requestGPUMemPercentage: (Optional, string) Requires HAMi. The percentage of GPU memory requested, e.g., "80". It cannot be used together with requestGPUMem.
-  # - requestGPUCores: (Optional, string) Requires HAMi. The percentage of GPU cores requested, e.g., "10". Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage
-  # - limitCPU: (Optional, string) The CPU limit for the model, e.g., "8"
-  # - limitMemory: (Optional, string) The memory limit for the model, e.g., "32Gi"
-  # Note: If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.
-  # - limitGPUMem: (Optional, string) Requires HAMi. The limit of GPU memory, e.g., 3000. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage
-  # - limitGPUMemPercentage: (Optional, string) Requires HAMi. The limit of GPU memory of GPU, e.g., "80"
-  # - limitGPUCores: (Optional, string) Requires HAMi. The limit of GPU cores, e.g., "10". Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage
 
-  # - pvcStorage: (Optional, string) The amount of storage requested for the model, e.g., "50Gi".
-  # - pvcAccessMode: (Optional, list) The access mode policy for the mounted volume, e.g., ["ReadWriteOnce"]
-  # - storageClass: (Optional, String) The storage class of the PVC e.g., "", default is ""
-  # - pvcMatchLabels: (Optional, map) The labels to match the PVC, e.g., {model: "opt125m"}
-  # - pvcLabels: (Optional, map} The labels to add to the PVC, e.g., {label_excluded_from_alerts: "true"}
-  # - pvcAnnotations: (Optional, map} The annotations to add to the PVC
-  # - extraVolumes: (Optional, list) Additional volumes to add to the pod, in Kubernetes volume format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volume-v1-core
-  #   Example for an emptyDir volume:
-  #   extraVolumes:
-  #   - name: tmp-volume
-  #     emptyDir:
-  #       medium: ""
-  #       sizeLimit: 5Gi
-  # - extraVolumeMounts: (Optional, list) Additional volume mounts to add to the container, in Kubernetes volumeMount format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volumemount-v1-core
-  #   Example for mounting the tmp-volume to /tmp:
-  #   extraVolumeMounts:
-  #   - name: tmp-volume
-  #     mountPath: /tmp
-  # - initContainer: (optional, list of objects) The configuration for the init container to be run before the main container.
-  #   - name: (string) The name of the init container, e.g., "init"
-  #   - image: (string) The Docker image for the init container, e.g., "busybox:latest"
-  #   - command: (optional, list) The command to run in the init container, e.g., ["sh", "-c"]
-  #   - args: (optional, list) Additional arguments to pass to the command, e.g., ["ls"]
-  #   - env: (optional, list) List of environment variables to set in the container, each being a map with:
-  #   - resources: (optional, map) The resource requests and limits for the container:
-  #   - mountPvcStorage: (optional, bool) Whether to mount the model's volume.
-  #   - extraVolumeMounts: (Optional, list) Additional volume mounts to add to the init container, in Kubernetes volumeMount format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volumemount-v1-core
-  #
-  # - vllmConfig: (optional, map) The configuration for the VLLM model, supported options are:
-  #   - v0: (optional, map) Specify to 1 to use vLLM v0, otherwise vLLM v1 is used. e.g., 0
-  #   - enablePrefixCaching: (optional, bool) Enable prefix caching, e.g., false
-  #   - enableChunkedPrefill: (optional, bool) Enable chunked prefill, e.g., false
-  #   - maxModelLen: (optional, int) The maximum model length, e.g., 16384
-  #   - dtype: (optional, string) The data type, e.g., "bfloat16"
-  #   - tensorParallelSize: (optional, int) The degree of tensor parallelism, e.g., 2
-  #   - maxNumSeqs: (optional, int) Maximum number of sequences to be processed in a single iteration., e.g., 32
-  #   - maxLoras: (optional, int) The maximum number of LoRA models to be loaded in a single batch, e.g., 4
-  #   - gpuMemoryUtilization: (optional, float) The fraction of GPU memory to be used for the model executor, which can range from 0 to 1. e.g., 0.95
-  #   - runner: (optional, string) The runner type for the model, can be "auto" or "pooling". e.g., "pooling"
-  #   - convert: (optional, string) The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score". e.g., "embed"
-  #   - extraArgs: (optional, list) Extra command line arguments to pass to vLLM, e.g., ["--gpu-memory-utilization", "0.4"]
-  #
-  # - lmcacheConfig: (optional, map) The configuration of the LMCache for KV offloading, supported options are:
-  #   - enabled: (optional, bool) Enable LMCache, e.g., true
-  #   - cpuOffloadingBufferSize: (optional, string) The CPU offloading buffer size, e.g., "30"
-  #   - logLevel: (optional, string) The log level for LMCache, e.g., "DEBUG", "INFO", "WARNING", "ERROR"
-  #
-  # - hf_token: (optional) Hugging Face token configuration. Can be either:
-  #   - A string containing the token directly (will be stored in a generated secret)
-  #   - An object referencing an existing secret:
-  #     secretName: "my-existing-secret"
-  #     secretKey: "hf-token-key"
-  #
-  # - envFromSecret: (optional) Reference to an existing Kubernetes Secret from which
-  #   all key/value pairs will be loaded as environment variables into the container.
-  #   Example:
-  #     envFromSecret:
-  #       name: s3-registry
-  #
-  #   The referenced Secret could look like:
-  #     apiVersion: v1
-  #     kind: Secret
-  #     metadata:
-  #       name: s3-registry
-  #       namespace: vllm
-  #     data:
-  #       AWS_ACCESS_KEY_ID: <base64-encoded-value>
-  #       AWS_SECRET_ACCESS_KEY: <base64-encoded-value>
-  #       AWS_ENDPOINT_URL: <base64-encoded-value>
-  #
-  # - env: (optional, list) The environment variables to set in the container, e.g., your HF_TOKEN
-  #
-  # - affinity: (optional, map) Affinity configuration
-  # - nodeSelectorTerms: (optional, list) The node selector terms to match the nodes. When both affinity and nodeSelectorTerms are defined, nodeSelectorTerms will be ignored.
-  # - nodeName: (optional) Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
-  # - shmSize: (optional, string) The size of the shared memory, e.g., "20Gi"
-  # - enableLoRA: (optional, bool) Whether to enable LoRA, e.g., true
-  #
-  # - keda: (optional, map) KEDA autoscaling configuration for this model deployment. Requires KEDA to be installed in the cluster.
-  #   - enabled: (optional, bool) Whether to enable KEDA autoscaling for this model, e.g., true
-  #   - minReplicaCount: (optional, int) Minimum number of replicas (supports 0 for scale-to-zero), e.g., 1
-  #   - maxReplicaCount: (optional, int) Maximum number of replicas, e.g., 5
-  #   - pollingInterval: (optional, int) How often KEDA should check the metrics (in seconds), e.g., 15
-  #   - cooldownPeriod: (optional, int) How long to wait before scaling down after scaling up (in seconds), e.g., 360
-  #   - idleReplicaCount: (optional, int) Number of replicas to scale to when no triggers are active, e.g., 0
-  #   - initialCooldownPeriod: (optional, int) Initial cooldown period in seconds before scaling down after creation, e.g., 60
-  #   - fallback: (optional, map) Fallback configuration when scaler fails
-  #     - failureThreshold: (int) Number of consecutive failures before fallback, e.g., 3
-  #     - replicas: (int) Number of replicas to scale to in fallback, e.g., 2
-  #   - triggers: (optional, list) List of KEDA trigger configurations
-  #     - type: (string) Trigger type, e.g., "prometheus"
-  #     - metadata: (map) Trigger metadata
-  #       - serverAddress: (string) Prometheus server address, e.g., "http://prometheus-operated.monitoring.svc:9090"
-  #       - metricName: (string) Name of the metric to monitor, e.g., "vllm:num_requests_waiting"
-  #       - query: (string) Prometheus query to fetch the metric, e.g., "vllm:num_requests_waiting"
-  #       - threshold: (string) Threshold value that triggers scaling, e.g., "5"
-  #   - advanced: (optional, map) Advanced KEDA configuration
-  #     - restoreToOriginalReplicaCount: (optional, bool) Restore original replica count when ScaledObject is deleted, e.g., false
-  #     - horizontalPodAutoscalerConfig: (optional, map) HPA-specific configuration
-  #       - name: (optional, string) Custom name for the HPA resource, default: "keda-hpa-{scaled-object-name}"
-  #       - behavior: (optional, map) HPA scaling behavior configuration, see https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
-  #     - scalingModifiers: (optional, map) Scaling modifiers for composite metrics
-  #       - target: (string) Target value for the composed metric
-  #       - activationTarget: (optional, string) Activation target for the composed metric
-  #       - metricType: (optional, string) Metric type (AverageValue or Value), default: "AverageValue"
-  #       - formula: (string) Formula to compose metrics together
-  #
-  # Example:
-  # vllmApiKey: "vllm_xxxxxxxxxxxxx"
-  # modelSpec:
-  # - name: "mistral"
-  #   annotations:
-  #     model: "mistral"
-  #   podAnnotations:
-  #     model: "mistral"
-  #   serviceAccountName: "vllm-service-account"
-  #   repository: "lmcache/vllm-openai"
-  #   tag: "latest"
-  #   modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
-  #   replicaCount: 1
-  #   pdb:
-  #     enabled: false
-  #     labels: {}
-  #     annotations: {}
-  #     minAvailable: ""
-  #     maxUnavailable: ""
-  #   imagePullPolicy: "Always" # or "IfNotPresent"
-  #
-  #   requestCPU: 10
-  #   requestMemory: "64Gi"
-  #   requestGPU: 1
-  #
-  #   pvcStorage: "50Gi"
-  #   pvcLabels:
-  #     label_excluded_from_alerts: "true"
-  #   pvcAnnotations:
-  #     annotation_example: "value"
-  #   pvcAccessMode:
-  #     - ReadWriteOnce
-  #   pvcMatchLabels:
-  #     model: "mistral"
-  #   initContainer:
-  #     name: my-container
-  #     image: busybox
-  #     command: ["sh"]
-  #     env: {}
-  #     args: []
-  #     resources: {}
-  #     mountPvcStorage: true
-  #
-  #   vllmConfig:
-  #     enableChunkedPrefill: false
-  #     enablePrefixCaching: false
-  #     maxModelLen: 16384
-  #     dtype: "bfloat16"
-  #     maxNumSeqs: 32
-  #     gpuMemoryUtilization: 0.95
-  #     maxLoras: 4
-  #     extraArgs: ["--trust-remote-code"]
-  #
-  #   lmcacheConfig:
-  #     enabled: true
-  #     cpuOffloadingBufferSize: "30"
-  #     logLevel: "INFO"
-  #
-  #   hf_token: "hf_xxxxxxxxxxxxx"
-  #
-  #
-  #   nodeSelectorTerms:
-  #     - matchExpressions:
-  #       - key: nvidia.com/gpu.product
-  #         operator: "In"
-  #         values:
-  #         - "NVIDIA-RTX-A6000"
-  #
-  #   keda:
-  #     enabled: true
-  #     minReplicaCount: 1
-  #     maxReplicaCount: 3
-  #     pollingInterval: 15
-  #     cooldownPeriod: 360
-  #     triggers:
-  #       - type: prometheus
-  #         metadata:
-  #           serverAddress: http://prometheus-operated.monitoring.svc:9090
-  #           metricName: vllm:num_requests_waiting
-  #           query: vllm:num_requests_waiting
-  #           threshold: '5'
+  # -- API key for securing the vLLM models. Can be either a string that will be stored in a generated secret or an object referencing an existing secret.
+  vllmApiKey: # @schema type:[string, object]
+    # -- Name of the existing Kubernetes secret that contains the vLLM API key
+    secretName: ""
+    # -- Key within the secret that contains the vLLM API key
+    secretKey: ""
 
+  # -- Array of specifications for configuring multiple serving engine deployments running different models. Each entry in the modelSpec array should contain the following fields
+  ## The model below serves as an example. It is not deployed by default.
+  modelSpec:
+  # -- The name of the model.
+  - name: "mistral"
+    # -- Whether to deploy the model. it Default to true if not set
+    enabled: false
+    # -- The annotations to add to the deployment
+    annotations: {}
+    # -- The annotations to add to the pods
+    podAnnotations: {}
+    # -- The name of the service account to use for the deployment
+    serviceAccountName: ""
+    # -- The name of the priority class name for the deployment
+    priorityClassName: ""
+    # -- Runtime class for the pod, e.g., "nvidia". If not specified, falls back to servingEngineSpec.runtimeClassName
+    runtimeClassName: "nvidia"
+    # -- The repository of the model
+    repository: "lmcache/vllm-openai"
+    # -- The tag of the model
+    tag: "latest"
+    # -- Name of secret with credentials to private container repository
+    imagePullSecret: ""
+    # -- The URL of the model
+    modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+    # -- Chat template (Jinga2) specifying tokenizer configuration
+    # chatTemplate: "{% for message in messages %}\n{% if message['role'] == 'user' %}\n{{ 'Question:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'system' %}\n{{ 'System:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'assistant' %}{{ 'Answer:\n'  + message['content'] + '\n\n' }}{% endif %}\n{% if loop.last and add_generation_prompt %}\n{{ 'Answer:\n' }}{% endif %}{% endfor %}"
+    # -- The number of replicas for the model
+    replicaCount: 1
+    # -- a resources block containing requests and limits. If specified, this takes priority over simplified resource fields
+    resources: {}
+    # -- The number of CPUs requested for the model
+    requestCPU: 6
+    # -- The amount of memory requested for the model
+    requestMemory: "16Gi"
+    # -- The number of GPUs requested for the model
+    requestGPU: 1 # @schema type:[integer, number, string]
+    # -- The type of GPU requested. If not specified, defaults to "nvidia.com/gpu"
+    requestGPUType: "nvidia.com/mig-4g.71gb"
+    # -- Requires HAMi. The amount of GPU memory requested. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage
+    requestGPUMem: "3000"
+    # -- Requires HAMi. The percentage of GPU memory requested, e.g., "80". It cannot be used together with requestGPUMem.
+    requestGPUMemPercentage: "80"
+    # -- Requires HAMi. The percentage of GPU cores requested, e.g., "10". Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage
+    requestGPUCores: "10"
+    # -- The CPU limit for the model. If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.
+    limitCPU: 8 # @schema type:[integer, number, string]
+    # -- The memory limit for the model. If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.
+    limitMemory: "32Gi"
+    # -- Requires HAMi. The limit of GPU memory. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage
+    limitGPUMem: "3000"
+    # -- Requires HAMi. The limit of GPU memory of GPU
+    limitGPUMemPercentage: "80"
+    # -- Requires HAMi. The limit of GPU cores. Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage
+    limitGPUCores: "10"
+    # -- The amount of storage requested for the model
+    pvcStorage: "50Gi"
+    # -- The access mode policy for the mounted volume.
+    pvcAccessMode:
+      - ReadWriteOnce
+    # -- The storage class of the PVC
+    storageClass: ""
+    # -- The labels to match the PVC.
+    pvcMatchLabels: {}
+    # -- The labels to add to the PVC
+    pvcLabels: {}
+    # -- The annotations to add to the PVC
+    pvcAnnotations: {}
+    # -- Additional volumes to add to the pod, in Kubernetes volume format
+    extraVolumes: []
+      # - name: tmp-volume
+      #   emptyDir:
+      #     medium: ""
+      #     sizeLimit: 5Gi
+    # -- Additional volume mounts to add to the container, in Kubernetes volumeMount format
+    extraVolumeMounts: []
+      # - name: tmp-volume
+      #   mountPath: /tmp
+    # -- The configuration for the init container to be run before the main container.
+    initContainer:
+    # -- The name of the init container
+      name: "init"
+      # -- The Docker image for the init container
+      image: "busybox:latest"
+      # -- The command to run in the init container
+      command:
+        - "sh"
+        - "-c"
+      # -- Additional arguments to pass to the command
+      args:
+        - "ls"
+      # -- List of environment variables to set in the container
+      env: []
+      # -- The resource requests and limits for the container
+      resources: {}
+      # -- Whether to mount the model's volume
+      mountPvcStorage: true
+      # -- Additional volume mounts to add to the init container, in Kubernetes volumeMount format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volumemount-v1-core
+      extraVolumeMounts: []
+    # -- The configuration for the VLLM model
+    vllmConfig:
+      # -- Specify to 1 to use vLLM v0, otherwise vLLM v1 is used
+      v0: "1"
+      # -- Enable prefix caching
+      enablePrefixCaching: false
+      # -- Enable chunked prefill.
+      enableChunkedPrefill: false
+      # -- The maximum model length
+      maxModelLen: 16384
+      # -- The data type
+      dtype: "bfloat16"
+      # -- The degree of tensor parallelism
+      tensorParallelSize: 2
+      # -- Maximum number of sequences to be processed in a single iteration.
+      maxNumSeqs: 32
+      # -- The maximum number of LoRA models to be loaded in a single batch
+      maxLoras: 4
+      # -- The fraction of GPU memory to be used for the model executor, which can range from 0 to 1
+      gpuMemoryUtilization: 0.95 # @schema type:[integer, number, string]
+      # -- The runner type for the model, can be auto or pooling
+      runner: "pooling" # @schema enum:[auto,pooling]
+      # -- The conversion type for the model, can be "token_embed", "embed", "token_classify", "classify", or "score".
+      convert: "embed" # @schema enum:[token_embed,embed,token_classify,classify,score]
+      # --  Extra command line arguments to pass to vLLM
+      extraArgs:
+        - "--gpu-memory-utilization"
+        - "0.4"
+    # -- The configuration of the LMCache for KV offloading
+    lmcacheConfig:
+      # -- Enable LMCache
+      enabled: true
+      # -- The CPU offloading buffer size
+      cpuOffloadingBufferSize: "30" # @schema type:[integer, number, string]
+      # -- The log level for LMCache, e.g., "DEBUG", "INFO", "WARNING", "ERROR"
+      logLevel: INFO # @schema enum:[DEBUG,INFO,WARNING,ERROR]
+    # -- Hugging Face token configuration. Can be either a string that will be stored in a generated secret or an object referencing an existing secret.
+    hf_token: # @schema type:[string, object]
+      # -- Name of the existing Kubernetes secret that contains the Hugging Face token
+      secretName: ""
+      # -- Key within the secret that contains the Hugging Face token
+      secretKey: ""
+    # -- Reference to an existing Kubernetes Secret from which all key/value pairs will be loaded as environment variables into the container
+    envFromSecret: {}
+      # name: s3-registry
+    #   The referenced Secret could look like:
+    #     apiVersion: v1
+    #     kind: Secret
+    #     metadata:
+    #       name: s3-registry
+    #       namespace: vllm
+    #     data:
+    #       AWS_ACCESS_KEY_ID: <base64-encoded-value>
+    #       AWS_SECRET_ACCESS_KEY: <base64-encoded-value>
+    #       AWS_ENDPOINT_URL: <base64-encoded-value>
+    # -- The environment variables to set in the container, e.g., your HF_TOKEN
+    env: []
+    # -- Affinity configuration
+    affinity: {}
+    # -- The node selector terms to match the nodes. When both affinity and nodeSelectorTerms are defined, nodeSelectorTerms will be ignored.
+    nodeSelectorTerms: []
+    # -- Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
+    nodeName: ""
+    # -- The size of the shared memory
+    shmSize: "20Gi"
+    # -- Whether to enable LoRA
+    enableLoRA: true
+    # -- KEDA autoscaling configuration for this model deployment. Requires KEDA to be installed in the cluster.
+    keda:
+      # -- Whether to enable KEDA autoscaling for this model
+      enabled: true
+      # -- Minimum number of replicas (supports 0 for scale-to-zero)
+      minReplicaCount: 1 # @schema minimum:0
+      # -- Maximum number of replicas
+      maxReplicaCount: 5
+      # -- How often KEDA should check the metrics (in seconds)
+      pollingInterval: 15
+      # -- How long to wait before scaling down after scaling up (in seconds).
+      cooldownPeriod: 360
+      # -- Number of replicas to scale to when no triggers are active
+      idleReplicaCount: 0
+      # -- Initial cooldown period in seconds before scaling down after creation
+      initialCooldownPeriod: 60
+      # -- Fallback configuration when scaler fails
+      fallback:
+        # -- Number of consecutive failures before fallback
+        failureThreshold: 3
+        # -- Number of replicas to scale to in fallback
+        replicas: 2
+      # -- List of KEDA trigger configurations
+      triggers:
+        # -- Trigger type
+        type: "prometheus"
+        # -- Trigger metadata
+        metadata:
+          # -- Prometheus server address
+          serverAddress: "http://prometheus-operated.monitoring.svc:9090"
+          # -- Name of the metric to monitor
+          metricName: "vllm:num_requests_waiting"
+          # -- Prometheus query to fetch the metric
+          query: "vllm:num_requests_waiting"
+          # -- Threshold value that triggers scaling
+          threshold: "5"
+      # -- Advanced KEDA configuration
+      advanced:
+        # --  Restore original replica count when ScaledObject is deleted
+        restoreToOriginalReplicaCount: false
+        # -- HPA-specific configuration
+        horizontalPodAutoscalerConfig:
+          # -- Custom name for the HPA resource
+          name: "keda-hpa-{scaled-object-name}"
+          # -- HPA scaling behavior configuration, see https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+          behavior: {}
+        # -- Scaling modifiers for composite metrics
+        scalingModifiers:
+          # -- Target value for the composed metric
+          target: ""
+          # -- Activation target for the composed metric
+          activationTarget: ""
+          # -- Metric type (AverageValue or Value)
+          metricType: "AverageValue"
+          # -- Formula to compose metrics together
+          formula: ""
 
-  #   extraVolumes:
-  #     - name: dev-fuse
-  #       hostPath:
-  #         path: /dev/fuse
-  #         type: CharDevice
-  #     - name: cache-dir
-  #       hostPath:
-  #         path: /var/cache/vllm
-  #   extraVolumeMounts:
-  #   - name: dev-fuse
-  #     mountPath: /dev/fuse
-  #     readOnly: true
-  #   - name: cache-dir
-  #     mountPath: /cache
-  #     readOnly: false
-
-  modelSpec: []
+    # -- RaySec configuration, to deploy the model as a rayCluster instead of a deployment
+    raySpec:
+      # -- Whether to deploy the model as a rayCluster
+      enabled: false
+      # -- Head node configuration
+      headNode:
+        # -- CPU request for the head node
+        requestCPU: 1
+        # -- Memory request for the head node
+        requestMemory: "1Gi"
+        # -- GPU request for the head node
+        requestGPU: 1
 
   # -- Container port
   containerPort: 8000
@@ -279,7 +281,7 @@ servingEngineSpec:
       # -- Path to access on the HTTP server
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
-      port: 8000
+      port: 8000  # @schema type:[integer, string]
 
   # -- Liveness probe configuration
   livenessProbe:
@@ -294,7 +296,7 @@ servingEngineSpec:
       # -- Path to access on the HTTP server
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
-      port: 8000
+      port: 8000  # @schema type:[integer, string]
 
   # -- Readiness probe configuration
   readinessProbe:
@@ -309,10 +311,7 @@ servingEngineSpec:
       # -- Path to access on the HTTP server
       path: /health
       # -- Name or number of the port to access on the container, on which the server is listening
-      port: 8000
-
-  # -- Disruption Budget Configuration
-  maxUnavailablePodDisruptionBudget: ""
+      port: 8000  # @schema type:[integer, string]
 
   # -- Tolerations configuration (when there are taints on nodes)
   # Example:
@@ -327,6 +326,9 @@ servingEngineSpec:
 
   # -- SchedulerName configuration
   schedulerName: ""
+
+  # -- image pull policy for the model deployment
+  imagePullPolicy: "Always" # @schema enum:[Always,IfNotPresent,Never]
 
   # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
   securityContext: {}
@@ -361,9 +363,12 @@ servingEngineSpec:
 
   # -- Sidecar configuration
   sidecar:
+    # -- Docker image repository and tag for the sidecar
     image: "lmcache/lmstack-sidecar:latest"
-    imagePullPolicy: "Always"
+    # -- image pull policy for the sidecar
+    imagePullPolicy: "Always" # @schema enum:[Always,IfNotPresent,Never]
 
+  # -- ServiceMonitor configuration to collect serving engine metrics
   serviceMonitor:
     # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
     enabled: false
@@ -398,33 +403,19 @@ servingEngineSpec:
     #   replacement: $1
     #   action: replace
 
-# Optional cache server configuration.
-# When set, resources accepts any Kubernetes resource keys (for example `rdma/ib`).
-#
-# Example:
-# cacheserverSpec:
-#   repository: "lmcache/vllm-openai"
-#   tag: "latest-nightly"
-#   containerPort: 8000
-#   servicePort: 80
-#   serde: "naive"
-#   resources:
-#     requests:
-#       cpu: "4"
-#       memory: "8Gi"
-#       rdma/ib: "1"
-#     limits:
-#       cpu: "4"
-#       memory: "10Gi"
-#       rdma/ib: "1"
-
+# -- Router configuration
 routerSpec:
   # -- Whether to enable the router service
   enableRouter: true
   # -- The docker image of the router. The following values are defaults:
   repository: "lmcache/lmstack-router"
+  # -- docker tag for the router pod
   tag: "latest"
-  imagePullPolicy: "Always"
+  # -- image pull policy for the router pod
+  imagePullPolicy: "Always" # @schema enum:[Always,IfNotPresent,Never]
+
+  # -- Hugging Face token configuration
+  hf_token: ""
 
   # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
   securityContext: {}
@@ -444,8 +435,8 @@ routerSpec:
   # -- autoscaling configuration
   autoscaling:
     enabled: false
-    minReplicas: 1
-    maxReplicas: 3
+    minReplicas: 1 # @schema minimum:0
+    maxReplicas: 3 # @schema minimum:0
     targetCPUUtilizationPercentage: 80
 
   # -- Router Pod Disruption Budget
@@ -458,9 +449,9 @@ routerSpec:
     # -- Annotations to be added to router pdb
     annotations: {}
     # -- Number of pods that are available after eviction as number or percentage (eg.: 50%)
-    minAvailable: ""
+    minAvailable: # @schema type:[string, integer, null];minimum:0
     # -- Number of pods that are unavailable after eviction as number or percentage (eg.: 50%).
-    maxUnavailable: ""
+    maxUnavailable:  # @schema type:[string, integer, null];minimum:0
 
   # -- Priority Class
   priorityClassName: ""
@@ -469,32 +460,29 @@ routerSpec:
   containerPort: 8000
 
   # -- Service type
-  serviceType: ClusterIP
+  serviceType: ClusterIP # @schema enum:[ClusterIP,NodePort,LoadBalancer,ExternalName]
   # -- Service annotations if you use a LoadBalancer or NodePort service type
   serviceAnnotations: {}
   # -- Fixed NodePort for the router service when serviceType is NodePort.
   # -- If not set, Kubernetes assigns a random port (range 30000-32767).
-  # nodePort: 30080
+  nodePort: # @schema type:[integer, null];minimum:30000;maximum:32767
 
   # -- Service port
   servicePort: 80
 
   # -- Service discovery mode, supports "k8s" or "static". Defaults to "k8s" if not set.
-  serviceDiscovery: "k8s"
+  serviceDiscovery: "k8s" # @schema enum:[k8s,static]
   # -- Service discovery mode type, supports "pod-ip" or "service-name". Defaults to "pod-ip" if not set.
-  k8sServiceDiscoveryType: "pod-ip"
+  k8sServiceDiscoveryType: "pod-ip" # @schema enum:[pod-ip,service-name]
   # -- If serviceDiscovery is set to "static", the comma-separated values below are required. There needs to be the same number of backends and models
   staticBackends: ""
   staticModels: ""
 
-  # -- routing logic, supports "roundrobin", "session", "prefixaware", or "kvaware"
-  routingLogic: "roundrobin"
+  # -- routing logic, supports "roundrobin", "session", "prefixaware", "kvaware" or "disaggregated_prefill"
+  routingLogic: "roundrobin" # @schema enum:[roundrobin,session,prefixaware,kvaware,disaggregated_prefill]
 
   # -- session key if using "session" routing logic
   sessionKey: ""
-
-  # -- lmcache controller port, used when routingLogic is "kvaware"
-  lmcacheControllerPort: ""
 
   # -- FastAPI root path for hosting under a subpath (e.g. /vllm)
   rootPath: ""
@@ -523,9 +511,20 @@ routerSpec:
   # -- deployment strategy
   strategy: {}
 
-  # vllmApiKey: (optional) api key for securing the vLLM models. Must be an object referencing an existing secret
-  #   secretName: "my-existing-secret"
-  #   secretKey: "vllm-api-key"
+  # -- API key for securing the vLLM models. Must be an object referencing an existing secret. If not set, it defaults to .Values.servingEngineSpec.vllmApiKey.
+  vllmApiKey:
+    # -- Name of the existing Kubernetes secret that contains the vLLM API key
+    secretName: ""
+    # -- Key within the secret that contains the vLLM API key
+    secretKey: ""
+
+  # -- lmcache configuration for the router deployment
+  lmcacheConfig:
+    # -- LMCache log level for the router deployment.
+    logLevel: "INFO"
+
+  # -- lmcache controller port, used when routingLogic is "kvaware"
+  lmcacheControllerPort: "" # @schema type:[integer, string]
 
   # -- router resource requests and limits
   resources:
@@ -535,6 +534,7 @@ routerSpec:
     limits:
       memory: 1000Mi
 
+  # @schema skipProperties:true
   # -- Customized labels for the router deployment
   labels:
     environment: "router"
@@ -543,6 +543,7 @@ routerSpec:
   # -- Customized pod annotations for the router pods
   podAnnotations: {}
 
+  # -- Ingress configuration for the router
   ingress:
     # -- Enable ingress controller resource
     enabled: false
@@ -551,8 +552,7 @@ routerSpec:
     className: ""
 
     # -- Additional annotations for the Ingress resource
-    annotations:
-      {}
+    annotations: {}
       # kubernetes.io/ingress.class: alb
       # kubernetes.io/ingress.class: nginx
       # kubernetes.io/tls-acme: "true"
@@ -570,6 +570,7 @@ routerSpec:
     #    hosts:
     #      - vllm-router.local
 
+  # @schema mergeProperties: true
   # -- Expose the service via gateway-api HTTPRoute
   # More routes can be added by adding a dictionary key like the 'main' route.
   # Requires Gateway API resources and suitable controller installed within the cluster
@@ -582,14 +583,20 @@ routerSpec:
       # -- Set the route apiVersion, e.g. gateway.networking.k8s.io/v1 or gateway.networking.k8s.io/v1alpha2
       apiVersion: gateway.networking.k8s.io/v1
       # -- Set the route kind
-      # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
-      kind: HTTPRoute
+      kind: HTTPRoute # @schema enum:[HTTPRoute,GRPCRoute,TCPRoute,TLSRoute,UDPRoute]
 
+      # -- Additional annotations to add to the route
       annotations: {}
+
+      # -- Additional labels to add to the route
       labels: {}
 
+      # -- List of hostnames for the Route
       hostnames: []
       # - my-filter.example.com
+
+      # -- Gateway API parentRefs for the Route
+      ## Must reference an existing Gateway
       parentRefs: []
       # - name: acme-gw
 
@@ -598,70 +605,80 @@ routerSpec:
       ## matches, filters and additionalRules will be ignored if this is set to true.
       httpsRedirect: false
 
+      # -- Route match configuration
       matches:
         - path:
             type: PathPrefix
             value: /
 
-      ## Filters define the filters that are applied to requests that match this rule.
+      # -- Filters define the filters that are applied to requests that match this rule.
       filters: []
+        # - type: RequestHeaderModifier
+        #   requestHeaderModifier:
+        #     add:
+        #       - name: X-Custom-Header
+        #         value: custom-value
 
-      ## Additional custom rules that can be added to the route
+      # -- Additional custom rules that can be added to the route
       additionalRules: []
 
-  # Affinity configuration
+  # -- Affinity configuration
   affinity: {}
 
-  # The node selector terms to match the nodes. Will be ignored if affinity is configured.
-  # Example:
-  #   nodeSelectorTerms:
-  #     - matchExpressions:
-  #       - key: nvidia.com/gpu.product
-  #         operator: "In"
-  #         values:
-  #         - "NVIDIA-RTX-A6000"
+  # -- The node selector terms to match the nodes. Will be ignored if affinity is configured.
   nodeSelectorTerms: []
+    # - matchExpressions:
+    #   - key: nvidia.com/gpu.product
+    #     operator: "In"
+    #     values:
+    #     - "NVIDIA-RTX-A6000"
 
-  # Router probes configuration
-  # <probe>.httpGet.port will automatically be set to .Values.routerSpec.containerPort
-
-  # Liveness probe configuration.
+  # -- Liveness probe configuration for the router pod.
   livenessProbe:
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 30
+    # -- How often (in seconds) to perform the liveness probe
     periodSeconds: 5
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive
     failureThreshold: 3
+    # -- Configuration of the Kubelet http request on the server
     httpGet:
+      # -- Path to access on the HTTP server
       path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: router-port # @schema type:[integer, string]
 
-  # Startup probe configuration.
+  # Startup probe configuration  for the router pod.
   startupProbe:
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 5
+    # -- How often (in seconds) to perform the startup probe
     periodSeconds: 5
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready
     failureThreshold: 3
+    # -- Configuration of the Kubelet http request on the server
     httpGet:
+      # -- Path to access on the HTTP server
       path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: router-port # @schema type:[integer, string]
 
-  # Readiness probe configuration.
+  # Readiness probe configuration for the router pod.
   readinessProbe:
+    # -- Number of seconds after the container has started before liveness probe is initiated
     initialDelaySeconds: 30
+    # -- How often (in seconds) to perform the readiness probe
     periodSeconds: 5
+    # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive
     failureThreshold: 3
+    # -- Configuration of the Kubelet http request on the server
     httpGet:
+      # -- Path to access on the HTTP server
       path: /health
+      # -- Name or number of the port to access on the container, on which the server is listening
+      port: router-port # @schema type:[integer, string]
 
-  # -- TODO: Readiness probe configuration
-  #startupProbe:
-  #  # -- Number of seconds after the container has started before startup probe is initiated
-  #  initialDelaySeconds: 5
-  #  # -- How often (in seconds) to perform the startup probe
-  #  periodSeconds: 5
-  #  # -- Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready
-  #  failureThreshold: 100
-  #   # -- Configuration of the Kubelet http request on the server
-  #  httpGet:
-  #    # -- Path to access on the HTTP server
-  #
-
+  # -- ServiceMonitor configuration to collect router metrics
   serviceMonitor:
     # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
     enabled: false
@@ -696,55 +713,122 @@ routerSpec:
     #   replacement: $1
     #   action: replace
 
+# -- Configuration for the LMCache cache server deployment
+cacheserverSpec:
+  # -- Whether to enable the cache server
+  enabled: false
+  # -- Image configuration for the cache Server
+  image:
+    # -- Docker image repository for the cache server
+    repository: "lmcache/lmstack-cache-server"
+    # -- Docker image tag for the cache server
+    tag: "latest"
+  # -- Image pull policy for the cache server
+  imagePullPolicy: "IfNotPresent" # @schema enum:[Always,IfNotPresent,Never]
+  # -- Image pull secrets for private container registries
+  imagePullSecrets: []
+  # -- Number of replicas for the cache server pod
+  replicaCount: 1
+  # -- Port the cache server container is listening on
+  containerPort: 8000
+  # -- Kubernetes service type for the cache server
+  serviceType: ClusterIP # @schema enum:[ClusterIP,NodePort,LoadBalancer,ExternalName]
+  # -- Port the cache server service will listen on
+  servicePort: 80
+  # -- Service annotations for the cache server service
+  serviceAnnotations: {}
+  # -- Resource requests and limits for the cache server container
+  resources: {}
+  # -- Customized annotations for the cache server deployment
+  annotations: {}
+  # -- Customized labels for the cache server deployment and service
+  labels: {}
+  # -- Deployment strategy for the cache server pods
+  strategy:  # @schema additionalProperties: false
+    # -- Customize updateStrategy of the cache server deployment.
+    type: RollingUpdate # @schema enum:[RollingUpdate, Recreate]
+    rollingUpdate:
+      maxUnavailable: 0  # @schema type:[integer, string, null]
+      maxSurge: 1        # @schema type:[integer, string, null]
 
-# -- LoRA Adapter Configuration
-loraAdapters: []
+  # -- Configuration for the liveness probe
+  livenessProbe: # @schema additionalProperties: false
+    # -- The number of seconds to wait before starting the first probe.
+    initialDelaySeconds: 30
+    # -- The number of seconds to wait between consecutive probes.
+    periodSeconds: 10
+    # -- The number of consecutive failures allowed before considering the probe as failed.
+    failureThreshold: 3
+    # -- The number of seconds to wait for a probe response before considering it as failed.
+    timeoutSeconds: 5
+  # -- Tolerations configuration for the cache server pods
+  tolerations: []
+  # -- RuntimeClassName configuration for the cache server pods
+  runtimeClassName: ""
+  # -- SchedulerName configuration for the cache server pods
+  schedulerName: ""
+  # -- Pod-level security context configuration
+  securityContext: {}
+  # @schema skipProperties:true
+  # -- Container-level security context configuration
+  containerSecurityContext:
+    runAsNonRoot: false
+  # -- Priority class for the cache server pods
+  priorityClassName: ""
+  # -- Node selector for the cache server pods
+  nodeSelector: {}
+  # -- Affinity configuration. If specified, takes precedence over nodeSelectorTerms.
+  affinity: {}
+  # -- Serialization/deserialization format for the cache server
+  serde: ""
 
-  # -- LoRA adapter instances to deploy
-  # Each instance should contain:
-  # - name: (string) The name of the LoRA adapter instance
-  # - baseModel: (string) The name of the base model this adapter is for
-  # - vllmApiKey: (optional) API key configuration for vLLM authentication
-  #   - secretRef: Reference to a secret containing the API key
-  #     - secretName: (string) Name of the secret
-  #     - secretKey: (string) Key in the secret containing the API key
-  #   - value: (string) Direct API key value
-  # - adapterSource: (object) Configuration for the adapter source
-  #   - type: (string) Type of adapter source (local, s3, http, huggingface)
-  #   - adapterName: (string) Name of the adapter to apply
-  #   - adapterPath: (optional, string) Path to the LoRA adapter weights
-  #   - repository: (optional, string) Repository to get the LoRA adapter from
-  #   - pattern: (optional, string) Pattern to use for the adapter name
-  #   - maxAdapters: (optional, int) Maximum number of adapters to load
-  #   - credentials: (optional, object) Reference to secret with storage credentials
-  #     - secretName: (string) Name of the secret
-  #     - secretKey: (string) Key in the secret containing the credentials
-  # - loraAdapterDeploymentConfig: (object) Configuration for adapter deployment
-  #   - algorithm: (string) Placement algorithm to use (default, ordered, equalized)
-  #   - replicas: (optional, int) Number of replicas that should load this adapter
-  # - labels: (optional, map) Additional labels for the LoRA adapter
-  #
-  # Example:
-  # loraAdapters:
-  #   - name: "llama3-nemoguard-adapter"
-  #     baseModel: "llama3-8b-instr"
-  #     vllmApiKey:
-  #       secretRef:
-  #         secretName: "vllm-api-key"
-  #         secretKey: "VLLM_API_KEY"
-  #     adapterSource:
-  #       type: "local"
-  #       adapterName: "llama-3.1-nemoguard-8b-topic-control"
-  #       adapterPath: "/data/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
-  #     loraAdapterDeploymentConfig:
-  #       algorithm: "default"
-  #       replicas: 1
-  #     labels:
-  #       environment: "production"
-  #       model: "llama3-nemoguard"
+# -- LoRA Adapters Configuration
+loraAdapters:
+  # -- The name of the LoRA adapter instance
+  - name: "llama3-nemoguard-adapter"
+    # -- Whether to create le LoRa adapter
+    enabled: false
+    # -- The name of the base model this adapter is for
+    baseModel: llama3-8b-instr
+    # -- API key configuration for vLLM authentication. If not Set, it defaults to servingEngineSpec.vllmApiKey
+    vllmApiKey:
+      # -- Name of the secret
+      secretName: "vllm-api-key"
+      # -- Key in the secret containing the API key
+      secretKey: "VLLM_API_KEY"
+    # -- Configuration for the adapter source
+    adapterSource:
+      # -- Type of adapter source (local, s3, http, huggingface)
+      type: "local"
+      # -- Name of the adapter to apply
+      adapterName: "llama-3.1-nemoguard-8b-topic-control"
+      # -- Path to the LoRA adapter weights
+      adapterPath: "/data/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+      # -- Repository to get the LoRA adapter from
+      repository: ""
+      # -- Pattern to use for the adapter name
+      pattern: ""
+      # -- Maximum number of adapters to load
+      maxAdapters: 1
+      # -- Reference to secret with storage credentials
+      ## Can be either a string that will be stored in a generated secret or an object referencing an existing secret.
+      credentials:  # @schema type:[string, object]
+        # -- Name of the secret
+        secretName: "secret"
+        # -- Key in the secret containing the credentials
+        secretKey: "key"
+    # -- Configuration for adapter deployment
+    loraAdapterDeploymentConfig:
+      # -- Placement algorithm to use (default, ordered, equalized)
+      algorithm: "default"
+      # -- Number of replicas that should load this adapter
+      replicas: 1
+      # -- Additional labels for the LoRA adapter
+      labels: {}
 
 # -- lora controller Configuration
 loraController:
+  # -- Whether to enable the Lora Controller
   enableLoraController: false
   # -- kubernetes cluster domain
   kubernetesClusterDomain: "cluster.local"
@@ -754,9 +838,12 @@ loraController:
 
   # -- lora controller image configuration
   image:
+    # -- Docker image repository
     repository: "lmcache/lmstack-lora-controller"
+    # -- Docker image tag
     tag: "latest"
-    pullPolicy: "IfNotPresent"
+    # -- Image pull policy
+    pullPolicy: "IfNotPresent" # @schema enum:[Always,IfNotPresent,Never]
 
   # -- Image pull secrets
   imagePullSecrets: []
@@ -773,12 +860,14 @@ loraController:
   # -- Pod labels
   podLabels: {}
 
+  # @schema skipProperties:true
   # -- Pod security context
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:
       type: RuntimeDefault
 
+  # @schema skipProperties:true
   # -- Container security context
   containerSecurityContext:
     allowPrivilegeEscalation: false
@@ -804,12 +893,14 @@ loraController:
   # -- Extra arguments for the lora controller
   extraArgs: []
 
-  # -- Expose lora controller metrics
+  # -- Lora Controller metrics configuration
   metrics:
+    # -- Expose lora controller metrics
     enabled: true
 
-  # -- Webhook configuration
+  # -- loraController Webhook configuration
   webhook:
+    # -- Deploy a webhook inside lora controller
     enabled: false
 
   # -- loraController Pod Disruption Budget
@@ -822,11 +913,39 @@ loraController:
     # -- Annotations to be added to loraController pdb
     annotations: {}
     # -- Number of pods that are available after eviction as number or percentage (eg.: 50%)
-    minAvailable: ""
+    minAvailable: # @schema type:[string, integer, null];minimum:0
     # -- Number of pods that are unavailable after eviction as number or percentage (eg.: 50%).
-    maxUnavailable: ""
+    maxUnavailable: # @schema type:[string, integer, null];minimum:0
 
-# -- Array of extra K8s manifests to deploy. Supports use of custom Helm templates
+# -- Configuration for a shared PVC that can be mounted to multiple model deployments.
+sharedPvcStorage:
+  # -- Whether to enable shared storage for the models
+  enabled: false
+  # -- Size of the shared storage volume
+  size: "100Gi"
+  # -- Access modes for the shared storage volume
+  accessModes:
+    - ReadWriteMany
+  # -- Storage class name for the shared storage volume
+  storageClass: ""
+  # -- Host path for the shared storage volume. Specifying a hostPath or nfs server will create a PersistentVolume. These fields should be omitted to rely on dynamic provisioning of PersistentVolumeClaim.
+  hostPath: ""
+  # -- NFS configuration for the shared storage volume
+  nfs:
+    # -- NFS server address for the shared storage volume
+    server: ""
+    # -- NFS export path for the shared storage volume
+    path: ""
+  # -- Docker image used in the lora Controller as an init container to set permissions in the PVC
+  image:
+    # -- Docker image repository
+    repository: "busybox"
+    # -- Docker image tag
+    tag: "1.37"
+
+
+
+# -- Array of extra Kubernetes objects to deploy. Each object should be a valid Kubernetes manifest in YAML format. This can be used to deploy additional resources such as ConfigMaps, Secrets, or custom resources that are not directly supported by the chart's built-in configuration. Supports use of custom Helm templates.
 extraObjects: []
 
 # -- Set to true do deploy dashboards stored in the "dashboards" directory as configmaps. This requires the kube-prometheus-stack to be deployed with Grafana enabled and properly configured to pick up dashboards from configmaps.
@@ -834,10 +953,12 @@ grafanaDashboards:
   enabled: false
   # -- Additional annotations to add to the dashboard configmaps
   annotations: {}
+  # @schema skipProperties:true
   # -- Additional labels to add to the dashboard configmaps
   labels:
     grafana_dashboard: "1"
 
+# @schema skipProperties:true
 # -- Kube Prometheus Stack dependency chart configuration. More values can be found [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml).
 kube-prometheus-stack:
   enabled: false
@@ -849,6 +970,7 @@ kube-prometheus-stack:
         matchLabels:
           app.kubernetes.io/part-of: vllm-stack
 
+# @schema skipProperties:true
 # -- Prometheus Adapter dependency chart configuration. More values can be found [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus-adapter/values.yaml).
 prometheus-adapter:
   enabled: false

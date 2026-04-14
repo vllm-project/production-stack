@@ -247,16 +247,31 @@ class KvawareRouter(RoutingInterface):
         kv_aware_threshold: int = 2000,
         lmcache_health_check_interval: int = 5,
         lmcache_worker_timeout: int = 30,
+        lmcache_controller_reply_port: Optional[int] = None,
+        lmcache_controller_heartbeat_port: Optional[int] = None,
     ):
         self.lmcache_controller_port = lmcache_controller_port
+        self.lmcache_controller_reply_port = lmcache_controller_reply_port
+        self.lmcache_controller_heartbeat_port = lmcache_controller_heartbeat_port
         logger.info(
-            f"Initializing KvawareRouter with port: {self.lmcache_controller_port}"
+            f"Initializing KvawareRouter with port: {self.lmcache_controller_port}, "
+            f"reply port: {self.lmcache_controller_reply_port}, "
+            f"heartbeat port: {self.lmcache_controller_heartbeat_port}"
         )
+        controller_urls = {
+            "pull": f"0.0.0.0:{self.lmcache_controller_port}",
+            "reply": (
+                f"0.0.0.0:{self.lmcache_controller_reply_port}"
+                if self.lmcache_controller_reply_port is not None
+                else None
+            ),
+        }
+        if self.lmcache_controller_heartbeat_port is not None:
+            controller_urls["heartbeat"] = (
+                f"0.0.0.0:{self.lmcache_controller_heartbeat_port}"
+            )
         self.kv_manager = controller_manager.LMCacheControllerManager(
-            {
-                "pull": f"0.0.0.0:{self.lmcache_controller_port}",
-                "reply": None,
-            },
+            controller_urls,
             health_check_interval=lmcache_health_check_interval,
             lmcache_worker_timeout=lmcache_worker_timeout,
         )
@@ -646,6 +661,10 @@ def initialize_routing_logic(
             kv_aware_threshold=kwargs.get("kv_aware_threshold"),
             lmcache_health_check_interval=kwargs.get("lmcache_health_check_interval"),
             lmcache_worker_timeout=kwargs.get("lmcache_worker_timeout"),
+            lmcache_controller_reply_port=kwargs.get("lmcache_controller_reply_port"),
+            lmcache_controller_heartbeat_port=kwargs.get(
+                "lmcache_controller_heartbeat_port"
+            ),
         )
         router.start_kv_manager()
     elif routing_logic == RoutingLogic.PREFIXAWARE:

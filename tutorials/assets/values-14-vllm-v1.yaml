@@ -27,6 +27,7 @@ servingEngineSpec:
     hf_token: <hf-token>
 
 cacheserverSpec:
+  enabled: true
   # -- Number of replicas
   replicaCount: 1
 
