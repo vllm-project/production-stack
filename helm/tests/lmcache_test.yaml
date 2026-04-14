@@ -1,0 +1,262 @@
+suite: test cacheserverSpec configuration across all templates
+templates:
+  - deployment-cache-server.yaml
+  - deployment-vllm-multi.yaml
+  - ray-cluster.yaml
+tests:
+  - it: should not render anything relative to lmcache in engine deployments when cacheserverSpec is disabled
+    set:
+      cacheserverSpec:
+        enabled: false
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            vllmConfig:
+              enablePrefixCaching: true
+              maxModelLen: 1024
+              gpuMemoryUtilization: 0.8
+            lmcacheConfig:
+              enabled: true
+              cpuOffloadingBufferSize: "10"
+              enableController: true
+              controllerPort: 9000
+              workerPorts: "8001"
+              p2pHost: "localhost"
+              p2pInitPorts: "30081"
+              logLevel: "DEBUG"
+    asserts:
+      - template: deployment-cache-server.yaml
+        hasDocuments:
+        count: 0
+
+      - template: deployment-vllm-multi.yaml
+        documentIndex: 0
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_URL
+          any: true
+      - template: deployment-vllm-multi.yaml
+        documentIndex: 0
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_SERDE
+          any: true
+
+      - template: ray-cluster.yaml
+        hasDocuments:
+        count: 0
+
+  - it: should not render anything relative to lmcache in rayCluster when cacheserverSpec is disabled
+    set:
+      cacheserverSpec:
+        enabled: false
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+            vllmConfig:
+              enablePrefixCaching: true
+              maxModelLen: 1024
+              gpuMemoryUtilization: 0.8
+            lmcacheConfig:
+              enabled: true
+              cpuOffloadingBufferSize: "10"
+              enableController: true
+              controllerPort: 9000
+              workerPorts: "8001"
+              p2pHost: "localhost"
+              p2pInitPorts: "30081"
+              logLevel: "DEBUG"
+    asserts:
+      - template: deployment-cache-server.yaml
+        hasDocuments:
+        count: 0
+
+      - template: deployment-vllm-multi.yaml
+        hasDocuments:
+        count: 0
+
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        notContains:
+          path: spec.headGroupSpec.template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_URL
+          any: true
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        notContains:
+          path: spec.headGroupSpec.template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_SERDE
+          any: true
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        notContains:
+          path: spec.workerGroupSpecs[0].template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_URL
+          any: true
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        notContains:
+          path: spec.workerGroupSpecs[0].template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_SERDE
+          any: true
+
+  - it: should add lmcache config to engine deployments when cacheserverSpec is enabled
+    release:
+      name: vllm
+    set:
+      cacheserverSpec:
+        enabled: true
+        serde: "json"
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            vllmConfig:
+              enablePrefixCaching: true
+              maxModelLen: 1024
+              gpuMemoryUtilization: 0.8
+            lmcacheConfig:
+              enabled: true
+              cpuOffloadingBufferSize: "10"
+              enableController: true
+              controllerPort: 9000
+              workerPorts: "8001"
+              p2pHost: "localhost"
+              p2pInitPorts: "30081"
+              logLevel: "DEBUG"
+    asserts:
+      - template: deployment-vllm-multi.yaml
+        documentIndex: 0
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_URL
+            value: "lm://vllm-cache-server-service:80"
+          any: true
+      - template: deployment-vllm-multi.yaml
+        documentIndex: 0
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_SERDE
+            value: "json"
+          any: true
+
+      - template: ray-cluster.yaml
+        hasDocuments:
+        count: 0
+
+  - it: should add lmcache config to rayCluster when cacheserverSpec is enabled
+    release:
+      name: vllm
+    set:
+      cacheserverSpec:
+        enabled: true
+        serde: "json"
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+            vllmConfig:
+              enablePrefixCaching: true
+              maxModelLen: 1024
+              gpuMemoryUtilization: 0.8
+            lmcacheConfig:
+              enabled: true
+              cpuOffloadingBufferSize: "10"
+              enableController: true
+              controllerPort: 9000
+              workerPorts: "8001"
+              p2pHost: "localhost"
+              p2pInitPorts: "30081"
+              logLevel: "DEBUG"
+    asserts:
+
+      - template: deployment-vllm-multi.yaml
+        hasDocuments:
+        count: 0
+
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        contains:
+          path: spec.headGroupSpec.template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_URL
+            value: "lm://vllm-cache-server-service:80"
+          any: true
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        contains:
+          path: spec.headGroupSpec.template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_SERDE
+            value: "json"
+          any: true
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        contains:
+          path: spec.workerGroupSpecs[0].template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_URL
+            value: "lm://vllm-cache-server-service:80"
+          any: true
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        contains:
+          path: spec.workerGroupSpecs[0].template.spec.containers[0].env
+          content:
+            name: LMCACHE_REMOTE_SERDE
+            value: "json"
+          any: true

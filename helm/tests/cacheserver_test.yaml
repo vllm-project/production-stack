@@ -1,0 +1,184 @@
+suite: test cacheserverSpec configuration
+templates:
+  - deployment-cache-server.yaml
+tests:
+  - it: should not render anything when cacheserverSpec is disabled
+    set:
+      cacheserverSpec:
+        enabled: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+
+  - it: should render a deployment with custom values
+    release:
+      name: vllm
+    set:
+      cacheserverSpec:
+        enabled: true
+        image:
+          repository: "lmcache/lmstack-cache-server"
+          tag: "v1"
+        imagePullPolicy: "Always"
+        imagePullSecrets:
+          - name: repo-secret
+        replicaCount: 2
+        containerPort: 8000
+        serviceType: ClusterIP
+        servicePort: 80
+        serviceAnnotations:
+          annotation-key: annotation-value
+        resources:
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+          requests:
+            cpu: "0.5"
+            memory: "512Mi"
+        annotations:
+          annotation-key: annotation-value
+        labels:
+          label-key: label-value
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 0
+            maxSurge: 1
+        livenessProbe:
+          initialDelaySeconds: 60
+          periodSeconds: 20
+          failureThreshold: 6
+          timeoutSeconds: 10
+        tolerations:
+          - key: "key"
+            operator: "Equal"
+            value: "value"
+            effect: "NoSchedule"
+        runtimeClassName: "nvidia"
+        schedulerName: "custom-scheduler"
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 3000
+        containerSecurityContext:
+          runAsNonRoot: false
+        priorityClassName: "system-cluster-critical"
+        nodeSelector:
+          disktype: ssd
+        affinity: {}
+        serde: ""
+    asserts:
+    - equal:
+        path: metadata.labels
+        value:
+          app.kubernetes.io/name: cache-server
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: cache-server
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          label-key: label-value
+    - equal:
+        path: metadata.annotations
+        value:
+          annotation-key: annotation-value
+    - equal:
+        path: spec.replicas
+        value: 2
+    - equal:
+        path: spec.strategy
+        value:
+          type: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 0
+            maxSurge: 1
+    - equal:
+        path: spec.selector.matchLabels
+        value:
+          app.kubernetes.io/name: cache-server
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: cache-server
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          label-key: label-value
+    - equal:
+        path: spec.template.metadata.labels
+        value:
+          app.kubernetes.io/name: cache-server
+          app.kubernetes.io/instance: vllm
+          app.kubernetes.io/component: cache-server
+          app.kubernetes.io/part-of: vllm-stack
+          app.kubernetes.io/managed-by: helm
+          label-key: label-value
+    - equal:
+        path: spec.template.spec.priorityClassName
+        value: "system-cluster-critical"
+
+    - equal:
+        path: spec.template.spec.runtimeClassName
+        value: "nvidia"
+
+    - equal:
+        path: spec.template.spec.schedulerName
+        value: "custom-scheduler"
+
+    - equal:
+        path: spec.template.spec.tolerations
+        value:
+          - key: "key"
+            operator: "Equal"
+            value: "value"
+            effect: "NoSchedule"
+
+    - equal:
+        path: spec.template.spec.securityContext
+        value:
+          runAsUser: 1000
+          runAsGroup: 3000
+
+    - notExists:
+        path: spec.template.spec.affinity
+
+    - equal:
+        path: spec.template.spec.nodeSelector
+        value:
+          disktype: ssd
+
+    - equal:
+        path: spec.template.spec.imagePullSecrets[0].name
+        value: repo-secret
+
+    - equal:
+        path: spec.template.spec.containers[0].resources
+        value:
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+          requests:
+            cpu: "0.5"
+            memory: "512Mi"
+
+    - equal:
+        path: spec.template.spec.containers[0].ports[0].containerPort
+        value: 8000
+
+    - equal:
+        path: spec.template.spec.containers[0].imagePullPolicy
+        value: "Always"
+
+    - equal:
+        path: spec.template.spec.containers[0].livenessProbe
+        value:
+          initialDelaySeconds: 60
+          periodSeconds: 20
+          failureThreshold: 6
+          timeoutSeconds: 10
+          exec:
+            command:
+            - "/opt/venv/bin/python3"
+            - "/workspace/LMCache/examples/kubernetes/health_probe.py"
+            - "127.0.0.1"
+            - "8000"
+    - equal:
+        path: spec.template.spec.containers[0].securityContext
+        value:
+          runAsNonRoot: false

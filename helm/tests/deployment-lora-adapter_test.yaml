@@ -1,0 +1,259 @@
+suite: test Lora adapter deployment configuration
+templates:
+  - deployment-lora-adapter.yaml
+tests:
+  - it: should not render anything by default
+    asserts:
+    - hasDocuments:
+        count: 0
+
+
+  - it: should render one lora adapter
+    release:
+      name: vllm
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+          labels:
+            custom-label: custom-value
+    asserts:
+    - hasDocuments:
+        count: 1
+    - equal:
+        path: metadata.labels
+        value:
+          app.kubernetes.io/component: lora-adapter
+          helm-release-name: vllm
+          custom-label: custom-value
+    - equal:
+        path: spec
+        value:
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+
+  - it: should render one lora adapter
+    release:
+      name: vllm
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+        - name: "disabled-adapter"
+          enabled: false
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+    asserts:
+    - hasDocuments:
+        count: 1
+
+  - it: should render two lora adapters
+    release:
+      name: vllm
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+        - name: "llama4-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+    asserts:
+    - hasDocuments:
+        count: 2
+
+  - it: should render credentials from default secret
+    release:
+      name: vllm
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            credentials: custom_secret
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+    asserts:
+    - hasDocuments:
+        count: 1
+    - equal:
+        path: spec.adapterSource.credentialsSecretRef
+        value:
+          name: vllm-secrets
+          key: lora_adapter_credentials_llama-3.1-nemoguard-8b-topic-control
+
+  - it: should render credentials from referenced secret
+    release:
+      name: vllm
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            credentials:
+              secretName: custom-secret
+              secretKey: custom-key
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+    asserts:
+    - hasDocuments:
+        count: 1
+    - equal:
+        path: spec.adapterSource.credentialsSecretRef
+        value:
+          name: custom-secret
+          key: custom-key
+
+  - it: should not render anything relative to vllmApiKey in lora adapters
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+    asserts:
+      - notExists:
+          path: spec.vllmApiKey
+
+  - it: should render value from loraAdapters[0].vllmApiKey
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+          vllmApiKey:
+            secretName: apikey-secret
+            secretKey: apikey
+      servingEngineSpec:
+        vllmApiKey:
+          secretName: servingEngineSpec-apikey-secret
+          secretKey: servingEngineSpec-apikey
+    asserts:
+      - equal:
+          path: spec.vllmApiKey
+          value:
+            secretName: apikey-secret
+            secretKey: apikey
+
+  - it: should render value from servingEngineSpec.vllmApiKey
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+      servingEngineSpec:
+        vllmApiKey:
+          secretName: servingEngineSpec-apikey-secret
+          secretKey: servingEngineSpec-apikey
+    asserts:
+      - equal:
+          path: spec.vllmApiKey
+          value:
+            secretName: servingEngineSpec-apikey-secret
+            secretKey: servingEngineSpec-apikey
+
+  - it: should use generated secret based on servingEngineSpec.vllmApiKey
+    release:
+      name: vllm
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+      servingEngineSpec:
+        vllmApiKey: custom_api_key
+    asserts:
+      - equal:
+          path: spec.vllmApiKey
+          value:
+            secretName: vllm-secrets
+            secretKey: vllmApiKey
+
+  - it: should not render vllmApiKey when empty string
+    release:
+      name: vllm
+    set:
+      loraAdapters:
+        - name: "llama3-nemoguard-adapter"
+          baseModel: "llama3"
+          adapterSource:
+            type: "local"
+            adapterName: "llama-3.1-nemoguard-8b-topic-control"
+            adapterPath: "/data/shared-pvc-storage/lora-adapters/llama-3.1-nemoguard-8b-topic-control"
+          loraAdapterDeploymentConfig:
+            algorithm: "default"
+            replicas: 1
+      servingEngineSpec:
+        vllmApiKey: ""
+    asserts:
+      - notExists:
+          path: spec.vllmApiKey

@@ -1,0 +1,185 @@
+suite: test routerSpec HTTPRoute configuration
+templates:
+  - route.yaml
+tests:
+  - it: should not render a route when routerSpec is disabled
+    set:
+      routerSpec:
+        enableRouter: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should not render a route when main route is disabled
+    set:
+      routerSpec:
+        enableRouter: true
+      route:
+        main:
+          enabled: false
+    asserts:
+    - hasDocuments:
+        count: 0
+
+  - it: should render multiple routes
+    release:
+      name: vllm
+    set:
+      routerSpec:
+        enableRouter: true
+        route:
+          grpc:
+            enabled: true
+            apiVersion: gateway.networking.k8s.io/v1
+            kind: GRPCRoute
+            hostnames:
+              - grpc.example.com
+            parentRefs:
+              - name: gateway-2
+                namespace: default
+            matches:
+              - path:
+                  type: PathPrefix
+                  value: /grpc
+            filters:
+              - type: RequestHeaderModifier
+                requestHeaderModifier:
+                  add:
+                    - name: X-Custom-Header
+                      value: custom-value
+            additionalRules:
+              - backendRefs:
+                - name: "{{ $.Release.Name }}-router-service"
+                  port: 8080
+                matches:
+                - path:
+                    type: PathPrefix
+                    value: /test
+          main:
+            enabled: true
+            annotations:
+              custom-annotation: custom-value
+            labels:
+              custom-label: custom-value
+            hostnames:
+              - main.example.com
+            parentRefs:
+              - name: gateway
+                namespace: default
+    asserts:
+    - hasDocuments:
+        count: 2
+
+    - documentIndex: 0
+      equal:
+        path: apiVersion
+        value: gateway.networking.k8s.io/v1
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: GRPCRoute
+    - documentIndex: 0
+      equal:
+        path: metadata.name
+        value: vllm-router-grpc
+    - documentIndex: 0
+      equal:
+        path: metadata.labels
+        value:
+          environment: router
+          release: router
+    - documentIndex: 0
+      equal:
+        path: spec.parentRefs
+        value:
+          - name: gateway-2
+            namespace: default
+    - documentIndex: 0
+      equal:
+        path: spec.hostnames
+        value:
+          - grpc.example.com
+    - documentIndex: 0
+      equal:
+        path: spec.rules[0].backendRefs
+        value:
+          - name: vllm-router-service
+            port: 8080
+    - documentIndex: 0
+      equal:
+        path: spec.rules[0].matches
+        value:
+          - path:
+              type: PathPrefix
+              value: /test
+    - documentIndex: 0
+      equal:
+        path: spec.rules[1].backendRefs
+        value:
+          - name: vllm-router-service
+            port: 80
+    - documentIndex: 0
+      equal:
+        path: spec.rules[1].matches
+        value:
+          - path:
+              type: PathPrefix
+              value: /grpc
+    - documentIndex: 0
+      equal:
+        path: spec.rules[1].filters[0]
+        value:
+          requestHeaderModifier:
+            add:
+              - name: X-Custom-Header
+                value: custom-value
+          type: RequestHeaderModifier
+
+    - documentIndex: 1
+      equal:
+        path: apiVersion
+        value: gateway.networking.k8s.io/v1
+    - documentIndex: 1
+      equal:
+        path: kind
+        value: HTTPRoute
+    - documentIndex: 1
+      equal:
+        path: metadata.name
+        value: vllm-router
+    - documentIndex: 1
+      equal:
+        path: metadata.annotations
+        value:
+          custom-annotation: custom-value
+    - documentIndex: 1
+      equal:
+        path: metadata.labels
+        value:
+          environment: router
+          release: router
+          custom-label: custom-value
+    - documentIndex: 1
+      equal:
+        path: spec.parentRefs
+        value:
+          - name: gateway
+            namespace: default
+    - documentIndex: 1
+      equal:
+        path: spec.hostnames
+        value:
+          - main.example.com
+    - documentIndex: 1
+      equal:
+        path: spec.rules[0].backendRefs
+        value:
+          - name: vllm-router-service
+            port: 80
+    - documentIndex: 1
+      equal:
+        path: spec.rules[0].matches
+        value:
+          - path:
+              type: PathPrefix
+              value: /

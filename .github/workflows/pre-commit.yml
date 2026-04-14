@@ -32,3 +32,9 @@ jobs:
     - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
       with:
         extra_args: --all-files -v --hook-stage manual ${{ matrix.hook }}
+    - name: Check if values schema is up-to-date
+      uses: losisin/helm-values-schema-json-action@b0c5e688b224ce7c36fcf005184f1105850d8f3b # v2.4.1
+      with:
+        working-directory: helm
+        fail-on-diff: true
+        useHelmDocs: true
