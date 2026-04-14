@@ -914,38 +914,6 @@
                         }
                     }
                 },
-              "tolerations": {
-                "type": "array",
-                "description": "Per-model tolerations. Interacts with servingEngineSpec.tolerations according to tolerationsPolicy.",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "key": {
-                      "type": "string"
-                    },
-                    "operator": {
-                      "type": "string"
-                    },
-                    "value": {
-                      "type": "string"
-                    },
-                    "effect": {
-                      "type": "string"
-                    },
-                    "tolerationSeconds": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              },
-              "tolerationsPolicy": {
-                "type": "string",
-                "description": "How per-model tolerations interact with global servingEngineSpec.tolerations. 'append' (default) unions both lists; 'override' replaces global tolerations with model-level ones.",
-                "enum": [
-                  "append",
-                  "override"
-                ]
-              },
                 "servicePort": {
                     "description": "Service port",
                     "type": "integer"
@@ -1525,6 +1493,14 @@
                             },
                             "tag": {
                                 "description": "The tag of the model",
+                                "type": "string"
+                            },
+                            "tolerations": {
+                                "description": "Per-model tolerations. Interacts with servingEngineSpec.tolerations according to tolerationsPolicy.",
+                                "type": "array"
+                            },
+                            "tolerationsPolicy": {
+                                "description": "How per-model tolerations interact with global servingEngineSpec.tolerations.",
                                 "type": "string"
                             },
                             "vllmConfig": {
