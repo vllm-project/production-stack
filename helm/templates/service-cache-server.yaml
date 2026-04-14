@@ -1,4 +1,4 @@
-{{- if .Values.cacheserverSpec -}}
+{{- if .Values.cacheserverSpec.enabled -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,8 +7,12 @@ metadata:
   labels:
   {{- include "chart.cacheserverStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.cacheserverLabels" . | nindent 4 }}
+  {{- with .Values.cacheserverSpec.serviceAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.cacheserverSpec.serviceType }}
   ports:
     - name: "cacheserver-sport"
       port: {{ .Values.cacheserverSpec.servicePort }}

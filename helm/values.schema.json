@@ -1,515 +1,919 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "servingEngineSpec": {
-      "type": "object",
-      "properties": {
-        "labels": {
-          "type": "object",
-          "properties": {
-            "environment": {
-              "type": "string"
-            },
-            "release": {
-              "type": "string"
-            }
-          }
-        },
-        "vllmApiKey": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "secretName": {
-                  "type": "string"
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "cacheserverSpec": {
+            "description": "Configuration for the LMCache cache server deployment",
+            "type": "object",
+            "properties": {
+                "affinity": {
+                    "description": "Affinity configuration. If specified, takes precedence over nodeSelectorTerms.",
+                    "type": "object"
                 },
-                "secretKey": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "secretName",
-                "secretKey"
-              ]
-            }
-          ]
-        },
-        "env": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "value": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name",
-              "value"
-            ]
-          }
-        },
-        "modelSpec": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "annotations": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "podAnnotations": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "name": {
-                "type": "string"
-              },
-              "repository": {
-                "type": "string"
-              },
-              "tag": {
-                "type": "string"
-              },
-              "imagePullSecret": {
-                "type": "string",
-                "description": "Name of secret with credentials to private container repository"
-              },
-              "modelURL": {
-                "type": "string"
-              },
-              "replicaCount": {
-                "type": "integer"
-              },
-              "pdb": {
-                "type": "object",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean"
-                  },
-                  "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  },
-                  "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  },
-                  "minAvailable": {
-                    "type": "string"
-                  },
-                  "maxUnavailable": {
-                    "type": "string"
-                  }
-                }
-              },
-              "resources": {
-                "type": "object",
-                "properties": {
-                  "limits": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "integer"
-                        }
-                      ]
-                    }
-                  },
-                  "requests": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "oneOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "integer"
-                        }
-                      ]
-                    }
-                  }
-                }
-              },
-              "requestCPU": {
-                "type": "integer"
-              },
-              "requestMemory": {
-                "type": "string"
-              },
-              "limitCPU": {
-                "type": "integer"
-              },
-              "limitMemory": {
-                "type": "string"
-              },
-              "requestGPU": {
-                "type": "integer"
-              },
-              "requestGPUType": {
-                "type": "string"
-              },
-              "requestGPUMem": {
-                "type": "string"
-              },
-              "requestGPUMemPercentage": {
-                "type": "string"
-              },
-              "requestGPUCores": {
-                "type": "string"
-              },
-              "limitGPUMem": {
-                "type": "string"
-              },
-              "limitGPUMemPercentage": {
-                "type": "string"
-              },
-              "limitGPUCores": {
-                "type": "string"
-              },
-              "priorityClassName": {
-                "type": "string"
-              },
-              "runtimeClassName": {
-                "type": "string"
-              },
-              "pvcStorage": {
-                "type": "string"
-              },
-              "pvcLabels": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "pvcAnnotations": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "pvcMatchLabels": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              },
-              "serviceAccountName": {
-                "type": "string"
-              },
-              "initContainer": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "image": {
-                    "type": "string"
-                  },
-                  "command": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "env": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  },
-                  "args": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "resources": {
-                    "type": "object",
-                    "properties": {
-                      "requests": {
-                        "type": "object",
-                        "properties": {
-                          "cpu": {
-                            "type": "string"
-                          },
-                          "memory": {
-                            "type": "string"
-                          }
-                        }
-                      },
-                      "limits": {
-                        "type": "object",
-                        "properties": {
-                          "cpu": {
-                            "type": "string"
-                          },
-                          "memory": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "mountPvcStorage": {
-                    "type": "boolean"
-                  }
-                }
-              },
-              "vllmConfig": {
-                "type": "object",
-                "properties": {
-                  "enablePrefixCaching": {
-                    "type": "boolean"
-                  },
-                  "enableChunkedPrefill": {
-                    "type": "boolean"
-                  },
-                  "maxModelLen": {
+                "annotations": {
+                    "description": "Customized annotations for the cache server deployment",
+                    "type": "object"
+                },
+                "containerPort": {
+                    "description": "Port the cache server container is listening on",
                     "type": "integer"
-                  },
-                  "dtype": {
-                    "type": "string"
-                  },
-                  "runner": {
-                    "type": "string",
-                    "enum": [
-                      "auto",
-                      "pooling"
-                    ]
-                  },
-                  "convert": {
-                    "type": "string",
-                    "enum": [
-                      "token_embed",
-                      "embed",
-                      "token_classify",
-                      "classify",
-                      "score"
-                    ]
-                  },
-                  "extraArgs": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                }
-              },
-              "lmcacheConfig": {
-                "type": "object",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean"
-                  },
-                  "cpuOffloadingBufferSize": {
-                    "type": "string"
-                  }
                 },
-                "required": [
-                  "enabled",
-                  "cpuOffloadingBufferSize"
-                ]
-              },
-              "hf_token": {
-                "oneOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
+                "containerSecurityContext": {
+                    "description": "Container-level security context configuration",
+                    "type": "object"
+                },
+                "enabled": {
+                    "description": "Whether to enable the cache server",
+                    "type": "boolean"
+                },
+                "image": {
+                    "description": "Image configuration for the cache Server",
                     "type": "object",
                     "properties": {
-                      "secretName": {
-                        "type": "string"
-                      },
-                      "secretKey": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "secretName",
-                      "secretKey"
-                    ]
-                  }
-                ]
-              },
-              "env": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "value": {
-                      "type": "string"
+                        "repository": {
+                            "description": "Docker image repository for the cache server",
+                            "type": "string"
+                        },
+                        "tag": {
+                            "description": "Docker image tag for the cache server",
+                            "type": "string"
+                        }
                     }
-                  },
-                  "required": [
-                    "name",
-                    "value"
-                  ]
+                },
+                "imagePullPolicy": {
+                    "description": "Image pull policy for the cache server",
+                    "type": "string",
+                    "enum": [
+                        "Always",
+                        "IfNotPresent",
+                        "Never"
+                    ]
+                },
+                "imagePullSecrets": {
+                    "description": "Image pull secrets for private container registries",
+                    "type": "array"
+                },
+                "labels": {
+                    "description": "Customized labels for the cache server deployment and service",
+                    "type": "object"
+                },
+                "livenessProbe": {
+                    "description": "Configuration for the liveness probe",
+                    "type": "object",
+                    "properties": {
+                        "failureThreshold": {
+                            "description": "The number of consecutive failures allowed before considering the probe as failed.",
+                            "type": "integer"
+                        },
+                        "initialDelaySeconds": {
+                            "description": "The number of seconds to wait before starting the first probe.",
+                            "type": "integer"
+                        },
+                        "periodSeconds": {
+                            "description": "The number of seconds to wait between consecutive probes.",
+                            "type": "integer"
+                        },
+                        "timeoutSeconds": {
+                            "description": "The number of seconds to wait for a probe response before considering it as failed.",
+                            "type": "integer"
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "nodeSelector": {
+                    "description": "Node selector for the cache server pods",
+                    "type": "object"
+                },
+                "priorityClassName": {
+                    "description": "Priority class for the cache server pods",
+                    "type": "string"
+                },
+                "replicaCount": {
+                    "description": "Number of replicas for the cache server pod",
+                    "type": "integer"
+                },
+                "resources": {
+                    "description": "Resource requests and limits for the cache server container",
+                    "type": "object"
+                },
+                "runtimeClassName": {
+                    "description": "RuntimeClassName configuration for the cache server pods",
+                    "type": "string"
+                },
+                "schedulerName": {
+                    "description": "SchedulerName configuration for the cache server pods",
+                    "type": "string"
+                },
+                "securityContext": {
+                    "description": "Pod-level security context configuration",
+                    "type": "object"
+                },
+                "serde": {
+                    "description": "Serialization/deserialization format for the cache server",
+                    "type": "string"
+                },
+                "serviceAnnotations": {
+                    "description": "Service annotations for the cache server service",
+                    "type": "object"
+                },
+                "servicePort": {
+                    "description": "Port the cache server service will listen on",
+                    "type": "integer"
+                },
+                "serviceType": {
+                    "description": "Kubernetes service type for the cache server",
+                    "type": "string",
+                    "enum": [
+                        "ClusterIP",
+                        "NodePort",
+                        "LoadBalancer",
+                        "ExternalName"
+                    ]
+                },
+                "strategy": {
+                    "description": "Deployment strategy for the cache server pods",
+                    "type": "object",
+                    "properties": {
+                        "rollingUpdate": {
+                            "type": "object",
+                            "properties": {
+                                "maxSurge": {
+                                    "type": [
+                                        "integer",
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "maxUnavailable": {
+                                    "type": [
+                                        "integer",
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            }
+                        },
+                        "type": {
+                            "description": "Customize updateStrategy of the cache server deployment.",
+                            "type": "string",
+                            "enum": [
+                                "RollingUpdate",
+                                "Recreate"
+                            ]
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "tolerations": {
+                    "description": "Tolerations configuration for the cache server pods",
+                    "type": "array"
                 }
-              },
-              "nodeName": {
-                "type": "string"
-              },
-              "nodeSelectorTerms": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "matchExpressions": {
-                      "type": "array",
-                      "items": {
+            }
+        },
+        "extraObjects": {
+            "description": "Array of extra Kubernetes objects to deploy. Each object should be a valid Kubernetes manifest in YAML format. This can be used to deploy additional resources such as ConfigMaps, Secrets, or custom resources that are not directly supported by the chart's built-in configuration. Supports use of custom Helm templates.",
+            "type": "array"
+        },
+        "grafanaDashboards": {
+            "description": "Set to true do deploy dashboards stored in the \"dashboards\" directory as configmaps. This requires the kube-prometheus-stack to be deployed with Grafana enabled and properly configured to pick up dashboards from configmaps.",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "description": "Additional annotations to add to the dashboard configmaps",
+                    "type": "object"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "labels": {
+                    "description": "Additional labels to add to the dashboard configmaps",
+                    "type": "object"
+                }
+            }
+        },
+        "kube-prometheus-stack": {
+            "description": "Kube Prometheus Stack dependency chart configuration. More values can be found [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml).",
+            "type": "object"
+        },
+        "loraAdapters": {
+            "description": "LoRA Adapters Configuration",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "adapterSource": {
+                        "description": "Configuration for the adapter source",
                         "type": "object",
                         "properties": {
-                          "key": {
+                            "adapterName": {
+                                "description": "Name of the adapter to apply",
+                                "type": "string"
+                            },
+                            "adapterPath": {
+                                "description": "Path to the LoRA adapter weights",
+                                "type": "string"
+                            },
+                            "credentials": {
+                                "description": "Reference to secret with storage credentials # Can be either a string that will be stored in a generated secret or an object referencing an existing secret.",
+                                "type": [
+                                    "string",
+                                    "object"
+                                ],
+                                "properties": {
+                                    "secretKey": {
+                                        "description": "Key in the secret containing the credentials",
+                                        "type": "string"
+                                    },
+                                    "secretName": {
+                                        "description": "Name of the secret",
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "maxAdapters": {
+                                "description": "Maximum number of adapters to load",
+                                "type": "integer"
+                            },
+                            "pattern": {
+                                "description": "Pattern to use for the adapter name",
+                                "type": "string"
+                            },
+                            "repository": {
+                                "description": "Repository to get the LoRA adapter from",
+                                "type": "string"
+                            },
+                            "type": {
+                                "description": "Type of adapter source (local, s3, http, huggingface)",
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "baseModel": {
+                        "description": "The name of the base model this adapter is for",
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "description": "Whether to create le LoRa adapter",
+                        "type": "boolean"
+                    },
+                    "loraAdapterDeploymentConfig": {
+                        "description": "Configuration for adapter deployment",
+                        "type": "object",
+                        "properties": {
+                            "algorithm": {
+                                "description": "Placement algorithm to use (default, ordered, equalized)",
+                                "type": "string"
+                            },
+                            "labels": {
+                                "description": "Additional labels for the LoRA adapter",
+                                "type": "object"
+                            },
+                            "replicas": {
+                                "description": "Number of replicas that should load this adapter",
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "vllmApiKey": {
+                        "description": "API key configuration for vLLM authentication. If not Set, it defaults to servingEngineSpec.vllmApiKey",
+                        "type": "object",
+                        "properties": {
+                            "secretKey": {
+                                "description": "Key in the secret containing the API key",
+                                "type": "string"
+                            },
+                            "secretName": {
+                                "description": "Name of the secret",
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "loraController": {
+            "description": "lora controller Configuration",
+            "type": "object",
+            "properties": {
+                "affinity": {
+                    "description": "Affinity",
+                    "type": "object"
+                },
+                "annotations": {
+                    "description": "Deployment annotations",
+                    "type": "object"
+                },
+                "containerSecurityContext": {
+                    "description": "Container security context",
+                    "type": "object"
+                },
+                "enableLoraController": {
+                    "description": "Whether to enable the Lora Controller",
+                    "type": "boolean"
+                },
+                "env": {
+                    "description": "Environment variables",
+                    "type": "array"
+                },
+                "extraArgs": {
+                    "description": "Extra arguments for the lora controller",
+                    "type": "array"
+                },
+                "image": {
+                    "description": "lora controller image configuration",
+                    "type": "object",
+                    "properties": {
+                        "pullPolicy": {
+                            "description": "Image pull policy",
+                            "type": "string",
+                            "enum": [
+                                "Always",
+                                "IfNotPresent",
+                                "Never"
+                            ]
+                        },
+                        "repository": {
+                            "description": "Docker image repository",
                             "type": "string"
-                          },
-                          "operator": {
+                        },
+                        "tag": {
+                            "description": "Docker image tag",
                             "type": "string"
-                          },
-                          "values": {
+                        }
+                    }
+                },
+                "imagePullSecrets": {
+                    "description": "Image pull secrets",
+                    "type": "array"
+                },
+                "kubernetesClusterDomain": {
+                    "description": "kubernetes cluster domain",
+                    "type": "string"
+                },
+                "labels": {
+                    "description": "Deployment labels",
+                    "type": "object"
+                },
+                "metrics": {
+                    "description": "Lora Controller metrics configuration",
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "description": "Expose lora controller metrics",
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "nodeSelector": {
+                    "description": "Node selector",
+                    "type": "object"
+                },
+                "pdb": {
+                    "description": "loraController Pod Disruption Budget",
+                    "type": "object",
+                    "properties": {
+                        "annotations": {
+                            "description": "Annotations to be added to loraController pdb",
+                            "type": "object"
+                        },
+                        "enabled": {
+                            "description": "Deploy a PodDisruptionBudget for the loraController deployment",
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "description": "Labels to be added to loraController pdb",
+                            "type": "object"
+                        },
+                        "maxUnavailable": {
+                            "description": "Number of pods that are unavailable after eviction as number or percentage (eg.: 50%).",
+                            "type": [
+                                "string",
+                                "integer",
+                                "null"
+                            ],
+                            "minimum": 0
+                        },
+                        "minAvailable": {
+                            "description": "Number of pods that are available after eviction as number or percentage (eg.: 50%)",
+                            "type": [
+                                "string",
+                                "integer",
+                                "null"
+                            ],
+                            "minimum": 0
+                        }
+                    }
+                },
+                "podAnnotations": {
+                    "description": "Pod annotations",
+                    "type": "object"
+                },
+                "podLabels": {
+                    "description": "Pod labels",
+                    "type": "object"
+                },
+                "podSecurityContext": {
+                    "description": "Pod security context",
+                    "type": "object"
+                },
+                "replicaCount": {
+                    "description": "Number of lora controller replicas",
+                    "type": "integer"
+                },
+                "resources": {
+                    "description": "lora controller resources",
+                    "type": "object"
+                },
+                "tolerations": {
+                    "description": "Tolerations",
+                    "type": "array"
+                },
+                "webhook": {
+                    "description": "loraController Webhook configuration",
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "description": "Deploy a webhook inside lora controller",
+                            "type": "boolean"
+                        }
+                    }
+                }
+            }
+        },
+        "prometheus-adapter": {
+            "description": "Prometheus Adapter dependency chart configuration. More values can be found [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus-adapter/values.yaml).",
+            "type": "object"
+        },
+        "routerSpec": {
+            "description": "Router configuration",
+            "type": "object",
+            "properties": {
+                "affinity": {
+                    "description": "Affinity configuration",
+                    "type": "object"
+                },
+                "autoscaling": {
+                    "description": "autoscaling configuration",
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "maxReplicas": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "minReplicas": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "targetCPUUtilizationPercentage": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "containerPort": {
+                    "description": "Container port",
+                    "type": "integer"
+                },
+                "containerSecurityContext": {
+                    "description": "Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core",
+                    "type": "object"
+                },
+                "enableRouter": {
+                    "description": "Whether to enable the router service",
+                    "type": "boolean"
+                },
+                "engineScrapeInterval": {
+                    "description": "Interval in seconds to scrape the serving engine metrics",
+                    "type": "integer"
+                },
+                "extraArgs": {
+                    "description": "extra router commandline arguments",
+                    "type": "array"
+                },
+                "extraPorts": {
+                    "description": "extra service ports",
+                    "type": "array"
+                },
+                "hf_token": {
+                    "description": "Hugging Face token configuration",
+                    "type": "string"
+                },
+                "imagePullPolicy": {
+                    "description": "image pull policy for the router pod",
+                    "type": "string",
+                    "enum": [
+                        "Always",
+                        "IfNotPresent",
+                        "Never"
+                    ]
+                },
+                "imagePullSecrets": {
+                    "description": "Image pull secrets for private container registries Example: imagePullSecrets: - name: my-registry-secret",
+                    "type": "array"
+                },
+                "ingress": {
+                    "description": "Ingress configuration for the router",
+                    "type": "object",
+                    "properties": {
+                        "annotations": {
+                            "description": "Additional annotations for the Ingress resource",
+                            "type": "object"
+                        },
+                        "className": {
+                            "description": "IngressClass that will be used to implement the Ingress",
+                            "type": "string"
+                        },
+                        "enabled": {
+                            "description": "Enable ingress controller resource",
+                            "type": "boolean"
+                        },
+                        "hosts": {
                             "type": "array",
                             "items": {
-                              "type": "string"
+                                "type": "object",
+                                "properties": {
+                                    "host": {
+                                        "type": "string"
+                                    },
+                                    "paths": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "path": {
+                                                    "type": "string"
+                                                },
+                                                "pathType": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                          }
                         },
-                        "required": [
-                          "key",
-                          "operator",
-                          "values"
-                        ]
-                      }
-                    }
-                  }
-                }
-              },
-              "keda": {
-                "type": "object",
-                "description": "KEDA autoscaling configuration for this model deployment",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean",
-                    "description": "Whether to enable KEDA autoscaling for this model"
-                  },
-                  "minReplicaCount": {
-                    "type": "integer",
-                    "description": "Minimum number of replicas (supports 0 for scale-to-zero)",
-                    "minimum": 0
-                  },
-                  "maxReplicaCount": {
-                    "type": "integer",
-                    "description": "Maximum number of replicas",
-                    "minimum": 1
-                  },
-                  "pollingInterval": {
-                    "type": "integer",
-                    "description": "How often KEDA should check the metrics (in seconds)",
-                    "minimum": 1
-                  },
-                  "cooldownPeriod": {
-                    "type": "integer",
-                    "description": "How long to wait before scaling down after scaling up (in seconds)",
-                    "minimum": 0
-                  },
-                  "idleReplicaCount": {
-                    "type": "integer",
-                    "description": "Number of replicas to scale to when no triggers are active",
-                    "minimum": 0
-                  },
-                  "initialCooldownPeriod": {
-                    "type": "integer",
-                    "description": "Initial cooldown period in seconds before scaling down after creation",
-                    "minimum": 0
-                  },
-                  "fallback": {
-                    "type": "object",
-                    "description": "Fallback configuration when scaler fails",
-                    "properties": {
-                      "failureThreshold": {
-                        "type": "integer",
-                        "description": "Number of consecutive failures before fallback",
-                        "minimum": 1
-                      },
-                      "replicas": {
-                        "type": "integer",
-                        "description": "Number of replicas to scale to in fallback",
-                        "minimum": 0
-                      }
-                    },
-                    "required": [
-                      "failureThreshold",
-                      "replicas"
-                    ]
-                  },
-                  "triggers": {
-                    "type": "array",
-                    "description": "List of KEDA trigger configurations",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "description": "Trigger type (e.g., prometheus, cpu, memory)"
-                        },
-                        "metadata": {
-                          "type": "object",
-                          "description": "Trigger-specific metadata",
-                          "additionalProperties": true
+                        "tls": {
+                            "description": "The tls configuration for hostnames to be covered with this ingress record.",
+                            "type": "array"
                         }
-                      },
-                      "required": [
-                        "type",
-                        "metadata"
-                      ]
                     }
-                  },
-                  "advanced": {
-                    "type": "object",
-                    "description": "Advanced KEDA configuration",
-                    "properties": {
-                      "restoreToOriginalReplicaCount": {
-                        "type": "boolean",
-                        "description": "Restore original replica count when ScaledObject is deleted"
-                      },
-                      "horizontalPodAutoscalerConfig": {
-                        "type": "object",
-                        "description": "HPA-specific configuration",
-                        "additionalProperties": true
-                      },
-                      "scalingModifiers": {
-                        "type": "object",
-                        "description": "Scaling modifiers for composite metrics",
-                        "additionalProperties": true
-                      }
-                    }
-                  }
                 },
-                "required": [
-                  "enabled"
-                ]
-              },
+                "k8sServiceDiscoveryType": {
+                    "description": "Service discovery mode type, supports \"pod-ip\" or \"service-name\". Defaults to \"pod-ip\" if not set.",
+                    "type": "string",
+                    "enum": [
+                        "pod-ip",
+                        "service-name"
+                    ]
+                },
+                "labels": {
+                    "description": "Customized labels for the router deployment",
+                    "type": "object"
+                },
+                "livenessProbe": {
+                    "description": "Liveness probe configuration for the router pod.",
+                    "type": "object",
+                    "properties": {
+                        "failureThreshold": {
+                            "description": "Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive",
+                            "type": "integer"
+                        },
+                        "httpGet": {
+                            "description": "Configuration of the Kubelet http request on the server",
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "description": "Path to access on the HTTP server",
+                                    "type": "string"
+                                },
+                                "port": {
+                                    "description": "Name or number of the port to access on the container, on which the server is listening",
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
+                                }
+                            }
+                        },
+                        "initialDelaySeconds": {
+                            "description": "Number of seconds after the container has started before liveness probe is initiated",
+                            "type": "integer"
+                        },
+                        "periodSeconds": {
+                            "description": "How often (in seconds) to perform the liveness probe",
+                            "type": "integer"
+                        }
+                    }
+                },
+                "lmcacheConfig": {
+                    "description": "lmcache configuration for the router deployment",
+                    "type": "object",
+                    "properties": {
+                        "logLevel": {
+                            "description": "LMCache log level for the router deployment.",
+                            "type": "string"
+                        }
+                    }
+                },
+                "lmcacheControllerPort": {
+                    "description": "lmcache controller port, used when routingLogic is \"kvaware\"",
+                    "type": [
+                        "integer",
+                        "string"
+                    ]
+                },
+                "nodePort": {
+                    "description": "Fixed NodePort for the router service when serviceType is NodePort.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "maximum": 32767,
+                    "minimum": 30000
+                },
+                "nodeSelectorTerms": {
+                    "description": "The node selector terms to match the nodes. Will be ignored if affinity is configured.",
+                    "type": "array"
+                },
+                "otel": {
+                    "description": "OpenTelemetry tracing configuration When otelEndpoint is set, tracing is automatically enabled",
+                    "type": "object",
+                    "properties": {
+                        "endpoint": {
+                            "description": "OTLP endpoint for tracing (e.g., \"localhost:4317\" or \"otel-collector:4317\")",
+                            "type": "string"
+                        },
+                        "secure": {
+                            "description": "Use secure (TLS) connection for OTLP exporter (default: false, i.e., insecure)",
+                            "type": "boolean"
+                        },
+                        "serviceName": {
+                            "description": "Service name for traces (default: \"vllm-router\")",
+                            "type": "string"
+                        }
+                    }
+                },
+                "pdb": {
+                    "description": "Router Pod Disruption Budget",
+                    "type": "object",
+                    "properties": {
+                        "annotations": {
+                            "description": "Annotations to be added to router pdb",
+                            "type": "object"
+                        },
+                        "enabled": {
+                            "description": "Deploy a PodDisruptionBudget for the router deployment",
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "description": "Labels to be added to router pdb",
+                            "type": "object"
+                        },
+                        "maxUnavailable": {
+                            "description": "Number of pods that are unavailable after eviction as number or percentage (eg.: 50%).",
+                            "type": [
+                                "string",
+                                "integer",
+                                "null"
+                            ],
+                            "minimum": 0
+                        },
+                        "minAvailable": {
+                            "description": "Number of pods that are available after eviction as number or percentage (eg.: 50%)",
+                            "type": [
+                                "string",
+                                "integer",
+                                "null"
+                            ],
+                            "minimum": 0
+                        }
+                    }
+                },
+                "podAnnotations": {
+                    "description": "Customized pod annotations for the router pods",
+                    "type": "object"
+                },
+                "priorityClassName": {
+                    "description": "Priority Class",
+                    "type": "string"
+                },
+                "readinessProbe": {
+                    "type": "object",
+                    "properties": {
+                        "failureThreshold": {
+                            "description": "Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive",
+                            "type": "integer"
+                        },
+                        "httpGet": {
+                            "description": "Configuration of the Kubelet http request on the server",
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "description": "Path to access on the HTTP server",
+                                    "type": "string"
+                                },
+                                "port": {
+                                    "description": "Name or number of the port to access on the container, on which the server is listening",
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
+                                }
+                            }
+                        },
+                        "initialDelaySeconds": {
+                            "description": "Number of seconds after the container has started before liveness probe is initiated",
+                            "type": "integer"
+                        },
+                        "periodSeconds": {
+                            "description": "How often (in seconds) to perform the readiness probe",
+                            "type": "integer"
+                        }
+                    }
+                },
+                "replicaCount": {
+                    "description": "Number of replicas",
+                    "type": "integer"
+                },
+                "repository": {
+                    "description": "The docker image of the router. The following values are defaults:",
+                    "type": "string"
+                },
+                "requestStatsWindow": {
+                    "description": "Window size in seconds to calculate the request statistics",
+                    "type": "integer"
+                },
+                "resources": {
+                    "description": "router resource requests and limits",
+                    "type": "object",
+                    "properties": {
+                        "limits": {
+                            "type": "object",
+                            "properties": {
+                                "memory": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "requests": {
+                            "type": "object",
+                            "properties": {
+                                "cpu": {
+                                    "type": "string"
+                                },
+                                "memory": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "rootPath": {
+                    "description": "FastAPI root path for hosting under a subpath (e.g. /vllm)",
+                    "type": "string"
+                },
+                "route": {
+                    "description": "Expose the service via gateway-api HTTPRoute More routes can be added by adding a dictionary key like the 'main' route. Requires Gateway API resources and suitable controller installed within the cluster (see: https://gateway-api.sigs.k8s.io/guides/)",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "additionalRules": {
+                                "description": "Additional custom rules that can be added to the route",
+                                "type": "array"
+                            },
+                            "annotations": {
+                                "description": "Additional annotations to add to the route",
+                                "type": "object"
+                            },
+                            "apiVersion": {
+                                "description": "Set the route apiVersion, e.g. gateway.networking.k8s.io/v1 or gateway.networking.k8s.io/v1alpha2",
+                                "type": "string"
+                            },
+                            "enabled": {
+                                "description": "Enables or disables the route",
+                                "type": "boolean"
+                            },
+                            "filters": {
+                                "description": "Filters define the filters that are applied to requests that match this rule.",
+                                "type": "array"
+                            },
+                            "hostnames": {
+                                "description": "List of hostnames for the Route",
+                                "type": "array"
+                            },
+                            "httpsRedirect": {
+                                "description": "create http route for redirect (https://gateway-api.sigs.k8s.io/guides/http-redirect-rewrite/#http-to-https-redirects) # Take care that you only enable this on the http listener of the gateway to avoid an infinite redirect. # matches, filters and additionalRules will be ignored if this is set to true.",
+                                "type": "boolean"
+                            },
+                            "kind": {
+                                "description": "Set the route kind",
+                                "type": "string",
+                                "enum": [
+                                    "HTTPRoute",
+                                    "GRPCRoute",
+                                    "TCPRoute",
+                                    "TLSRoute",
+                                    "UDPRoute"
+                                ]
+                            },
+                            "labels": {
+                                "description": "Additional labels to add to the route",
+                                "type": "object"
+                            },
+                            "matches": {
+                                "description": "Route match configuration",
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "path": {
+                                            "type": "object",
+                                            "properties": {
+                                                "type": {
+                                                    "type": "string"
+                                                },
+                                                "value": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "parentRefs": {
+                                "description": "Gateway API parentRefs for the Route # Must reference an existing Gateway",
+                                "type": "array"
+                            }
+                        }
+                    }
+                },
+                "routingLogic": {
+                    "description": "routing logic, supports \"roundrobin\", \"session\", \"prefixaware\", \"kvaware\" or \"disaggregated_prefill\"",
+                    "type": "string",
+                    "enum": [
+                        "roundrobin",
+                        "session",
+                        "prefixaware",
+                        "kvaware",
+                        "disaggregated_prefill"
+                    ]
+                },
+                "securityContext": {
+                    "description": "Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core",
+                    "type": "object"
+                },
+                "serviceAnnotations": {
+                    "description": "Service annotations if you use a LoadBalancer or NodePort service type",
+                    "type": "object"
+                },
+                "serviceDiscovery": {
+                    "description": "Service discovery mode, supports \"k8s\" or \"static\". Defaults to \"k8s\" if not set.",
+                    "type": "string",
+                    "enum": [
+                        "k8s",
+                        "static"
+                    ]
+                },
+                "serviceMonitor": {
+                    "description": "ServiceMonitor configuration to collect router metrics",
+                    "type": "object",
+                    "properties": {
+                        "additionalLabels": {
+                            "description": "Additional labels",
+                            "type": "object"
+                        },
+                        "enabled": {
+                            "description": "Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics",
+                            "type": "boolean"
+                        },
+                        "honorLabels": {
+                            "description": "Let prometheus add an exported_ prefix to conflicting labels",
+                            "type": "boolean"
+                        },
+                        "interval": {
+                            "description": "Interval to scrape metrics",
+                            "type": "string"
+                        },
+                        "metricRelabelings": {
+                            "description": "Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs)",
+                            "type": "array"
+                        },
+                        "relabelings": {
+                            "description": "Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config)",
+                            "type": "array"
+                        },
+                        "scrapeTimeout": {
+                            "description": "Timeout if metrics can't be retrieved in given time interval",
+                            "type": "string"
+                        }
+                    }
+                },
               "tolerations": {
                 "type": "array",
                 "description": "Per-model tolerations. Interacts with servingEngineSpec.tolerations according to tolerationsPolicy.",
@@ -541,566 +945,885 @@
                   "append",
                   "override"
                 ]
-              }
-            },
-            "required": [
-              "name",
-              "repository",
-              "tag",
-              "modelURL",
-              "replicaCount",
-              "requestCPU",
-              "requestMemory",
-              "requestGPU",
-              "pvcStorage"
-            ]
-          }
-        },
-        "containerPort": {
-          "type": "integer"
-        },
-        "servicePort": {
-          "type": "integer"
-        },
-        "startupProbe": {
-          "type": "object",
-          "properties": {
-            "initialDelaySeconds": {
-              "type": "integer"
-            },
-            "periodSeconds": {
-              "type": "integer"
-            },
-            "failureThreshold": {
-              "type": "integer"
-            },
-            "httpGet": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string"
+              },
+                "servicePort": {
+                    "description": "Service port",
+                    "type": "integer"
                 },
-                "port": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "path",
-                "port"
-              ]
-            }
-          }
-        },
-        "livenessProbe": {
-          "type": "object",
-          "properties": {
-            "initialDelaySeconds": {
-              "type": "integer"
-            },
-            "periodSeconds": {
-              "type": "integer"
-            },
-            "failureThreshold": {
-              "type": "integer"
-            },
-            "httpGet": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string"
+                "serviceType": {
+                    "description": "Service type",
+                    "type": "string",
+                    "enum": [
+                        "ClusterIP",
+                        "NodePort",
+                        "LoadBalancer",
+                        "ExternalName"
+                    ]
                 },
-                "port": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "path",
-                "port"
-              ]
-            }
-          }
-        },
-        "maxUnavailablePodDisruptionBudget": {
-          "type": "string"
-        },
-        "tolerations": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "key": {
-                "type": "string"
-              },
-              "operator": {
-                "type": "string"
-              },
-              "effect": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "runtimeClassName": {
-          "type": "string"
-        },
-        "schedulerName": {
-          "type": "string"
-        },
-        "securityContext": {
-          "type": "object",
-          "description": "Pod-level security context configuration",
-          "additionalProperties": true
-        },
-        "containerSecurityContext": {
-          "type": "object",
-          "description": "Container-level security context configuration",
-          "additionalProperties": true
-        },
-        "extraPorts": {
-          "type": "array",
-          "description": "List of additional ports to expose from the serving engine container.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "appProtocol": {
-                "type": "string",
-                "description": "Application protocol for this port (e.g., 'http', 'https', 'grpc'). Used as a hint for implementations to offer richer behavior."
-              },
-              "name": {
-                "type": "string",
-                "description": "Name of the port. Must be unique within the service and conform to DNS label standards."
-              },
-              "nodePort": {
-                "type": "integer",
-                "description": "Port to expose on each node in a cluster."
-              },
-              "port": {
-                "type": "integer",
-                "description": "The port that will be exposed by this service.",
-                "minimum": 1,
-                "maximum": 65535
-              },
-              "protocol": {
-                "type": "string",
-                "enum": [
-                  "TCP",
-                  "UDP",
-                  "SCTP"
-                ],
-                "description": "Protocol for the port. Must be TCP, UDP, or SCTP. Defaults to TCP."
-              },
-              "targetPort": {
-                "oneOf": [
-                  {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65535
-                  },
-                  {
+                "sessionKey": {
+                    "description": "session key if using \"session\" routing logic",
                     "type": "string"
-                  }
-                ],
-                "description": "Port number or name on the container to forward traffic to. If not specified, defaults to the value of 'port'."
-              }
-            },
-            "required": [
-              "port"
-            ],
-            "additionalProperties": false
-          }
-        }
-      }
-    },
-    "routerSpec": {
-      "type": "object",
-      "properties": {
-        "replicaCount": {
-          "type": "integer"
-        },
-        "pdb": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "labels": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            },
-            "annotations": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            },
-            "minAvailable": {
-              "type": "string"
-            },
-            "maxUnavailable": {
-              "type": "string"
+                },
+                "startupProbe": {
+                    "type": "object",
+                    "properties": {
+                        "failureThreshold": {
+                            "description": "Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready",
+                            "type": "integer"
+                        },
+                        "httpGet": {
+                            "description": "Configuration of the Kubelet http request on the server",
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "description": "Path to access on the HTTP server",
+                                    "type": "string"
+                                },
+                                "port": {
+                                    "description": "Name or number of the port to access on the container, on which the server is listening",
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
+                                }
+                            }
+                        },
+                        "initialDelaySeconds": {
+                            "description": "Number of seconds after the container has started before liveness probe is initiated",
+                            "type": "integer"
+                        },
+                        "periodSeconds": {
+                            "description": "How often (in seconds) to perform the startup probe",
+                            "type": "integer"
+                        }
+                    }
+                },
+                "staticBackends": {
+                    "description": "If serviceDiscovery is set to \"static\", the comma-separated values below are required. There needs to be the same number of backends and models",
+                    "type": "string"
+                },
+                "staticModels": {
+                    "type": "string"
+                },
+                "strategy": {
+                    "description": "deployment strategy",
+                    "type": "object"
+                },
+                "tag": {
+                    "description": "docker tag for the router pod",
+                    "type": "string"
+                },
+                "vllmApiKey": {
+                    "description": "API key for securing the vLLM models. Must be an object referencing an existing secret. If not set, it defaults to .Values.servingEngineSpec.vllmApiKey.",
+                    "type": "object",
+                    "properties": {
+                        "secretKey": {
+                            "description": "Key within the secret that contains the vLLM API key",
+                            "type": "string"
+                        },
+                        "secretName": {
+                            "description": "Name of the existing Kubernetes secret that contains the vLLM API key",
+                            "type": "string"
+                        }
+                    }
+                }
             }
-          }
         },
-        "imagePullSecrets": {
-          "type": "array",
-          "description": "Image pull secrets for private container registries",
-          "items": {
+        "servingEngineSpec": {
+            "description": "Serving engine configuration",
             "type": "object",
             "properties": {
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name"
-            ]
-          }
-        },
-        "autoscaling": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "minReplicas": {
-              "type": "integer"
-            },
-            "maxReplicas": {
-              "type": "integer"
-            },
-            "targetCPUUtilizationPercentage": {
-              "type": "integer"
+                "configs": {
+                    "description": "Set other environment variables from config map",
+                    "type": "object"
+                },
+                "containerPort": {
+                    "description": "Container port",
+                    "type": "integer"
+                },
+                "containerSecurityContext": {
+                    "description": "Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core",
+                    "type": "object",
+                    "properties": {
+                        "runAsNonRoot": {
+                            "description": "Run as non-root",
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "enableEngine": {
+                    "description": "Whether to enable the serving engine",
+                    "type": "boolean"
+                },
+                "extraPorts": {
+                    "description": "Extra service ports for models",
+                    "type": "array"
+                },
+                "imagePullPolicy": {
+                    "description": "image pull policy for the model deployment",
+                    "type": "string",
+                    "enum": [
+                        "Always",
+                        "IfNotPresent",
+                        "Never"
+                    ]
+                },
+                "labels": {
+                    "description": "Customized labels for the serving engine deployment",
+                    "type": "object"
+                },
+                "livenessProbe": {
+                    "description": "Liveness probe configuration",
+                    "type": "object",
+                    "properties": {
+                        "failureThreshold": {
+                            "description": "Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive",
+                            "type": "integer"
+                        },
+                        "httpGet": {
+                            "description": "Configuration of the Kubelet http request on the server",
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "description": "Path to access on the HTTP server",
+                                    "type": "string"
+                                },
+                                "port": {
+                                    "description": "Name or number of the port to access on the container, on which the server is listening",
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
+                                }
+                            }
+                        },
+                        "initialDelaySeconds": {
+                            "description": "Number of seconds after the container has started before liveness probe is initiated",
+                            "type": "integer"
+                        },
+                        "periodSeconds": {
+                            "description": "How often (in seconds) to perform the liveness probe",
+                            "type": "integer"
+                        }
+                    }
+                },
+                "modelSpec": {
+                    "description": "Array of specifications for configuring multiple serving engine deployments running different models. Each entry in the modelSpec array should contain the following fields # The model below serves as an example. It is not deployed by default.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "affinity": {
+                                "description": "Affinity configuration",
+                                "type": "object"
+                            },
+                            "annotations": {
+                                "description": "The annotations to add to the deployment",
+                                "type": "object"
+                            },
+                            "enableLoRA": {
+                                "description": "Whether to enable LoRA",
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "description": "Whether to deploy the model. it Default to true if not set",
+                                "type": "boolean"
+                            },
+                            "env": {
+                                "description": "The environment variables to set in the container, e.g., your HF_TOKEN",
+                                "type": "array"
+                            },
+                            "envFromSecret": {
+                                "description": "Reference to an existing Kubernetes Secret from which all key/value pairs will be loaded as environment variables into the container",
+                                "type": "object"
+                            },
+                            "extraVolumeMounts": {
+                                "description": "Additional volume mounts to add to the container, in Kubernetes volumeMount format",
+                                "type": "array"
+                            },
+                            "extraVolumes": {
+                                "description": "Additional volumes to add to the pod, in Kubernetes volume format",
+                                "type": "array"
+                            },
+                            "hf_token": {
+                                "description": "Hugging Face token configuration. Can be either a string that will be stored in a generated secret or an object referencing an existing secret.",
+                                "type": [
+                                    "string",
+                                    "object"
+                                ],
+                                "properties": {
+                                    "secretKey": {
+                                        "description": "Key within the secret that contains the Hugging Face token",
+                                        "type": "string"
+                                    },
+                                    "secretName": {
+                                        "description": "Name of the existing Kubernetes secret that contains the Hugging Face token",
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "imagePullSecret": {
+                                "description": "Name of secret with credentials to private container repository",
+                                "type": "string"
+                            },
+                            "initContainer": {
+                                "description": "The configuration for the init container to be run before the main container.",
+                                "type": "object",
+                                "properties": {
+                                    "args": {
+                                        "description": "Additional arguments to pass to the command",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "command": {
+                                        "description": "The command to run in the init container",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "env": {
+                                        "description": "List of environment variables to set in the container",
+                                        "type": "array"
+                                    },
+                                    "extraVolumeMounts": {
+                                        "description": "Additional volume mounts to add to the init container, in Kubernetes volumeMount format. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#volumemount-v1-core",
+                                        "type": "array"
+                                    },
+                                    "image": {
+                                        "description": "The Docker image for the init container",
+                                        "type": "string"
+                                    },
+                                    "mountPvcStorage": {
+                                        "description": "Whether to mount the model's volume",
+                                        "type": "boolean"
+                                    },
+                                    "name": {
+                                        "description": "The name of the init container",
+                                        "type": "string"
+                                    },
+                                    "resources": {
+                                        "description": "The resource requests and limits for the container",
+                                        "type": "object"
+                                    }
+                                }
+                            },
+                            "keda": {
+                                "description": "KEDA autoscaling configuration for this model deployment. Requires KEDA to be installed in the cluster.",
+                                "type": "object",
+                                "properties": {
+                                    "advanced": {
+                                        "description": "Advanced KEDA configuration",
+                                        "type": "object",
+                                        "properties": {
+                                            "horizontalPodAutoscalerConfig": {
+                                                "description": "HPA-specific configuration",
+                                                "type": "object",
+                                                "properties": {
+                                                    "behavior": {
+                                                        "description": "HPA scaling behavior configuration, see https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
+                                                        "type": "object"
+                                                    },
+                                                    "name": {
+                                                        "description": "Custom name for the HPA resource",
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            },
+                                            "restoreToOriginalReplicaCount": {
+                                                "description": "Restore original replica count when ScaledObject is deleted",
+                                                "type": "boolean"
+                                            },
+                                            "scalingModifiers": {
+                                                "description": "Scaling modifiers for composite metrics",
+                                                "type": "object",
+                                                "properties": {
+                                                    "activationTarget": {
+                                                        "description": "Activation target for the composed metric",
+                                                        "type": "string"
+                                                    },
+                                                    "formula": {
+                                                        "description": "Formula to compose metrics together",
+                                                        "type": "string"
+                                                    },
+                                                    "metricType": {
+                                                        "description": "Metric type (AverageValue or Value)",
+                                                        "type": "string"
+                                                    },
+                                                    "target": {
+                                                        "description": "Target value for the composed metric",
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "cooldownPeriod": {
+                                        "description": "How long to wait before scaling down after scaling up (in seconds).",
+                                        "type": "integer"
+                                    },
+                                    "enabled": {
+                                        "description": "Whether to enable KEDA autoscaling for this model",
+                                        "type": "boolean"
+                                    },
+                                    "fallback": {
+                                        "description": "Fallback configuration when scaler fails",
+                                        "type": "object",
+                                        "properties": {
+                                            "failureThreshold": {
+                                                "description": "Number of consecutive failures before fallback",
+                                                "type": "integer"
+                                            },
+                                            "replicas": {
+                                                "description": "Number of replicas to scale to in fallback",
+                                                "type": "integer"
+                                            }
+                                        }
+                                    },
+                                    "idleReplicaCount": {
+                                        "description": "Number of replicas to scale to when no triggers are active",
+                                        "type": "integer"
+                                    },
+                                    "initialCooldownPeriod": {
+                                        "description": "Initial cooldown period in seconds before scaling down after creation",
+                                        "type": "integer"
+                                    },
+                                    "maxReplicaCount": {
+                                        "description": "Maximum number of replicas",
+                                        "type": "integer"
+                                    },
+                                    "minReplicaCount": {
+                                        "description": "Minimum number of replicas (supports 0 for scale-to-zero)",
+                                        "type": "integer",
+                                        "minimum": 0
+                                    },
+                                    "pollingInterval": {
+                                        "description": "How often KEDA should check the metrics (in seconds)",
+                                        "type": "integer"
+                                    },
+                                    "triggers": {
+                                        "description": "List of KEDA trigger configurations",
+                                        "type": "object",
+                                        "properties": {
+                                            "metadata": {
+                                                "description": "Trigger metadata",
+                                                "type": "object",
+                                                "properties": {
+                                                    "metricName": {
+                                                        "description": "Name of the metric to monitor",
+                                                        "type": "string"
+                                                    },
+                                                    "query": {
+                                                        "description": "Prometheus query to fetch the metric",
+                                                        "type": "string"
+                                                    },
+                                                    "serverAddress": {
+                                                        "description": "Prometheus server address",
+                                                        "type": "string"
+                                                    },
+                                                    "threshold": {
+                                                        "description": "Threshold value that triggers scaling",
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            },
+                                            "type": {
+                                                "description": "Trigger type",
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "limitCPU": {
+                                "description": "The CPU limit for the model. If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.",
+                                "type": [
+                                    "integer",
+                                    "number",
+                                    "string"
+                                ]
+                            },
+                            "limitGPUCores": {
+                                "description": "Requires HAMi. The limit of GPU cores. Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage",
+                                "type": "string"
+                            },
+                            "limitGPUMem": {
+                                "description": "Requires HAMi. The limit of GPU memory. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage",
+                                "type": "string"
+                            },
+                            "limitGPUMemPercentage": {
+                                "description": "Requires HAMi. The limit of GPU memory of GPU",
+                                "type": "string"
+                            },
+                            "limitMemory": {
+                                "description": "The memory limit for the model. If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.",
+                                "type": "string"
+                            },
+                            "lmcacheConfig": {
+                                "description": "The configuration of the LMCache for KV offloading",
+                                "type": "object",
+                                "properties": {
+                                    "cpuOffloadingBufferSize": {
+                                        "description": "The CPU offloading buffer size",
+                                        "type": [
+                                            "integer",
+                                            "number",
+                                            "string"
+                                        ]
+                                    },
+                                    "enabled": {
+                                        "description": "Enable LMCache",
+                                        "type": "boolean"
+                                    },
+                                    "logLevel": {
+                                        "description": "The log level for LMCache, e.g., \"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\"",
+                                        "type": "string",
+                                        "enum": [
+                                            "DEBUG",
+                                            "INFO",
+                                            "WARNING",
+                                            "ERROR"
+                                        ]
+                                    }
+                                }
+                            },
+                            "modelURL": {
+                                "description": "The URL of the model",
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "nodeName": {
+                                "description": "Directly assigns a pod to a specific node (e.g., \"192.168.56.5\"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.",
+                                "type": "string"
+                            },
+                            "nodeSelectorTerms": {
+                                "description": "The node selector terms to match the nodes. When both affinity and nodeSelectorTerms are defined, nodeSelectorTerms will be ignored.",
+                                "type": "array"
+                            },
+                            "podAnnotations": {
+                                "description": "The annotations to add to the pods",
+                                "type": "object"
+                            },
+                            "priorityClassName": {
+                                "description": "The name of the priority class name for the deployment",
+                                "type": "string"
+                            },
+                            "pvcAccessMode": {
+                                "description": "The access mode policy for the mounted volume.",
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "pvcAnnotations": {
+                                "description": "The annotations to add to the PVC",
+                                "type": "object"
+                            },
+                            "pvcLabels": {
+                                "description": "The labels to add to the PVC",
+                                "type": "object"
+                            },
+                            "pvcMatchLabels": {
+                                "description": "The labels to match the PVC.",
+                                "type": "object"
+                            },
+                            "pvcStorage": {
+                                "description": "The amount of storage requested for the model",
+                                "type": "string"
+                            },
+                            "raySpec": {
+                                "description": "RaySec configuration, to deploy the model as a rayCluster instead of a deployment",
+                                "type": "object",
+                                "properties": {
+                                    "enabled": {
+                                        "description": "Whether to deploy the model as a rayCluster",
+                                        "type": "boolean"
+                                    },
+                                    "headNode": {
+                                        "description": "Head node configuration",
+                                        "type": "object",
+                                        "properties": {
+                                            "requestCPU": {
+                                                "description": "CPU request for the head node",
+                                                "type": "integer"
+                                            },
+                                            "requestGPU": {
+                                                "description": "GPU request for the head node",
+                                                "type": "integer"
+                                            },
+                                            "requestMemory": {
+                                                "description": "Memory request for the head node",
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "replicaCount": {
+                                "description": "Chat template (Jinga2) specifying tokenizer configuration chatTemplate: \"{% for message in messages %}\\n{% if message['role'] == 'user' %}\\n{{ 'Question:\\n' + message['content'] + '\\n\\n' }}{% elif message['role'] == 'system' %}\\n{{ 'System:\\n' + message['content'] + '\\n\\n' }}{% elif message['role'] == 'assistant' %}{{ 'Answer:\\n'  + message['content'] + '\\n\\n' }}{% endif %}\\n{% if loop.last and add_generation_prompt %}\\n{{ 'Answer:\\n' }}{% endif %}{% endfor %}\"",
+                                "type": "integer"
+                            },
+                            "repository": {
+                                "description": "The repository of the model",
+                                "type": "string"
+                            },
+                            "requestCPU": {
+                                "description": "The number of CPUs requested for the model",
+                                "type": "integer"
+                            },
+                            "requestGPU": {
+                                "description": "The number of GPUs requested for the model",
+                                "type": [
+                                    "integer",
+                                    "number",
+                                    "string"
+                                ]
+                            },
+                            "requestGPUCores": {
+                                "description": "Requires HAMi. The percentage of GPU cores requested, e.g., \"10\". Each unit equals to 1% device cores. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-core-usage",
+                                "type": "string"
+                            },
+                            "requestGPUMem": {
+                                "description": "Requires HAMi. The amount of GPU memory requested. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage",
+                                "type": "string"
+                            },
+                            "requestGPUMemPercentage": {
+                                "description": "Requires HAMi. The percentage of GPU memory requested, e.g., \"80\". It cannot be used together with requestGPUMem.",
+                                "type": "string"
+                            },
+                            "requestGPUType": {
+                                "description": "The type of GPU requested. If not specified, defaults to \"nvidia.com/gpu\"",
+                                "type": "string"
+                            },
+                            "requestMemory": {
+                                "description": "The amount of memory requested for the model",
+                                "type": "string"
+                            },
+                            "resources": {
+                                "description": "a resources block containing requests and limits. If specified, this takes priority over simplified resource fields",
+                                "type": "object"
+                            },
+                            "runtimeClassName": {
+                                "description": "Runtime class for the pod, e.g., \"nvidia\". If not specified, falls back to servingEngineSpec.runtimeClassName",
+                                "type": "string"
+                            },
+                            "serviceAccountName": {
+                                "description": "The name of the service account to use for the deployment",
+                                "type": "string"
+                            },
+                            "shmSize": {
+                                "description": "The size of the shared memory",
+                                "type": "string"
+                            },
+                            "storageClass": {
+                                "description": "The storage class of the PVC",
+                                "type": "string"
+                            },
+                            "tag": {
+                                "description": "The tag of the model",
+                                "type": "string"
+                            },
+                            "vllmConfig": {
+                                "description": "The configuration for the VLLM model",
+                                "type": "object",
+                                "properties": {
+                                    "convert": {
+                                        "description": "The conversion type for the model, can be \"token_embed\", \"embed\", \"token_classify\", \"classify\", or \"score\".",
+                                        "type": "string",
+                                        "enum": [
+                                            "token_embed",
+                                            "embed",
+                                            "token_classify",
+                                            "classify",
+                                            "score"
+                                        ]
+                                    },
+                                    "dtype": {
+                                        "description": "The data type",
+                                        "type": "string"
+                                    },
+                                    "enableChunkedPrefill": {
+                                        "description": "Enable chunked prefill.",
+                                        "type": "boolean"
+                                    },
+                                    "enablePrefixCaching": {
+                                        "description": "Enable prefix caching",
+                                        "type": "boolean"
+                                    },
+                                    "extraArgs": {
+                                        "description": "Extra command line arguments to pass to vLLM",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "gpuMemoryUtilization": {
+                                        "description": "The fraction of GPU memory to be used for the model executor, which can range from 0 to 1",
+                                        "type": [
+                                            "integer",
+                                            "number",
+                                            "string"
+                                        ]
+                                    },
+                                    "maxLoras": {
+                                        "description": "The maximum number of LoRA models to be loaded in a single batch",
+                                        "type": "integer"
+                                    },
+                                    "maxModelLen": {
+                                        "description": "The maximum model length",
+                                        "type": "integer"
+                                    },
+                                    "maxNumSeqs": {
+                                        "description": "Maximum number of sequences to be processed in a single iteration.",
+                                        "type": "integer"
+                                    },
+                                    "runner": {
+                                        "description": "The runner type for the model, can be auto or pooling",
+                                        "type": "string",
+                                        "enum": [
+                                            "auto",
+                                            "pooling"
+                                        ]
+                                    },
+                                    "tensorParallelSize": {
+                                        "description": "The degree of tensor parallelism",
+                                        "type": "integer"
+                                    },
+                                    "v0": {
+                                        "description": "Specify to 1 to use vLLM v0, otherwise vLLM v1 is used",
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "readinessProbe": {
+                    "description": "Readiness probe configuration",
+                    "type": "object",
+                    "properties": {
+                        "failureThreshold": {
+                            "description": "Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not alive",
+                            "type": "integer"
+                        },
+                        "httpGet": {
+                            "description": "Configuration of the Kubelet http request on the server",
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "description": "Path to access on the HTTP server",
+                                    "type": "string"
+                                },
+                                "port": {
+                                    "description": "Name or number of the port to access on the container, on which the server is listening",
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
+                                }
+                            }
+                        },
+                        "initialDelaySeconds": {
+                            "description": "Number of seconds after the container has started before readiness probe is initiated",
+                            "type": "integer"
+                        },
+                        "periodSeconds": {
+                            "description": "How often (in seconds) to perform the readiness probe",
+                            "type": "integer"
+                        }
+                    }
+                },
+                "runtimeClassName": {
+                    "description": "RuntimeClassName configuration, set to \"nvidia\" if the model requires GPU",
+                    "type": "string"
+                },
+                "schedulerName": {
+                    "description": "SchedulerName configuration",
+                    "type": "string"
+                },
+                "securityContext": {
+                    "description": "Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core",
+                    "type": "object"
+                },
+                "serviceMonitor": {
+                    "description": "ServiceMonitor configuration to collect serving engine metrics",
+                    "type": "object",
+                    "properties": {
+                        "additionalLabels": {
+                            "description": "Additional labels",
+                            "type": "object"
+                        },
+                        "enabled": {
+                            "description": "Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics",
+                            "type": "boolean"
+                        },
+                        "honorLabels": {
+                            "description": "Let prometheus add an exported_ prefix to conflicting labels",
+                            "type": "boolean"
+                        },
+                        "interval": {
+                            "description": "Interval to scrape metrics",
+                            "type": "string"
+                        },
+                        "metricRelabelings": {
+                            "description": "Metric relabel configs to apply to samples before ingestion. [Metric Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs)",
+                            "type": "array"
+                        },
+                        "relabelings": {
+                            "description": "Relabel configs to apply to samples before ingestion. [Relabeling](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config)",
+                            "type": "array"
+                        },
+                        "scrapeTimeout": {
+                            "description": "Timeout if metrics can't be retrieved in given time interval",
+                            "type": "string"
+                        }
+                    }
+                },
+                "servicePort": {
+                    "description": "Service port",
+                    "type": "integer"
+                },
+                "sidecar": {
+                    "description": "Sidecar configuration",
+                    "type": "object",
+                    "properties": {
+                        "image": {
+                            "description": "Docker image repository and tag for the sidecar",
+                            "type": "string"
+                        },
+                        "imagePullPolicy": {
+                            "description": "image pull policy for the sidecar",
+                            "type": "string",
+                            "enum": [
+                                "Always",
+                                "IfNotPresent",
+                                "Never"
+                            ]
+                        }
+                    }
+                },
+                "startupProbe": {
+                    "description": "Readiness probe configuration",
+                    "type": "object",
+                    "properties": {
+                        "failureThreshold": {
+                            "description": "Number of times after which if a probe fails in a row, Kubernetes considers that the overall check has failed: the container is not ready",
+                            "type": "integer"
+                        },
+                        "httpGet": {
+                            "description": "Configuration of the Kubelet http request on the server",
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "description": "Path to access on the HTTP server",
+                                    "type": "string"
+                                },
+                                "port": {
+                                    "description": "Name or number of the port to access on the container, on which the server is listening",
+                                    "type": [
+                                        "integer",
+                                        "string"
+                                    ]
+                                }
+                            }
+                        },
+                        "initialDelaySeconds": {
+                            "description": "Number of seconds after the container has started before startup probe is initiated",
+                            "type": "integer"
+                        },
+                        "periodSeconds": {
+                            "description": "How often (in seconds) to perform the startup probe",
+                            "type": "integer"
+                        }
+                    }
+                },
+                "strategy": {
+                    "description": "deployment strategy",
+                    "type": "object"
+                },
+                "tolerations": {
+                    "description": "Tolerations configuration (when there are taints on nodes) Example: tolerations: - key: \"node-role.kubernetes.io/control-plane\" operator: \"Exists\" effect: \"NoSchedule\"",
+                    "type": "array"
+                },
+                "vllmApiKey": {
+                    "description": "API key for securing the vLLM models. Can be either a string that will be stored in a generated secret or an object referencing an existing secret.",
+                    "type": [
+                        "string",
+                        "object"
+                    ],
+                    "properties": {
+                        "secretKey": {
+                            "description": "Key within the secret that contains the vLLM API key",
+                            "type": "string"
+                        },
+                        "secretName": {
+                            "description": "Name of the existing Kubernetes secret that contains the vLLM API key",
+                            "type": "string"
+                        }
+                    }
+                }
             }
-          }
         },
-        "containerPort": {
-          "type": "integer"
-        },
-        "securityContext": {
-          "type": "object",
-          "description": "Pod-level security context configuration",
-          "additionalProperties": true
-        },
-        "containerSecurityContext": {
-          "type": "object",
-          "description": "Container-level security context configuration",
-          "additionalProperties": true
-        },
-        "servicePort": {
-          "type": "integer"
-        },
-        "nodePort": {
-          "type": "integer",
-          "description": "Fixed NodePort for the router service when serviceType is NodePort. If unset, Kubernetes assigns a random port.",
-          "minimum": 30000,
-          "maximum": 32767
-        },
-        "serviceDiscovery": {
-          "type": "string",
-          "description": "Service discovery mode. Available values: k8s or static.",
-          "enum": [
-            "k8s",
-            "static"
-          ]
-        },
-        "k8sServiceDiscoveryType": {
-          "type": "string",
-          "description": "Kubernetes service discovery type. Available values: pod-ip and service-name.",
-          "enum": [
-            "pod-ip",
-            "service-name"
-          ]
-        },
-        "routingLogic": {
-          "type": "string"
-        },
-        "sessionKey": {
-          "type": "string"
-        },
-        "extraArgs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "engineScrapeInterval": {
-          "type": "integer"
-        },
-        "requestStatsWindow": {
-          "type": "integer"
-        },
-        "vllmApiKey": {
-          "type": "object",
-          "properties": {
-            "secretName": {
-              "type": "string"
-            },
-            "secretKey": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "secretName",
-            "secretKey"
-          ]
-        },
-        "labels": {
-          "type": "object",
-          "properties": {
-            "environment": {
-              "type": "string"
-            },
-            "release": {
-              "type": "string"
-            }
-          }
-        },
-        "podAnnotations": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "otel": {
-          "type": "object",
-          "description": "OpenTelemetry tracing configuration for the router",
-          "properties": {
-            "endpoint": {
-              "type": "string",
-              "description": "OTLP endpoint for tracing (e.g., 'otel-collector:4317'). Tracing is enabled when this is set."
-            },
-            "serviceName": {
-              "type": "string",
-              "description": "Service name for OpenTelemetry traces",
-              "default": "vllm-router"
-            },
-            "secure": {
-              "type": "boolean",
-              "description": "Use secure (TLS) connection for OTLP exporter",
-              "default": false
-            }
-          }
-        }
-      }
-    },
-    "cacheserverSpec": {
-      "type": "object",
-      "description": "Configuration for the LMCache cache server deployment",
-      "properties": {
-        "repository": {
-          "type": "string",
-          "description": "Docker image repository for the cache server"
-        },
-        "tag": {
-          "type": "string",
-          "description": "Docker image tag for the cache server"
-        },
-        "imagePullSecrets": {
-          "type": "array",
-          "description": "Image pull secrets for private container registries",
-          "items": {
+        "sharedPvcStorage": {
+            "description": "Configuration for a shared PVC that can be mounted to multiple model deployments.",
             "type": "object",
             "properties": {
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name"
-            ]
-          }
-        },
-        "replicaCount": {
-          "type": "integer",
-          "description": "Number of replicas for the cache server pod"
-        },
-        "containerPort": {
-          "type": "integer",
-          "description": "Port the cache server container is listening on"
-        },
-        "servicePort": {
-          "type": "integer",
-          "description": "Port the cache server service will listen on"
-        },
-        "serviceType": {
-          "type": "string",
-          "description": "Kubernetes service type for the cache server"
-        },
-        "serde": {
-          "type": "string",
-          "description": "Serialization/deserialization format for the cache server"
-        },
-        "labels": {
-          "type": "object",
-          "description": "Customized labels for the cache server deployment",
-          "properties": {
-            "environment": {
-              "type": "string"
-            },
-            "release": {
-              "type": "string"
-            }
-          }
-        },
-        "podAnnotations": {
-          "type": "object",
-          "description": "Annotations to add to the cache server pods",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "strategy": {
-          "type": "object",
-          "description": "Deployment strategy for the cache server pods",
-          "additionalProperties": true
-        },
-        "maxUnavailablePodDisruptionBudget": {
-          "type": "string",
-          "description": "Configuration for the PodDisruptionBudget maxUnavailable field"
-        },
-        "tolerations": {
-          "type": "array",
-          "description": "Tolerations configuration for the cache server pods",
-          "items": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        },
-        "nodeSelectorTerms": {
-          "type": "array",
-          "description": "Node selector terms. Ignored if affinity is specified.",
-          "items": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        },
-        "runtimeClassName": {
-          "type": "string",
-          "description": "RuntimeClassName configuration for the cache server pods"
-        },
-        "schedulerName": {
-          "type": "string",
-          "description": "SchedulerName configuration for the cache server pods"
-        },
-        "priorityClassName": {
-          "type": "string",
-          "description": "Priority class for the cache server pods"
-        },
-        "securityContext": {
-          "type": "object",
-          "description": "Pod-level security context configuration",
-          "additionalProperties": true
-        },
-        "containerSecurityContext": {
-          "type": "object",
-          "description": "Container-level security context configuration",
-          "additionalProperties": true
-        },
-        "affinity": {
-          "type": "object",
-          "description": "Affinity configuration. If specified, takes precedence over nodeSelectorTerms.",
-          "additionalProperties": true
-        },
-        "resources": {
-          "type": "object",
-          "description": "Resource requests and limits for the cache server container",
-          "properties": {
-            "requests": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              },
-              "properties": {
-                "cpu": {
-                  "type": "string"
+                "accessModes": {
+                    "description": "Access modes for the shared storage volume",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
-                "memory": {
-                  "type": "string"
-                }
-              }
-            },
-            "limits": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              },
-              "properties": {
-                "cpu": {
-                  "type": "string"
+                "enabled": {
+                    "description": "Whether to enable shared storage for the models",
+                    "type": "boolean"
                 },
-                "memory": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "startupProbe": {
-          "type": "object",
-          "description": "Configuration for the startup probe",
-          "properties": {
-            "initialDelaySeconds": {
-              "type": "integer"
-            },
-            "periodSeconds": {
-              "type": "integer"
-            },
-            "failureThreshold": {
-              "type": "integer"
-            },
-            "timeoutSeconds": {
-              "type": "integer"
-            },
-            "httpGet": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string"
+                "hostPath": {
+                    "description": "Host path for the shared storage volume. Specifying a hostPath or nfs server will create a PersistentVolume. These fields should be omitted to rely on dynamic provisioning of PersistentVolumeClaim.",
+                    "type": "string"
                 },
-                "port": {
-                  "type": "integer"
-                }
-              }
-            }
-          }
-        },
-        "livenessProbe": {
-          "type": "object",
-          "description": "Configuration for the liveness probe",
-          "properties": {
-            "initialDelaySeconds": {
-              "type": "integer"
-            },
-            "periodSeconds": {
-              "type": "integer"
-            },
-            "failureThreshold": {
-              "type": "integer"
-            },
-            "timeoutSeconds": {
-              "type": "integer"
-            },
-            "httpGet": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string"
+                "image": {
+                    "description": "Docker image used in the lora Controller as an init container to set permissions in the PVC",
+                    "type": "object",
+                    "properties": {
+                        "repository": {
+                            "description": "Docker image repository",
+                            "type": "string"
+                        },
+                        "tag": {
+                            "description": "Docker image tag",
+                            "type": "string"
+                        }
+                    }
                 },
-                "port": {
-                  "type": "integer"
+                "nfs": {
+                    "description": "NFS configuration for the shared storage volume",
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "description": "NFS export path for the shared storage volume",
+                            "type": "string"
+                        },
+                        "server": {
+                            "description": "NFS server address for the shared storage volume",
+                            "type": "string"
+                        }
+                    }
+                },
+                "size": {
+                    "description": "Size of the shared storage volume",
+                    "type": "string"
+                },
+                "storageClass": {
+                    "description": "Storage class name for the shared storage volume",
+                    "type": "string"
                 }
-              }
             }
-          }
         }
-      },
-      "required": [
-        "repository",
-        "tag",
-        "containerPort"
-      ]
     }
-  }
 }
