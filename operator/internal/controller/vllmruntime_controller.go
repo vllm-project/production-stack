@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -51,6 +52,8 @@ type VLLMRuntimeReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=keda.sh,resources=scaledobjects,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=production-stack.vllm.ai,resources=vllmruntimes/scale,verbs=get;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -320,6 +323,35 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 		}
 		// Deployment updated successfully - return and requeue
 		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Create, update or delete KEDA ScaledObject
+	if vllmRuntime.Spec.AutoscalingConfig != nil && vllmRuntime.Spec.AutoscalingConfig.Enabled {
+		cfg := vllmRuntime.Spec.AutoscalingConfig
+		if *cfg.MinReplicas > cfg.MaxReplicas {
+			log.Error(nil, "Invalid autoscaling config: minReplicas must be <= maxReplicas",
+				"minReplicas", *cfg.MinReplicas, "maxReplicas", cfg.MaxReplicas)
+			return ctrl.Result{}, fmt.Errorf("minReplicas (%d) must be <= maxReplicas (%d)", *cfg.MinReplicas, cfg.MaxReplicas)
+		}
+		if cfg.MaxReplicas < vllmRuntime.Spec.DeploymentConfig.Replicas {
+			log.Error(nil, "Invalid autoscaling config: maxReplicas must be >= deploymentConfig.replicas",
+				"maxReplicas", cfg.MaxReplicas, "replicas", vllmRuntime.Spec.DeploymentConfig.Replicas)
+			return ctrl.Result{}, fmt.Errorf("maxReplicas (%d) must be >= deploymentConfig.replicas (%d)", cfg.MaxReplicas, vllmRuntime.Spec.DeploymentConfig.Replicas)
+		}
+		if err := r.reconcileScaledObject(ctx, vllmRuntime); err != nil {
+			log.Error(err, "Failed to reconcile ScaledObject")
+			return ctrl.Result{}, err
+		}
+	} else {
+		scaledObject := &unstructured.Unstructured{}
+		scaledObject.SetAPIVersion("keda.sh/v1alpha1")
+		scaledObject.SetKind("ScaledObject")
+		scaledObject.SetName(vllmRuntime.Name + "-scaledobject")
+		scaledObject.SetNamespace(vllmRuntime.Namespace)
+		if err := r.Delete(ctx, scaledObject); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "Failed to delete ScaledObject")
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Update the status
@@ -1030,8 +1062,105 @@ func (r *VLLMRuntimeReconciler) updateStatus(
 			latestVR.Status.ModelStatus = "Unknown"
 		}
 
+		// Set replica count and selector for the scale subresource (required by HPA for AverageValue metrics)
+		latestVR.Status.Replicas = dep.Status.Replicas
+		latestVR.Status.Selector = metav1.FormatLabelSelector(dep.Spec.Selector)
+
 		return r.Status().Update(ctx, latestVR)
 	})
+}
+
+// reconcileScaledObject creates or updates the KEDA ScaledObject for autoscaling
+func (r *VLLMRuntimeReconciler) reconcileScaledObject(
+	ctx context.Context,
+	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
+) error {
+	cfg := vllmRuntime.Spec.AutoscalingConfig
+	jobName := vllmRuntime.Name
+
+	scaledObject := &unstructured.Unstructured{}
+	scaledObject.SetAPIVersion("keda.sh/v1alpha1")
+	scaledObject.SetKind("ScaledObject")
+	scaledObject.SetName(vllmRuntime.Name + "-scaledobject")
+	scaledObject.SetNamespace(vllmRuntime.Namespace)
+	scaledObject.SetOwnerReferences([]metav1.OwnerReference{
+		*metav1.NewControllerRef(vllmRuntime, productionstackv1alpha1.GroupVersion.WithKind("VLLMRuntime")),
+	})
+
+	prometheusAddr := cfg.Triggers.PrometheusAddress
+	servedModelName := vllmRuntime.Spec.Model.ModelURL
+
+	spec := map[string]interface{}{
+		"scaleTargetRef": map[string]interface{}{
+			"apiVersion": "production-stack.vllm.ai/v1alpha1",
+			"kind":       "VLLMRuntime",
+			"name":       vllmRuntime.Name,
+		},
+		"minReplicaCount": *cfg.MinReplicas,
+		"maxReplicaCount": cfg.MaxReplicas,
+		"pollingInterval": *cfg.PollingInterval,
+		"cooldownPeriod":  *cfg.ScaleDownPolicy.ScaleToZeroDelaySeconds,
+		"advanced": map[string]interface{}{
+			"horizontalPodAutoscalerConfig": map[string]interface{}{
+				"behavior": map[string]interface{}{
+					"scaleUp": map[string]interface{}{
+						"stabilizationWindowSeconds": *cfg.ScaleUpPolicy.StabilizationWindowSeconds,
+						"policies": []map[string]interface{}{
+							{"type": "Pods", "value": *cfg.ScaleUpPolicy.PodValue, "periodSeconds": *cfg.ScaleUpPolicy.PeriodSeconds},
+						},
+					},
+					"scaleDown": map[string]interface{}{
+						"stabilizationWindowSeconds": *cfg.ScaleDownPolicy.StabilizationWindowSeconds,
+						"policies": []map[string]interface{}{
+							{"type": "Pods", "value": *cfg.ScaleDownPolicy.PodValue, "periodSeconds": *cfg.ScaleDownPolicy.PeriodSeconds},
+						},
+					},
+				},
+			},
+		},
+		"triggers": []map[string]interface{}{
+			{
+				"type":       "prometheus",
+				"metricType": "Value",
+				"metadata": map[string]string{
+					"serverAddress": prometheusAddr,
+					"metricName":    "vllm_incoming_keepalive",
+					"query":         fmt.Sprintf(`sum(rate(vllm:num_incoming_requests_total{namespace="%s", model="%s"}[1m]) > bool 0)`, vllmRuntime.Namespace, servedModelName),
+					"threshold":     "1",
+				},
+			},
+			{
+				"type": "prometheus",
+				"metadata": map[string]string{
+					"serverAddress": prometheusAddr,
+					"metricName":    "vllm_requests_running",
+					"query":         fmt.Sprintf(`sum(vllm:num_requests_running{job="%s"})`, jobName),
+					"threshold":     fmt.Sprintf("%d", *cfg.Triggers.RequestsRunningThreshold),
+				},
+			},
+			{
+				"type": "prometheus",
+				"metadata": map[string]string{
+					"serverAddress": prometheusAddr,
+					"metricName":    "vllm_generation_tokens_rate",
+					"query":         fmt.Sprintf(`sum(rate(vllm:generation_tokens_total{job="%s"}[1m]))`, jobName),
+					"threshold":     fmt.Sprintf("%d", *cfg.Triggers.GenerationTokensThreshold),
+				},
+			},
+			{
+				"type": "prometheus",
+				"metadata": map[string]string{
+					"serverAddress": prometheusAddr,
+					"metricName":    "vllm_prompt_tokens_rate",
+					"query":         fmt.Sprintf(`sum(rate(vllm:prompt_tokens_total{job="%s"}[1m]))`, jobName),
+					"threshold":     fmt.Sprintf("%d", *cfg.Triggers.PromptTokensThreshold),
+				},
+			},
+		},
+	}
+
+	scaledObject.Object["spec"] = spec
+	return r.Client.Patch(ctx, scaledObject, client.Apply, client.FieldOwner("vllmruntime-controller"))
 }
 
 // serviceForVLLMRuntime returns a VLLMRuntime Service object
