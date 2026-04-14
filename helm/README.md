@@ -117,6 +117,8 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].env` | list | - | (Optional) Environment variables for the container |
 | `servingEngineSpec.modelSpec[].nodeName` | string | - | (Optional) Direct node assignment |
 | `servingEngineSpec.modelSpec[].nodeSelectorTerms` | list | - | (Optional) Node selector terms |
+| `servingEngineSpec.modelSpec[].tolerations` | list | - | (Optional) Per-model tolerations. Merged with or replaces `servingEngineSpec.tolerations` according to `tolerationsPolicy` |
+| `servingEngineSpec.modelSpec[].tolerationsPolicy` | string | `"append"` | (Optional) How per-model tolerations interact with global tolerations. `"append"` unions both lists; `"override"` replaces global tolerations entirely for this model |
 
 #### Init Container Configuration
 
