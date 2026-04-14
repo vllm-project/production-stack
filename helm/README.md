@@ -301,7 +301,7 @@ This table documents all available configuration values for the Production Stack
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `cacheserverSpec.enabled` | boolean | `false` | Whether to enable the cache server deployment |
-| `cacheserverSpec.image.repository` | string | `"lmcache/lmstack-cache-server"` | Docker image repository for the cache server |
+| `cacheserverSpec.image.repository` | string | `"lmcache/vllm-openai"` | Docker image repository for the cache server |
 | `cacheserverSpec.image.tag` | string | `"latest"` | Docker image tag for the cache server |
 | `cacheserverSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the cache server |
 | `cacheserverSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
@@ -317,7 +317,7 @@ This table documents all available configuration values for the Production Stack
 | `cacheserverSpec.runtimeClassName` | string | `""` | RuntimeClassName configuration for the cache server pods |
 | `cacheserverSpec.schedulerName` | string | `""` | SchedulerName configuration for the cache server pods |
 | `cacheserverSpec.securityContext` | map | `{}` | Pod-level security context configuration |
-| `cacheserverSpec.containerSecurityContext` | map | `{runAsNonRoot: false}` | Container-level security context configuration |
+| `cacheserverSpec.containerSecurityContext` | map | `{}` | Container-level security context configuration |
 | `cacheserverSpec.priorityClassName` | string | - | Priority class for cache server |
 | `cacheserverSpec.affinity` | map | - | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
 | `cacheserverSpec.nodeSelector` | map | - | (Optional) nodeSelector for the cache pods. |
