@@ -546,6 +546,10 @@ spec:
           status:
             description: VLLMRuntimeStatus defines the observed state of VLLMRuntime
             properties:
+              availableReplicas:
+                description: Number of pods that are ready and serving traffic
+                format: int32
+                type: integer
               lastUpdated:
                 description: Last updated timestamp
                 format: date-time
@@ -561,6 +565,14 @@ spec:
                 description: Label selector for pods (used by scale subresource for
                   HPA AverageValue)
                 type: string
+              unavailableReplicas:
+                description: Number of pods that are not yet available
+                format: int32
+                type: integer
+              updatedReplicas:
+                description: Number of pods running the latest pod template
+                format: int32
+                type: integer
             type: object
         type: object
     served: true
