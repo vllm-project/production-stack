@@ -35,7 +35,9 @@ class ExternalProviderConfig:
     models: list[ExternalModelConfig] = field(default_factory=list)
     api_key_env_var: Optional[str] = None
 
-    timeout: float = 10.0
+    # Timeout in seconds applied to socket connect and per-read operations.
+    # A total timeout is intentionally not set so long streaming responses are not cut off.
+    timeout: float = 30.0
     max_retries: int = 3
     custom_headers: Dict[str, str] = field(default_factory=dict)
 
@@ -77,7 +79,7 @@ class ExternalProviderConfig:
             api_base=data["api_base"],
             models=models,
             api_key_env_var=data.get("api_key_env_var"),
-            timeout=data.get("timeout", 10.0),
+            timeout=data.get("timeout", 30.0),
             max_retries=data.get("max_retries", 3),
             custom_headers=data.get("custom_headers", {}),
         )

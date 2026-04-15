@@ -33,7 +33,10 @@ class OpenAIProvider(ExternalProviderAdapter):
         """Get or create an aiohttp ClientSession for making requests."""
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=self.config.timeout)
+                timeout=aiohttp.ClientTimeout(
+                    connect=self.config.timeout,
+                    sock_read=self.config.timeout,
+                )
             )
         return self._session
 

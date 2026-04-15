@@ -72,7 +72,7 @@ class TestExternalProviderConfig:
         assert cfg.type == "openai"
         assert cfg.api_base == "https://api.openai.com"
         assert cfg.models == []
-        assert cfg.timeout == 10.0
+        assert cfg.timeout == 30.0
         assert cfg.max_retries == 3
         assert cfg.custom_headers == {}
 
