@@ -57,6 +57,7 @@ class DynamicRouterConfig:
     static_aliases: Optional[str] = None
     static_model_labels: Optional[str] = None
     static_model_types: Optional[str] = None
+    static_healthcheck_disabled: Optional[str] = None
     static_backend_health_checks: Optional[bool] = False
     static_backend_health_check_interval: Optional[int] = 60
     static_backend_health_check_timeout_seconds: Optional[int] = 10
@@ -97,6 +98,9 @@ class DynamicRouterConfig:
             static_backend_health_checks=args.static_backend_health_checks,
             static_backend_health_check_interval=args.static_backend_health_check_interval,
             static_backend_health_check_timeout_seconds=args.static_backend_health_check_timeout_seconds,
+            static_healthcheck_disabled=getattr(
+                args, "static_healthcheck_disabled", None
+            ),
             k8s_port=args.k8s_port,
             k8s_namespace=args.k8s_namespace,
             k8s_label_selector=args.k8s_label_selector,
@@ -176,6 +180,9 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 ),
                 model_labels=parse_comma_separated_args(config.static_model_labels),
                 model_types=parse_comma_separated_args(config.static_model_types),
+                healthcheck_disabled=parse_comma_separated_args(
+                    config.static_healthcheck_disabled
+                ),
                 static_backend_health_checks=config.static_backend_health_checks,
                 static_backend_health_check_interval=config.static_backend_health_check_interval,
                 static_backend_health_check_timeout_seconds=config.static_backend_health_check_timeout_seconds,
