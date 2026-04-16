@@ -61,10 +61,9 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           kubectl config use-context minikube
-          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
-          sudo docker push localhost:5000/git-act-router
           sudo sysctl fs.protected_regular=0
-          minikube image load localhost:5000/git-act-router
+          eval "$(minikube docker-env)"
+          docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router:ci -f docker/Dockerfile .
           helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
       - name: Validate the installation and send query to the stack
         run: |
@@ -219,10 +218,9 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           kubectl config use-context minikube
-          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
-          sudo docker push localhost:5000/git-act-router
           sudo sysctl fs.protected_regular=0
-          minikube image load localhost:5000/git-act-router
+          eval "$(minikube docker-env)"
+          docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router:ci -f docker/Dockerfile .
           helm install vllm ./helm -f .github/values-11-monitoring.yaml
       - name: Validate the installation and send query to the stack
         run: |
