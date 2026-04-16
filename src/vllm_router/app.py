@@ -202,6 +202,11 @@ def initialize_all(app: FastAPI, args):
             static_backend_health_check_timeout_seconds=args.static_backend_health_check_timeout_seconds,
             prefill_model_labels=args.prefill_model_labels,
             decode_model_labels=args.decode_model_labels,
+            fallback_models=(
+                parse_static_aliases(args.static_fallback_models)
+                if args.static_fallback_models
+                else None
+            ),
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(

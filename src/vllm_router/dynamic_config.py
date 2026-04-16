@@ -57,6 +57,7 @@ class DynamicRouterConfig:
     static_aliases: Optional[str] = None
     static_model_labels: Optional[str] = None
     static_model_types: Optional[str] = None
+    static_fallback_models: Optional[str] = None
     static_backend_health_checks: Optional[bool] = False
     static_backend_health_check_interval: Optional[int] = 60
     static_backend_health_check_timeout_seconds: Optional[int] = 10
@@ -97,6 +98,7 @@ class DynamicRouterConfig:
             static_backend_health_checks=args.static_backend_health_checks,
             static_backend_health_check_interval=args.static_backend_health_check_interval,
             static_backend_health_check_timeout_seconds=args.static_backend_health_check_timeout_seconds,
+            static_fallback_models=getattr(args, "static_fallback_models", None),
             k8s_port=args.k8s_port,
             k8s_namespace=args.k8s_namespace,
             k8s_label_selector=args.k8s_label_selector,
@@ -184,6 +186,11 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 ),
                 decode_model_labels=parse_comma_separated_args(
                     config.decode_model_labels
+                ),
+                fallback_models=(
+                    parse_static_aliases(config.static_fallback_models)
+                    if config.static_fallback_models
+                    else None
                 ),
             )
         elif config.service_discovery == "k8s":

@@ -29,6 +29,7 @@ The router can be configured using command-line arguments. Below are the availab
 - `--static-models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
 - `--static-aliases`: The aliases of the models running in the static serving engines, separated by commas and associated using colons (e.g., `model_alias1:model,mode_alias2:model`).
 - `--static-backend-health-checks`: Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.
+- `--static-fallback-models`: Fallback model mappings, separated by commas (e.g., `model1:fallback1,model2:fallback2`). When all backends for a model are unavailable, requests are retried on the fallback model.
 - `--k8s-port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
 - `--k8s-namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
 - `--k8s-label-selector`: The label selector to filter vLLM pods when using K8s service discovery.
@@ -108,6 +109,64 @@ different endpoints for each model type.
 > Enabling this flag will put some load on your backend every minute as real requests are send to the nodes
 > to test their functionality.
 
+## Fallback models
+
+When all backends for a model become unavailable (e.g. during node reboots), the
+router can automatically retry the request on a different **fallback model**. The
+model name in the request body is rewritten to the fallback model name before
+forwarding, so the fallback backend receives the correct model identifier.
+
+Fallback triggers in two situations:
+
+1. **No healthy endpoints** -- all backends have been marked unhealthy by the
+   periodic health check. The router switches to the fallback model immediately
+   without attempting the primary backends.
+2. **All instance-level failover attempts failed** -- the primary backends were
+   still considered healthy but every attempt returned a connection error (e.g.
+   the node went down between health checks). After exhausting
+   `--max-instance-failover-reroute-attempts`, the router retries once on the
+   fallback model.
+
+### Configuration
+
+**In a YAML config file**, add `fallback_model` to any model entry. The value
+must be the name of another model defined in `static_models`:
+
+```yaml
+static_models:
+    glm-5:
+        static_backends:
+            - https://gpu-node-1/glm-5
+            - https://gpu-node-2/glm-5
+        static_model_type: chat
+        fallback_model: glm-5-cloud   # fall back to the cloud-hosted variant
+    glm-5-cloud:
+        static_backends:
+            - http://cloud-gateway:1975
+        static_model_type: chat
+        healthcheck_disabled: true
+```
+
+**Via CLI**, use `--static-fallback-models` with comma-separated
+`model:fallback` pairs:
+
+```bash
+vllm-router --port 8000 \
+    --service-discovery static \
+    --static-backends "https://gpu-node-1/glm-5,https://gpu-node-2/glm-5,http://cloud-gateway:1975" \
+    --static-models "glm-5,glm-5,glm-5-cloud" \
+    --static-model-types "chat,chat,chat" \
+    --static-fallback-models "glm-5:glm-5-cloud" \
+    --static-backend-health-checks \
+    --max-instance-failover-reroute-attempts 2 \
+    --routing-logic roundrobin
+```
+
+Combining `fallback_model` with `--max-instance-failover-reroute-attempts` and a
+short `--static-backend-health-check-interval` gives the best resilience: failed
+requests are retried on other instances first, then on the fallback model, while
+the health check quickly removes dead backends from future routing decisions.
+
 ## Dynamic Router Config
 
 The router can be configured dynamically using a config file when passing the `--dynamic-config-yaml` or
@@ -128,6 +187,7 @@ Currently, the dynamic config supports the following fields:
 - (When using `static` service discovery) `static_models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
 - (When using `static` service discovery) `static_aliases`: The aliases of the models running in the static serving engines, separated by commas and associated using colons (e.g., `model_alias1:model,mode_alias2:model`).
 - (When using `static` service discovery and if you enable the `--static-backend-health-checks` flag) `static_model_types`: The model types running in the static serving engines, separated by commas (e.g., `chat,chat`).
+- (When using `static` service discovery) `fallback_model`: A per-model string in the YAML config (under each model entry) specifying another model to fall back to when all backends are unavailable.
 - (When using `k8s` service discovery) `k8s_port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
 - (When using `k8s` service discovery) `k8s_namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
 - (When using `k8s` service discovery) `k8s_label_selector`: The label selector to filter vLLM pods when using K8s service discovery.
