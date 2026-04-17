@@ -172,6 +172,13 @@ def parse_args():
         help="The model labels of static backends, separated by commas. E.g., model1,model2",
     )
     parser.add_argument(
+        "--static-fallback-models",
+        type=str,
+        default=None,
+        help="Fallback model mappings, separated by commas. E.g., model1:fallback1,model2:fallback2. "
+        "When all backends for a model are unavailable, requests are retried on the fallback model.",
+    )
+    parser.add_argument(
         "--static-backend-health-checks",
         action="store_true",
         help="Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.",

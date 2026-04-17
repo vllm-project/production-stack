@@ -217,6 +217,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         static_backend_health_check_timeout_seconds: int = 10,
         prefill_model_labels: List[str] | None = None,
         decode_model_labels: List[str] | None = None,
+        fallback_models: Dict[str, str] | None = None,
     ):
         self.app = app
         assert len(urls) == len(models), "URLs and models should have the same length"
@@ -225,6 +226,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.aliases = aliases
         self.model_labels = model_labels
         self.model_types = model_types
+        self.fallback_models = fallback_models or {}
         self.engines_id = [str(uuid.uuid4()) for i in range(0, len(urls))]
         self.added_timestamp = int(time.time())
         self.unhealthy_endpoint_hashes = []

@@ -37,6 +37,18 @@ def generate_static_model_types(models: dict[str, Any]) -> str:
     return ",".join(static_model_types)
 
 
+def generate_static_fallback_models(models: dict[str, Any]) -> str | None:
+    """Generate comma-separated fallback model mappings.
+
+    Format: model1:fallback1,model2:fallback2
+    """
+    fallback_models = []
+    for name, details in models.items():
+        if "fallback_model" in details:
+            fallback_models.append(f"{name}:{details['fallback_model']}")
+    return ",".join(fallback_models) if fallback_models else None
+
+
 def read_and_process_yaml_config_file(config_path: str) -> dict[str, Any]:
     with open(config_path, encoding="utf-8") as f:
         try:
@@ -49,6 +61,9 @@ def read_and_process_yaml_config_file(config_path: str) -> dict[str, Any]:
                 yaml_config["static_backends"] = generate_static_backends(models)
                 yaml_config["static_models"] = generate_static_models(models)
                 yaml_config["static_model_types"] = generate_static_model_types(models)
+                fallback_models = generate_static_fallback_models(models)
+                if fallback_models:
+                    yaml_config["static_fallback_models"] = fallback_models
             if aliases:
                 yaml_config["static_aliases"] = generate_static_aliases(aliases)
             return yaml_config

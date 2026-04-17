@@ -98,6 +98,48 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
 }
 
 
+async def _select_backend(
+    router, endpoints, engine_stats, request_stats, request, request_json=None
+):
+    """Pick a backend URL via the router's routing logic."""
+    if isinstance(router, (KvawareRouter, PrefixAwareRouter, SessionRouter)):
+        return await router.route_request(
+            endpoints, engine_stats, request_stats, request, request_json
+        )
+    return router.route_request(endpoints, engine_stats, request_stats, request)
+
+
+async def _send_and_parse(
+    request,
+    request_body,
+    server_url,
+    request_id,
+    endpoint,
+    background_tasks,
+    span_context,
+):
+    """Send a proxied request and return (generator, headers_dict, media_type, status)."""
+    gen = process_request(
+        request,
+        request_body,
+        server_url,
+        request_id,
+        endpoint,
+        background_tasks,
+        parent_span_context=span_context,
+    )
+    headers, status = await anext(gen)
+    media_type = headers.get("content-type", "text/event-stream")
+    headers_dict = {
+        k: v
+        for k, v in headers.items()
+        if k.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
+        and k.lower() != "content-type"
+    }
+    headers_dict["X-Request-Id"] = request_id
+    return gen, headers_dict, media_type, status
+
+
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
@@ -372,15 +414,42 @@ async def route_general_request(
     else:
         endpoints = list(
             filter(
-                lambda x: requested_model in x.model_names
-                and x.Id == request_endpoint
-                and not x.sleep,
+                lambda x: (
+                    requested_model in x.model_names
+                    and x.Id == request_endpoint
+                    and not x.sleep
+                ),
                 endpoints,
             )
         )
 
     # Track all valid incoming requests
     num_incoming_requests_total.labels(model=requested_model).inc()
+
+    # --- Fallback model support ---
+    # If no endpoints are available for the requested model, check if a
+    # fallback model is configured and switch to it.
+    fallback_models = getattr(service_discovery, "fallback_models", None)
+    fallback_model = fallback_models.get(requested_model) if fallback_models else None
+    used_fallback = False
+
+    if not endpoints and fallback_model and not request_endpoint:
+        logger.info(
+            f"No healthy endpoints for model '{requested_model}', "
+            f"falling back to '{fallback_model}'"
+        )
+        all_endpoints = service_discovery.get_endpoint_info()
+        endpoints = list(
+            filter(
+                lambda x: fallback_model in x.model_names and not x.sleep,
+                all_endpoints,
+            )
+        )
+        if endpoints:
+            requested_model = fallback_model
+            request_body = replace_model_in_request_body(request_json, fallback_model)
+            update_content_length(request, request_body)
+            used_fallback = True
 
     if not endpoints:
         if not model_ever_existed:
@@ -409,16 +478,14 @@ async def route_general_request(
         logger.debug(
             f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
-
-    elif isinstance(
-        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
-    ):
-        server_url = await request.app.state.router.route_request(
-            endpoints, engine_stats, request_stats, request, request_json
-        )
     else:
-        server_url = request.app.state.router.route_request(
-            endpoints, engine_stats, request_stats, request
+        server_url = await _select_backend(
+            request.app.state.router,
+            endpoints,
+            engine_stats,
+            request_stats,
+            request,
+            request_json,
         )
 
     curr_time = time.time()
@@ -457,16 +524,14 @@ async def route_general_request(
                 break
             if request_endpoint:
                 server_url = remaining[0].url
-            elif isinstance(
-                request.app.state.router,
-                (KvawareRouter, PrefixAwareRouter, SessionRouter),
-            ):
-                server_url = await request.app.state.router.route_request(
-                    remaining, engine_stats, request_stats, request, request_json
-                )
             else:
-                server_url = request.app.state.router.route_request(
-                    remaining, engine_stats, request_stats, request
+                server_url = await _select_backend(
+                    request.app.state.router,
+                    remaining,
+                    engine_stats,
+                    request_stats,
+                    request,
+                    request_json,
                 )
             logger.info(
                 f"Routing request {request_id} to {server_url} "
@@ -475,26 +540,16 @@ async def route_general_request(
             if span is not None:
                 span.set_attribute("vllm.backend_url", server_url)
 
-        media_type = "text/event-stream"
         try:
-            stream_generator = process_request(
+            stream_generator, headers_dict, media_type, status = await _send_and_parse(
                 request,
                 request_body,
                 server_url,
                 request_id,
                 endpoint,
                 background_tasks,
-                parent_span_context=span_context,
+                span_context,
             )
-            headers, status = await anext(stream_generator)
-            media_type = headers.get("content-type", "text/event-stream")
-            headers_dict = {
-                key: value
-                for key, value in headers.items()
-                if key.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
-                and key.lower() != "content-type"
-            }
-            headers_dict["X-Request-Id"] = request_id
             last_error = None
             break
         except HTTPException:
@@ -506,6 +561,65 @@ async def route_general_request(
                 f"Request {request_id} failed on {server_url} "
                 f"(attempt {attempt + 1}/{max_attempts}): {e}"
             )
+
+    # All instance-level failover attempts failed. Try fallback model
+    # if configured and not already used.
+    can_fallback = (
+        last_error and fallback_model and not used_fallback and not request_endpoint
+    )
+    if can_fallback:
+        logger.info(
+            f"All backends for '{requested_model}' failed, "
+            f"falling back to '{fallback_model}'"
+        )
+        all_endpoints = service_discovery.get_endpoint_info()
+        fallback_endpoints = list(
+            filter(
+                lambda x: fallback_model in x.model_names and not x.sleep,
+                all_endpoints,
+            )
+        )
+        if not fallback_endpoints:
+            can_fallback = False
+
+    if can_fallback:
+        requested_model = fallback_model
+        request_body = replace_model_in_request_body(request_json, fallback_model)
+        update_content_length(request, request_body)
+
+        server_url = await _select_backend(
+            request.app.state.router,
+            fallback_endpoints,
+            engine_stats,
+            request_stats,
+            request,
+            request_json,
+        )
+        logger.info(
+            f"Routing request {request_id} to fallback {fallback_model} at {server_url}"
+        )
+        if span is not None:
+            span.set_attribute("vllm.backend_url", server_url)
+            span.set_attribute("vllm.fallback_model", fallback_model)
+
+        try:
+            stream_generator, headers_dict, media_type, status = await _send_and_parse(
+                request,
+                request_body,
+                server_url,
+                request_id,
+                endpoint,
+                background_tasks,
+                span_context,
+            )
+            last_error = None
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(
+                f"Fallback to {fallback_model} at {server_url} also failed: {e}"
+            )
+            last_error = e
 
     if last_error:
         end_span(span, error=last_error, status_code=500) if tracing_active else None
