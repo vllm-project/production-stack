@@ -64,10 +64,10 @@ jobs:
           sudo sysctl fs.protected_regular=0
           eval "$(minikube docker-env)"
           docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router:ci -f docker/Dockerfile .
-          helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
+          helm install vllm ./helm -f tests/assets/values-05-secure-vllm.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          bash .github/port-forward.sh curl-05-secure-vllm
+          bash tests/scripts/port-forward.sh curl-05-secure-vllm
         timeout-minutes: 3
       - name: Archive functionality results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -113,10 +113,10 @@ jobs:
       - name: Deploy via helm charts
         run: |
           cd ${{ github.workspace }}
-          helm install vllm ./helm -f .github/values-01-2pods-minimal-example.yaml
+          helm install vllm ./helm -f tests/assets/values-01-2pods-minimal-example.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          bash .github/port-forward.sh curl-02-two-pods
+          bash tests/scripts/port-forward.sh curl-02-two-pods
         timeout-minutes: 3
       - name: Archive functionality results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -160,10 +160,10 @@ jobs:
           helm dependency build helm/
       - name: Deploy via helm charts
         run: |
-          helm install vllm ./helm -f .github/values-04-multiple-models.yaml
+          helm install vllm ./helm -f tests/assets/values-04-multiple-models.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          bash .github/port-forward.sh curl-04-multiple-models
+          bash tests/scripts/port-forward.sh curl-04-multiple-models
         timeout-minutes: 5
       - name: Archive functionality results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -221,10 +221,10 @@ jobs:
           sudo sysctl fs.protected_regular=0
           eval "$(minikube docker-env)"
           docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router:ci -f docker/Dockerfile .
-          helm install vllm ./helm -f .github/values-11-monitoring.yaml
+          helm install vllm ./helm -f tests/assets/values-11-monitoring.yaml
       - name: Validate the installation and send query to the stack
         run: |
-          bash .github/port-forward.sh curl-06-monitoring
+          bash tests/scripts/port-forward.sh curl-06-monitoring
         timeout-minutes: 3
       - name: Archive functionality results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

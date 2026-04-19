@@ -122,6 +122,21 @@ async def generate_fake_response(
     )
 
 
+
+from fastapi import Body
+
+@app.post("/v1/completions")
+async def completions(raw_request: Request, body: dict = Body(...)):
+    global MODEL_NAME
+    request_id = raw_request.get("x-request-id", f"fake_request_id_{uuid.uuid4()}")
+    print(f"Received completion request with id: {request_id}")
+    num_tokens = body.get("max_tokens", 100)
+    tokens_per_sec = GLOBAL_ARGS.speed
+    return StreamingResponse(
+        generate_fake_response(request_id, MODEL_NAME, num_tokens, tokens_per_sec),
+        media_type="text/event-stream"
+    )
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest, raw_request: Request):
     global MODEL_NAME
