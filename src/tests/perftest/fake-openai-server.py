@@ -214,7 +214,27 @@ async def chat_completions(request: ChatCompletionRequest, raw_request: Request)
     )
 
 
-@app.get("/metrics")
+
+@app.get("/v1/models")
+async def show_models():
+    global MODEL_NAME
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": MODEL_NAME,
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "organization-owner"
+            }
+        ]
+    }
+
+@app.get("/health")
+async def health():
+    return Response(content="ok", media_type="text/plain")
+
+\n@app.get("/metrics")
 async def metrics():
     global NUM_RUNNING_REQUESTS, MODEL_NAME
     content = f"""# HELP vllm:num_requests_running Number of requests currently running on GPU.

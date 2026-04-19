@@ -239,3 +239,40 @@ jobs:
             sudo docker image prune -f
         if: always()
       - run: echo "🍏 This job's status is ${{ job.status }}."
+
+  K8s-Discovery-Routing:
+    runs-on: self-hosted
+    needs: Multiple-Models
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup minikube and helm
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          kubectl config use-context minikube
+          sudo sysctl fs.protected_regular=0
+          eval "$(minikube docker-env)"
+          docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router:ci -f docker/Dockerfile .
+      - name: Run all k8s discovery routing tests
+        run: |
+          source /usr/local/bin/conda-init
+          conda activate llmstack
+          chmod +x tests/e2e/run-k8s-routing-test.sh
+          ./tests/e2e/run-k8s-routing-test.sh all \
+            --model "facebook/opt-125m" \
+            --num-requests 25 \
+            --chunk-size 128 \
+            --verbose \
+            --result-dir /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }} \
+            --timeout 20
+        timeout-minutes: 20
+      - name: Archive k8s discovery routing test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: k8s-discovery-routing-test-results-pr-${{ github.event.pull_request.number || 'main' }}
+          path: |
+            /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }}/*
+      - run: echo "🍏 This job's status is ${{ job.status }}."
+
