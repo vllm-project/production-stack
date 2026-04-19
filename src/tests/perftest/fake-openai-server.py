@@ -123,24 +123,87 @@ async def generate_fake_response(
 
 
 
+
+async def generate_fake_completion_response(
+    request_id: str,
+    model_name: str,
+    num_tokens: int,
+    tokens_per_sec: float,
+):
+    import json
+    async def sleep_to_target(target: float):
+        sleep_time = target - time.time()
+        if sleep_time > 0:
+            await asyncio.sleep(sleep_time)
+
+    start = time.time()
+    global NUM_RUNNING_REQUESTS
+
+    if GLOBAL_ARGS.ttft > 0:
+        await asyncio.sleep(GLOBAL_ARGS.ttft)
+
+    NUM_RUNNING_REQUESTS += 1
+    created_time = int(time.time())
+    
+    token_batch = 20
+
+    for i in range(num_tokens):
+        if i % token_batch == 0:
+            await sleep_to_target(start + i / tokens_per_sec)
+
+        chunk = {
+            "id": request_id,
+            "object": "text_completion",
+            "created": created_time,
+            "model": model_name,
+            "choices": [{"text": "Hello ", "index": 0, "logprobs": None, "finish_reason": None}]
+        }
+        data = json.dumps(chunk)
+        yield f"data: {data}\n\n"
+
+    await sleep_to_target(num_tokens / tokens_per_sec + start)
+
+    chunk = {
+        "id": request_id,
+        "object": "text_completion",
+        "created": created_time,
+        "model": model_name,
+        "choices": [{"text": "\n", "index": 0, "logprobs": None, "finish_reason": "length"}],
+        "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": num_tokens,
+            "total_tokens": num_tokens
+        }
+    }
+    data = json.dumps(chunk)
+
+    yield f"data: {data}\n\n"
+    yield "data: [DONE]\n\n"
+
+    NUM_RUNNING_REQUESTS -= 1
+    elapsed = time.time() - start
+    thp = num_tokens / elapsed
+    print(f"Finished completion request with id: {request_id}, elapsed time {elapsed}, throughput {thp}")
+
+
 from fastapi import Body
 
 @app.post("/v1/completions")
 async def completions(raw_request: Request, body: dict = Body(...)):
     global MODEL_NAME
-    request_id = raw_request.get("x-request-id", f"fake_request_id_{uuid.uuid4()}")
+    request_id = raw_request.headers.get("x-request-id", f"fake_request_id_{uuid.uuid4()}")
     print(f"Received completion request with id: {request_id}")
     num_tokens = body.get("max_tokens", 100)
     tokens_per_sec = GLOBAL_ARGS.speed
     return StreamingResponse(
-        generate_fake_response(request_id, MODEL_NAME, num_tokens, tokens_per_sec),
+        generate_fake_completion_response(request_id, MODEL_NAME, num_tokens, tokens_per_sec),
         media_type="text/event-stream"
     )
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest, raw_request: Request):
     global MODEL_NAME
-    request_id = raw_request.get("x-request-id", f"fake_request_id_{uuid.uuid4()}")
+    request_id = raw_request.headers.get("x-request-id", f"fake_request_id_{uuid.uuid4()}")
     print(f"Received request with id: {request_id} at {time.time()}")
     model_name = MODEL_NAME
     num_tokens = request.max_tokens if request.max_tokens else 100
