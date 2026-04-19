@@ -119,8 +119,11 @@ import asyncio
 async def stream_transcription():
     url = "http://localhost:8000/v1/audio/transcriptions"
 
+    with open("audio.wav", "rb") as audio_file:
+        audio_bytes = audio_file.read()
+
     data = aiohttp.FormData()
-    data.add_field("file", open("audio.wav", "rb"), filename="audio.wav", content_type="audio/wav")
+    data.add_field("file", audio_bytes, filename="audio.wav", content_type="audio/wav")
     data.add_field("model", "openai/whisper-small")
     data.add_field("stream", "true")
 

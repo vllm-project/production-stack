@@ -1094,29 +1094,29 @@ async def proxy_multipart_request(
             }
             headers["X-Request-Id"] = request_id
 
+        request_stats_monitor.on_new_request(chosen_url, request_id, time.time())
+
+        try:
+            backend_response = await client.post(
+                f"{chosen_url}{endpoint}",
+                data=form_data,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=300),
+            )
+        except BaseException:
+            request_stats_monitor.on_request_complete(
+                chosen_url, request_id, time.time()
+            )
+            raise
+
+        resp_headers = {
+            k: v
+            for k, v in backend_response.headers.items()
+            if k.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
+        }
+        resp_headers["X-Request-Id"] = request_id
+
         if stream:
-            start_time = time.time()
-            request_stats_monitor.on_new_request(chosen_url, request_id, start_time)
-
-            try:
-                backend_response = await client.post(
-                    f"{chosen_url}{endpoint}",
-                    data=form_data,
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=300),
-                )
-            except BaseException:
-                request_stats_monitor.on_request_complete(
-                    chosen_url, request_id, time.time()
-                )
-                raise
-
-            resp_headers_dict = {
-                k: v
-                for k, v in backend_response.headers.items()
-                if k.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
-            }
-            resp_headers_dict["X-Request-Id"] = request_id
 
             async def traced_stream():
                 first_token = False
@@ -1138,33 +1138,26 @@ async def proxy_multipart_request(
             return StreamingResponse(
                 traced_stream(),
                 status_code=backend_response.status,
-                headers=resp_headers_dict,
+                headers=resp_headers,
                 media_type=backend_response.headers.get(
                     "content-type", "text/event-stream"
                 ),
             )
 
-        backend_response = await client.post(
-            f"{chosen_url}{endpoint}",
-            data=form_data,
-            headers=headers,
-            timeout=aiohttp.ClientTimeout(total=300),
-        )
-
-        resp_headers = {
-            k: v
-            for k, v in backend_response.headers.items()
-            if k.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
-        }
-        resp_headers["X-Request-Id"] = request_id
-
-        response_content = await backend_response.json()
-
-        return JSONResponse(
-            content=response_content,
-            status_code=backend_response.status,
-            headers=resp_headers,
-        )
+        try:
+            request_stats_monitor.on_request_response(
+                chosen_url, request_id, time.time()
+            )
+            response_content = await backend_response.json()
+            return JSONResponse(
+                content=response_content,
+                status_code=backend_response.status,
+                headers=resp_headers,
+            )
+        finally:
+            request_stats_monitor.on_request_complete(
+                chosen_url, request_id, time.time()
+            )
     except aiohttp.ClientResponseError as response_error:
         if response_error.response is not None:
             try:

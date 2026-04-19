@@ -160,6 +160,9 @@ async def test_transcription_non_streaming_returns_json_response(setup_mocks):
     assert isinstance(resp, JSONResponse)
     assert resp.status_code == 200
     assert resp.body == b'{"text":"Hello world transcription"}'
+    req.app.state.request_stats_monitor.on_new_request.assert_called_once()
+    req.app.state.request_stats_monitor.on_request_response.assert_called_once()
+    req.app.state.request_stats_monitor.on_request_complete.assert_called_once()
 
 
 @pytest.mark.asyncio
