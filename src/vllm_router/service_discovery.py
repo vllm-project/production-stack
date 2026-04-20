@@ -37,6 +37,7 @@ _global_service_discovery: "Optional[ServiceDiscovery]" = None
 class ServiceDiscoveryType(enum.Enum):
     STATIC = "static"
     K8S = "k8s"
+    EXTERNAL_ONLY = "external-only"
 
 
 @dataclass
@@ -200,6 +201,22 @@ class ServiceDiscovery(metaclass=abc.ABCMeta):
         """
         Close the service discovery module.
         """
+        pass
+
+
+class ExternalOnlyServiceDiscovery(ServiceDiscovery):
+    """
+    A no-op service discovery implementation for deployments that use
+    external providers exclusively and have no local vLLM backends.
+    """
+
+    def get_endpoint_info(self) -> List[EndpointInfo]:
+        return []
+
+    def get_health(self) -> bool:
+        return True
+
+    def close(self) -> None:
         pass
 
 
@@ -1319,6 +1336,8 @@ def _create_service_discovery(
             return K8sServiceNameServiceDiscovery(*args, **kwargs)
         else:
             return K8sPodIPServiceDiscovery(*args, **kwargs)
+    elif service_discovery_type == ServiceDiscoveryType.EXTERNAL_ONLY:
+        return ExternalOnlyServiceDiscovery()
     else:
         raise ValueError("Invalid service discovery type")
 
