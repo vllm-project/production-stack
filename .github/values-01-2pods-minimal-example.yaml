@@ -29,6 +29,7 @@ servingEngineSpec:
       extraArgs: ["--gpu-memory-utilization", "0.4"]
 
 routerSpec:
-  repository: "localhost:5000/git-act-router"
+  repository: "git-act-router"
+  tag: "ci"
   imagePullPolicy: "IfNotPresent"
   enableRouter: true

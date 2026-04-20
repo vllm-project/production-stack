@@ -1,0 +1,70 @@
+name: Self-hosted runner cleanup
+
+on:
+  schedule:
+    # 02:00 America/Los_Angeles. GitHub cron is UTC and does not observe DST,
+    # so this is pinned to PST (UTC-8) — it fires at 02:00 PST / 03:00 PDT.
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: runner-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - name: Disk usage before
+        run: |
+          echo "=== Host disk ==="
+          df -h / /var/lib/docker 2>/dev/null || df -h /
+          echo "=== Host docker ==="
+          sudo docker system df || true
+          echo "=== Minikube VM disk ==="
+          minikube ssh -- 'df -h /' || true
+          echo "=== Minikube docker ==="
+          minikube ssh -- 'docker system df' || true
+
+      - name: Uninstall leftover helm releases
+        run: |
+          releases=$(helm list -A -q || true)
+          if [ -n "$releases" ]; then
+            echo "Uninstalling leftover releases: $releases"
+            for r in $releases; do
+              ns=$(helm list -A -o json | python3 -c "import json,sys; rs=json.load(sys.stdin); print(next((x['namespace'] for x in rs if x['name']=='$r'),''))")
+              helm uninstall "$r" -n "$ns" || true
+            done
+          fi
+
+      - name: Delete orphan PVCs in default namespace
+        run: |
+          # Only touch the default namespace — leaves kube-system / monitoring PVCs alone.
+          kubectl delete pvc --all -n default --ignore-not-found --timeout=60s || true
+          # Force-remove any stuck PVCs that still have finalizers.
+          for pvc in $(kubectl get pvc -n default -o name 2>/dev/null); do
+            kubectl patch "$pvc" -n default -p '{"metadata":{"finalizers":null}}' --type=merge || true
+          done
+
+      - name: Prune host docker
+        run: |
+          sudo docker system prune -af --volumes || true
+          sudo docker builder prune -af || true
+
+      - name: Prune minikube docker
+        run: |
+          minikube ssh -- 'docker system prune -af --volumes' || true
+          minikube ssh -- 'docker builder prune -af' || true
+
+      - name: Disk usage after
+        if: always()
+        run: |
+          echo "=== Host disk ==="
+          df -h / /var/lib/docker 2>/dev/null || df -h /
+          echo "=== Host docker ==="
+          sudo docker system df || true
+          echo "=== Minikube VM disk ==="
+          minikube ssh -- 'df -h /' || true
+          echo "=== Minikube docker ==="
+          minikube ssh -- 'docker system df' || true

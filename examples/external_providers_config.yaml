@@ -1,0 +1,16 @@
+external_providers:
+  - name: openai
+    type: openai
+    api_base: https://api.openai.com
+    api_key_env_var: OPENAI_API_KEY
+    timeout: 30.0
+    max_retries: 3
+    models:
+      - id: gpt-4o
+        type: chat
+        aliases:
+          - gpt4o
+      - id: gpt-4o-mini
+        type: chat
+        aliases:
+          - gpt4o-mini

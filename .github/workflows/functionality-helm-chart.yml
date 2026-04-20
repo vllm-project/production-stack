@@ -29,7 +29,7 @@ jobs:
       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
       - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
       - name: Helm uninstall
@@ -61,17 +61,16 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           kubectl config use-context minikube
-          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
-          sudo docker push localhost:5000/git-act-router
           sudo sysctl fs.protected_regular=0
-          minikube image load localhost:5000/git-act-router
+          eval "$(minikube docker-env)"
+          docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router:ci -f docker/Dockerfile .
           helm install vllm ./helm -f .github/values-05-secure-vllm.yaml
       - name: Validate the installation and send query to the stack
         run: |
           bash .github/port-forward.sh curl-05-secure-vllm
         timeout-minutes: 3
       - name: Archive functionality results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: output-05-secure-vllm
@@ -120,7 +119,7 @@ jobs:
           bash .github/port-forward.sh curl-02-two-pods
         timeout-minutes: 3
       - name: Archive functionality results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: output-02-two-pods
@@ -167,7 +166,7 @@ jobs:
           bash .github/port-forward.sh curl-04-multiple-models
         timeout-minutes: 5
       - name: Archive functionality results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: output-04-multiple-models
@@ -187,7 +186,7 @@ jobs:
       - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
       - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
       - name: Helm uninstall
@@ -219,17 +218,16 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           kubectl config use-context minikube
-          sudo docker build --build-arg INSTALL_OPTIONAL_DEP=default -t localhost:5000/git-act-router -f docker/Dockerfile .
-          sudo docker push localhost:5000/git-act-router
           sudo sysctl fs.protected_regular=0
-          minikube image load localhost:5000/git-act-router
+          eval "$(minikube docker-env)"
+          docker build --build-arg INSTALL_OPTIONAL_DEP=default -t git-act-router:ci -f docker/Dockerfile .
           helm install vllm ./helm -f .github/values-11-monitoring.yaml
       - name: Validate the installation and send query to the stack
         run: |
           bash .github/port-forward.sh curl-06-monitoring
         timeout-minutes: 3
       - name: Archive functionality results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: curl-06-monitoring

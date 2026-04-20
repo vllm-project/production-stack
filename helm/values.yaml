@@ -182,6 +182,18 @@ servingEngineSpec:
     nodeSelectorTerms: []
     # -- Directly assigns a pod to a specific node (e.g., "192.168.56.5"). When both nodeName and nodeSelectorTerms are defined, the preference is given to nodeName.
     nodeName: ""
+    # -- Per-model tolerations. Interacts with servingEngineSpec.tolerations according to tolerationsPolicy.
+    tolerations: []
+    #   Example:
+    #   tolerations:
+    #     - key: "dedicated"
+    #       operator: "Equal"
+    #       value: "gpu-model-a"
+    #       effect: "NoSchedule"
+    # -- How per-model tolerations interact with global servingEngineSpec.tolerations.
+    tolerationsPolicy: append
+    #   - "append" (default): model tolerations are appended to the global tolerations (union of both lists).
+    #   - "override": model tolerations replace the global tolerations entirely for this model.
     # -- The size of the shared memory
     shmSize: "20Gi"
     # -- Whether to enable LoRA

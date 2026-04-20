@@ -98,6 +98,108 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
 }
 
 
+async def process_external_provider_request(
+    request: Request,
+    endpoint: str,
+    request_json: dict,
+    request_id: str,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Process a request destined for an external provider (e.g., OpenAI, Anthropic).
+
+    This function:
+    1. Looks up the appropriate adapter from the external provider registry
+    2. Calls the adapter's send_request method
+    3. Returns a StreamingResponse or JSONResponse based on the response type
+
+    Args:
+        request (Request): The incoming HTTP request.
+        endpoint (str): The API endpoint (e.g., "/v1/chat/completions").
+        request_json (dict): The already-parsed request body.
+        request_id (str): The unique request identifier.
+        background_tasks (BackgroundTasks): FastAPI background tasks.
+
+    Returns:
+        StreamingResponse or JSONResponse: The response from the external provider.
+    """
+    requested_model = request_json.get("model")
+    is_streaming = request_json.get("stream", False)
+
+    registry = request.app.state.external_provider_registry
+    adapter = registry.lookup_adapter(requested_model)
+    provider_name = registry.get_provider_name(requested_model)
+    canonical_model_id = registry.get_canonical_model_id(requested_model)
+
+    logger.info(
+        f"Routing request {request_id} for model '{requested_model}' "
+        f"to external provider '{provider_name}' (canonical: {canonical_model_id})"
+    )
+
+    # Track incoming request
+    num_incoming_requests_total.labels(model=requested_model).inc()
+
+    try:
+        # Send request to external provider
+        provider_response = await adapter.send_request(
+            endpoint=endpoint, payload=request_json, stream=is_streaming
+        )
+
+        # Build response headers
+        response_headers = {"X-Request-Id": request_id}
+        response_headers.update(
+            {
+                k: v
+                for k, v in provider_response.headers.items()
+                if k.lower() != "content-type"
+            }
+        )
+
+        # Handle streaming response
+        if provider_response.is_stream and provider_response.stream_iterator:
+            media_type = provider_response.headers.get(
+                "content-type", "text/event-stream"
+            )
+
+            async def stream_wrapper():
+                try:
+                    async for chunk in provider_response.stream_iterator:
+                        yield chunk
+                except Exception as e:
+                    logger.error(
+                        f"Error streaming from external provider '{provider_name}': {e}"
+                    )
+                    raise
+
+            return StreamingResponse(
+                stream_wrapper(),
+                status_code=provider_response.status_code,
+                headers=response_headers,
+                media_type=media_type,
+            )
+
+        # Handle standard (non-streaming) response
+        else:
+            return JSONResponse(
+                content=provider_response.body,
+                status_code=provider_response.status_code,
+                headers=response_headers,
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Request {request_id} failed for external provider '{provider_name}': {e}"
+        )
+        # Track error
+        request_errors_total.labels(
+            server=provider_name, model=requested_model, error_type=type(e).__name__
+        ).inc()
+        raise HTTPException(
+            status_code=502,
+            detail=f"External provider '{provider_name}' request failed: {str(e)}",
+        )
+
+
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
@@ -352,6 +454,19 @@ async def route_general_request(
         requested_model = aliases[requested_model]
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
+
+    # Check if this model should be routed to an external provider
+    registry = getattr(request.app.state, "external_provider_registry", None)
+    if registry is not None and registry.is_external_model(requested_model):
+        try:
+            response = await process_external_provider_request(
+                request, endpoint, request_json, request_id, background_tasks
+            )
+            end_span(span, status_code=response.status_code) if tracing_active else None
+            return response
+        except Exception as e:
+            end_span(span, error=e, status_code=502) if tracing_active else None
+            raise
 
     # Check if model has ever been seen (even if currently scaled to zero)
     model_ever_existed = False
