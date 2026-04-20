@@ -21,7 +21,11 @@ def test_verify_required_args_provided_when_routing_logic_missing_raises_systeme
 def test_verify_required_args_provided_when_service_discovery_missing_raises_systemexit() -> (
     None
 ):
-    args_mock = MagicMock(routing_logic="roundrobin", service_discovery=None)
+    args_mock = MagicMock(
+        routing_logic="roundrobin",
+        service_discovery=None,
+        external_providers_config=None,
+    )
     with pytest.raises(SystemExit):
         parser.verify_required_args_provided(args_mock)
 

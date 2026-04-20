@@ -50,6 +50,7 @@ def setup():
     state.otel_enabled = False
     state.semantic_cache_available = False
     state.callbacks = None
+    state.external_provider_registry = None
 
     req = MagicMock()
     req.headers = {"content-type": "application/json"}
