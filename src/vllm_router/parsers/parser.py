@@ -40,8 +40,15 @@ def verify_required_args_provided(args: argparse.Namespace) -> None:
         logger.error("--routing-logic must be provided.")
         sys.exit(1)
     if not args.service_discovery:
-        logger.error("--service-discovery must be provided.")
-        sys.exit(1)
+        if not getattr(args, "external_providers_config", None):
+            logger.error(
+                "--service-discovery must be provided, "
+                "or use --external-providers-config with --service-discovery=external-only "
+                "for an external-providers-only deployment."
+            )
+            sys.exit(1)
+        # External-providers-only mode: default to 'external-only' service discovery
+        args.service_discovery = "external-only"
 
 
 def load_initial_config_from_config_file_if_required(
@@ -132,8 +139,8 @@ def parse_args():
     parser.add_argument(
         "--service-discovery",
         type=str,
-        choices=["static", "k8s"],
-        help="The service discovery type.",
+        choices=["static", "k8s", "external-only"],
+        help="The service discovery type. Use 'external-only' for deployments with no local vLLM backends.",
     )
     parser.add_argument(
         "--k8s-service-discovery-type",
@@ -459,6 +466,13 @@ def parse_args():
         type=int,
         default=30,
         help="Timeout for LMCache worker (seconds)",
+    )
+
+    parser.add_argument(
+        "--external-providers-config",
+        type=str,
+        default=None,
+        help="Path to a YAML file defining external LLM provider configurations (startup-time only).",
     )
 
     args = parser.parse_args()
