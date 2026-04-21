@@ -32,6 +32,16 @@ from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 _global_service_discovery: "Optional[ServiceDiscovery]" = None
+_MODEL_INFO_KNOWN_FIELDS = frozenset(
+    {
+        "id",
+        "object",
+        "created",
+        "owned_by",
+        "root",
+        "parent",
+    }
+)
 
 
 class ServiceDiscoveryType(enum.Enum):
@@ -43,17 +53,6 @@ class ServiceDiscoveryType(enum.Enum):
 @dataclass
 class ModelInfo:
     """Information about a model including its relationships and metadata."""
-
-    _KNOWN_FIELDS = frozenset(
-        {
-            "id",
-            "object",
-            "created",
-            "owned_by",
-            "root",
-            "parent",
-        }
-    )
 
     id: str
     object: str
@@ -75,7 +74,9 @@ class ModelInfo:
             root=data.get("root", None),
             parent=data.get("parent", None),
             is_adapter=data.get("parent") is not None,
-            extra_fields={k: v for k, v in data.items() if k not in cls._KNOWN_FIELDS},
+            extra_fields={
+                k: v for k, v in data.items() if k not in _MODEL_INFO_KNOWN_FIELDS
+            },
         )
 
     def to_dict(self) -> Dict:
