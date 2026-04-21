@@ -65,6 +65,15 @@ from vllm_router.utils import (
 )
 
 try:
+    import yaml
+
+    from vllm_router.external_providers.registry import create_external_provider_manager
+
+    external_providers_available = True
+except ImportError:
+    external_providers_available = False
+
+try:
     # Semantic cache integration
     from vllm_router.experimental.semantic_cache import (
         enable_semantic_cache,
@@ -111,6 +120,11 @@ async def lifespan(app: FastAPI):
     if hasattr(service_discovery, "initialize_client_sessions"):
         await service_discovery.initialize_client_sessions()
 
+    # Validate external provider models against live provider model lists
+    if getattr(app.state, "external_provider_registry", None) is not None:
+        logger.info("Validating external provider models against live provider APIs")
+        await app.state.external_provider_registry.validate_models()
+
     yield
     await app.state.aiohttp_client_wrapper.stop()
 
@@ -132,6 +146,11 @@ async def lifespan(app: FastAPI):
     # Close routing logic instances
     logger.info("Closing routing logic instances")
     cleanup_routing_logic()
+
+    # Close external provider registry if initialized
+    if getattr(app.state, "external_provider_registry", None) is not None:
+        logger.info("Closing external provider registry")
+        await app.state.external_provider_registry.close()
 
     # Shutdown OpenTelemetry tracing if enabled
     if otel_available and app.state.otel_enabled:
@@ -216,6 +235,9 @@ def initialize_all(app: FastAPI, args):
             watcher_timeout_seconds=args.k8s_watcher_timeout_seconds,
             health_check_timeout_seconds=args.backend_health_check_timeout_seconds,
         )
+
+    elif args.service_discovery == "external-only":
+        initialize_service_discovery(ServiceDiscoveryType.EXTERNAL_ONLY)
 
     else:
         raise ValueError(f"Invalid service discovery type: {args.service_discovery}")
@@ -318,6 +340,22 @@ def initialize_all(app: FastAPI, args):
                 "Semantic cache model specified but SemanticCache feature gate is not enabled. "
                 "Enable the feature gate with --feature-gates=SemanticCache=true"
             )
+
+    # Initialize external provider registry if config provided
+    if external_providers_available and getattr(
+        args, "external_providers_config", None
+    ):
+        with open(args.external_providers_config) as f:
+            raw = yaml.safe_load(f)
+        provider_configs = raw.get("external_providers", [])
+        app.state.external_provider_registry = create_external_provider_manager(
+            provider_configs
+        )
+        logger.info(
+            f"External provider registry initialized: {app.state.external_provider_registry}"
+        )
+    else:
+        app.state.external_provider_registry = None
 
     # --- Hybrid addition: attach singletons to FastAPI state ---
     app.state.engine_stats_scraper = get_engine_stats_scraper()
