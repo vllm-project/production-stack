@@ -127,7 +127,7 @@ async def show_version():
 
 
 @main_router.get("/v1/models")
-async def show_models():
+async def show_models(request: Request):
     """
     Returns a list of all models available in the stack.
 
@@ -160,6 +160,22 @@ async def show_models():
                 parent=model_info.parent,
             )
             model_cards.append(model_card)
+            existing_models.add(model_id)
+
+    # Append external provider models not already listed
+    registry = getattr(request.app.state, "external_provider_registry", None)
+    if registry is not None:
+        for model_id in registry.get_all_external_model_ids():
+            if model_id in existing_models:
+                continue
+            provider_name = registry.get_provider_name(model_id)
+            model_cards.append(
+                ModelCard(
+                    id=model_id,
+                    object="model",
+                    owned_by=provider_name,
+                )
+            )
             existing_models.add(model_id)
 
     model_list = ModelList(data=model_cards)
