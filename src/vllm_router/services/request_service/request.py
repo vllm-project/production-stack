@@ -1218,7 +1218,7 @@ async def proxy_multipart_request(
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=300),
             )
-        except BaseException:
+        except Exception:
             request_stats_monitor.on_request_complete(
                 chosen_url, request_id, time.time()
             )
