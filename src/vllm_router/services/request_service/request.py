@@ -1269,6 +1269,18 @@ async def proxy_multipart_request(
                 status_code=backend_response.status,
                 headers=resp_headers,
             )
+        except (aiohttp.ContentTypeError, json.JSONDecodeError) as parse_error:
+            try:
+                text_content = await backend_response.text()
+            except aiohttp.ClientError:
+                text_content = str(parse_error)
+            return JSONResponse(
+                status_code=502,
+                content={
+                    "error": f"Backend returned non-JSON response: {text_content}"
+                },
+                headers=resp_headers,
+            )
         finally:
             request_stats_monitor.on_request_complete(
                 chosen_url, request_id, time.time()

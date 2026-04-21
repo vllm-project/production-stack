@@ -129,7 +129,10 @@ async def stream_transcription():
 
     async with aiohttp.ClientSession() as session:
         async with session.post(url, data=data) as response:
-            async for line in response.content:
+            while True:
+                line = await response.content.readline()
+                if not line:
+                    break
                 line = line.decode("utf-8").strip()
                 if line.startswith("data: "):
                     print(line[6:])  # Print the JSON data
