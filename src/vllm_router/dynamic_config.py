@@ -180,8 +180,10 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 ),
                 model_labels=parse_comma_separated_args(config.static_model_labels),
                 model_types=parse_comma_separated_args(config.static_model_types),
-                healthcheck_disabled=parse_comma_separated_args(
-                    config.static_healthcheck_disabled
+                healthcheck_disabled=(
+                    parse_comma_separated_args(config.static_healthcheck_disabled)
+                    if config.static_healthcheck_disabled
+                    else None
                 ),
                 static_backend_health_checks=config.static_backend_health_checks,
                 static_backend_health_check_interval=config.static_backend_health_check_interval,

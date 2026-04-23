@@ -259,7 +259,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         unhealthy_endpoints = []
         try:
             for i, (url, model, model_type) in enumerate(
-                zip(self.urls, self.models, self.model_types, strict=True)
+                zip(self.urls, self.models, self.model_types or [], strict=True)
             ):
                 if (
                     self.healthcheck_disabled
