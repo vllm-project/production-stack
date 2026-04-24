@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from vllm_router.service_discovery import StaticServiceDiscovery
+from vllm_router.utils import AliasConfig
 
 
 def test_init_when_static_backend_health_checks_calls_start_health_checks(
@@ -162,7 +163,7 @@ def test_has_ever_seen_model_when_model_is_alias_returns_true():
         None,
         ["http://localhost.com"],
         ["llama3"],
-        {"llama": "llama3"},
+        {"llama": AliasConfig(model="llama3")},
         None,
         ["chat"],
         static_backend_health_checks=False,
@@ -172,3 +173,36 @@ def test_has_ever_seen_model_when_model_is_alias_returns_true():
     assert discovery_instance.has_ever_seen_model("llama") is True
     assert discovery_instance.has_ever_seen_model("llama3") is True
     assert discovery_instance.has_ever_seen_model("unknown-model") is False
+
+
+def _make_discovery(aliases=None):
+    return StaticServiceDiscovery(
+        None,
+        ["http://localhost.com"],
+        ["llama3"],
+        aliases,
+        None,
+        ["chat"],
+        static_backend_health_checks=False,
+        prefill_model_labels=None,
+        decode_model_labels=None,
+    )
+
+
+def test_init_normalizes_legacy_str_aliases_to_alias_config():
+    """Programmatic callers passing dict[str, str] should still work."""
+    d = _make_discovery({"llama": "llama3"})
+    assert d.aliases == {"llama": AliasConfig(model="llama3")}
+    assert d.has_ever_seen_model("llama") is True
+
+
+def test_init_accepts_alias_config_values():
+    d = _make_discovery(
+        {"reasoning": AliasConfig(model="llama3", reasoning_effort="high")}
+    )
+    assert d.aliases["reasoning"].reasoning_effort == "high"
+
+
+def test_init_rejects_invalid_alias_value_type():
+    with pytest.raises(TypeError, match="expected str or AliasConfig"):
+        _make_discovery({"bad": 123})
