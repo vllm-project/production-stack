@@ -1084,11 +1084,9 @@ async def route_general_transcriptions(
 ):
     """Handles audio transcription requests by parsing form data and proxying to backend."""
 
-    # --- 1. Form parsing ---
     try:
         form = await request.form()
 
-        # Extract parameters from the form data
         file: UploadFile = form["file"]
         model: str = form["model"]
         prompt: Optional[str] = form.get("prompt", None)
@@ -1098,6 +1096,7 @@ async def route_general_transcriptions(
             float(temperature_str) if temperature_str is not None else None
         )
         language: Optional[str] = form.get("language", "en")
+        stream: bool = form.get("stream", "false").lower() == "true"
     except KeyError as e:
         return JSONResponse(
             status_code=400,
@@ -1107,15 +1106,15 @@ async def route_general_transcriptions(
     logger.debug("==== Enter audio_transcriptions ====")
     logger.debug("Received upload: %s (%s)", file.filename, file.content_type)
     logger.debug(
-        "Params: model=%s prompt=%r response_format=%r temperature=%r language=%s",
+        "Params: model=%s prompt=%r response_format=%r temperature=%r language=%s stream=%s",
         model,
         prompt,
         response_format,
         temperature,
         language,
+        stream,
     )
 
-    # --- 3. Prepare and Proxy the Request ---
     payload_bytes = await file.read()
     files = {"file": (file.filename, payload_bytes, file.content_type)}
 
@@ -1130,17 +1129,20 @@ async def route_general_transcriptions(
     if temperature is not None:
         data["temperature"] = str(temperature)
 
+    if stream:
+        data["stream"] = "true"
+
     form_data = aiohttp.FormData()
 
-    # add file data
     for key, (filename, content, content_type) in files.items():
         form_data.add_field(key, content, filename=filename, content_type=content_type)
 
-    # add from data
     for key, value in data.items():
         form_data.add_field(key, value)
 
-    return await proxy_multipart_request(form_data, model, endpoint, request)
+    return await proxy_multipart_request(
+        form_data, model, endpoint, request, stream=stream
+    )
 
 
 async def route_image_edit_request(
@@ -1166,7 +1168,12 @@ async def route_image_edit_request(
 
 
 async def proxy_multipart_request(
-    form_data: bytes | FormData, model: str, endpoint: str, request: Request
+    form_data: bytes | FormData,
+    model: str,
+    endpoint: str,
+    request: Request,
+    *,
+    stream: bool = False,
 ):
     request_id = request.headers.get("X-Request-Id", str(uuid.uuid4()))
 
@@ -1177,21 +1184,13 @@ async def proxy_multipart_request(
             headers={"X-Request-Id": request_id},
         )
 
-    # Access singletons via request.app.state for consistent style
-    service_discovery = (
-        get_service_discovery()
-    )  # This one is often still accessed directly via its get function
-    router = request.app.state.router  # Access router from app.state
-    engine_stats_scraper = (
-        request.app.state.engine_stats_scraper
-    )  # Access engine_stats_scraper from app.state
-    request_stats_monitor = (
-        request.app.state.request_stats_monitor
-    )  # Access request_stats_monitor from app.state
+    service_discovery = get_service_discovery()
+    router = request.app.state.router
+    engine_stats_scraper = request.app.state.engine_stats_scraper
+    request_stats_monitor = request.app.state.request_stats_monitor
 
     endpoints = service_discovery.get_endpoint_info()
 
-    # filter the endpoints url by model name
     endpoints = [ep for ep in endpoints if model in ep.model_names and not ep.sleep]
 
     if not endpoints:
@@ -1224,28 +1223,82 @@ async def proxy_multipart_request(
             include_content_type=isinstance(form_data, bytes),
         )
 
-        backend_response = await client.post(
-            f"{chosen_url}{endpoint}",
-            data=form_data,
-            headers=headers,
-            timeout=aiohttp.ClientTimeout(total=300),
-        )
+        request_stats_monitor.on_new_request(chosen_url, request_id, time.time())
 
-        # --- 4. Return the response ---
-        response_content = await backend_response.json()
-        headers = {
+        try:
+            backend_response = await client.post(
+                f"{chosen_url}{endpoint}",
+                data=form_data,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=300),
+            )
+        except Exception:
+            request_stats_monitor.on_request_complete(
+                chosen_url, request_id, time.time()
+            )
+            raise
+
+        resp_headers = {
             k: v
             for k, v in backend_response.headers.items()
             if k.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
         }
+        resp_headers["X-Request-Id"] = request_id
 
-        headers["X-Request-Id"] = request_id
+        if stream:
 
-        return JSONResponse(
-            content=response_content,
-            status_code=backend_response.status,
-            headers=headers,
-        )
+            async def traced_stream():
+                first_token = False
+                try:
+                    async for chunk in backend_response.content.iter_any():
+                        if not first_token:
+                            first_token = True
+                            request_stats_monitor.on_request_response(
+                                chosen_url, request_id, time.time()
+                            )
+                        if chunk:
+                            yield chunk
+                finally:
+                    backend_response.close()
+                    request_stats_monitor.on_request_complete(
+                        chosen_url, request_id, time.time()
+                    )
+
+            return StreamingResponse(
+                traced_stream(),
+                status_code=backend_response.status,
+                headers=resp_headers,
+                media_type=backend_response.headers.get(
+                    "content-type", "text/event-stream"
+                ),
+            )
+
+        try:
+            request_stats_monitor.on_request_response(
+                chosen_url, request_id, time.time()
+            )
+            response_content = await backend_response.json()
+            return JSONResponse(
+                content=response_content,
+                status_code=backend_response.status,
+                headers=resp_headers,
+            )
+        except (aiohttp.ContentTypeError, json.JSONDecodeError) as parse_error:
+            try:
+                text_content = await backend_response.text()
+            except aiohttp.ClientError:
+                text_content = str(parse_error)
+            return JSONResponse(
+                status_code=502,
+                content={
+                    "error": f"Backend returned non-JSON response: {text_content}"
+                },
+                headers=resp_headers,
+            )
+        finally:
+            request_stats_monitor.on_request_complete(
+                chosen_url, request_id, time.time()
+            )
     except aiohttp.ClientResponseError as response_error:
         if response_error.response is not None:
             try:

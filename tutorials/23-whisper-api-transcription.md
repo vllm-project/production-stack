@@ -85,8 +85,62 @@ curl -v http://localhost:8000/v1/audio/transcriptions \
 | `response_format` | One of `json`, `text`, `srt`, `verbose_json`, or `vtt` |
 | `temperature`     | *(Optional)* Sampling temperature as a float           |
 | `language`        | ISO 639-1 code (e.g., `en`, `fr`, `zh`)                |
+| `stream`          | *(Optional)* Set to `true` to receive streaming SSE response |
 
-## 4. Sample Output
+## 4. Streaming Transcription
+
+For long audio files, you can enable streaming to receive transcription results incrementally as Server-Sent Events (SSE):
+
+```bash
+curl -v http://localhost:8000/v1/audio/transcriptions \
+  -F 'file=@/path/to/long_audio.wav;type=audio/wav' \
+  -F 'model=openai/whisper-small' \
+  -F 'response_format=json' \
+  -F 'language=en' \
+  -F 'stream=true'
+```
+
+The response will be streamed as SSE chunks:
+
+```text
+data: {"text": "Hello"}
+
+data: {"text": " world"}
+
+data: {"text": ", this is a test"}
+```
+
+### Python Example for Streaming
+
+```python
+import aiohttp
+import asyncio
+
+async def stream_transcription():
+    url = "http://localhost:8000/v1/audio/transcriptions"
+
+    with open("audio.wav", "rb") as audio_file:
+        audio_bytes = audio_file.read()
+
+    data = aiohttp.FormData()
+    data.add_field("file", audio_bytes, filename="audio.wav", content_type="audio/wav")
+    data.add_field("model", "openai/whisper-small")
+    data.add_field("stream", "true")
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, data=data) as response:
+            while True:
+                line = await response.content.readline()
+                if not line:
+                    break
+                line = line.decode("utf-8").strip()
+                if line.startswith("data: "):
+                    print(line[6:])  # Print the JSON data
+
+asyncio.run(stream_transcription())
+```
+
+## 5. Sample Output
 
 ```json
 {
@@ -94,12 +148,12 @@ curl -v http://localhost:8000/v1/audio/transcriptions \
 }
 ```
 
-## 5. Notes
+## 6. Notes
 
 * Router uses extended aiohttp timeouts to support long transcription jobs.
 * This implementation dynamically discovers valid transcription backends and routes requests accordingly.
 
-## 6. Resources
+## 7. Resources
 
 * [PR #469 – Add Whisper Transcription API](https://github.com/vllm-project/production-stack/pull/469)
 * [OpenAI Whisper GitHub](https://github.com/openai/whisper)
