@@ -1,6 +1,8 @@
 import random
 from typing import Dict, List, Tuple
 
+import pytest
+
 from vllm_router.routers.routing_logic import RoundRobinRouter
 
 
@@ -47,7 +49,8 @@ def generate_request(request_type="http") -> Request:
     return Request({"type": request_type})
 
 
-def test_roundrobin_logic(
+@pytest.mark.asyncio
+async def test_roundrobin_logic(
     dynamic_discoveries: int = 10, max_endpoints: int = 1000, max_requests: int = 10000
 ):
     """
@@ -55,13 +58,15 @@ def test_roundrobin_logic(
     """
     router = RoundRobinRouter()
 
-    def _fixed_router_check(num_endpoints: int, num_requests: int) -> bool:
+    async def _fixed_router_check(num_endpoints: int, num_requests: int) -> bool:
         # Make num_requests requests to the router and check even output distribution
         endpoints, engine_stats, request_stats = generate_request_args(num_endpoints)
         output_distribution = {}
         for request_idx in range(num_requests):
             request = generate_request()
-            url = router.route_request(endpoints, engine_stats, request_stats, request)
+            url = await router.route_request(
+                endpoints, engine_stats, request_stats, request
+            )
             output_distribution[url] = output_distribution.get(url, 0) + 1
         request_counts = output_distribution.values()
         return max(request_counts) - min(request_counts) <= 1
@@ -70,5 +75,5 @@ def test_roundrobin_logic(
         num_endpoints = random.randint(1, max_endpoints)
         num_requests = random.randint(1, max_requests)
         # Perform router check
-        res = _fixed_router_check(num_endpoints, num_requests)
+        res = await _fixed_router_check(num_endpoints, num_requests)
         assert res
