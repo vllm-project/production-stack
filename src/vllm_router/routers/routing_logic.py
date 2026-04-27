@@ -59,7 +59,6 @@ class RoutingLogic(str, enum.Enum):
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
-
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
     ) -> str:
@@ -140,14 +139,31 @@ class RoutingInterface(metaclass=SingletonABCMeta):
 class RoundRobinRouter(RoutingInterface):
     # TODO (ApostaC): when available engines in the endpoints changes, the
     # algorithm may not be "perfectly" round-robin.
+
+    # Upper bound on cached endpoint-set entries to prevent unbounded memory
+    # growth when endpoints change dynamically (add / remove / update).
+    _MAX_CACHE_SIZE = 1024
+
     def __init__(self):
         if hasattr(self, "_initialized"):
             return
-        self.req_id = 0
-        self.sorted_endpoints = []
-        self.last_endpoints_id = None
-        self.last_endpoints_hash = None
+        self._next_index: dict[tuple[str, ...], int] = {}
+        self._sorted_cache: dict[frozenset[str], tuple[str, ...]] = {}
         self._initialized = True
+
+    def _endpoint_key(self, endpoints: List[EndpointInfo]) -> tuple[str, ...]:
+        """Return a stable, sorted key for the endpoint set (cached after first sort)."""
+        if not endpoints:
+            raise ValueError("RoundRobinRouter requires at least one endpoint")
+
+        urls = frozenset(e.url for e in endpoints)
+        key = self._sorted_cache.get(urls)
+        if key is None:
+            if len(self._sorted_cache) >= self._MAX_CACHE_SIZE:
+                self._sorted_cache.clear()
+            key = tuple(sorted(urls))
+            self._sorted_cache[urls] = key
+        return key
 
     def route_request(
         self,
@@ -168,16 +184,15 @@ class RoundRobinRouter(RoutingInterface):
                 indicating the request-level performance of each engine
             request (Request): The incoming request
         """
-        endpoints_id = id(endpoints)
-        if endpoints_id != self.last_endpoints_id:
-            current_hash = hash(tuple(e.url for e in endpoints))
-            if current_hash != self.last_endpoints_hash:
-                self.sorted_endpoints = sorted(endpoints, key=lambda e: e.url)
-                self.last_endpoints_hash = current_hash
-            self.last_endpoints_id = endpoints_id
-        chosen = self.sorted_endpoints[self.req_id % len(self.sorted_endpoints)]
-        self.req_id += 1
-        return chosen.url
+        endpoint_urls = self._endpoint_key(endpoints)
+        idx = self._next_index.get(endpoint_urls, 0)
+        if (
+            len(self._next_index) >= self._MAX_CACHE_SIZE
+            and endpoint_urls not in self._next_index
+        ):
+            self._next_index.clear()
+        self._next_index[endpoint_urls] = idx + 1
+        return endpoint_urls[idx % len(endpoint_urls)]
 
 
 class SessionRouter(RoutingInterface):
