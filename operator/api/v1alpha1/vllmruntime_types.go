@@ -328,6 +328,15 @@ type VLLMRuntimeStatus struct {
 	// Current replica count (used by scale subresource)
 	Replicas int32 `json:"replicas,omitempty"`
 
+	// Number of pods that are ready and serving traffic
+	AvailableReplicas int32 `json:"availableReplicas,omitempty"`
+
+	// Number of pods running the latest pod template
+	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
+
+	// Number of pods that are not yet available
+	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty"`
+
 	// Label selector for pods (used by scale subresource for HPA AverageValue)
 	Selector string `json:"selector,omitempty"`
 }
