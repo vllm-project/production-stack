@@ -13,8 +13,8 @@
 # limitations under the License.
 import threading
 import time
-from dataclasses import dataclass
-from typing import Dict
+from dataclasses import dataclass, replace
+from typing import Callable, Dict, Optional
 
 import requests
 from prometheus_client.parser import text_string_to_metric_families
@@ -86,7 +86,12 @@ class EngineStats:
 
 
 class EngineStatsScraper(metaclass=SingletonMeta):
-    def __init__(self, scrape_interval: float):
+    def __init__(
+        self,
+        scrape_interval: float,
+        admission_scrape_interval: Optional[float] = None,
+        on_metrics_update: Optional[Callable[[], None]] = None,
+    ):
         """
         Initialize the scraper to periodically fetch metrics from all serving engines.
 
@@ -109,6 +114,12 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         self.engine_stats: Dict[str, EngineStats] = {}
         self.engine_stats_lock = threading.Lock()
         self.scrape_interval = scrape_interval
+        self.admission_scrape_interval = (
+            admission_scrape_interval
+            if admission_scrape_interval is not None
+            else scrape_interval
+        )
+        self.on_metrics_update = on_metrics_update
 
         # scrape thread
         self.running = True
@@ -116,7 +127,7 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         self.scrape_thread.start()
         self._initialized = True
 
-    def _scrape_one_endpoint(self, url: str):
+    def _scrape_one_endpoint(self, url: str, queue_only: bool = False):
         """
         Scrape metrics from a single serving engine.
 
@@ -124,7 +135,13 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             url (str): The URL of the serving engine (does not contain endpoint)
         """
         try:
-            response = requests.get(url + "/metrics", timeout=self.scrape_interval)
+            timeout = (
+                self.admission_scrape_interval if queue_only else self.scrape_interval
+            )
+            response = requests.get(
+                url + "/metrics",
+                timeout=timeout,
+            )
             response.raise_for_status()
             engine_stats = EngineStats.from_vllm_scrape(response.text)
         except Exception as e:
@@ -132,7 +149,7 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             return None
         return engine_stats
 
-    def _scrape_metrics(self):
+    def _scrape_metrics(self, queue_only: bool = False):
         """
         Scrape metrics from all serving engines.
 
@@ -143,10 +160,11 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         """
         collected_engine_stats = {}
         endpoints = get_service_discovery().get_endpoint_info()
-        logger.info(f"Scraping metrics from {len(endpoints)} serving engine(s)")
+        log_fn = logger.debug if queue_only else logger.info
+        log_fn(f"Scraping metrics from {len(endpoints)} serving engine(s)")
         for info in endpoints:
             url = info.url
-            engine_stats = self._scrape_one_endpoint(url)
+            engine_stats = self._scrape_one_endpoint(url, queue_only=queue_only)
             if engine_stats:
                 collected_engine_stats[url] = engine_stats
 
@@ -156,17 +174,13 @@ class EngineStatsScraper(metaclass=SingletonMeta):
                 if old_url not in collected_engine_stats:
                     del self.engine_stats[old_url]
             for url, stats in collected_engine_stats.items():
-                self.engine_stats[url] = stats
-
-    def _sleep_or_break(self, check_interval: float = 1):
-        """
-        Sleep for self.scrape_interval seconds if self.running is True.
-        Otherwise, break the loop.
-        """
-        for _ in range(int(self.scrape_interval / check_interval)):
-            if not self.running:
-                break
-            time.sleep(check_interval)
+                if queue_only and url in self.engine_stats:
+                    self.engine_stats[url] = replace(
+                        self.engine_stats[url],
+                        num_queuing_requests=stats.num_queuing_requests,
+                    )
+                else:
+                    self.engine_stats[url] = stats
 
     def _scrape_worker(self):
         """
@@ -177,9 +191,32 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         metrics from all serving engines and store them in self.engine_stats.
 
         """
+        next_full_scrape = 0.0
+        next_admission_scrape = 0.0
+        fast_admission_enabled = self.admission_scrape_interval < self.scrape_interval
         while self.running:
-            self._scrape_metrics()
-            self._sleep_or_break()
+            now = time.monotonic()
+            did_scrape = False
+
+            if now >= next_full_scrape:
+                self._scrape_metrics(queue_only=False)
+                next_full_scrape = now + self.scrape_interval
+                next_admission_scrape = now + self.admission_scrape_interval
+                did_scrape = True
+            elif fast_admission_enabled and now >= next_admission_scrape:
+                self._scrape_metrics(queue_only=True)
+                next_admission_scrape = now + self.admission_scrape_interval
+                did_scrape = True
+
+            if did_scrape and self.on_metrics_update is not None:
+                try:
+                    self.on_metrics_update()
+                except Exception as e:
+                    logger.warning(f"Engine stats refresh callback failed: {e}")
+
+            next_wakeup = min(next_full_scrape, next_admission_scrape)
+            sleep_time = max(0.1, min(max(next_wakeup - time.monotonic(), 0.0), 0.5))
+            time.sleep(sleep_time)
 
     def get_engine_stats(self) -> Dict[str, EngineStats]:
         """
@@ -209,8 +246,16 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         self.scrape_thread.join()
 
 
-def initialize_engine_stats_scraper(scrape_interval: float) -> EngineStatsScraper:
-    return EngineStatsScraper(scrape_interval)
+def initialize_engine_stats_scraper(
+    scrape_interval: float,
+    admission_scrape_interval: Optional[float] = None,
+    on_metrics_update: Optional[Callable[[], None]] = None,
+) -> EngineStatsScraper:
+    return EngineStatsScraper(
+        scrape_interval,
+        admission_scrape_interval=admission_scrape_interval,
+        on_metrics_update=on_metrics_update,
+    )
 
 
 def get_engine_stats_scraper() -> EngineStatsScraper:

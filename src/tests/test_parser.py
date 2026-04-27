@@ -151,6 +151,46 @@ def test_validate_args_when_service_discovery_is_set_to_static_and_static_backen
         )
 
 
+def test_validate_args_when_router_queue_enabled_with_non_roundrobin_raises_value_error() -> (
+    None
+):
+    with pytest.raises(ValueError):
+        parser.validate_args(
+            MagicMock(
+                routing_logic="session",
+                service_discovery="static",
+                static_backends="http://localhost:8000",
+                static_models="m1",
+                static_backend_health_checks=False,
+                enable_router_queue=True,
+                router_max_queued_requests=10,
+                router_max_queue_wait_seconds=5.0,
+                router_waiting_threshold_per_endpoint=1,
+                router_admission_scrape_interval_seconds=1.0,
+            )
+        )
+
+
+def test_validate_args_when_router_queue_size_is_not_positive_raises_value_error() -> (
+    None
+):
+    with pytest.raises(ValueError):
+        parser.validate_args(
+            MagicMock(
+                routing_logic="roundrobin",
+                service_discovery="static",
+                static_backends="http://localhost:8000",
+                static_models="m1",
+                static_backend_health_checks=False,
+                enable_router_queue=True,
+                router_max_queued_requests=0,
+                router_max_queue_wait_seconds=5.0,
+                router_waiting_threshold_per_endpoint=1,
+                router_admission_scrape_interval_seconds=1.0,
+            )
+        )
+
+
 def test_validate_static_model_types_when_model_types_is_not_defines_raises_value_error() -> (
     None
 ):
