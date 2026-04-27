@@ -53,6 +53,7 @@ class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
     KVAWARE = "kvaware"
+    LOAD_BALANCED_KVAWARE = "load_balanced_kvaware"
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
     DISAGGREGATED_PREFILL_ORCHESTRATED = "disaggregated_prefill_orchestrated"
@@ -413,6 +414,111 @@ class KvawareRouter(RoutingInterface):
             return self.instance_id_to_ip[queried_instance_ids[0]]
 
 
+class LoadBalancedKvawareRouter(KvawareRouter):
+    """
+    Route the request using KV-aware routing with a load-balancing first tier.
+
+    Before performing KV-aware cache lookup, the router evaluates whether the
+    current load is balanced across replicas by comparing queue lengths
+    (num_running_requests + num_queuing_requests).  If the difference between
+    the highest and lowest queue lengths exceeds *imbalanced_threshold*, the
+    request is sent to the least-loaded replica so that load is re-balanced.
+    Otherwise the standard KV-aware routing logic is applied.
+
+    Args:
+        imbalanced_threshold: Queue length difference threshold for
+            considering load balanced.  Lower values prioritize load
+            balancing over cache locality.  Default is ``math.inf``
+            (always use KV-aware routing).
+    """
+
+    def __init__(
+        self,
+        lmcache_controller_port: int,
+        session_key: str,
+        kv_aware_threshold: int = 2000,
+        imbalanced_threshold: float = math.inf,
+        lmcache_health_check_interval: int = 5,
+        lmcache_worker_timeout: int = 30,
+    ):
+        super().__init__(
+            lmcache_controller_port=lmcache_controller_port,
+            session_key=session_key,
+            kv_aware_threshold=kv_aware_threshold,
+            lmcache_health_check_interval=lmcache_health_check_interval,
+            lmcache_worker_timeout=lmcache_worker_timeout,
+        )
+        self.imbalanced_threshold = imbalanced_threshold
+        logger.info(
+            f"LoadBalancedKvawareRouter initialized with "
+            f"imbalanced_threshold: {self.imbalanced_threshold}"
+        )
+
+    @staticmethod
+    def _get_queue_length(engine_stats: Dict[str, EngineStats], url: str) -> int:
+        """Return the total queue length (running + waiting) for *url*."""
+        stats = engine_stats.get(url)
+        if stats is None:
+            return 0
+        return stats.num_running_requests + stats.num_queuing_requests
+
+    def _is_load_balanced(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+    ) -> bool:
+        """Return True when the queue-length spread is within threshold."""
+        if not endpoints:
+            return True
+        lengths = [self._get_queue_length(engine_stats, ep.url) for ep in endpoints]
+        return (max(lengths) - min(lengths)) < self.imbalanced_threshold
+
+    def _route_to_least_loaded(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+    ) -> str:
+        """Return the URL of the endpoint with the shortest queue."""
+        return min(
+            endpoints, key=lambda ep: self._get_queue_length(engine_stats, ep.url)
+        ).url
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        """
+        Route a request with a load-balancing first tier followed by
+        KV-aware routing.
+
+        1. **Load balance check** - compare queue lengths across replicas.
+           If the spread exceeds *imbalanced_threshold*, route to the
+           least-loaded replica immediately.
+        2. **KV-aware routing** - look up the longest prefix match in the
+           LMCache controller and route accordingly.
+        3. **Fallback** - if no suitable KV cache hit is found, fall back
+           to session-based consistent hashing or QPS-based routing.
+        """
+
+        # --- Tier 1: Load balance check ---
+        if not self._is_load_balanced(endpoints, engine_stats):
+            url = self._route_to_least_loaded(endpoints, engine_stats)
+            logger.debug(
+                f"LoadBalancedKvawareRouter: load imbalanced, routing to "
+                f"least-loaded endpoint {url}"
+            )
+            return url
+
+        # --- Tier 2 & 3: Delegate to parent KV-aware logic ---
+        return await super().route_request(
+            endpoints, engine_stats, request_stats, request, request_json
+        )
+
+
 class PrefixAwareRouter(RoutingInterface):
     """
     Route the request to the appropriate engine URL by where the longest
@@ -667,6 +773,17 @@ def initialize_routing_logic(
             ),
         )
         router.start_kv_manager()
+    elif routing_logic == RoutingLogic.LOAD_BALANCED_KVAWARE:
+        logger.info("Initializing load-balanced kvaware routing logic")
+        router = LoadBalancedKvawareRouter(
+            lmcache_controller_port=kwargs.get("lmcache_controller_port"),
+            session_key=kwargs.get("session_key"),
+            kv_aware_threshold=kwargs.get("kv_aware_threshold"),
+            imbalanced_threshold=kwargs.get("imbalanced_threshold", math.inf),
+            lmcache_health_check_interval=kwargs.get("lmcache_health_check_interval"),
+            lmcache_worker_timeout=kwargs.get("lmcache_worker_timeout"),
+        )
+        router.start_kv_manager()
     elif routing_logic == RoutingLogic.PREFIXAWARE:
         logger.info("Initializing prefix-aware routing logic")
         router = PrefixAwareRouter()
@@ -703,6 +820,7 @@ def get_routing_logic() -> RoutingInterface:
         SessionRouter,
         RoundRobinRouter,
         KvawareRouter,
+        LoadBalancedKvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
         DisaggregatedPrefillOrchestratedRouter,
@@ -718,6 +836,7 @@ def cleanup_routing_logic():
         SessionRouter,
         RoundRobinRouter,
         KvawareRouter,
+        LoadBalancedKvawareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
         DisaggregatedPrefillOrchestratedRouter,
