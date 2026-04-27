@@ -20,7 +20,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 import aiohttp
 import requests
@@ -32,6 +32,16 @@ from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 _global_service_discovery: "Optional[ServiceDiscovery]" = None
+_MODEL_INFO_KNOWN_FIELDS = frozenset(
+    {
+        "id",
+        "object",
+        "created",
+        "owned_by",
+        "root",
+        "parent",
+    }
+)
 
 
 class ServiceDiscoveryType(enum.Enum):
@@ -51,6 +61,7 @@ class ModelInfo:
     root: Optional[str] = None
     parent: Optional[str] = None
     is_adapter: bool = False
+    extra_fields: Dict[str, Any] = None
 
     @classmethod
     def from_dict(cls, data: Dict) -> "ModelInfo":
@@ -63,19 +74,24 @@ class ModelInfo:
             root=data.get("root", None),
             parent=data.get("parent", None),
             is_adapter=data.get("parent") is not None,
+            extra_fields={
+                k: v for k, v in data.items() if k not in _MODEL_INFO_KNOWN_FIELDS
+            },
         )
 
     def to_dict(self) -> Dict:
         """Convert the ModelInfo instance to a dictionary."""
-        return {
+        data = {
             "id": self.id,
             "object": self.object,
             "created": self.created,
             "owned_by": self.owned_by,
             "root": self.root,
             "parent": self.parent,
-            "is_adapter": self.is_adapter,
         }
+        if self.extra_fields:
+            data.update(self.extra_fields)
+        return data
 
 
 @dataclass

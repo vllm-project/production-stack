@@ -152,13 +152,7 @@ async def show_models(request: Request):
             if model_id in existing_models:
                 continue
 
-            model_card = ModelCard(
-                id=model_id,
-                object="model",
-                created=model_info.created,
-                owned_by=model_info.owned_by,
-                parent=model_info.parent,
-            )
+            model_card = ModelCard(**model_info.to_dict())
             model_cards.append(model_card)
             existing_models.add(model_id)
 
