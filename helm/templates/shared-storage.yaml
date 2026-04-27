@@ -1,5 +1,5 @@
 {{- if .Values.sharedPvcStorage.enabled }}
-{{- if or (.Values.sharedPvcStorage.hostPath) (and .Values.sharedPvcStorage.nfs.server .Values.sharedPvcStorage.nfs.path) }}
+{{- if and (not .Values.sharedPvcStorage.storageClass) (or .Values.sharedPvcStorage.hostPath (and .Values.sharedPvcStorage.nfs.server .Values.sharedPvcStorage.nfs.path)) }}
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -10,9 +10,6 @@ metadata:
     app: {{ .Release.Name }}
     component: shared-pvc-storage
 spec:
-  {{- if .Values.sharedPvcStorage.storageClass }}
-  storageClassName: {{ .Values.sharedPvcStorage.storageClass }}
-  {{- end }}
   capacity:
     storage: {{ .Values.sharedPvcStorage.size }}
   accessModes:
@@ -48,7 +45,7 @@ spec:
   resources:
     requests:
       storage: {{ .Values.sharedPvcStorage.size }}
-  {{- if or (.Values.sharedPvcStorage.hostPath) (and .Values.sharedPvcStorage.nfs.server .Values.sharedPvcStorage.nfs.path) }}
+  {{- if and (not .Values.sharedPvcStorage.storageClass) (or .Values.sharedPvcStorage.hostPath (and .Values.sharedPvcStorage.nfs.server .Values.sharedPvcStorage.nfs.path)) }}
   volumeName: {{ .Release.Name }}-shared-pvc-storage
   {{- end }}
 {{- end }}
