@@ -298,6 +298,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         """
         Get detailed model information. For static serving engines, we don't query the engine, instead we use predefined
         static model info.
+        This will be modified
 
         Args:
             model: the model name
