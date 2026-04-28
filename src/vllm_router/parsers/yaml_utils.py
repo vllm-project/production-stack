@@ -37,6 +37,15 @@ def generate_static_model_types(models: dict[str, Any]) -> str:
     return ",".join(static_model_types)
 
 
+def generate_static_healthcheck_disabled(models: dict[str, Any]) -> str:
+    healthcheck_disabled = []
+    for _, details in models.items():
+        if "static_backends" in details:
+            disabled = str(details.get("healthcheck_disabled", False)).lower()
+            healthcheck_disabled.extend([disabled] * len(details["static_backends"]))
+    return ",".join(healthcheck_disabled)
+
+
 def read_and_process_yaml_config_file(config_path: str) -> dict[str, Any]:
     with open(config_path, encoding="utf-8") as f:
         try:
@@ -49,6 +58,9 @@ def read_and_process_yaml_config_file(config_path: str) -> dict[str, Any]:
                 yaml_config["static_backends"] = generate_static_backends(models)
                 yaml_config["static_models"] = generate_static_models(models)
                 yaml_config["static_model_types"] = generate_static_model_types(models)
+                yaml_config["static_healthcheck_disabled"] = (
+                    generate_static_healthcheck_disabled(models)
+                )
             if aliases:
                 yaml_config["static_aliases"] = generate_static_aliases(aliases)
             return yaml_config
