@@ -49,9 +49,7 @@ spec:
               - name: EXPECTED_NODES
                 value: "{{ add $modelSpec.replicaCount 1}}"
               - name: HF_HOME
-                {{- if $.Values.sharedPvcStorage.enabled }}
-                value: /data/shared-pvc-storage
-                {{- else if hasKey $modelSpec "pvcStorage" }}
+                {{- if hasKey $modelSpec "pvcStorage" }}
                 value: /data
                 {{- else }}
                 value: /tmp
@@ -296,9 +294,7 @@ spec:
                     fieldRef:
                       fieldPath: status.podIP
                 - name: HF_HOME
-                  {{- if $.Values.sharedPvcStorage.enabled }}
-                  value: /data/shared-pvc-storage
-                  {{- else if hasKey $modelSpec "pvcStorage" }}
+                  {{- if hasKey $modelSpec "pvcStorage" }}
                   value: /data
                   {{- else }}
                   value: /tmp
