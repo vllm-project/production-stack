@@ -40,6 +40,7 @@ from vllm_router.services.request_service.rewriter import (
     is_request_rewriter_initialized,
 )
 from vllm_router.utils import (
+    normalize_alias_config,
     replace_model_in_request_body,
     update_content_length,
 )
@@ -467,8 +468,15 @@ async def route_general_request(
     endpoints = service_discovery.get_endpoint_info()
 
     aliases = getattr(service_discovery, "aliases", None)
-    if aliases and requested_model in aliases.keys():
-        requested_model = aliases[requested_model]
+    if aliases and requested_model in aliases:
+        alias_config = normalize_alias_config(requested_model, aliases[requested_model])
+        requested_model = alias_config.model
+        if alias_config.reasoning_effort and "reasoning_effort" not in request_json:
+            request_json["reasoning_effort"] = alias_config.reasoning_effort
+        if alias_config.reasoning_effort == "none":
+            request_json.setdefault("chat_template_kwargs", {})[
+                "enable_thinking"
+            ] = False
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
 
