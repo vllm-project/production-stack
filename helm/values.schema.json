@@ -1089,6 +1089,10 @@
                                 "description": "The annotations to add to the deployment",
                                 "type": "object"
                             },
+                            "labels": {
+                                "description": "Additional labels to add to the deployment",
+                                "type": "object"
+                            },
                             "enableLoRA": {
                                 "description": "Whether to enable LoRA",
                                 "type": "boolean"
@@ -1374,6 +1378,10 @@
                             },
                             "podAnnotations": {
                                 "description": "The annotations to add to the pods",
+                                "type": "object"
+                            },
+                            "podLabels": {
+                                "description": "Additional labels to add to the pods",
                                 "type": "object"
                             },
                             "priorityClassName": {
