@@ -41,7 +41,6 @@ logger = init_logger(__name__)
 
 metrics_router = APIRouter()
 
-# Define Gauges for system resource usage
 router_cpu_usage_percent = Gauge(
     "router_cpu_usage_percent",
     "CPU usage percent",
@@ -56,8 +55,6 @@ router_disk_usage_percent = Gauge(
 )
 
 
-# All label-based gauges that must be cleared on each scrape to prevent
-# stale series when endpoints are removed from service discovery.
 _LABEL_GAUGES = [
     current_qps,
     avg_decoding_length,
@@ -75,55 +72,23 @@ _LABEL_GAUGES = [
 
 
 def _clear_label_gauges() -> None:
-    """
-    Clear all label-based gauges to avoid stale series for removed endpoints.
-
-    When an endpoint is removed from service discovery, its ``server=...``
-    label is never overwritten, so Prometheus keeps exporting the last known
-    value indefinitely.  Calling ``.clear()`` on each gauge removes all
-    label combinations so only *currently active* endpoints are re-added.
-    """
     for gauge in _LABEL_GAUGES:
         gauge.clear()
 
 
-# --- Prometheus Metrics Endpoint ---
 @metrics_router.get("/metrics")
 async def metrics():
-    # Retrieve request stats from the monitor.
-    """
-    Endpoint to expose Prometheus metrics for the vLLM router.
-
-    This function gathers request statistics, engine metrics, and health status
-    of the service endpoints to update Prometheus gauges. It exports metrics
-    such as queries per second (QPS), average decoding length, number of prefill
-    and decoding requests, average latency, average inter-token latency, number
-    of swapped requests, and the number of healthy pods for each server. The
-    metrics are used to monitor the performance and health of the vLLM router
-    services.
-
-    Returns:
-        Response: A HTTP response containing the latest Prometheus metrics in
-        the appropriate content type.
-    """
-
-    # Clear all label-based gauges to prevent stale series for removed
-    # endpoints.  Unlabeled system gauges (CPU, memory, disk) are unaffected.
     _clear_label_gauges()
 
-    # Collect CPU utilization (short interval)
     cpu_percent = psutil.cpu_percent(interval=0.1)
     router_cpu_usage_percent.set(cpu_percent)
 
-    # Collect memory utilization
     memory_percent = psutil.virtual_memory().percent
     router_memory_usage_percent.set(memory_percent)
 
-    # Collect disk utilization on root filesystem
     disk_percent = psutil.disk_usage("/").percent
     router_disk_usage_percent.set(disk_percent)
 
-    # Existing vLLM router request statistics
     stats = get_request_stats_monitor().get_request_stats(time.time())
     for server, stat in stats.items():
         current_qps.labels(server=server).set(stat.qps)
@@ -137,7 +102,6 @@ async def metrics():
         avg_itl.labels(server=server).set(stat.avg_itl)
         num_requests_swapped.labels(server=server).set(stat.num_swapped_requests)
 
-    # Engine statistics (GPU prefix cache metrics)
     engine_stats = get_engine_stats_scraper().get_engine_stats()
     for server, engine_stat in engine_stats.items():
         gpu_prefix_cache_hit_rate.labels(server=server).set(
@@ -150,10 +114,8 @@ async def metrics():
             engine_stat.gpu_prefix_cache_queries_total
         )
 
-    # Service discovery health status
     endpoints = get_service_discovery().get_endpoint_info()
     for ep in endpoints:
         healthy_pods_total.labels(server=ep.url).set(1 if ep.healthy else 0)
 
-    # Return all metrics in Prometheus format
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

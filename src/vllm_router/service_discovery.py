@@ -80,37 +80,16 @@ class ModelInfo:
 
 @dataclass
 class EndpointInfo:
-    # Endpoint's url
     url: str
-
-    # Model names
     model_names: List[str]
-
-    # Endpoint Id
     Id: str
-
-    # Added timestamp
     added_timestamp: float
-
-    # Model label
     model_label: str
-
-    # Endpoint's sleep status
     sleep: bool
-
-    # Endpoint health status (from service discovery health checks)
     healthy: bool = True
-
-    # Pod name
     pod_name: Optional[str] = None
-
-    # Service name
     service_name: Optional[str] = None
-
-    # Namespace
     namespace: Optional[str] = None
-
-    # Model information including relationships
     model_info: Dict[str, ModelInfo] = None
 
     def __str__(self):

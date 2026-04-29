@@ -12,10 +12,6 @@ from vllm_router.services.metrics_service import (
     num_requests_running,
 )
 
-# ---------------------------------------------------------------------------
-# EndpointInfo.healthy field
-# ---------------------------------------------------------------------------
-
 
 def test_endpoint_info_healthy_defaults_to_true():
     ep = EndpointInfo(
@@ -40,11 +36,6 @@ def test_endpoint_info_healthy_can_be_set_false():
         healthy=False,
     )
     assert ep.healthy is False
-
-
-# ---------------------------------------------------------------------------
-# _clear_label_gauges behaviour
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)
