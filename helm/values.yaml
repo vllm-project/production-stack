@@ -13,8 +13,17 @@ servingEngineSpec:
   # -- Extra service ports for models
   extraPorts: []
 
-  # -- API key for securing the vLLM models. Can be either a string that will be stored in a generated secret or an object referencing an existing secret.
-  vllmApiKey: # @schema type:[string, object]
+  # -- API key for securing the vLLM models. Accepts a single string, a
+  # -- comma-separated string, a list of strings (all stored in a generated
+  # -- secret joined as comma-separated), or an object referencing an existing
+  # -- Kubernetes secret. Multiple keys enable multi-tenant access so different
+  # -- teams can authenticate with independent tokens.
+  # -- Examples:
+  # --   vllmApiKey: "single-key"
+  # --   vllmApiKey: "key1,key2,key3"
+  # --   vllmApiKey: ["key1", "key2", "key3"]
+  # --   vllmApiKey: {secretName: my-secret, secretKey: api-key}
+  vllmApiKey: # @schema type:[string, array, object]
     # -- Name of the existing Kubernetes secret that contains the vLLM API key
     secretName: ""
     # -- Key within the secret that contains the vLLM API key
