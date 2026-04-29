@@ -17,9 +17,10 @@ from contextlib import asynccontextmanager
 
 import sentry_sdk
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from vllm_router.aiohttp_client import AiohttpClientWrapper
+from vllm_router.auth import verify_api_key
 from vllm_router.dynamic_config import (
     DynamicRouterConfig,
     get_dynamic_config_watcher,
@@ -45,9 +46,7 @@ from vllm_router.service_discovery import (
 from vllm_router.services.batch_service import initialize_batch_processor
 from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
-from vllm_router.services.request_service.rewriter import (
-    get_request_rewriter,
-)
+from vllm_router.services.request_service.rewriter import get_request_rewriter
 from vllm_router.stats.engine_stats import (
     get_engine_stats_scraper,
     initialize_engine_stats_scraper,
@@ -80,9 +79,7 @@ try:
         initialize_semantic_cache,
         is_semantic_cache_enabled,
     )
-    from vllm_router.experimental.semantic_cache_integration import (
-        semantic_cache_size,
-    )
+    from vllm_router.experimental.semantic_cache_integration import semantic_cache_size
 
     semantic_cache_available = True
 except ImportError:
@@ -365,7 +362,7 @@ def initialize_all(app: FastAPI, args):
 
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(main_router)
+app.include_router(main_router, dependencies=[Depends(verify_api_key)])
 app.include_router(files_router)
 app.include_router(batches_router)
 app.include_router(metrics_router)

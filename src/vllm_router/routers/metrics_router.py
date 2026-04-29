@@ -18,6 +18,7 @@ import psutil
 from fastapi import APIRouter, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
 
+from vllm_router.log import init_logger
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.metrics_service import (
     avg_decoding_length,
@@ -36,6 +37,8 @@ from vllm_router.services.metrics_service import (
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
 from vllm_router.stats.request_stats import get_request_stats_monitor
 
+logger = init_logger(__name__)
+
 metrics_router = APIRouter()
 
 # Define Gauges for system resource usage
@@ -51,6 +54,37 @@ router_disk_usage_percent = Gauge(
     "router_disk_usage_percent",
     "Disk usage percent",
 )
+
+
+# All label-based gauges that must be cleared on each scrape to prevent
+# stale series when endpoints are removed from service discovery.
+_LABEL_GAUGES = [
+    current_qps,
+    avg_decoding_length,
+    num_prefill_requests,
+    num_decoding_requests,
+    num_requests_running,
+    avg_latency,
+    avg_itl,
+    num_requests_swapped,
+    gpu_prefix_cache_hit_rate,
+    gpu_prefix_cache_hits_total,
+    gpu_prefix_cache_queries_total,
+    healthy_pods_total,
+]
+
+
+def _clear_label_gauges() -> None:
+    """
+    Clear all label-based gauges to avoid stale series for removed endpoints.
+
+    When an endpoint is removed from service discovery, its ``server=...``
+    label is never overwritten, so Prometheus keeps exporting the last known
+    value indefinitely.  Calling ``.clear()`` on each gauge removes all
+    label combinations so only *currently active* endpoints are re-added.
+    """
+    for gauge in _LABEL_GAUGES:
+        gauge.clear()
 
 
 # --- Prometheus Metrics Endpoint ---
@@ -72,6 +106,10 @@ async def metrics():
         Response: A HTTP response containing the latest Prometheus metrics in
         the appropriate content type.
     """
+
+    # Clear all label-based gauges to prevent stale series for removed
+    # endpoints.  Unlabeled system gauges (CPU, memory, disk) are unaffected.
+    _clear_label_gauges()
 
     # Collect CPU utilization (short interval)
     cpu_percent = psutil.cpu_percent(interval=0.1)
@@ -115,9 +153,7 @@ async def metrics():
     # Service discovery health status
     endpoints = get_service_discovery().get_endpoint_info()
     for ep in endpoints:
-        healthy_pods_total.labels(server=ep.url).set(
-            1 if getattr(ep, "healthy", True) else 0
-        )
+        healthy_pods_total.labels(server=ep.url).set(1 if ep.healthy else 0)
 
     # Return all metrics in Prometheus format
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

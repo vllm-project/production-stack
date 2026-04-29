@@ -249,7 +249,7 @@ spec:
           {{- end }}
           {{- $vllmApiKey := $.Values.servingEngineSpec.vllmApiKey }}
           {{- if $vllmApiKey }}
-          {{- if kindIs "string" $vllmApiKey }}
+          {{- if or (kindIs "string" $vllmApiKey) (kindIs "slice" $vllmApiKey) }}
           - name: VLLM_API_KEY
             valueFrom:
               secretKeyRef:
