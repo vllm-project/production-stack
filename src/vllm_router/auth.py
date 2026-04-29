@@ -54,8 +54,8 @@ async def verify_api_key(request: Request) -> None:
     if not allowed_keys:
         return
 
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(
             status_code=401,
             detail="Missing or malformed Authorization header. Expected: Bearer <token>",
