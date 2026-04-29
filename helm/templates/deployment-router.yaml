@@ -74,7 +74,7 @@ spec:
                 name: {{ .Values.routerSpec.vllmApiKey.secretName }}
                 key: {{ .Values.routerSpec.vllmApiKey.secretKey }}
           {{- else if and .Values.servingEngineSpec.enableEngine }}
-          {{- if kindIs "string" .Values.servingEngineSpec.vllmApiKey }}
+          {{- if or (kindIs "string" .Values.servingEngineSpec.vllmApiKey) (kindIs "slice" .Values.servingEngineSpec.vllmApiKey) }}
           - name: VLLM_API_KEY
             valueFrom:
               secretKeyRef:
