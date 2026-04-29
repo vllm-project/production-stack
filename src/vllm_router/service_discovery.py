@@ -114,6 +114,9 @@ class EndpointInfo:
     # Endpoint's sleep status
     sleep: bool
 
+    # Endpoint health status (from service discovery health checks)
+    healthy: bool = True
+
     # Pod name
     pod_name: Optional[str] = None
 
