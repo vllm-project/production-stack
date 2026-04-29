@@ -4,12 +4,19 @@ from prometheus_client import REGISTRY, CollectorRegistry, generate_latest
 from vllm_router.routers.metrics_router import _LABEL_GAUGES, _clear_label_gauges
 from vllm_router.service_discovery import EndpointInfo
 from vllm_router.services.metrics_service import (
+    avg_decoding_length,
+    avg_itl,
+    avg_latency,
     current_qps,
     gpu_prefix_cache_hit_rate,
     gpu_prefix_cache_hits_total,
     gpu_prefix_cache_queries_total,
     healthy_pods_total,
+    num_decoding_requests,
+    num_prefill_requests,
     num_requests_running,
+    num_requests_swapped,
+    num_requests_waiting,
 )
 
 
@@ -96,11 +103,18 @@ def test_label_gauges_list_contains_all_expected_gauges():
     """Ensure every gauge we export with a server label is in _LABEL_GAUGES."""
     expected = {
         current_qps,
+        avg_decoding_length,
+        num_prefill_requests,
+        num_decoding_requests,
+        num_requests_running,
+        num_requests_waiting,
+        avg_latency,
+        avg_itl,
+        num_requests_swapped,
         gpu_prefix_cache_hit_rate,
         gpu_prefix_cache_hits_total,
         gpu_prefix_cache_queries_total,
         healthy_pods_total,
-        num_requests_running,
     }
     assert expected.issubset(set(_LABEL_GAUGES))
 

@@ -33,6 +33,7 @@ from vllm_router.services.metrics_service import (
     num_prefill_requests,
     num_requests_running,
     num_requests_swapped,
+    num_requests_waiting,
 )
 from vllm_router.stats.engine_stats import get_engine_stats_scraper
 from vllm_router.stats.request_stats import get_request_stats_monitor
@@ -61,6 +62,7 @@ _LABEL_GAUGES = [
     num_prefill_requests,
     num_decoding_requests,
     num_requests_running,
+    num_requests_waiting,
     avg_latency,
     avg_itl,
     num_requests_swapped,
@@ -78,6 +80,21 @@ def _clear_label_gauges() -> None:
 
 @metrics_router.get("/metrics")
 async def metrics():
+    """
+    Endpoint to expose Prometheus metrics for the vLLM router.
+
+    This function gathers request statistics, engine metrics, and health status
+    of the service endpoints to update Prometheus gauges. It exports metrics
+    such as queries per second (QPS), average decoding length, number of prefill
+    and decoding requests, average latency, average inter-token latency, number
+    of swapped requests, and the number of healthy pods for each server. The
+    metrics are used to monitor the performance and health of the vLLM router
+    services.
+
+    Returns:
+        Response: A HTTP response containing the latest Prometheus metrics in
+        the appropriate content type.
+    """
     _clear_label_gauges()
 
     cpu_percent = psutil.cpu_percent(interval=0.1)
