@@ -121,7 +121,9 @@ def validate_args(args):
             "Sentry profile session sample rate must be between 0.0 and 1.0."
         )
     if args.retry_max_retries < 1:
-        raise ValueError("Retry max retries must be at least 1.")
+        raise ValueError(
+            "Retry max retries must be at least 1 (1 = no retries, initial attempt only)."
+        )
     if args.retry_initial_backoff_ms <= 0:
         raise ValueError("Retry initial backoff must be greater than 0.")
     if args.retry_max_backoff_ms < args.retry_initial_backoff_ms:

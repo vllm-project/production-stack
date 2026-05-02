@@ -487,7 +487,7 @@ class PrefixAwareRouter(RoutingInterface):
     In this class, we assume that there is no eviction of prefix cache.
     """
 
-    def __init__(self: int):
+    def __init__(self):
         if hasattr(self, "_initialized"):
             return
         super().__init__()  # Initialize retry_config

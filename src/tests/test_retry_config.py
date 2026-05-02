@@ -1,4 +1,31 @@
 from vllm_router.routers.routing_logic import RetryConfig
+from vllm_router.services.request_service.request import is_retryable_status
+
+
+class TestIsRetryableStatus:
+    """Test retryable status code detection."""
+
+    def test_retryable_status_codes(self):
+        """Test that expected status codes are retryable."""
+        assert is_retryable_status(408)
+        assert is_retryable_status(429)
+        assert is_retryable_status(500)
+        assert is_retryable_status(502)
+        assert is_retryable_status(503)
+        assert is_retryable_status(504)
+
+    def test_non_retryable_status_codes(self):
+        """Test that non-retryable status codes return False."""
+        assert not is_retryable_status(200)
+        assert not is_retryable_status(201)
+        assert not is_retryable_status(204)
+        assert not is_retryable_status(400)
+        assert not is_retryable_status(401)
+        assert not is_retryable_status(403)
+        assert not is_retryable_status(404)
+        assert not is_retryable_status(405)
+        assert not is_retryable_status(422)
+        assert not is_retryable_status(499)
 
 
 class TestRetryConfig:
