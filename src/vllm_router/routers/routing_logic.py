@@ -100,7 +100,8 @@ class RoutingLogic(str, enum.Enum):
 
 class RoutingInterface(metaclass=SingletonABCMeta):
     def __init__(self):
-        self.retry_config = RetryConfig()
+        if not hasattr(self, "retry_config"):
+            self.retry_config = RetryConfig()
 
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
@@ -620,6 +621,7 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
     def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
         if hasattr(self, "_initialized"):
             return
+        super().__init__()  # Initialize retry_config
         self.prefill_model_labels = prefill_model_labels or []
         self.decode_model_labels = decode_model_labels or []
         # Round-robin counters for load balancing across xPyD pods

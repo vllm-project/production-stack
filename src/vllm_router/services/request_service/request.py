@@ -662,6 +662,9 @@ async def route_general_request(
             break
         except HTTPException as e:
             # Check if HTTPException status is retryable
+            # Note: We don't add to error_urls for HTTPException since retryable
+            # status codes (429, 503, etc.) may be temporary and the same backend
+            # could recover, unlike connection failures which indicate a down backend.
             if is_retryable_status(e.status_code) and attempt + 1 < max_attempts:
                 logger.warning(
                     f"Request {request_id} got retryable HTTPException {e.status_code} from {server_url}, "

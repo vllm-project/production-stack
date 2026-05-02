@@ -67,12 +67,12 @@ The router supports automatic retry with exponential backoff for transient failu
 
 **Retryable Status Codes:** 408, 429, 500, 502, 503, 504
 
-- `--retry-max-retries`: Maximum retry attempts. Default is 5.
+- `--retry-max-retries`: Maximum total attempts including the initial request. Default is 5 (meaning 1 initial attempt + up to 4 retries).
 - `--retry-initial-backoff-ms`: Initial backoff duration in milliseconds. Default is 50.
 - `--retry-max-backoff-ms`: Maximum backoff duration in milliseconds. Default is 30000.
 - `--retry-backoff-multiplier`: Exponential backoff multiplier. Default is 1.5.
 - `--retry-jitter-factor`: Random jitter factor (0.0-1.0) to prevent thundering herd. Default is 0.2.
-- `--disable-retries`: Disable retries entirely.
+- `--disable-retries`: Disable retries entirely (sets max_retries to 1, meaning only the initial attempt).
 
 **Example with retry configuration:**
 

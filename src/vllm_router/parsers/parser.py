@@ -120,6 +120,18 @@ def validate_args(args):
         raise ValueError(
             "Sentry profile session sample rate must be between 0.0 and 1.0."
         )
+    if args.retry_max_retries < 1:
+        raise ValueError("Retry max retries must be at least 1.")
+    if args.retry_initial_backoff_ms <= 0:
+        raise ValueError("Retry initial backoff must be greater than 0.")
+    if args.retry_max_backoff_ms < args.retry_initial_backoff_ms:
+        raise ValueError(
+            "Retry max backoff must be greater than or equal to initial backoff."
+        )
+    if args.retry_backoff_multiplier < 1.0:
+        raise ValueError("Retry backoff multiplier must be at least 1.0.")
+    if not (0.0 <= args.retry_jitter_factor <= 1.0):
+        raise ValueError("Retry jitter factor must be between 0.0 and 1.0.")
 
 
 def parse_args():
@@ -456,7 +468,7 @@ def parse_args():
         "--retry-max-retries",
         type=int,
         default=5,
-        help="Maximum retry attempts for failed requests (default: 5)",
+        help="Maximum total attempts including initial request (default: 5)",
     )
     retry_group.add_argument(
         "--retry-initial-backoff-ms",
@@ -486,13 +498,6 @@ def parse_args():
         "--disable-retries",
         action="store_true",
         help="Disable retries entirely (sets max_retries to 1)",
-    )
-
-    parser.add_argument(
-        "--max-instance-failover-reroute-attempts",
-        type=int,
-        default=0,
-        help="Number of reroute attempts per failed request",
     )
 
     parser.add_argument(

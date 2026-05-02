@@ -196,7 +196,7 @@ async def test_breaks_when_no_remaining_endpoints(setup):
 
 
 @pytest.mark.asyncio
-async def test_http_exception_not_retried(setup):
+async def test_non_retryable_http_exception_not_retried(setup):
     from fastapi import HTTPException
 
     req, router = setup
@@ -218,3 +218,31 @@ async def test_http_exception_not_retried(setup):
             await route_general_request(req, "/v1/chat/completions", MagicMock())
 
     assert call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_retryable_http_exception_is_retried(setup):
+    from fastapi import HTTPException
+
+    req, router = setup
+    router.retry_config = RetryConfig(max_retries=3)
+    call_count = 0
+
+    async def fail_then_ok(*a, **kw):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise HTTPException(status_code=503, detail="service unavailable")
+        yield MOCK_HEADERS, 200
+        yield b"done"
+
+    with patch(
+        "vllm_router.services.request_service.request.process_request",
+        side_effect=fail_then_ok,
+    ):
+        from vllm_router.services.request_service.request import route_general_request
+
+        resp = await route_general_request(req, "/v1/chat/completions", MagicMock())
+
+    assert resp.status_code == 200
+    assert call_count == 2
