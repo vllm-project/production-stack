@@ -639,7 +639,6 @@ async def route_general_request(
             if span is not None:
                 span.set_attribute("vllm.backend_url", server_url)
 
-        media_type = "text/event-stream"
         try:
             stream_generator = process_request(
                 request,
@@ -651,6 +650,7 @@ async def route_general_request(
                 parent_span_context=span_context,
             )
             headers, status = await anext(stream_generator)
+            media_type = headers.get("content-type", "text/event-stream")
             headers_dict = {
                 key: value
                 for key, value in headers.items()
