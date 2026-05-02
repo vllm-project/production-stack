@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vllm_router.routers.routing_logic import (
+    RetryConfig,
     RoundRobinRouter,
     RoutingLogic,
     initialize_routing_logic,
@@ -36,7 +37,7 @@ MOCK_HEADERS.items.return_value = [("content-type", "text/event-stream")]
 def setup():
     """Yield (request, background_tasks) with all dependencies patched."""
     router = RoundRobinRouter()
-    router.max_instance_failover_reroute_attempts = 1
+    router.retry_config = RetryConfig(max_retries=2)
 
     sd = MagicMock()
     sd.get_endpoint_info.return_value = ENDPOINTS
@@ -81,19 +82,15 @@ def setup():
         p.stop()
 
 
-def test_initialize_sets_failover_attempts():
-    assert (
-        initialize_routing_logic(
-            RoutingLogic.ROUND_ROBIN
-        ).max_instance_failover_reroute_attempts
-        == 0
+def test_initialize_sets_retry_config():
+    router = initialize_routing_logic(RoutingLogic.ROUND_ROBIN)
+    assert router.retry_config.max_retries == 5  # default
+
+    retry_config = RetryConfig(max_retries=3)
+    router = initialize_routing_logic(
+        RoutingLogic.ROUND_ROBIN, retry_config=retry_config
     )
-    assert (
-        initialize_routing_logic(
-            RoutingLogic.ROUND_ROBIN, max_instance_failover_reroute_attempts=3
-        ).max_instance_failover_reroute_attempts
-        == 3
-    )
+    assert router.retry_config.max_retries == 3
 
 
 @pytest.mark.asyncio
@@ -160,7 +157,7 @@ async def test_raises_after_all_attempts_exhausted(setup):
 @pytest.mark.asyncio
 async def test_no_retry_when_disabled(setup):
     req, router = setup
-    router.max_instance_failover_reroute_attempts = 0
+    router.retry_config = RetryConfig(max_retries=1)
     call_count = 0
 
     async def fail(*a, **kw):
@@ -183,7 +180,7 @@ async def test_no_retry_when_disabled(setup):
 @pytest.mark.asyncio
 async def test_breaks_when_no_remaining_endpoints(setup):
     req, router = setup
-    router.max_instance_failover_reroute_attempts = 5  # more retries than endpoints
+    router.retry_config = RetryConfig(max_retries=5)
 
     async def fail(*a, **kw):
         raise ConnectionError("down")
@@ -199,11 +196,11 @@ async def test_breaks_when_no_remaining_endpoints(setup):
 
 
 @pytest.mark.asyncio
-async def test_http_exception_not_retried(setup):
+async def test_non_retryable_http_exception_not_retried(setup):
     from fastapi import HTTPException
 
     req, router = setup
-    router.max_instance_failover_reroute_attempts = 3
+    router.retry_config = RetryConfig(max_retries=3)
     call_count = 0
 
     async def fail(*a, **kw):
@@ -221,3 +218,31 @@ async def test_http_exception_not_retried(setup):
             await route_general_request(req, "/v1/chat/completions", MagicMock())
 
     assert call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_retryable_http_exception_is_retried(setup):
+    from fastapi import HTTPException
+
+    req, router = setup
+    router.retry_config = RetryConfig(max_retries=3)
+    call_count = 0
+
+    async def fail_then_ok(*a, **kw):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise HTTPException(status_code=503, detail="service unavailable")
+        yield MOCK_HEADERS, 200
+        yield b"done"
+
+    with patch(
+        "vllm_router.services.request_service.request.process_request",
+        side_effect=fail_then_ok,
+    ):
+        from vllm_router.services.request_service.request import route_general_request
+
+        resp = await route_general_request(req, "/v1/chat/completions", MagicMock())
+
+    assert resp.status_code == 200
+    assert call_count == 2
