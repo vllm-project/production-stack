@@ -33,6 +33,7 @@ from vllm_router.routers.files_router import files_router
 from vllm_router.routers.main_router import main_router
 from vllm_router.routers.metrics_router import metrics_router
 from vllm_router.routers.routing_logic import (
+    RetryConfig,
     cleanup_routing_logic,
     get_routing_logic,
     initialize_routing_logic,
@@ -270,6 +271,15 @@ def initialize_all(app: FastAPI, args):
     if args.callbacks:
         configure_custom_callbacks(args.callbacks, app)
 
+    # Configure retry mechanism
+    retry_config = RetryConfig(
+        max_retries=1 if args.disable_retries else args.retry_max_retries,
+        initial_backoff_ms=args.retry_initial_backoff_ms,
+        max_backoff_ms=args.retry_max_backoff_ms,
+        backoff_multiplier=args.retry_backoff_multiplier,
+        jitter_factor=args.retry_jitter_factor,
+    )
+
     initialize_routing_logic(
         args.routing_logic,
         session_key=args.session_key,
@@ -279,9 +289,9 @@ def initialize_all(app: FastAPI, args):
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
         kv_aware_threshold=args.kv_aware_threshold,
-        max_instance_failover_reroute_attempts=args.max_instance_failover_reroute_attempts,
         lmcache_health_check_interval=args.lmcache_health_check_interval,
         lmcache_worker_timeout=args.lmcache_worker_timeout,
+        retry_config=retry_config,
     )
 
     # Initialize feature gates

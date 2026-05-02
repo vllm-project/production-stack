@@ -20,6 +20,7 @@ import math
 import random
 import threading
 import uuid
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 import requests
@@ -49,6 +50,45 @@ from vllm_router.utils import SingletonABCMeta
 logger = init_logger(__name__)
 
 
+@dataclass
+class RetryConfig:
+    """Configuration for retry with exponential backoff and jitter.
+
+    This implements the same retry mechanism as sglang model gateway.
+    """
+
+    max_retries: int = 5
+    initial_backoff_ms: int = 50
+    max_backoff_ms: int = 30000
+    backoff_multiplier: float = 1.5
+    jitter_factor: float = 0.2
+
+    @staticmethod
+    def calculate_delay(attempt: int, config: "RetryConfig") -> float:
+        """Calculate backoff delay with jitter for a given attempt.
+
+        Formula: delay = min(initial_backoff_ms * (multiplier ^ attempt), max_backoff_ms)
+        With jitter: D' = D * (1 + U[-j, +j]) where j is jitter_factor
+
+        Args:
+            attempt: The attempt number (0-based)
+            config: Retry configuration
+
+        Returns:
+            Delay in seconds
+        """
+        delay_ms = min(
+            config.initial_backoff_ms * (config.backoff_multiplier**attempt),
+            config.max_backoff_ms,
+        )
+
+        if config.jitter_factor > 0:
+            jitter_scale = random.uniform(-config.jitter_factor, config.jitter_factor)
+            delay_ms = max(0, delay_ms * (1 + jitter_scale))
+
+        return delay_ms / 1000.0  # Convert to seconds
+
+
 class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
@@ -59,6 +99,9 @@ class RoutingLogic(str, enum.Enum):
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
+    def __init__(self):
+        self.retry_config = RetryConfig()
+
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
     ) -> str:
@@ -147,6 +190,11 @@ class RoundRobinRouter(RoutingInterface):
     def __init__(self):
         if hasattr(self, "_initialized"):
             return
+        super().__init__()  # Initialize retry_config
+        self.req_id = 0
+        self.sorted_endpoints = []
+        self.last_endpoints_id = None
+        self.last_endpoints_hash = None
         self._next_index: dict[tuple[str, ...], int] = {}
         self._sorted_cache: dict[frozenset[str], tuple[str, ...]] = {}
         self._initialized = True
@@ -204,6 +252,7 @@ class SessionRouter(RoutingInterface):
     def __init__(self, session_key: str = None):
         if hasattr(self, "_initialized"):
             return
+        super().__init__()  # Initialize retry_config
         if session_key is None:
             raise ValueError("SessionRouter must be initialized with a session_key")
         self.session_key = session_key
@@ -265,6 +314,7 @@ class KvawareRouter(RoutingInterface):
         lmcache_controller_reply_port: Optional[int] = None,
         lmcache_controller_heartbeat_port: Optional[int] = None,
     ):
+        super().__init__()  # Initialize retry_config
         self.lmcache_controller_port = lmcache_controller_port
         self.lmcache_controller_reply_port = lmcache_controller_reply_port
         self.lmcache_controller_heartbeat_port = lmcache_controller_heartbeat_port
@@ -439,6 +489,7 @@ class PrefixAwareRouter(RoutingInterface):
     def __init__(self: int):
         if hasattr(self, "_initialized"):
             return
+        super().__init__()  # Initialize retry_config
         from vllm_router.prefix.hashtrie import HashTrie
 
         self.hashtrie = HashTrie()
@@ -514,6 +565,7 @@ class DisaggregatedPrefillRouter(RoutingInterface):
     """
 
     def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
+        super().__init__()  # Initialize retry_config
         self.prefill_model_labels = prefill_model_labels
         self.decode_model_labels = decode_model_labels
         self.request_cache = {}  # Cache to store prefill results
@@ -698,9 +750,9 @@ def initialize_routing_logic(
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
-    router.max_instance_failover_reroute_attempts = kwargs.get(
-        "max_instance_failover_reroute_attempts", 0
-    )
+    if "retry_config" in kwargs:
+        router.retry_config = kwargs["retry_config"]
+
     return router
 
 

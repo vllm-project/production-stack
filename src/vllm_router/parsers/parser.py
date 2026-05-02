@@ -447,11 +447,45 @@ def parse_args():
         help="The threshold for kv-aware routing.",
     )
 
-    parser.add_argument(
-        "--max-instance-failover-reroute-attempts",
+    # Retry configuration arguments
+    retry_group = parser.add_argument_group(
+        "Retry Configuration",
+        "Configure retry behavior with exponential backoff",
+    )
+    retry_group.add_argument(
+        "--retry-max-retries",
         type=int,
-        default=0,
-        help="Number of reroute attempts per failed request",
+        default=5,
+        help="Maximum retry attempts for failed requests (default: 5)",
+    )
+    retry_group.add_argument(
+        "--retry-initial-backoff-ms",
+        type=int,
+        default=50,
+        help="Initial backoff duration in milliseconds (default: 50)",
+    )
+    retry_group.add_argument(
+        "--retry-max-backoff-ms",
+        type=int,
+        default=30000,
+        help="Maximum backoff duration in milliseconds (default: 30000)",
+    )
+    retry_group.add_argument(
+        "--retry-backoff-multiplier",
+        type=float,
+        default=1.5,
+        help="Exponential backoff multiplier (default: 1.5)",
+    )
+    retry_group.add_argument(
+        "--retry-jitter-factor",
+        type=float,
+        default=0.2,
+        help="Random jitter factor (0.0-1.0) to prevent thundering herd (default: 0.2)",
+    )
+    retry_group.add_argument(
+        "--disable-retries",
+        action="store_true",
+        help="Disable retries entirely (sets max_retries to 1)",
     )
 
     parser.add_argument(
