@@ -1296,6 +1296,7 @@ async def proxy_multipart_request(
                 headers=resp_headers,
             )
         finally:
+            backend_response.close()
             request_stats_monitor.on_request_complete(
                 chosen_url, request_id, time.time()
             )
