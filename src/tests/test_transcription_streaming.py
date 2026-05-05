@@ -255,7 +255,10 @@ async def test_streaming_uses_aiohttp_multipart_boundary(setup_mocks):
     call_args = mock_client.post.call_args
     assert call_args is not None
     kwargs = call_args[1] if call_args[1] else {}
-    assert kwargs.get("headers") is None
+    # Headers are forwarded (auth, request-id, etc.) but content-type must be absent
+    # so aiohttp can generate the multipart/form-data boundary automatically.
+    passed_headers = kwargs.get("headers") or {}
+    assert "content-type" not in {k.lower() for k in passed_headers}
 
 
 @pytest.mark.asyncio
