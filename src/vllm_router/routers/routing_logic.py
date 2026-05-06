@@ -192,10 +192,6 @@ class RoundRobinRouter(RoutingInterface):
         if hasattr(self, "_initialized"):
             return
         super().__init__()  # Initialize retry_config
-        self.req_id = 0
-        self.sorted_endpoints = []
-        self.last_endpoints_id = None
-        self.last_endpoints_hash = None
         self._next_index: dict[tuple[str, ...], int] = {}
         self._sorted_cache: dict[frozenset[str], tuple[str, ...]] = {}
         self._initialized = True
