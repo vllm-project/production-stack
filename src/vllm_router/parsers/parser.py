@@ -464,13 +464,18 @@ def parse_args():
     # Retry configuration arguments
     retry_group = parser.add_argument_group(
         "Retry Configuration",
-        "Configure retry behavior with exponential backoff",
+        "Configure retry behavior with exponential backoff (disabled by default)",
+    )
+    retry_group.add_argument(
+        "--enable-retries",
+        action="store_true",
+        help="Enable automatic retry for transient HTTP failures (408, 429, 500, 502, 503, 504). Disabled by default for fast failover.",
     )
     retry_group.add_argument(
         "--retry-max-retries",
         type=int,
         default=5,
-        help="Maximum total attempts including initial request (default: 5)",
+        help="Maximum total attempts including initial request (default: 5). Only used when --enable-retries is set.",
     )
     retry_group.add_argument(
         "--retry-initial-backoff-ms",
@@ -495,11 +500,6 @@ def parse_args():
         type=float,
         default=0.2,
         help="Random jitter factor (0.0-1.0) to prevent thundering herd (default: 0.2)",
-    )
-    retry_group.add_argument(
-        "--disable-retries",
-        action="store_true",
-        help="Disable retries entirely (sets max_retries to 1)",
     )
 
     parser.add_argument(

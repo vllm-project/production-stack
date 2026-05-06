@@ -63,16 +63,22 @@ The router can be configured using command-line arguments. Below are the availab
 
 ### Retry Configuration
 
-The router supports automatic retry with exponential backoff for transient failures.
+The router supports automatic retry with exponential backoff for transient failures. **Retries are disabled by default** for fast failover behavior.
 
 **Retryable Status Codes:** 408, 429, 500, 502, 503, 504
 
-- `--retry-max-retries`: Maximum total attempts including the initial request. Default is 5 (meaning 1 initial attempt + up to 4 retries).
+**Important Limitation:** Retries only apply to errors that occur before streaming begins. If an error occurs mid-stream (after the first chunk is sent to the client), the error is passed directly to the client without retry. This is intentional because:
+
+- Buffering entire responses would defeat the purpose of streaming
+- HTTP headers have already been sent to the client
+- Clients can implement their own retry logic for incomplete streaming responses
+
+- `--enable-retries`: Enable automatic retry for transient HTTP failures. Disabled by default.
+- `--retry-max-retries`: Maximum total attempts including the initial request. Default is 5 (meaning 1 initial attempt + up to 4 retries). Only used when `--enable-retries` is set.
 - `--retry-initial-backoff-ms`: Initial backoff duration in milliseconds. Default is 50.
 - `--retry-max-backoff-ms`: Maximum backoff duration in milliseconds. Default is 30000.
 - `--retry-backoff-multiplier`: Exponential backoff multiplier. Default is 1.5.
 - `--retry-jitter-factor`: Random jitter factor (0.0-1.0) to prevent thundering herd. Default is 0.2.
-- `--disable-retries`: Disable retries entirely (sets max_retries to 1, meaning only the initial attempt).
 
 **Example with retry configuration:**
 
@@ -82,6 +88,7 @@ vllm-router --port 8000 \
     --static-backends "http://localhost:9001,http://localhost:9002" \
     --static-models "facebook/opt-125m,facebook/opt-125m" \
     --routing-logic roundrobin \
+    --enable-retries \
     --retry-max-retries 5 \
     --retry-initial-backoff-ms 100 \
     --retry-max-backoff-ms 60000 \
