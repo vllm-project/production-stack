@@ -1,7 +1,17 @@
 import random
+from collections import Counter
 from typing import Dict, List, Tuple
 
-from vllm_router.routers.routing_logic import RoundRobinRouter
+import pytest
+
+from vllm_router.routers.routing_logic import RoundRobinRouter, cleanup_routing_logic
+
+
+@pytest.fixture(autouse=True)
+def cleanup_router():
+    cleanup_routing_logic()
+    yield
+    cleanup_routing_logic()
 
 
 class EndpointInfo:
@@ -21,7 +31,7 @@ class Request:
 
 class EngineStats:
     def __init__(self):
-        return
+        pass
 
 
 def generate_request_args(
@@ -47,6 +57,11 @@ def generate_request(request_type="http") -> Request:
     return Request({"type": request_type})
 
 
+def assert_even_distribution(route_counts: Counter):
+    counts = route_counts.values()
+    assert max(counts) - min(counts) <= 1
+
+
 def test_roundrobin_logic(
     dynamic_discoveries: int = 10, max_endpoints: int = 1000, max_requests: int = 10000
 ):
@@ -55,20 +70,66 @@ def test_roundrobin_logic(
     """
     router = RoundRobinRouter()
 
-    def _fixed_router_check(num_endpoints: int, num_requests: int) -> bool:
-        # Make num_requests requests to the router and check even output distribution
+    def assert_router_stays_balanced(num_endpoints: int, num_requests: int):
         endpoints, engine_stats, request_stats = generate_request_args(num_endpoints)
-        output_distribution = {}
-        for request_idx in range(num_requests):
+        route_counts = Counter()
+        for _ in range(num_requests):
             request = generate_request()
             url = router.route_request(endpoints, engine_stats, request_stats, request)
-            output_distribution[url] = output_distribution.get(url, 0) + 1
-        request_counts = output_distribution.values()
-        return max(request_counts) - min(request_counts) <= 1
+            route_counts[url] += 1
+
+        assert_even_distribution(route_counts)
 
     for _ in range(dynamic_discoveries):
         num_endpoints = random.randint(1, max_endpoints)
         num_requests = random.randint(1, max_requests)
-        # Perform router check
-        res = _fixed_router_check(num_endpoints, num_requests)
-        assert res
+        assert_router_stays_balanced(num_endpoints, num_requests)
+
+
+def test_roundrobin_keeps_state_per_endpoint_set():
+    router = RoundRobinRouter()
+    request = generate_request()
+    engine_stats = {}
+    request_stats = {}
+    endpoints_a = [EndpointInfo(url="a0"), EndpointInfo(url="a1")]
+    endpoints_b = [EndpointInfo(url="b0"), EndpointInfo(url="b1")]
+    route_counts_a = Counter()
+    route_counts_b = Counter()
+
+    for _ in range(100):
+        url_a = router.route_request(endpoints_a, engine_stats, request_stats, request)
+        route_counts_a[url_a] += 1
+        url_b = router.route_request(endpoints_b, engine_stats, request_stats, request)
+        route_counts_b[url_b] += 1
+
+    assert_even_distribution(route_counts_a)
+    assert_even_distribution(route_counts_b)
+
+
+def test_roundrobin_keeps_state_when_endpoint_order_changes():
+    router = RoundRobinRouter()
+    request = generate_request()
+    engine_stats = {}
+    request_stats = {}
+    endpoints_a = [EndpointInfo(url="a0"), EndpointInfo(url="a1")]
+    endpoints_a_reordered = [EndpointInfo(url="a1"), EndpointInfo(url="a0")]
+
+    assert (
+        router.route_request(endpoints_a, engine_stats, request_stats, request) == "a0"
+    )
+    assert (
+        router.route_request(
+            endpoints_a_reordered,
+            engine_stats,
+            request_stats,
+            request,
+        )
+        == "a1"
+    )
+
+
+def test_roundrobin_rejects_empty_endpoint_list():
+    router = RoundRobinRouter()
+
+    with pytest.raises(ValueError, match="at least one endpoint"):
+        router.route_request([], {}, {}, generate_request())

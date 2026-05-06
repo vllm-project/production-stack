@@ -732,7 +732,7 @@ cacheserverSpec:
   # -- Image configuration for the cache Server
   image:
     # -- Docker image repository for the cache server
-    repository: "lmcache/lmstack-cache-server"
+    repository: "lmcache/vllm-openai"
     # -- Docker image tag for the cache server
     tag: "latest"
   # -- Image pull policy for the cache server
@@ -781,10 +781,8 @@ cacheserverSpec:
   schedulerName: ""
   # -- Pod-level security context configuration
   securityContext: {}
-  # @schema skipProperties:true
   # -- Container-level security context configuration
-  containerSecurityContext:
-    runAsNonRoot: false
+  containerSecurityContext: {}
   # -- Priority class for the cache server pods
   priorityClassName: ""
   # -- Node selector for the cache server pods
