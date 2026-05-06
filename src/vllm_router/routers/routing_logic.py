@@ -97,7 +97,6 @@ class RoutingLogic(str, enum.Enum):
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
-
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
     ) -> str:
@@ -475,7 +474,7 @@ class PrefixAwareRouter(RoutingInterface):
     In this class, we assume that there is no eviction of prefix cache.
     """
 
-    def __init__(self):
+    def __init__(self: int):
         if hasattr(self, "_initialized"):
             return
         from vllm_router.prefix.hashtrie import HashTrie
