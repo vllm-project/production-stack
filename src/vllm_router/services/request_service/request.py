@@ -660,12 +660,12 @@ async def route_general_request(
             last_error = None
             break
         except HTTPException as e:
+            last_error = e
             if is_retryable_status(e.status_code) and attempt + 1 < max_attempts:
                 logger.warning(
                     f"Request {request_id} got retryable HTTPException {e.status_code} from {server_url}, "
                     f"will retry (attempt {attempt + 1}/{max_attempts})"
                 )
-                last_error = e
                 continue
             raise
         except Exception as e:
