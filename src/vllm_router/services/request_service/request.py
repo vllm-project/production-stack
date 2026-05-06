@@ -102,7 +102,7 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
 def is_retryable_status(status_code: int) -> bool:
     """Check if HTTP status code indicates a retryable error.
 
-    Retryable status codes match sglang model gateway behavior:
+    Retryable status codes:
     - 408: Request Timeout
     - 429: Too Many Requests
     - 500: Internal Server Error
