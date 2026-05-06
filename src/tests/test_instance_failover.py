@@ -246,3 +246,32 @@ async def test_retryable_http_exception_is_retried(setup):
 
     assert resp.status_code == 200
     assert call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_all_endpoints_return_retryable_http_error(setup):
+    """Test that all endpoints returning 503 exhausts retries properly."""
+    from fastapi import HTTPException
+
+    req, router = setup
+    router.retry_config = RetryConfig(max_retries=3)
+    urls_called = []
+
+    async def always_503(*a, **kw):
+        urls_called.append(a[2])
+        raise HTTPException(status_code=503, detail="service unavailable")
+        yield
+
+    with patch(
+        "vllm_router.services.request_service.request.process_request",
+        side_effect=always_503,
+    ):
+        from vllm_router.services.request_service.request import route_general_request
+
+        with pytest.raises(HTTPException) as exc_info:
+            await route_general_request(req, "/v1/chat/completions", MagicMock())
+
+    assert exc_info.value.status_code == 503
+    assert len(urls_called) == 3
+    assert "http://engine1" in urls_called
+    assert "http://engine2" in urls_called
