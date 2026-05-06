@@ -601,7 +601,7 @@ async def route_general_request(
 
     error_urls = set()
     last_error = None
-    retry_config = request.app.state.router.retry_config
+    retry_config = request.app.state.retry_config
     max_attempts = retry_config.max_retries
 
     for attempt in range(max_attempts):

@@ -37,7 +37,6 @@ MOCK_HEADERS.items.return_value = [("content-type", "text/event-stream")]
 def setup():
     """Yield (request, background_tasks) with all dependencies patched."""
     router = RoundRobinRouter()
-    router.retry_config = RetryConfig(max_retries=2)
 
     sd = MagicMock()
     sd.get_endpoint_info.return_value = ENDPOINTS
@@ -46,6 +45,7 @@ def setup():
 
     state = MagicMock()
     state.router = router
+    state.retry_config = RetryConfig(max_retries=2)
     state.engine_stats_scraper.get_engine_stats.return_value = {}
     state.request_stats_monitor.get_request_stats.return_value = {}
     state.otel_enabled = False
@@ -82,15 +82,10 @@ def setup():
         p.stop()
 
 
-def test_initialize_sets_retry_config():
+def test_initialize_routing_logic_returns_router():
     router = initialize_routing_logic(RoutingLogic.ROUND_ROBIN)
-    assert router.retry_config.max_retries == 5  # default
-
-    retry_config = RetryConfig(max_retries=3)
-    router = initialize_routing_logic(
-        RoutingLogic.ROUND_ROBIN, retry_config=retry_config
-    )
-    assert router.retry_config.max_retries == 3
+    assert router is not None
+    assert isinstance(router, RoundRobinRouter)
 
 
 @pytest.mark.asyncio
@@ -157,7 +152,7 @@ async def test_raises_after_all_attempts_exhausted(setup):
 @pytest.mark.asyncio
 async def test_no_retry_when_disabled(setup):
     req, router = setup
-    router.retry_config = RetryConfig(max_retries=1)
+    req.app.state.retry_config = RetryConfig(max_retries=1)
     call_count = 0
 
     async def fail(*a, **kw):
@@ -180,7 +175,7 @@ async def test_no_retry_when_disabled(setup):
 @pytest.mark.asyncio
 async def test_breaks_when_no_remaining_endpoints(setup):
     req, router = setup
-    router.retry_config = RetryConfig(max_retries=5)
+    req.app.state.retry_config = RetryConfig(max_retries=5)
 
     async def fail(*a, **kw):
         raise ConnectionError("down")
@@ -200,7 +195,7 @@ async def test_non_retryable_http_exception_not_retried(setup):
     from fastapi import HTTPException
 
     req, router = setup
-    router.retry_config = RetryConfig(max_retries=3)
+    req.app.state.retry_config = RetryConfig(max_retries=3)
     call_count = 0
 
     async def fail(*a, **kw):
@@ -225,7 +220,7 @@ async def test_retryable_http_exception_is_retried(setup):
     from fastapi import HTTPException
 
     req, router = setup
-    router.retry_config = RetryConfig(max_retries=3)
+    req.app.state.retry_config = RetryConfig(max_retries=3)
     call_count = 0
 
     async def fail_then_ok(*a, **kw):
@@ -254,7 +249,7 @@ async def test_all_endpoints_return_retryable_http_error(setup):
     from fastapi import HTTPException
 
     req, router = setup
-    router.retry_config = RetryConfig(max_retries=3)
+    req.app.state.retry_config = RetryConfig(max_retries=3)
     urls_called = []
 
     async def always_503(*a, **kw):

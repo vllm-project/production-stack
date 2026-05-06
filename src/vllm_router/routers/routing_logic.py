@@ -97,9 +97,6 @@ class RoutingLogic(str, enum.Enum):
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
-    def __init__(self):
-        if not hasattr(self, "retry_config"):
-            self.retry_config = RetryConfig()
 
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
@@ -189,7 +186,6 @@ class RoundRobinRouter(RoutingInterface):
     def __init__(self):
         if hasattr(self, "_initialized"):
             return
-        super().__init__()  # Initialize retry_config
         self._next_index: dict[tuple[str, ...], int] = {}
         self._sorted_cache: dict[frozenset[str], tuple[str, ...]] = {}
         self._initialized = True
@@ -247,7 +243,6 @@ class SessionRouter(RoutingInterface):
     def __init__(self, session_key: str = None):
         if hasattr(self, "_initialized"):
             return
-        super().__init__()  # Initialize retry_config
         if session_key is None:
             raise ValueError("SessionRouter must be initialized with a session_key")
         self.session_key = session_key
@@ -309,7 +304,6 @@ class KvawareRouter(RoutingInterface):
         lmcache_controller_reply_port: Optional[int] = None,
         lmcache_controller_heartbeat_port: Optional[int] = None,
     ):
-        super().__init__()  # Initialize retry_config
         self.lmcache_controller_port = lmcache_controller_port
         self.lmcache_controller_reply_port = lmcache_controller_reply_port
         self.lmcache_controller_heartbeat_port = lmcache_controller_heartbeat_port
@@ -484,7 +478,6 @@ class PrefixAwareRouter(RoutingInterface):
     def __init__(self):
         if hasattr(self, "_initialized"):
             return
-        super().__init__()  # Initialize retry_config
         from vllm_router.prefix.hashtrie import HashTrie
 
         self.hashtrie = HashTrie()
@@ -560,7 +553,6 @@ class DisaggregatedPrefillRouter(RoutingInterface):
     """
 
     def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
-        super().__init__()  # Initialize retry_config
         self.prefill_model_labels = prefill_model_labels
         self.decode_model_labels = decode_model_labels
         self.request_cache = {}  # Cache to store prefill results
@@ -615,7 +607,6 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
     def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
         if hasattr(self, "_initialized"):
             return
-        super().__init__()  # Initialize retry_config
         self.prefill_model_labels = prefill_model_labels or []
         self.decode_model_labels = decode_model_labels or []
         # Round-robin counters for load balancing across xPyD pods
@@ -745,9 +736,6 @@ def initialize_routing_logic(
         )
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
-
-    if "retry_config" in kwargs:
-        router.retry_config = kwargs["retry_config"]
 
     return router
 

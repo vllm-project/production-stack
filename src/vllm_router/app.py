@@ -272,7 +272,7 @@ def initialize_all(app: FastAPI, args):
         configure_custom_callbacks(args.callbacks, app)
 
     # Configure retry mechanism
-    retry_config = RetryConfig(
+    app.state.retry_config = RetryConfig(
         max_retries=1 if args.disable_retries else args.retry_max_retries,
         initial_backoff_ms=args.retry_initial_backoff_ms,
         max_backoff_ms=args.retry_max_backoff_ms,
@@ -291,7 +291,6 @@ def initialize_all(app: FastAPI, args):
         kv_aware_threshold=args.kv_aware_threshold,
         lmcache_health_check_interval=args.lmcache_health_check_interval,
         lmcache_worker_timeout=args.lmcache_worker_timeout,
-        retry_config=retry_config,
     )
 
     # Initialize feature gates
