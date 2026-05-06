@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -1066,6 +1067,11 @@ func (r *VLLMRuntimeReconciler) updateStatus(
 		latestVR.Status.Replicas = dep.Status.Replicas
 		latestVR.Status.Selector = metav1.FormatLabelSelector(dep.Spec.Selector)
 
+		// Expose additional deployment status fields
+		latestVR.Status.AvailableReplicas = dep.Status.AvailableReplicas
+		latestVR.Status.UpdatedReplicas = dep.Status.UpdatedReplicas
+		latestVR.Status.UnavailableReplicas = dep.Status.UnavailableReplicas
+
 		return r.Status().Update(ctx, latestVR)
 	})
 }
@@ -1089,6 +1095,13 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 
 	prometheusAddr := cfg.Triggers.PrometheusAddress
 	servedModelName := vllmRuntime.Spec.Model.ModelURL
+	// Check extraArgs for --served-model-name override
+	for _, arg := range vllmRuntime.Spec.VLLMConfig.ExtraArgs {
+		if strings.HasPrefix(arg, "--served-model-name=") {
+			servedModelName = strings.TrimPrefix(arg, "--served-model-name=")
+			break
+		}
+	}
 
 	spec := map[string]interface{}{
 		"scaleTargetRef": map[string]interface{}{
@@ -1125,7 +1138,7 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 				"metadata": map[string]string{
 					"serverAddress": prometheusAddr,
 					"metricName":    "vllm_incoming_keepalive",
-					"query":         fmt.Sprintf(`sum(rate(vllm:num_incoming_requests_total{namespace="%s", model="%s"}[1m]) > bool 0)`, vllmRuntime.Namespace, servedModelName),
+					"query":         fmt.Sprintf(`sum(rate(vllm:num_incoming_requests_total{namespace="%s", model="%s"}[2m]) > bool 0)`, vllmRuntime.Namespace, servedModelName),
 					"threshold":     "1",
 				},
 			},

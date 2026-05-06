@@ -200,6 +200,25 @@ async def process_external_provider_request(
         )
 
 
+def _build_backend_request_headers(
+    request: Request, request_id: str, *, include_content_type: bool = True
+) -> dict[str, str]:
+    headers = {}
+    for key, value in request.headers.items():
+        lowered_key = key.lower()
+        if lowered_key in _HOP_BY_HOP_HEADERS:
+            continue
+        if not include_content_type and lowered_key == "content-type":
+            continue
+        if lowered_key == "x-request-id":
+            continue
+        headers[key] = value
+
+    headers["X-Request-Id"] = request_id
+
+    return headers
+
+
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
@@ -270,9 +289,7 @@ async def process_request(
         span.set_attribute("vllm.is_streaming", is_streaming)
 
     # Sanitize the request headers
-    headers = {
-        k: v for k, v in request.headers.items() if k.lower() not in _HOP_BY_HOP_HEADERS
-    }
+    headers = _build_backend_request_headers(request, request_id)
 
     # Inject trace context into outgoing headers
     if tracing_active:
@@ -1201,14 +1218,11 @@ async def proxy_multipart_request(
     try:
         client = request.app.state.aiohttp_client_wrapper()
 
-        headers = None
-        if isinstance(form_data, bytes):
-            headers = {
-                k: v
-                for k, v in request.headers.items()
-                if k.lower() not in _HOP_BY_HOP_HEADERS
-            }
-            headers["X-Request-Id"] = request_id
+        headers = _build_backend_request_headers(
+            request,
+            request_id,
+            include_content_type=isinstance(form_data, bytes),
+        )
 
         backend_response = await client.post(
             f"{chosen_url}{endpoint}",
