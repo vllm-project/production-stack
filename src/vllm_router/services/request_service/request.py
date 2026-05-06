@@ -612,7 +612,7 @@ async def route_general_request(
                 break
 
             # Calculate backoff delay
-            delay = RetryConfig.calculate_delay(attempt - 1, retry_config)
+            delay = retry_config.calculate_delay(attempt - 1)
             logger.info(
                 f"Request {request_id} retry attempt {attempt + 1}/{max_attempts}, "
                 f"waiting {delay:.3f}s before retry"

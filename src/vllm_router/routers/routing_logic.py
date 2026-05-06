@@ -63,8 +63,7 @@ class RetryConfig:
     backoff_multiplier: float = 1.5
     jitter_factor: float = 0.2
 
-    @staticmethod
-    def calculate_delay(attempt: int, config: "RetryConfig") -> float:
+    def calculate_delay(self, attempt: int) -> float:
         """Calculate backoff delay with jitter for a given attempt.
 
         Formula: delay = min(initial_backoff_ms * (multiplier ^ attempt), max_backoff_ms)
@@ -72,18 +71,17 @@ class RetryConfig:
 
         Args:
             attempt: The attempt number (0-based)
-            config: Retry configuration
 
         Returns:
             Delay in seconds
         """
         delay_ms = min(
-            config.initial_backoff_ms * (config.backoff_multiplier**attempt),
-            config.max_backoff_ms,
+            self.initial_backoff_ms * (self.backoff_multiplier**attempt),
+            self.max_backoff_ms,
         )
 
-        if config.jitter_factor > 0:
-            jitter_scale = random.uniform(-config.jitter_factor, config.jitter_factor)
+        if self.jitter_factor > 0:
+            jitter_scale = random.uniform(-self.jitter_factor, self.jitter_factor)
             delay_ms = max(0, delay_ms * (1 + jitter_scale))
 
         return delay_ms / 1000.0  # Convert to seconds
