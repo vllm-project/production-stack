@@ -33,7 +33,6 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillRouter,
     KvawareRouter,
     PrefixAwareRouter,
-    RetryConfig,
     SessionRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
