@@ -601,18 +601,13 @@ async def route_general_request(
         )
 
     error_urls = set()
-    retry_urls = set()
     last_error = None
     retry_config = request.app.state.router.retry_config
     max_attempts = retry_config.max_retries
 
     for attempt in range(max_attempts):
         if attempt > 0:
-            remaining = [
-                ep
-                for ep in endpoints
-                if ep.url not in error_urls and ep.url not in retry_urls
-            ]
+            remaining = [ep for ep in endpoints if ep.url not in error_urls]
             if not remaining:
                 break
 
@@ -667,7 +662,6 @@ async def route_general_request(
             break
         except HTTPException as e:
             if is_retryable_status(e.status_code) and attempt + 1 < max_attempts:
-                retry_urls.add(server_url)
                 logger.warning(
                     f"Request {request_id} got retryable HTTPException {e.status_code} from {server_url}, "
                     f"will retry (attempt {attempt + 1}/{max_attempts})"
