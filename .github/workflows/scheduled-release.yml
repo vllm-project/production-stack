@@ -61,7 +61,7 @@ jobs:
         id: bump-version
         run: |
           # Get current version from Chart.yaml
-          CURRENT_VERSION=$(grep -oP 'version: \K[0-9]+\.[0-9]+\.[0-9]+' helm/Chart.yaml)
+          CURRENT_VERSION=$(grep -oP '^version: \K[0-9]+\.[0-9]+\.[0-9]+' helm/Chart.yaml)
 
           # Calculate new version based on bump type
           BUMP_TYPE="${{ steps.bump-type.outputs.bump_type }}"
