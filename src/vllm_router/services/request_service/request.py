@@ -75,6 +75,7 @@ from vllm_router.services.metrics_service import (
     num_incoming_requests_total,
     output_tokens_total,
     request_errors_total,
+    request_latency_seconds,
 )
 
 logger = init_logger(__name__)
@@ -319,6 +320,9 @@ async def process_request(
     # For non-streaming requests, collect the full response to cache it properly
     full_response = bytearray()
 
+    request_status = "success"
+    http_status_code = None
+
     try:
         async with request.app.state.aiohttp_client_wrapper().request(
             method=request.method,
@@ -327,6 +331,7 @@ async def process_request(
             data=body,
             timeout=aiohttp.ClientTimeout(total=None),
         ) as backend_response:
+            http_status_code = backend_response.status
             # Set response status on span if tracing
             if span is not None:
                 span.set_attribute("http.status_code", backend_response.status)
@@ -346,9 +351,13 @@ async def process_request(
                     full_response.extend(chunk)
                 yield chunk
 
+        end_time = time.time()
         request.app.state.request_stats_monitor.on_request_complete(
-            backend_url, request_id, time.time()
+            backend_url, request_id, end_time
         )
+
+        if http_status_code is not None and http_status_code >= 400:
+            request_status = "error"
 
         # Track token usage for non-streaming requests
         if not is_streaming and full_response:
@@ -378,6 +387,7 @@ async def process_request(
                 request.app.state.callbacks.post_request, request, full_response
             )
     except Exception as e:
+        request_status = "error"
         # Track other errors
         request_errors_total.labels(
             server=backend_url, model=model_name, error_type=type(e).__name__
@@ -385,6 +395,9 @@ async def process_request(
         end_span(span, error=e) if tracing_active else None
         raise
     finally:
+        request_latency_seconds.labels(
+            server=backend_url, model=model_name, status=request_status
+        ).observe(time.time() - start_time)
         end_span(span) if tracing_active else None
 
 

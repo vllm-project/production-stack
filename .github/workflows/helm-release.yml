@@ -70,7 +70,7 @@ jobs:
         id: chart-version
         run: |
           set -euo pipefail
-          CHART_VERSION=$(grep -oP 'version: \K[0-9]+\.[0-9]+\.[0-9]+' helm/Chart.yaml)
+          CHART_VERSION=$(grep -oP '^version: \K[0-9]+\.[0-9]+\.[0-9]+' helm/Chart.yaml)
           echo "version=${CHART_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Chart version: ${CHART_VERSION}"
 
