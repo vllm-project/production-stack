@@ -1,5 +1,5 @@
 import time
-from typing import List, Optional
+from typing import ClassVar, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -11,11 +11,12 @@ logger = init_logger(__name__)
 class OpenAIBaseModel(BaseModel):
     # OpenAI API does allow extra fields
     model_config = ConfigDict(extra="allow")
+    _warn_on_extra_fields: ClassVar[bool] = True
 
     @model_validator(mode="before")
     @classmethod
     def __log_extra_fields__(cls, data):
-        if isinstance(data, dict):
+        if cls._warn_on_extra_fields and isinstance(data, dict):
             # Get all class field names and their potential aliases
             field_names = set()
             for field_name, field in cls.model_fields.items():
@@ -43,6 +44,7 @@ class ErrorResponse(OpenAIBaseModel):
 
 
 class ModelCard(OpenAIBaseModel):
+    _warn_on_extra_fields: ClassVar[bool] = False
     id: str
     object: str = "model"
     created: int = Field(default_factory=lambda: int(time.time()))
