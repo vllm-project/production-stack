@@ -214,7 +214,9 @@ spec:
           - name: PYTHONHASHSEED
             value: "123"
           - name: HF_HOME
-            {{- if hasKey $modelSpec "pvcStorage" }}
+            {{- if .Values.sharedPvcStorage.enabled }}
+            value: /data/shared-pvc-storage
+            {{- else if hasKey $modelSpec "pvcStorage" }}
             value: /data
             {{- else }}
             value: /tmp
