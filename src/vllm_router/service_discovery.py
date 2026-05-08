@@ -1294,17 +1294,14 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         """
         with self.known_models_lock:
             old_label = self._service_to_model.get(engine_name)
-            if event == "DELETED":
-                if old_label is None:
-                    return
-                del self._service_to_model[engine_name]
-                if old_label not in self._service_to_model.values():
-                    self.known_models.discard(old_label)
+            new_label = model_label if event != "DELETED" else None
+            if old_label == new_label:
                 return
-            if not model_label or old_label == model_label:
-                return
-            self._service_to_model[engine_name] = model_label
-            self.known_models.add(model_label)
+            if new_label:
+                self._service_to_model[engine_name] = new_label
+                self.known_models.add(new_label)
+            else:
+                self._service_to_model.pop(engine_name, None)
             if (
                 old_label is not None
                 and old_label not in self._service_to_model.values()

@@ -82,6 +82,27 @@ def test_track_known_model_relabel_keeps_old_label_when_another_service_referenc
     assert discovery._service_to_model == {"svc-a": "llama3-v2", "svc-b": "llama3"}
 
 
+def test_track_known_model_modified_event_removing_label_drops_stale(discovery):
+    discovery._track_known_model("svc-a", "ADDED", "llama3")
+
+    discovery._track_known_model("svc-a", "MODIFIED", None)
+
+    assert discovery.has_ever_seen_model("llama3") is False
+    assert discovery._service_to_model == {}
+
+
+def test_track_known_model_modified_event_removing_label_keeps_other_references(
+    discovery,
+):
+    discovery._track_known_model("svc-a", "ADDED", "llama3")
+    discovery._track_known_model("svc-b", "ADDED", "llama3")
+
+    discovery._track_known_model("svc-a", "MODIFIED", None)
+
+    assert discovery.has_ever_seen_model("llama3") is True
+    assert discovery._service_to_model == {"svc-b": "llama3"}
+
+
 def test_track_known_model_modified_event_with_same_label_is_noop(discovery):
     discovery._track_known_model("svc-a", "ADDED", "llama3")
 
