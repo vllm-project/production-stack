@@ -955,6 +955,9 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
         self.label_selector = label_selector
+        self.known_models: Set[str] = set()
+        self.known_models_lock = threading.Lock()
+        self._service_to_model: Dict[str, str] = {}
         self.watcher_timeout_seconds = watcher_timeout_seconds
         self.health_check_timeout_seconds = health_check_timeout_seconds
 
@@ -1241,6 +1244,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         model_names: List[str],
         model_label: Optional[str],
     ) -> None:
+        self._track_known_model(engine_name, event, model_label)
         if event == "ADDED":
             if not engine_name:
                 return
@@ -1272,6 +1276,44 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             ) and engine_name in self.available_engines:
                 self._delete_engine(engine_name)
                 return
+
+    def _track_known_model(
+        self,
+        engine_name: str,
+        event: str,
+        model_label: Optional[str],
+    ) -> None:
+        """Record every model observed via Service spec.selector["model"].
+
+        Ensures has_ever_seen_model() returns True even when the backing
+        Deployment is scaled to zero (no Ready pod -> no /v1/models probe
+        -> never registered by _on_engine_update without this hook).
+        """
+        if event == "DELETED":
+            with self.known_models_lock:
+                label = self._service_to_model.pop(engine_name, None)
+                if label is None:
+                    return
+                if not any(v == label for v in self._service_to_model.values()):
+                    self.known_models.discard(label)
+            return
+        label = model_label
+        if label is None:
+            try:
+                svc = self.k8s_api.read_namespaced_service(engine_name, self.namespace)
+                label = svc.spec.selector.get("model") if svc.spec.selector else None
+            except Exception:
+                label = None
+        if not label:
+            return
+        with self.known_models_lock:
+            self._service_to_model[engine_name] = label
+            self.known_models.add(label)
+
+    def has_ever_seen_model(self, model_name: str) -> bool:
+        """Check if we've ever seen this model, even if currently scaled to zero."""
+        with self.known_models_lock:
+            return model_name in self.known_models
 
     def get_endpoint_info(self) -> List[EndpointInfo]:
         """
