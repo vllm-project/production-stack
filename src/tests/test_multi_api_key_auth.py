@@ -1,8 +1,7 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
 
 from vllm_router.auth import _parse_api_keys, get_allowed_api_keys, verify_api_key
 

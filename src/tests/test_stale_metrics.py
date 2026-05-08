@@ -1,5 +1,5 @@
 import pytest
-from prometheus_client import REGISTRY, CollectorRegistry, generate_latest
+from prometheus_client import REGISTRY, generate_latest
 
 from vllm_router.routers.metrics_router import _LABEL_GAUGES, _clear_label_gauges
 from vllm_router.service_discovery import EndpointInfo
