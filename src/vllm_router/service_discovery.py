@@ -1175,20 +1175,20 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
                 ):
                     service = event["object"]
                     event_type = event["type"]
-                    if event_type == "DELETED":
-                        if service.metadata.name in self.available_engines:
-                            self._delete_engine(service.metadata.name)
-                        continue
                     service_name = service.metadata.name
+                    if event_type == "DELETED":
+                        self._track_known_model(service_name, "DELETED", None)
+                        if service_name in self.available_engines:
+                            self._delete_engine(service_name)
+                        continue
+                    model_label = self._get_model_label(service)
                     is_service_ready = self._check_service_ready(
                         service_name, self.namespace
                     )
                     if is_service_ready:
                         model_names = self._get_model_names(service_name)
-                        model_label = self._get_model_label(service)
                     else:
                         model_names = []
-                        model_label = None
                     self._on_engine_update(
                         service_name,
                         event_type,
@@ -1288,32 +1288,38 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         Ensures has_ever_seen_model() returns True even when the backing
         Deployment is scaled to zero (no Ready pod -> no /v1/models probe
         -> never registered by _on_engine_update without this hook).
+        Maintains a per-service refcount so the label is only dropped from
+        known_models once the last Service referencing it is gone or
+        relabelled.
         """
-        if event == "DELETED":
-            with self.known_models_lock:
-                label = self._service_to_model.pop(engine_name, None)
-                if label is None:
-                    return
-                if not any(v == label for v in self._service_to_model.values()):
-                    self.known_models.discard(label)
-            return
-        label = model_label
-        if label is None:
-            try:
-                svc = self.k8s_api.read_namespaced_service(engine_name, self.namespace)
-                label = svc.spec.selector.get("model") if svc.spec.selector else None
-            except Exception:
-                label = None
-        if not label:
-            return
         with self.known_models_lock:
-            self._service_to_model[engine_name] = label
-            self.known_models.add(label)
+            old_label = self._service_to_model.get(engine_name)
+            if event == "DELETED":
+                if old_label is None:
+                    return
+                del self._service_to_model[engine_name]
+                if old_label not in self._service_to_model.values():
+                    self.known_models.discard(old_label)
+                return
+            if not model_label or old_label == model_label:
+                return
+            self._service_to_model[engine_name] = model_label
+            self.known_models.add(model_label)
+            if (
+                old_label is not None
+                and old_label not in self._service_to_model.values()
+            ):
+                self.known_models.discard(old_label)
 
     def has_ever_seen_model(self, model_name: str) -> bool:
         """Check if we've ever seen this model, even if currently scaled to zero."""
         with self.known_models_lock:
             return model_name in self.known_models
+
+    def get_known_models(self) -> Set[str]:
+        """Get all models that have ever been discovered."""
+        with self.known_models_lock:
+            return self.known_models.copy()
 
     def get_endpoint_info(self) -> List[EndpointInfo]:
         """
