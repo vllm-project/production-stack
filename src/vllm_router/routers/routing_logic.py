@@ -423,13 +423,11 @@ class KvawareRouter(RoutingInterface):
             logger.debug(f"Fallback to using session id: {session_id}")
             # Update the hash ring with the current list of endpoints
             self._update_hash_ring(endpoints)
-            # outcome mirrors SessionRouter: QPS=fallback, hash-ring=success.
             if session_id is None:
                 url = self._qps_routing(endpoints, request_stats)
-                self._record_decision(url, model, outcome="fallback")
             else:
                 url = self.hash_ring.get_node(session_id)
-                self._record_decision(url, model)
+            self._record_decision(url, model, outcome="fallback")
             return url
         else:
             queried_instance_ids = [info for info in instance_id.layout_info]
