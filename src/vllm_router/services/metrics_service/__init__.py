@@ -69,3 +69,10 @@ request_latency_seconds = Histogram(
     ["server", "model", "status"],
     buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0),
 )
+
+# --- Routing-level metrics ---
+routing_decisions_total = Counter(
+    "vllm:routing_decisions_total",
+    "Total routing decisions made by the router.",
+    ["server", "model", "algorithm", "outcome"],
+)

@@ -748,8 +748,11 @@ async def route_orchestrated_disaggregated_request(
         )
 
     # Use round-robin load balancing to select prefill and decode endpoints
-    prefill_endpoint = router.select_prefill_endpoint(prefiller_endpoints)
-    decode_endpoint = router.select_decode_endpoint(decoder_endpoints)
+    requested_model = request_json.get("model", "unknown")
+    prefill_endpoint = router.select_prefill_endpoint(
+        prefiller_endpoints, requested_model
+    )
+    decode_endpoint = router.select_decode_endpoint(decoder_endpoints, requested_model)
     prefill_url = prefill_endpoint.url
     decode_url = decode_endpoint.url
 
@@ -917,6 +920,7 @@ async def route_disaggregated_prefill_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
+    requested_model = request_json.get("model", "unknown")
 
     # Save original request for decode phase
     orig_request_json = request_json.copy()
@@ -928,6 +932,8 @@ async def route_disaggregated_prefill_request(
     request_json.pop("max_completion_tokens", None)
 
     st = time.time()
+    # str() — _base_url is a yarl.URL, not a plain string.
+    prefill_url = str(request.app.state.prefill_client._base_url)
     try:
         await send_request_to_prefiller(
             request.app.state.prefill_client, endpoint, request_json, request_id
@@ -935,8 +941,9 @@ async def route_disaggregated_prefill_request(
         et = time.time()
         logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
         logger.info(
-            f"Routing request {request_id} with session id None to {request.app.state.prefill_client._base_url} at {et}, process time = {et - in_router_time:.4f}"
+            f"Routing request {request_id} with session id None to {prefill_url} at {et}, process time = {et - in_router_time:.4f}"
         )
+        request.app.state.router._record_decision(prefill_url, requested_model)
         # Use original request for decode phase
         request_json = orig_request_json
     except aiohttp.ClientResponseError as e:
@@ -1000,9 +1007,11 @@ async def route_disaggregated_prefill_request(
             yield json.dumps(error_response).encode("utf-8")
 
     curr_time = time.time()
+    decode_url = str(request.app.state.decode_client._base_url)
     logger.info(
-        f"Routing request {request_id} with session id None to {request.app.state.decode_client._base_url} at {curr_time}, process time = {curr_time - et:.4f}"
+        f"Routing request {request_id} with session id None to {decode_url} at {curr_time}, process time = {curr_time - et:.4f}"
     )
+    request.app.state.router._record_decision(decode_url, requested_model)
 
     return StreamingResponse(
         generate_stream(),
