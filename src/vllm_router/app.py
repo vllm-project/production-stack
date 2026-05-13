@@ -282,7 +282,41 @@ def initialize_all(app: FastAPI, args):
         max_instance_failover_reroute_attempts=args.max_instance_failover_reroute_attempts,
         lmcache_health_check_interval=args.lmcache_health_check_interval,
         lmcache_worker_timeout=args.lmcache_worker_timeout,
+        routing_threshold=args.routing_threshold,
+        load_balancing_strategy=args.load_balancing_strategy,
     )
+
+    # Initialize LMCache DPD connector state if configured
+    disagg_connector_type = getattr(args, "disagg_connector_type", "nixl")
+    app.state.disagg_connector_type = disagg_connector_type
+    app.state.decoder_registry = {}
+    if disagg_connector_type == "lmcache":
+        decoder_host = getattr(args, "decoder_host", None)
+        decoder_init_port = getattr(args, "decoder_init_port", None)
+        decoder_alloc_port = getattr(args, "decoder_alloc_port", None)
+        decoder_registry_json = getattr(args, "decoder_registry", None)
+
+        if decoder_registry_json:
+            import json as json_module
+            app.state.decoder_registry = json_module.loads(decoder_registry_json)
+            app.state.disagg_spec = None
+            logger.info(
+                f"LMCache DPD xPyD mode: {len(app.state.decoder_registry)} decoders registered"
+            )
+        elif all([decoder_host, decoder_init_port, decoder_alloc_port]):
+            app.state.disagg_spec = {
+                "receiver_host": decoder_host,
+                "receiver_init_port": [int(p) for p in decoder_init_port.split(",")],
+                "receiver_alloc_port": [int(p) for p in decoder_alloc_port.split(",")],
+            }
+            logger.info(f"LMCache DPD connector configured: decoder_host={decoder_host}")
+        else:
+            raise ValueError(
+                "When --disagg-connector-type=lmcache, provide either "
+                "--decoder-registry or --decoder-host/init-port/alloc-port"
+            )
+    else:
+        app.state.disagg_spec = None
 
     # Initialize feature gates
     initialize_feature_gates(args.feature_gates)
