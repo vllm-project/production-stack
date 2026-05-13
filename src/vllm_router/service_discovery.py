@@ -245,6 +245,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         aliases: List[str] | None = None,
         model_labels: List[str] | None = None,
         model_types: List[str] | None = None,
+        healthcheck_disabled: List[str] | None = None,
         static_backend_health_checks: bool = False,
         static_backend_health_check_interval: int = 60,
         static_backend_health_check_timeout_seconds: int = 10,
@@ -258,6 +259,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.aliases = aliases
         self.model_labels = model_labels
         self.model_types = model_types
+        self.healthcheck_disabled = healthcheck_disabled
         self.engines_id = [str(uuid.uuid4()) for i in range(0, len(urls))]
         self.added_timestamp = int(time.time())
         self.unhealthy_endpoint_hashes = []
@@ -272,9 +274,19 @@ class StaticServiceDiscovery(ServiceDiscovery):
     def get_unhealthy_endpoint_hashes(self) -> list[str]:
         unhealthy_endpoints = []
         try:
-            for url, model, model_type in zip(
-                self.urls, self.models, self.model_types, strict=True
+            for i, (url, model, model_type) in enumerate(
+                zip(self.urls, self.models, self.model_types or [], strict=True)
             ):
+                if (
+                    self.healthcheck_disabled
+                    and i < len(self.healthcheck_disabled)
+                    and self.healthcheck_disabled[i].lower() == "true"
+                ):
+                    logger.debug(
+                        f"Skipping health check for {model} at {url} "
+                        "(healthcheck disabled)"
+                    )
+                    continue
                 if utils.is_model_healthy(
                     url, model, model_type, self.health_check_timeout
                 ):
