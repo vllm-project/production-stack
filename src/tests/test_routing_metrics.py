@@ -130,7 +130,7 @@ async def test_session_router_records_success_with_session_id():
 
 @requires_lmcache
 @pytest.mark.asyncio
-async def test_kvaware_router_records_success_for_session_hashring_on_kv_miss():
+async def test_kvaware_router_records_fallback_on_kv_miss():
     # __new__ + manual field setup bypasses the lmcache controller in __init__.
     router = KvawareRouter.__new__(KvawareRouter)
     router._initialized = True
@@ -158,13 +158,13 @@ async def test_kvaware_router_records_success_for_session_hashring_on_kv_miss():
     request_json = {"model": "llama-3", "prompt": "hi"}
 
     before = {
-        ep.url: _counter_value(ep.url, "llama-3", "kvaware", "success")
+        ep.url: _counter_value(ep.url, "llama-3", "kvaware", "fallback")
         for ep in endpoints
     }
     url = await router.route_request(
         endpoints, None, request_stats, request, request_json
     )
-    after = _counter_value(url, "llama-3", "kvaware", "success")
+    after = _counter_value(url, "llama-3", "kvaware", "fallback")
 
     assert after - before[url] == 1
 
