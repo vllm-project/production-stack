@@ -90,7 +90,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "count by(endpoint) (vllm:healthy_pods_total)",
+          "expr": "sum(max by (server) (vllm:healthy_pods_total))",
           "format": "time_series",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
