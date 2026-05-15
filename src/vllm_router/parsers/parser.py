@@ -474,6 +474,53 @@ def parse_args():
         default=None,
         help="Path to a YAML file defining external LLM provider configurations (startup-time only).",
     )
+    parser.add_argument(
+        "--nixl-peer-host",
+        type=str,
+        help="The hostname or IP address of the NIXL peer service. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-peer-init-port",
+        type=int,
+        default=7300,
+        help="The initialization port for the NIXL peer service. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-peer-alloc-port",
+        type=int,
+        default=7400,
+        help="The allocation port for the NIXL peer service. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-proxy-host",
+        type=str,
+        help="The hostname or IP address for the NIXL proxy server. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-proxy-port",
+        type=int,
+        default=7500,
+        help="The port for the NIXL proxy server. Only use for DisaggregatedPrefillRouter.",
+    )
+    parser.add_argument(
+        "--nixl-finished-req-ttl",
+        type=float,
+        default=120.0,
+        help=(
+            "Seconds to retain a KV-ready entry in the ZMQ proxy before "
+            "evicting it. Must be at least as long as the worst-case decode "
+            "latency for a single request. Defaults to 120 s."
+        ),
+    )
+    parser.add_argument(
+        "--nixl-cleanup-interval",
+        type=float,
+        default=60.0,
+        help=(
+            "How often (seconds) the ZMQ proxy background task scans for "
+            "stale KV-ready entries. Defaults to 60 s."
+        ),
+    )
 
     args = parser.parse_args()
     args = load_initial_config_from_config_file_if_required(parser, args)
