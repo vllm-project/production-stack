@@ -31,6 +31,10 @@ servingEngineSpec:
     annotations: {}
     # -- The annotations to add to the pods
     podAnnotations: {}
+    # -- Additional labels to add to the deployment
+    labels: {}
+    # -- Additional labels to add to the pods
+    podLabels: {}
     # -- The name of the service account to use for the deployment
     serviceAccountName: ""
     # -- The name of the priority class name for the deployment
