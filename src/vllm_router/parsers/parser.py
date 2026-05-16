@@ -232,6 +232,7 @@ def parse_args():
             "roundrobin",
             "session",
             "kvaware",
+            "load_balanced_kvaware",
             "prefixaware",
             "disaggregated_prefill",
             "disaggregated_prefill_orchestrated",
@@ -445,6 +446,18 @@ def parse_args():
         type=int,
         default=2000,
         help="The threshold for kv-aware routing.",
+    )
+
+    parser.add_argument(
+        "--imbalanced-threshold",
+        type=float,
+        default=float("inf"),
+        help=(
+            "Queue length difference threshold for considering load balanced. "
+            "Only used with 'load_balanced_kvaware' routing logic. "
+            "Lower values prioritize load balancing over cache locality. "
+            "Default: infinity (always use KV-aware routing)."
+        ),
     )
 
     parser.add_argument(

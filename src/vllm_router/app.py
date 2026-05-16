@@ -279,6 +279,7 @@ def initialize_all(app: FastAPI, args):
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
         kv_aware_threshold=args.kv_aware_threshold,
+        imbalanced_threshold=args.imbalanced_threshold,
         max_instance_failover_reroute_attempts=args.max_instance_failover_reroute_attempts,
         lmcache_health_check_interval=args.lmcache_health_check_interval,
         lmcache_worker_timeout=args.lmcache_worker_timeout,
