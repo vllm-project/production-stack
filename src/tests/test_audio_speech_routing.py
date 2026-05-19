@@ -48,7 +48,6 @@ def cleanup_singletons():
 def setup():
     """Yield a (request, router) pair with all app-state dependencies patched."""
     router = RoundRobinRouter()
-    router.max_instance_failover_reroute_attempts = 0
 
     sd = MagicMock()
     sd.get_endpoint_info.return_value = ENDPOINTS
