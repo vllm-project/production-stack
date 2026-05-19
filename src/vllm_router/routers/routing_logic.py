@@ -493,7 +493,7 @@ class PrefixAwareRouter(RoutingInterface):
                 prompt = ""
         else:
             # Handle regular completions
-            prompt = request_json["prompt"]
+            prompt = request_json.get("prompt", "")
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
         _, matched_endpoint = await self.hashtrie.longest_prefix_match(
