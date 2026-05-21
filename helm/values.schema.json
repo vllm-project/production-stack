@@ -1487,6 +1487,10 @@
                                 "description": "The name of the service account to use for the deployment",
                                 "type": "string"
                             },
+                            "serviceAnnotations": {
+                                "description": "The model's service annotations",
+                                "type": "object"
+                            },
                             "shmSize": {
                                 "description": "The size of the shared memory",
                                 "type": "string"
