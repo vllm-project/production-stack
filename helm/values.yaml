@@ -444,6 +444,9 @@ routerSpec:
   # -- Number of replicas
   replicaCount: 1
 
+  # -- List of environment variables to set for the router
+  env: []
+
   # -- autoscaling configuration
   autoscaling:
     enabled: false
