@@ -786,7 +786,8 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels:      labels,
+					Annotations: vllmRuntime.Spec.DeploymentConfig.PodAnnotations,
 				},
 				Spec: corev1.PodSpec{
 					RuntimeClassName: &vllmRuntime.Spec.DeploymentConfig.RuntimeClass,
@@ -1058,6 +1059,25 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			actualRuntimeClass,
 		)
 		return true
+	}
+
+	expectedPodAnnotations := expectedDep.Spec.Template.Annotations
+	actualPodAnnotations := dep.Spec.Template.Annotations
+
+	for k, v := range expectedPodAnnotations {
+		if actualPodAnnotations[k] != v {
+			log.Info(
+				"Pod annotations mismatch",
+				"key",
+				k,
+				"expected",
+				v,
+				"actual",
+				actualPodAnnotations[k],
+			)
+
+			return true
+		}
 	}
 
 	return false

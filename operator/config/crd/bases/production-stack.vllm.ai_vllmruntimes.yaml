@@ -257,6 +257,11 @@ spec:
                       type: object
                       x-kubernetes-map-type: atomic
                     type: array
+                  podAnnotations:
+                    additionalProperties:
+                      type: string
+                    description: Pod annotations
+                    type: object
                   replicas:
                     default: 1
                     description: Replicas

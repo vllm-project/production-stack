@@ -51,6 +51,9 @@ type DeploymentConfig struct {
 	// Image configuration
 	Image ImageSpec `json:"image"`
 
+	// Pod annotations
+	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
+
 	// Sidecar configuration
 	SidecarConfig SidecarConfig `json:"sidecarConfig,omitempty"`
 }
