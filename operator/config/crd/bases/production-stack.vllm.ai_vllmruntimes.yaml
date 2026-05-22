@@ -274,6 +274,10 @@ spec:
                       memory:
                         type: string
                     type: object
+                  runtimeClass:
+                    default: nividia
+                    description: RuntimeClass
+                    type: string
                   sidecarConfig:
                     description: Sidecar configuration
                     properties:

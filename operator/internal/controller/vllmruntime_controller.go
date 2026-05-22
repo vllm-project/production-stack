@@ -332,12 +332,26 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 		if *cfg.MinReplicas > cfg.MaxReplicas {
 			log.Error(nil, "Invalid autoscaling config: minReplicas must be <= maxReplicas",
 				"minReplicas", *cfg.MinReplicas, "maxReplicas", cfg.MaxReplicas)
-			return ctrl.Result{}, fmt.Errorf("minReplicas (%d) must be <= maxReplicas (%d)", *cfg.MinReplicas, cfg.MaxReplicas)
+			return ctrl.Result{}, fmt.Errorf(
+				"minReplicas (%d) must be <= maxReplicas (%d)",
+				*cfg.MinReplicas,
+				cfg.MaxReplicas,
+			)
 		}
 		if cfg.MaxReplicas < vllmRuntime.Spec.DeploymentConfig.Replicas {
-			log.Error(nil, "Invalid autoscaling config: maxReplicas must be >= deploymentConfig.replicas",
-				"maxReplicas", cfg.MaxReplicas, "replicas", vllmRuntime.Spec.DeploymentConfig.Replicas)
-			return ctrl.Result{}, fmt.Errorf("maxReplicas (%d) must be >= deploymentConfig.replicas (%d)", cfg.MaxReplicas, vllmRuntime.Spec.DeploymentConfig.Replicas)
+			log.Error(
+				nil,
+				"Invalid autoscaling config: maxReplicas must be >= deploymentConfig.replicas",
+				"maxReplicas",
+				cfg.MaxReplicas,
+				"replicas",
+				vllmRuntime.Spec.DeploymentConfig.Replicas,
+			)
+			return ctrl.Result{}, fmt.Errorf(
+				"maxReplicas (%d) must be >= deploymentConfig.replicas (%d)",
+				cfg.MaxReplicas,
+				vllmRuntime.Spec.DeploymentConfig.Replicas,
+			)
 		}
 		if err := r.reconcileScaledObject(ctx, vllmRuntime); err != nil {
 			log.Error(err, "Failed to reconcile ScaledObject")
@@ -775,6 +789,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					RuntimeClassName: &vllmRuntime.Spec.DeploymentConfig.RuntimeClass,
 					Affinity:         affinity,
 					Tolerations:      vllmRuntime.Spec.DeploymentConfig.Toleration,
 					ImagePullSecrets: imagePullSecrets,
@@ -1031,6 +1046,20 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 		return true
 	}
 
+	expectedRuntimeClass := expectedDep.Spec.Template.Spec.RuntimeClassName
+	actualRuntimeClass := dep.Spec.Template.Spec.RuntimeClassName
+
+	if !reflect.DeepEqual(expectedRuntimeClass, actualRuntimeClass) {
+		log.Info(
+			"RuntimeClass mismatch",
+			"expected",
+			expectedRuntimeClass,
+			"actual",
+			actualRuntimeClass,
+		)
+		return true
+	}
+
 	return false
 }
 
@@ -1119,13 +1148,21 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 					"scaleUp": map[string]interface{}{
 						"stabilizationWindowSeconds": *cfg.ScaleUpPolicy.StabilizationWindowSeconds,
 						"policies": []map[string]interface{}{
-							{"type": "Pods", "value": *cfg.ScaleUpPolicy.PodValue, "periodSeconds": *cfg.ScaleUpPolicy.PeriodSeconds},
+							{
+								"type":          "Pods",
+								"value":         *cfg.ScaleUpPolicy.PodValue,
+								"periodSeconds": *cfg.ScaleUpPolicy.PeriodSeconds,
+							},
 						},
 					},
 					"scaleDown": map[string]interface{}{
 						"stabilizationWindowSeconds": *cfg.ScaleDownPolicy.StabilizationWindowSeconds,
 						"policies": []map[string]interface{}{
-							{"type": "Pods", "value": *cfg.ScaleDownPolicy.PodValue, "periodSeconds": *cfg.ScaleDownPolicy.PeriodSeconds},
+							{
+								"type":          "Pods",
+								"value":         *cfg.ScaleDownPolicy.PodValue,
+								"periodSeconds": *cfg.ScaleDownPolicy.PeriodSeconds,
+							},
 						},
 					},
 				},
@@ -1138,8 +1175,12 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 				"metadata": map[string]string{
 					"serverAddress": prometheusAddr,
 					"metricName":    "vllm_incoming_keepalive",
-					"query":         fmt.Sprintf(`sum(rate(vllm:num_incoming_requests_total{namespace="%s", model="%s"}[2m]) > bool 0)`, vllmRuntime.Namespace, servedModelName),
-					"threshold":     "1",
+					"query": fmt.Sprintf(
+						`sum(rate(vllm:num_incoming_requests_total{namespace="%s", model="%s"}[2m]) > bool 0)`,
+						vllmRuntime.Namespace,
+						servedModelName,
+					),
+					"threshold": "1",
 				},
 			},
 			{
@@ -1147,8 +1188,11 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 				"metadata": map[string]string{
 					"serverAddress": prometheusAddr,
 					"metricName":    "vllm_requests_running",
-					"query":         fmt.Sprintf(`sum(vllm:num_requests_running{job="%s"})`, jobName),
-					"threshold":     fmt.Sprintf("%d", *cfg.Triggers.RequestsRunningThreshold),
+					"query": fmt.Sprintf(
+						`sum(vllm:num_requests_running{job="%s"})`,
+						jobName,
+					),
+					"threshold": fmt.Sprintf("%d", *cfg.Triggers.RequestsRunningThreshold),
 				},
 			},
 			{
@@ -1156,8 +1200,11 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 				"metadata": map[string]string{
 					"serverAddress": prometheusAddr,
 					"metricName":    "vllm_generation_tokens_rate",
-					"query":         fmt.Sprintf(`sum(rate(vllm:generation_tokens_total{job="%s"}[1m]))`, jobName),
-					"threshold":     fmt.Sprintf("%d", *cfg.Triggers.GenerationTokensThreshold),
+					"query": fmt.Sprintf(
+						`sum(rate(vllm:generation_tokens_total{job="%s"}[1m]))`,
+						jobName,
+					),
+					"threshold": fmt.Sprintf("%d", *cfg.Triggers.GenerationTokensThreshold),
 				},
 			},
 			{
@@ -1165,15 +1212,23 @@ func (r *VLLMRuntimeReconciler) reconcileScaledObject(
 				"metadata": map[string]string{
 					"serverAddress": prometheusAddr,
 					"metricName":    "vllm_prompt_tokens_rate",
-					"query":         fmt.Sprintf(`sum(rate(vllm:prompt_tokens_total{job="%s"}[1m]))`, jobName),
-					"threshold":     fmt.Sprintf("%d", *cfg.Triggers.PromptTokensThreshold),
+					"query": fmt.Sprintf(
+						`sum(rate(vllm:prompt_tokens_total{job="%s"}[1m]))`,
+						jobName,
+					),
+					"threshold": fmt.Sprintf("%d", *cfg.Triggers.PromptTokensThreshold),
 				},
 			},
 		},
 	}
 
 	scaledObject.Object["spec"] = spec
-	return r.Client.Patch(ctx, scaledObject, client.Apply, client.FieldOwner("vllmruntime-controller"))
+	return r.Client.Patch(
+		ctx,
+		scaledObject,
+		client.Apply,
+		client.FieldOwner("vllmruntime-controller"),
+	)
 }
 
 // serviceForVLLMRuntime returns a VLLMRuntime Service object

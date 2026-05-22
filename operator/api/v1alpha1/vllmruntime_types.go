@@ -41,6 +41,10 @@ type DeploymentConfig struct {
 	// +kubebuilder:default=RollingUpdate
 	DeployStrategy string `json:"deploymentStrategy,omitempty"`
 
+	// RuntimeClass
+	// +kubebuilder:default=nividia
+	RuntimeClass string `json:"runtimeClass,omitempty"`
+
 	// Resource requirements
 	Resources ResourceRequirements `json:"resources"`
 
