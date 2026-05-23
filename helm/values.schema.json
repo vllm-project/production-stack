@@ -698,6 +698,10 @@
                     "description": "Customized pod annotations for the router pods",
                     "type": "object"
                 },
+                "prefixMinMatchLength": {
+                    "description": "Minimum prefix match length required for prefixaware routing to reuse a matched endpoint. If the longest prefix match is shorter than this value, the request falls back to QPS-based routing. Prefix matches are computed in chunks (chunk size defaults to 128 characters), so this threshold is effectively quantized to that granularity. Defaults to 0, which disables it.",
+                    "type": "integer"
+                },
                 "priorityClassName": {
                     "description": "Priority Class",
                     "type": "string"

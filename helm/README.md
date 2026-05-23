@@ -238,6 +238,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static" |
 | `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
 | `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic: `"roundrobin"`, `"session"`, `"prefixaware"`, or `"kvaware"` |
+| `routerSpec.prefixMinMatchLength` | integer | `0` | Minimum prefix match length for `prefixaware` routing to reuse a matched endpoint; below this, requests fall back to QPS routing. Quantized to the prefix chunk size (default 128). `0` disables it |
 | `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic |
 | `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router |
 | `routerSpec.engineScrapeInterval` | integer | `15` | Interval in seconds to scrape metrics from the serving engine |
