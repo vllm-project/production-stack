@@ -634,6 +634,11 @@ data:
       {{- range .extraArgs }}
     ARGS+=({{ . | quote }})
       {{- end }}
+      {{- if hasKey . "revision" }}
+        {{- if .revision }}
+    ARGS+=("--revision" {{ .revision | quote }})
+        {{- end }}
+      {{- end }}
     {{- end }}
 
     {{- if $modelSpec.lmcacheConfig }}

@@ -151,6 +151,8 @@ servingEngineSpec:
       extraArgs:
         - "--gpu-memory-utilization"
         - "0.4"
+      # -- Hugging Face model revision (branch, tag, or commit hash) to pin the model version
+      revision: ""
     # -- The configuration of the LMCache for KV offloading
     lmcacheConfig:
       # -- Enable LMCache

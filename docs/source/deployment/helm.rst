@@ -45,6 +45,7 @@ Explanation of Key Items in ``values-02-basic-config.yaml``
   - ``maxModelLen``: The maximum sequence length the model can handle.
   - ``dtype``: Data type for computations, e.g., ``bfloat16`` for faster performance on modern GPUs.
   - ``extraArgs``: Additional arguments passed to the vLLM engine for fine-tuning behavior.
+  - ``revision``: Hugging Face model revision (branch, tag, or commit hash) to pin the exact model version downloaded at deployment time.
 
 - **hf_token**: The Hugging Face token for authenticating with the Hugging Face model hub.
 - **env**: Extra environment variables to pass to the model-serving engine.

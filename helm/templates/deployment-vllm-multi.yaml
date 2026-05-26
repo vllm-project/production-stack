@@ -196,6 +196,12 @@ spec:
           - {{ . | quote }}
           {{-     end }}
           {{-   end }}
+          {{-   if hasKey . "revision" }}
+          {{-     if .revision }}
+          - "--revision"
+          - {{ .revision | quote }}
+          {{-     end }}
+          {{-   end }}
           {{- end }}
           {{- if $modelSpec.lmcacheConfig }}
           {{-   if $modelSpec.lmcacheConfig.enabled }}
