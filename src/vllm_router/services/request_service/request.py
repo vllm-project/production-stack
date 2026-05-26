@@ -844,51 +844,53 @@ async def route_orchestrated_disaggregated_request(
             },
             timeout=aiohttp.ClientTimeout(total=600),
         )
-        if decode_resp.status != 200:
-            error_text = await decode_resp.text()
+        try:
+            if decode_resp.status != 200:
+                error_text = await decode_resp.text()
+                logger.error(
+                    f"[{request_id}] Decode failed with status {decode_resp.status}: {error_text}"
+                )
+                return JSONResponse(
+                    status_code=decode_resp.status,
+                    content={"error": f"Decode failed: {error_text}"},
+                    headers={"X-Request-Id": request_id},
+                )
+
+            if is_streaming:
+                # For streaming, yield chunks as they arrive (true streaming)
+                async def generate_stream():
+                    try:
+                        async for chunk in decode_resp.content.iter_any():
+                            if chunk:
+                                yield chunk
+                    finally:
+                        decode_resp.release()
+                        curr_time = time.time()
+                        logger.info(
+                            f"[{request_id}] Orchestrated streaming request completed, total time = {curr_time - in_router_time:.4f}s"
+                        )
+
+                return StreamingResponse(
+                    generate_stream(),
+                    media_type="text/event-stream",
+                    headers={"X-Request-Id": request_id},
+                )
+            else:
+                # For non-streaming, read full response
+                response_data = await decode_resp.read()
+
+                curr_time = time.time()
+                logger.info(
+                    f"[{request_id}] Orchestrated request completed, total time = {curr_time - in_router_time:.4f}s"
+                )
+
+                return JSONResponse(
+                    content=json.loads(response_data),
+                    headers={"X-Request-Id": request_id},
+                )
+        except Exception as e:
             decode_resp.release()
-            logger.error(
-                f"[{request_id}] Decode failed with status {decode_resp.status}: {error_text}"
-            )
-            return JSONResponse(
-                status_code=decode_resp.status,
-                content={"error": f"Decode failed: {error_text}"},
-                headers={"X-Request-Id": request_id},
-            )
-
-        if is_streaming:
-            # For streaming, yield chunks as they arrive (true streaming)
-            async def generate_stream():
-                try:
-                    async for chunk in decode_resp.content.iter_any():
-                        if chunk:
-                            yield chunk
-                finally:
-                    decode_resp.release()
-                    curr_time = time.time()
-                    logger.info(
-                        f"[{request_id}] Orchestrated streaming request completed, total time = {curr_time - in_router_time:.4f}s"
-                    )
-
-            return StreamingResponse(
-                generate_stream(),
-                media_type="text/event-stream",
-                headers={"X-Request-Id": request_id},
-            )
-        else:
-            # For non-streaming, read full response
-            response_data = await decode_resp.read()
-            decode_resp.release()
-
-            curr_time = time.time()
-            logger.info(
-                f"[{request_id}] Orchestrated request completed, total time = {curr_time - in_router_time:.4f}s"
-            )
-
-            return JSONResponse(
-                content=json.loads(response_data),
-                headers={"X-Request-Id": request_id},
-            )
+            raise
 
     except aiohttp.ClientError as e:
         logger.error(
