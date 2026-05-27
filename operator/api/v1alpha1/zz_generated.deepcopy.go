@@ -205,6 +205,13 @@ func (in *DeploymentConfig) DeepCopyInto(out *DeploymentConfig) {
 	}
 	out.Resources = in.Resources
 	out.Image = in.Image
+	if in.PodAnnotations != nil {
+		in, out := &in.PodAnnotations, &out.PodAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.SidecarConfig.DeepCopyInto(&out.SidecarConfig)
 }
 

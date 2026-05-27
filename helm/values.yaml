@@ -200,6 +200,8 @@ servingEngineSpec:
     #   - "override": model tolerations replace the global tolerations entirely for this model.
     # -- The size of the shared memory
     shmSize: "20Gi"
+    # -- The model's service annotations
+    serviceAnnotations: {}
     # -- Whether to enable LoRA
     enableLoRA: true
     # -- KEDA autoscaling configuration for this model deployment. Requires KEDA to be installed in the cluster.
@@ -447,6 +449,9 @@ routerSpec:
 
   # -- Number of replicas
   replicaCount: 1
+
+  # -- List of environment variables to set for the router
+  env: []
 
   # -- autoscaling configuration
   autoscaling:
