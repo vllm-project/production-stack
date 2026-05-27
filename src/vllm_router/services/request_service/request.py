@@ -1176,7 +1176,7 @@ async def proxy_multipart_request(
     model: str,
     endpoint: str,
     request: Request,
-    request_json: dict,
+    request_json: dict = {},
     *,
     stream: bool = False,
 ):
