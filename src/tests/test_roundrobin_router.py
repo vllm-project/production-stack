@@ -75,7 +75,9 @@ def test_roundrobin_logic(
         route_counts = Counter()
         for _ in range(num_requests):
             request = generate_request()
-            url = router.route_request(endpoints, engine_stats, request_stats, request)
+            url = await router.route_request(
+                endpoints, engine_stats, request_stats, request
+            )
             route_counts[url] += 1
 
         assert_even_distribution(route_counts)
@@ -97,9 +99,13 @@ def test_roundrobin_keeps_state_per_endpoint_set():
     route_counts_b = Counter()
 
     for _ in range(100):
-        url_a = router.route_request(endpoints_a, engine_stats, request_stats, request)
+        url_a = await router.route_request(
+            endpoints_a, engine_stats, request_stats, request
+        )
         route_counts_a[url_a] += 1
-        url_b = router.route_request(endpoints_b, engine_stats, request_stats, request)
+        url_b = await router.route_request(
+            endpoints_b, engine_stats, request_stats, request
+        )
         route_counts_b[url_b] += 1
 
     assert_even_distribution(route_counts_a)
@@ -115,10 +121,11 @@ def test_roundrobin_keeps_state_when_endpoint_order_changes():
     endpoints_a_reordered = [EndpointInfo(url="a1"), EndpointInfo(url="a0")]
 
     assert (
-        router.route_request(endpoints_a, engine_stats, request_stats, request) == "a0"
+        await router.route_request(endpoints_a, engine_stats, request_stats, request)
+        == "a0"
     )
     assert (
-        router.route_request(
+        await router.route_request(
             endpoints_a_reordered,
             engine_stats,
             request_stats,
@@ -132,4 +139,4 @@ def test_roundrobin_rejects_empty_endpoint_list():
     router = RoundRobinRouter()
 
     with pytest.raises(ValueError, match="at least one endpoint"):
-        router.route_request([], {}, {}, generate_request())
+        await router.route_request([], {}, {}, generate_request())

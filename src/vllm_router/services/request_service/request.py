@@ -554,16 +554,9 @@ async def route_general_request(
         logger.debug(
             f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
-
-    elif isinstance(
-        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
-    ):
+    else:
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
-        )
-    else:
-        server_url = request.app.state.router.route_request(
-            endpoints, engine_stats, request_stats, request
         )
 
     curr_time = time.time()
@@ -602,16 +595,9 @@ async def route_general_request(
                 break
             if request_endpoint:
                 server_url = remaining[0].url
-            elif isinstance(
-                request.app.state.router,
-                (KvawareRouter, PrefixAwareRouter, SessionRouter),
-            ):
+            else:
                 server_url = await request.app.state.router.route_request(
                     remaining, engine_stats, request_stats, request, request_json
-                )
-            else:
-                server_url = request.app.state.router.route_request(
-                    remaining, engine_stats, request_stats, request
                 )
             logger.info(
                 f"Routing request {request_id} to {server_url} "
@@ -1224,26 +1210,9 @@ async def proxy_multipart_request(
     request_stats = request_stats_monitor.get_request_stats(time.time())
 
     # pick one using the router's configured logic (roundrobin, least-loaded, etc.)
-    if isinstance(
-        router,
-        (
-            KvawareRouter,
-            PrefixAwareRouter,
-            SessionRouter,
-            DisaggregatedPrefillOrchestratedRouter,
-        ),
-    ):
-        chosen_url = await router.route_request(
-            endpoints, engine_stats, request_stats, request, request_json
-        )
-    elif isinstance(router, DisaggregatedPrefillRouter):
-        chosen_url = router.route_request(
-            endpoints, engine_stats, request_stats, request, request_json
-        )
-    else:
-        chosen_url = router.route_request(
-            endpoints, engine_stats, request_stats, request
-        )
+    chosen_url = await router.route_request(
+        endpoints, engine_stats, request_stats, request, request_json
+    )
     logger.info(
         "Proxying multi-part form request for model %s to %s", model, chosen_url
     )
