@@ -13,7 +13,7 @@ servingEngineSpec:
       modelURL: "facebook/opt-125m"
       replicaCount: 1
       requestCPU: 8
-      requestMemory: "30Gi"
+      requestMemory: "40Gi"
       # requestGPU: 1
       pvcStorage: "50Gi"
       vllmConfig:
@@ -47,7 +47,7 @@ servingEngineSpec:
       modelURL: "facebook/opt-125m"
       replicaCount: 1
       requestCPU: 8
-      requestMemory: "30Gi"
+      requestMemory: "40Gi"
       # requestGPU: 1
       pvcStorage: "50Gi"
       vllmConfig:

@@ -9,7 +9,7 @@ servingEngineSpec:
       modelURL: "facebook/opt-125m"
       replicaCount: 2
       requestCPU: 6
-      requestMemory: "30Gi"
+      requestMemory: "40Gi"
       requestGPU: 1
       pvcStorage: "50Gi"
       vllmConfig:
@@ -43,10 +43,10 @@ routerSpec:
   resources:
     requests:
       cpu: "1"
-      memory: "2G"
+      memory: "4G"
     limits:
       cpu: "1"
-      memory: "2G"
+      memory: "4G"
   enableRouter: true
   routingLogic: "prefixaware"
   extraArgs:
