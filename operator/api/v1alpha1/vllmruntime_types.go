@@ -41,11 +41,18 @@ type DeploymentConfig struct {
 	// +kubebuilder:default=RollingUpdate
 	DeployStrategy string `json:"deploymentStrategy,omitempty"`
 
+	// RuntimeClass
+	// +kubebuilder:default=nividia
+	RuntimeClass string `json:"runtimeClass,omitempty"`
+
 	// Resource requirements
 	Resources ResourceRequirements `json:"resources"`
 
 	// Image configuration
 	Image ImageSpec `json:"image"`
+
+	// Pod annotations
+	PodAnnotations map[string]string `json:"podAnnotations,omitempty"`
 
 	// Sidecar configuration
 	SidecarConfig SidecarConfig `json:"sidecarConfig,omitempty"`

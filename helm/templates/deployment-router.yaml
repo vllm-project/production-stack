@@ -88,6 +88,9 @@ spec:
                 key: {{ .Values.servingEngineSpec.vllmApiKey.secretKey }}
           {{- end }}
           {{- end }}
+          {{- with .Values.routerSpec.env }}
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
         args:
           - "--host"
           - "0.0.0.0"

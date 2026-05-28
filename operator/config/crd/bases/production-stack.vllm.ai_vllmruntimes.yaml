@@ -257,6 +257,11 @@ spec:
                       type: object
                       x-kubernetes-map-type: atomic
                     type: array
+                  podAnnotations:
+                    additionalProperties:
+                      type: string
+                    description: Pod annotations
+                    type: object
                   replicas:
                     default: 1
                     description: Replicas
@@ -274,6 +279,10 @@ spec:
                       memory:
                         type: string
                     type: object
+                  runtimeClass:
+                    default: nividia
+                    description: RuntimeClass
+                    type: string
                   sidecarConfig:
                     description: Sidecar configuration
                     properties:
