@@ -1585,6 +1585,10 @@
                                         "description": "Maximum number of sequences to be processed in a single iteration.",
                                         "type": "integer"
                                     },
+                                    "revision": {
+                                        "description": "Hugging Face model revision (branch, tag, or commit hash) to pin the model version",
+                                        "type": "string"
+                                    },
                                     "runner": {
                                         "description": "The runner type for the model, can be auto or pooling",
                                         "type": "string",
@@ -1600,10 +1604,6 @@
                                     "v0": {
                                         "description": "Specify to 1 to use vLLM v0, otherwise vLLM v1 is used",
                                         "type": "string"
-                                    },
-                                    "revision": {
-                                        "type": "string",
-                                        "description": "Hugging Face model revision (branch, tag, or commit hash) to pin the model version"
                                     }
                                 }
                             }
