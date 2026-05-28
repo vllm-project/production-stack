@@ -12,7 +12,7 @@ servingEngineSpec:
         enabled: true
         minAvailable: 1
       requestCPU: 6
-      requestMemory: "30Gi"
+      requestMemory: "40Gi"
       requestGPU: 1
       pvcStorage: "50Gi"
       vllmConfig:
@@ -48,10 +48,10 @@ routerSpec:
   resources:
     requests:
       cpu: "1"
-      memory: "2G"
+      memory: "4G"
     limits:
       cpu: "1"
-      memory: "2G"
+      memory: "4G"
   lmcacheControllerPort: 9000
   sessionKey: "x-user-id"
   extraArgs:
