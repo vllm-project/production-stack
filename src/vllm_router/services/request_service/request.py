@@ -888,7 +888,7 @@ async def route_orchestrated_disaggregated_request(
                     content=json.loads(response_data),
                     headers={"X-Request-Id": request_id},
                 )
-        except Exception as e:
+        except Exception:
             decode_resp.release()
             raise
 
