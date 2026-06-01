@@ -1,7 +1,7 @@
 Autoscaling with KEDA
 =====================
 
-This tutorial shows you how to automatically scale a vLLM deployment using `KEDA <https://keda.sh/>`_ and Prometheus-based metrics. With the vLLM Production Stack Helm chart (v0.1.9+), KEDA autoscaling is integrated directly into the chart, allowing you to enable it through simple ``values.yaml`` configuration.
+This tutorial shows you how to automatically scale a vLLM deployment using `KEDA <https://keda.sh/>`_ and Prometheus-based metrics. With the vLLM Production Stack Helm chart (v0.1.11+), KEDA autoscaling and monitoring are integrated directly into the chart, allowing you to enable everything through simple ``values.yaml`` configuration.
 
 Table of Contents
 -----------------
@@ -9,7 +9,7 @@ Table of Contents
 - Prerequisites_
 - Steps_
 
-  - `1. Deploy the Observability Stack`_
+  - `1. Enable the Integrated Monitoring Stack`_
   - `2. Configure and Deploy vLLM`_
   - `3. Install KEDA`_
   - `4. Enable KEDA Autoscaling for vLLM`_
@@ -26,25 +26,44 @@ Prerequisites
 - Access to a Kubernetes cluster with at least 2 GPUs
 - ``kubectl`` and ``helm`` installed (v3.0+)
 - Basic understanding of Kubernetes and Prometheus metrics
+- vLLM Production Stack Helm chart v0.1.11+
 
 Steps
 -----
 
-1. Deploy the Observability Stack
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Enable the Integrated Monitoring Stack
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The observability stack (Prometheus, Grafana) is required for KEDA to query metrics.
+Since v0.1.11, the vLLM Production Stack Helm chart includes ``kube-prometheus-stack`` and ``prometheus-adapter`` as optional sub-chart dependencies. There is no longer a need to manually install a separate observability stack — simply enable it in your ``values.yaml``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
-   cd observability
-   bash install.sh
+   # Enable ServiceMonitors so Prometheus can scrape vLLM metrics
+   servingEngineSpec:
+     serviceMonitor:
+       enabled: true
+
+   routerSpec:
+     serviceMonitor:
+       enabled: true
+
+   # Deploy the full kube-prometheus-stack (Prometheus + Grafana) as a sub-chart
+   kube-prometheus-stack:
+     enabled: true
+
+   # Optionally enable prometheus-adapter for custom metrics API (used by HPA)
+   prometheus-adapter:
+     enabled: true
+
+.. note::
+
+   If you already have an existing Prometheus stack in your cluster (e.g., deployed via ``kube-prometheus-stack`` or VictoriaMetrics), you only need to enable the ``serviceMonitor`` resources. Set ``kube-prometheus-stack.enabled: false`` and your existing Prometheus Operator will automatically discover the ServiceMonitors.
 
 Verify Prometheus is scraping the queue length metric ``vllm:num_requests_waiting``:
 
 .. code-block:: bash
 
-   kubectl port-forward svc/prometheus-operated -n monitoring 9090:9090
+   kubectl port-forward svc/<release-name>-kube-prometheus-stack-prometheus 9090:9090
 
 In a separate terminal:
 
@@ -55,12 +74,14 @@ In a separate terminal:
 2. Configure and Deploy vLLM
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Create a ``values.yaml`` file to deploy vLLM. Note that we'll enable KEDA autoscaling in a later step after KEDA is installed:
+Create a ``values.yaml`` file to deploy vLLM with monitoring enabled. Note that we'll enable KEDA autoscaling in a later step after KEDA is installed:
 
 .. code-block:: yaml
 
    servingEngineSpec:
      enableEngine: true
+     serviceMonitor:
+       enabled: true
      modelSpec:
        - name: "llama3"
          repository: "lmcache/vllm-openai"
@@ -70,6 +91,16 @@ Create a ``values.yaml`` file to deploy vLLM. Note that we'll enable KEDA autosc
          requestCPU: 10
          requestMemory: "64Gi"
          requestGPU: 1
+
+   routerSpec:
+     serviceMonitor:
+       enabled: true
+
+   kube-prometheus-stack:
+     enabled: true
+
+   prometheus-adapter:
+     enabled: true
 
 Deploy the chart:
 
@@ -87,7 +118,7 @@ Verify Prometheus is scraping the vLLM metrics:
 
 .. code-block:: bash
 
-   kubectl port-forward svc/prometheus-operated -n monitoring 9090:9090
+   kubectl port-forward svc/<release-name>-kube-prometheus-stack-prometheus 9090:9090
 
 In a separate terminal:
 
@@ -142,10 +173,24 @@ Update your ``values.yaml`` file to enable KEDA autoscaling:
            triggers:
              - type: prometheus
                metadata:
-                 serverAddress: http://prometheus-operated.monitoring.svc:9090
+                 serverAddress: http://<release-name>-kube-prometheus-stack-prometheus:9090
                  metricName: vllm:num_requests_waiting
                  query: vllm:num_requests_waiting
                  threshold: '5'
+
+   routerSpec:
+     serviceMonitor:
+       enabled: true
+
+   kube-prometheus-stack:
+     enabled: true
+
+   prometheus-adapter:
+     enabled: true
+
+.. note::
+
+   The ``serverAddress`` in the KEDA trigger must point to your Prometheus instance. When using the integrated sub-chart, the service name follows the pattern ``<release-name>-kube-prometheus-stack-prometheus``. If you use an external Prometheus, adjust the address accordingly.
 
 Upgrade the chart to enable KEDA autoscaling:
 
@@ -231,14 +276,14 @@ Enable scale-to-zero by setting ``minReplicaCount: 0`` and adding a traffic-base
        # Queue-based scaling
        - type: prometheus
          metadata:
-           serverAddress: http://prometheus-operated.monitoring.svc:9090
+           serverAddress: http://<release-name>-kube-prometheus-stack-prometheus:9090
            metricName: vllm:num_requests_waiting
            query: vllm:num_requests_waiting
            threshold: '5'
        # Traffic-based keepalive (prevents scale-to-zero when traffic exists)
        - type: prometheus
          metadata:
-           serverAddress: http://prometheus-operated.monitoring.svc:9090
+           serverAddress: http://<release-name>-kube-prometheus-stack-prometheus:9090
            metricName: vllm:incoming_keepalive
            query: sum(rate(vllm:num_incoming_requests_total[1m]) > bool 0)
            threshold: "1"
@@ -295,12 +340,11 @@ To completely remove KEDA from the cluster:
    helm uninstall keda -n keda
    kubectl delete namespace keda
 
-To remove the observability stack:
+To disable the integrated monitoring, set ``kube-prometheus-stack.enabled: false`` in your ``values.yaml`` and upgrade:
 
 .. code-block:: bash
 
-   cd observability
-   bash uninstall.sh
+   helm upgrade vllm vllm/vllm-stack -f values.yaml
 
 Additional Resources
 --------------------
@@ -308,3 +352,4 @@ Additional Resources
 - `KEDA Documentation <https://keda.sh/docs/>`_
 - `KEDA ScaledObject Specification <https://keda.sh/docs/2.18/reference/scaledobject-spec/>`_
 - `Helm Chart KEDA Configuration <https://github.com/vllm-project/production-stack/blob/main/helm/README.md#keda-autoscaling-configuration>`_
+- `Monitoring Sub-Chart Integration (PR #860) <https://github.com/vllm-project/production-stack/pull/860>`_
