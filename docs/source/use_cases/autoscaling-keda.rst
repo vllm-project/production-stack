@@ -51,25 +51,13 @@ Since v0.1.11, the vLLM Production Stack Helm chart includes ``kube-prometheus-s
    kube-prometheus-stack:
      enabled: true
 
-   # Optionally enable prometheus-adapter for custom metrics API (used by HPA)
-   prometheus-adapter:
-     enabled: true
-
 .. note::
 
    If you already have an existing Prometheus stack in your cluster (e.g., deployed via ``kube-prometheus-stack`` or VictoriaMetrics), you only need to enable the ``serviceMonitor`` resources. Set ``kube-prometheus-stack.enabled: false`` and your existing Prometheus Operator will automatically discover the ServiceMonitors.
 
-Verify Prometheus is scraping the queue length metric ``vllm:num_requests_waiting``:
+.. note::
 
-.. code-block:: bash
-
-   kubectl port-forward svc/<release-name>-kube-prometheus-stack-prometheus 9090:9090
-
-In a separate terminal:
-
-.. code-block:: bash
-
-   curl -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=vllm:num_requests_waiting'
+   ``prometheus-adapter`` is **not** required for KEDA autoscaling. KEDA queries Prometheus directly via its built-in Prometheus scaler. You only need ``prometheus-adapter`` if you want to use the Kubernetes Custom Metrics API with a standard HPA.
 
 2. Configure and Deploy vLLM
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,9 +87,6 @@ Create a ``values.yaml`` file to deploy vLLM with monitoring enabled. Note that 
    kube-prometheus-stack:
      enabled: true
 
-   prometheus-adapter:
-     enabled: true
-
 Deploy the chart:
 
 .. code-block:: bash
@@ -118,7 +103,7 @@ Verify Prometheus is scraping the vLLM metrics:
 
 .. code-block:: bash
 
-   kubectl port-forward svc/<release-name>-kube-prometheus-stack-prometheus 9090:9090
+   kubectl port-forward svc/vllm-kube-prometheus-stack-prometheus 9090:9090
 
 In a separate terminal:
 
@@ -173,7 +158,7 @@ Update your ``values.yaml`` file to enable KEDA autoscaling:
            triggers:
              - type: prometheus
                metadata:
-                 serverAddress: http://<release-name>-kube-prometheus-stack-prometheus:9090
+                 serverAddress: http://vllm-kube-prometheus-stack-prometheus:9090
                  metricName: vllm:num_requests_waiting
                  query: vllm:num_requests_waiting
                  threshold: '5'
@@ -185,12 +170,9 @@ Update your ``values.yaml`` file to enable KEDA autoscaling:
    kube-prometheus-stack:
      enabled: true
 
-   prometheus-adapter:
-     enabled: true
-
 .. note::
 
-   The ``serverAddress`` in the KEDA trigger must point to your Prometheus instance. When using the integrated sub-chart, the service name follows the pattern ``<release-name>-kube-prometheus-stack-prometheus``. If you use an external Prometheus, adjust the address accordingly.
+   The ``serverAddress`` in the KEDA trigger must point to your Prometheus instance. When using the integrated sub-chart, the service name follows the pattern ``<release-name>-kube-prometheus-stack-prometheus`` (here: ``vllm-kube-prometheus-stack-prometheus``). If you use an external Prometheus, adjust the address accordingly.
 
 Upgrade the chart to enable KEDA autoscaling:
 
@@ -276,14 +258,14 @@ Enable scale-to-zero by setting ``minReplicaCount: 0`` and adding a traffic-base
        # Queue-based scaling
        - type: prometheus
          metadata:
-           serverAddress: http://<release-name>-kube-prometheus-stack-prometheus:9090
+           serverAddress: http://vllm-kube-prometheus-stack-prometheus:9090
            metricName: vllm:num_requests_waiting
            query: vllm:num_requests_waiting
            threshold: '5'
        # Traffic-based keepalive (prevents scale-to-zero when traffic exists)
        - type: prometheus
          metadata:
-           serverAddress: http://<release-name>-kube-prometheus-stack-prometheus:9090
+           serverAddress: http://vllm-kube-prometheus-stack-prometheus:9090
            metricName: vllm:incoming_keepalive
            query: sum(rate(vllm:num_incoming_requests_total[1m]) > bool 0)
            threshold: "1"
