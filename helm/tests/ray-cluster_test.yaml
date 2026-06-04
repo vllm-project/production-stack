@@ -456,3 +456,72 @@ tests:
           name: LMCACHE_REMOTE_SERDE
           value: naive
         any: true
+
+  - it: should set serviceAccountName on head and worker when specified
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            serviceAccountName: "my-custom-sa"
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.serviceAccountName
+        value: my-custom-sa
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.serviceAccountName
+        value: my-custom-sa
+
+  - it: should not set serviceAccountName when not specified
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      isNull:
+        path: spec.headGroupSpec.template.spec.serviceAccountName
+    - documentIndex: 0
+      isNull:
+        path: spec.workerGroupSpecs[0].template.spec.serviceAccountName
