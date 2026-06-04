@@ -525,3 +525,37 @@ tests:
     - documentIndex: 0
       isNull:
         path: spec.workerGroupSpecs[0].template.spec.serviceAccountName
+
+  - it: should not set serviceAccountName when set to empty string
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            serviceAccountName: ""
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      isNull:
+        path: spec.headGroupSpec.template.spec.serviceAccountName
+    - documentIndex: 0
+      isNull:
+        path: spec.workerGroupSpecs[0].template.spec.serviceAccountName
