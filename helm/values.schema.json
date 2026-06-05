@@ -1093,10 +1093,6 @@
                                 "description": "The annotations to add to the deployment",
                                 "type": "object"
                             },
-                            "labels": {
-                                "description": "Additional labels to add to the deployment",
-                                "type": "object"
-                            },
                             "enableLoRA": {
                                 "description": "Whether to enable LoRA",
                                 "type": "boolean"
@@ -1312,6 +1308,10 @@
                                         }
                                     }
                                 }
+                            },
+                            "labels": {
+                                "description": "Additional labels to add to the deployment",
+                                "type": "object"
                             },
                             "limitCPU": {
                                 "description": "The CPU limit for the model. If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.",
