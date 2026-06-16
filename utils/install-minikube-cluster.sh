@@ -43,7 +43,7 @@ if minikube_exists; then
   echo "Minikube already installed."
 else
   echo "Minikube not found or not executable on this host. Installing minikube for ${HOST_OS}-${HOST_ARCH}..."
-  curl -LO "https://github.com/kubernetes/minikube/releases/latest/download/minikube-${HOST_OS}-${HOST_ARCH}"
+  curl -fLO "https://github.com/kubernetes/minikube/releases/latest/download/minikube-${HOST_OS}-${HOST_ARCH}"
   sudo install "minikube-${HOST_OS}-${HOST_ARCH}" /usr/local/bin/minikube && rm "minikube-${HOST_OS}-${HOST_ARCH}"
 fi
 
