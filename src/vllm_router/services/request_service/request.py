@@ -719,6 +719,11 @@ async def send_request_to_prefiller(
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
         req_data["max_completion_tokens"] = 1
+    # Avoid min_tokens > max_tokens=1 conflict in vLLM SamplingParams.
+    req_data.pop("min_tokens", None)
+    # Force non-streaming: max_tokens=1 needs no SSE, and SSE would break response.json() below.
+    req_data["stream"] = False
+    req_data.pop("stream_options", None)
 
     headers = {
         "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
