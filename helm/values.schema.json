@@ -503,6 +503,14 @@
                     "description": "extra service ports",
                     "type": "array"
                 },
+                "extraVolumeMounts": {
+                    "description": "Additional volume mounts to add to the router container, in Kubernetes volumeMount format",
+                    "type": "array"
+                },
+                "extraVolumes": {
+                    "description": "Additional volumes to add to the router pod, in Kubernetes volume format",
+                    "type": "array"
+                },
                 "hf_token": {
                     "description": "Hugging Face token configuration",
                     "type": "string"

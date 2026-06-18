@@ -1,0 +1,65 @@
+# Tesla V100 SXM2 16GB (Volta, CUDA Compute Capability 7.0) - Single GPU (TP=1)
+# Validated on: OKD 4.19 / Kubernetes v1.32.8, vllm-stack-0.1.11
+# Model: Qwen/Qwen2.5-0.5B-Instruct
+#
+# Deploy with:
+#   helm install vllm vllm/vllm-stack -f values-25-v100-single-gpu.yaml
+servingEngineSpec:
+  # "nvidia" is required so the NVIDIA container runtime injects the GPU driver.
+  runtimeClassName: "nvidia"
+
+  # Recreate (instead of the default RollingUpdate) tears the old pod down
+  # before the new one starts. On a node with a single GPU this prevents the
+  # new pod from being stuck Pending while the old pod still holds the GPU.
+  strategy:
+    type: Recreate
+
+  modelSpec:
+  - name: "qwen05b"
+    # V100 (CC 7.0) is NOT supported by vllm/vllm-openai:latest (vLLM v0.9+).
+    # Pin to v0.8.5, the last tag that ships Volta-compatible CUDA kernels.
+    repository: "vllm/vllm-openai"
+    tag: "v0.8.5"
+    modelURL: "Qwen/Qwen2.5-0.5B-Instruct"
+    replicaCount: 1
+
+    requestCPU: 6
+    requestMemory: "16Gi"
+    requestGPU: 1
+
+    pvcStorage: "20Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
+
+    vllmConfig:
+      # V100 (CC 7.0) has no native BF16 datapath. Forcing FP16 ("half")
+      # avoids the "no kernel image is available for execution on the device"
+      # crash you get when vLLM defaults to bfloat16.
+      dtype: "half"
+      # Force the legacy vLLM V0 engine. The V1 engine assumes kernels that
+      # were compiled only for CC >= 8.0 (Ampere and newer).
+      v0: "1"
+      # TP=1: the 0.5B model fits comfortably on a single 16GB V100.
+      tensorParallelSize: 1
+      maxModelLen: 16384
+      gpuMemoryUtilization: 0.9
+      # enforce-eager disables CUDA graph capture, which is unreliable on
+      # Volta with the v0.8.5 image. The chart has no `enforceEager` field,
+      # so it must be passed through extraArgs.
+      extraArgs:
+        - "--enforce-eager"
+
+    env:
+      # Enables PTX JIT so kernels compiled for newer architectures can still
+      # run on Volta via CUDA forward compatibility.
+      - name: VLLM_ENABLE_CUDA_COMPATIBILITY
+        value: "1"
+
+    # Pin the pod to a known V100 host. Use nodeSelectorTerms (node affinity),
+    # NOT `nodeSelector` - the chart only renders nodeSelectorTerms.
+    nodeSelectorTerms:
+      - matchExpressions:
+          - key: "kubernetes.io/hostname"
+            operator: "In"
+            values:
+              - "gpu-node-01"
