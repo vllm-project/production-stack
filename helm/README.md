@@ -82,6 +82,8 @@ This table documents all available configuration values for the Production Stack
 |-------|------|---------|-------------|
 | `servingEngineSpec.modelSpec[].annotations` | map | `{}` | (Optional) Annotations to add to the deployment, e.g., {model: "opt125m"} |
 | `servingEngineSpec.modelSpec[].podAnnotations` | map | `{}` | (Optional) Annotations to add to the pod, e.g., {model: "opt125m"} |
+| `servingEngineSpec.modelSpec[].labels` | map | `{}` | (Optional) Additional labels to add to the deployment |
+| `servingEngineSpec.modelSpec[].podLabels` | map | `{}` | (Optional) Additional labels to add to the pods |
 | `servingEngineSpec.modelSpec[].name` | string | `""` | The name of the model, e.g., "example-model" |
 | `servingEngineSpec.modelSpec[].repository` | string | `""` | The repository of the model, e.g., "vllm/vllm-openai" |
 | `servingEngineSpec.modelSpec[].tag` | string | `""` | The tag of the model, e.g., "latest" |

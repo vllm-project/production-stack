@@ -1317,6 +1317,10 @@
                                     }
                                 }
                             },
+                            "labels": {
+                                "description": "Additional labels to add to the deployment",
+                                "type": "object"
+                            },
                             "limitCPU": {
                                 "description": "The CPU limit for the model. If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.",
                                 "type": [
@@ -1386,6 +1390,10 @@
                             },
                             "podAnnotations": {
                                 "description": "The annotations to add to the pods",
+                                "type": "object"
+                            },
+                            "podLabels": {
+                                "description": "Additional labels to add to the pods",
                                 "type": "object"
                             },
                             "priorityClassName": {
