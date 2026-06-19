@@ -53,7 +53,7 @@ lmcache = [
 test = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.3",
-    "vllm==0.22.0"
+    "vllm==0.22.0",
 ]
 
 [build-system]
