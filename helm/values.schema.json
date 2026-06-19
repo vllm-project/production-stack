@@ -503,6 +503,14 @@
                     "description": "extra service ports",
                     "type": "array"
                 },
+                "extraVolumeMounts": {
+                    "description": "Additional volume mounts to add to the router container, in Kubernetes volumeMount format",
+                    "type": "array"
+                },
+                "extraVolumes": {
+                    "description": "Additional volumes to add to the router pod, in Kubernetes volume format",
+                    "type": "array"
+                },
                 "hf_token": {
                     "description": "Hugging Face token configuration",
                     "type": "string"
@@ -1309,6 +1317,10 @@
                                     }
                                 }
                             },
+                            "labels": {
+                                "description": "Additional labels to add to the deployment",
+                                "type": "object"
+                            },
                             "limitCPU": {
                                 "description": "The CPU limit for the model. If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.",
                                 "type": [
@@ -1378,6 +1390,10 @@
                             },
                             "podAnnotations": {
                                 "description": "The annotations to add to the pods",
+                                "type": "object"
+                            },
+                            "podLabels": {
+                                "description": "Additional labels to add to the pods",
                                 "type": "object"
                             },
                             "priorityClassName": {

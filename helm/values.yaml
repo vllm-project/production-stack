@@ -31,6 +31,10 @@ servingEngineSpec:
     annotations: {}
     # -- The annotations to add to the pods
     podAnnotations: {}
+    # -- Additional labels to add to the deployment
+    labels: {}
+    # -- Additional labels to add to the pods
+    podLabels: {}
     # -- The name of the service account to use for the deployment
     serviceAccountName: ""
     # -- The name of the priority class name for the deployment
@@ -436,6 +440,19 @@ routerSpec:
 
   # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
   containerSecurityContext: {}
+
+  # -- Additional volumes to add to the router pod, in Kubernetes volume format
+  extraVolumes: []
+    # - name: tmp-volume
+    #   emptyDir: {}
+    # - name: home-volume
+    #   emptyDir: {}
+  # -- Additional volume mounts to add to the router container, in Kubernetes volumeMount format
+  extraVolumeMounts: []
+    # - name: tmp-volume
+    #   mountPath: /tmp
+    # - name: home-volume
+    #   mountPath: /home
 
   # -- Image pull secrets for private container registries
   # Example:
