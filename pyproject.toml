@@ -47,13 +47,13 @@ semantic_cache = [
     "huggingface-hub==0.34.0",
 ]
 lmcache = [
-    "lmcache==0.3.11",
-    "vllm==0.13.0",
+    "lmcache==0.4.7",
+    "vllm==0.22.0",
 ]
 test = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.3",
-    "vllm==0.13.0"
+    "vllm==0.22.0"
 ]
 
 [build-system]
