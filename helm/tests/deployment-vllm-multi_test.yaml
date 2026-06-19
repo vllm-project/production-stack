@@ -176,6 +176,53 @@ tests:
               fieldRef:
                 fieldPath: status.podIP
 
+  - it: should render per-model custom labels and podLabels
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "test-model"
+          labels:
+            gpu-size: large
+            team: ml-platform
+          podLabels:
+            cost-center: ml-infra
+            gpu-type: a100
+          repository: "vllm/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          replicaCount: 1
+          requestCPU: 1
+          requestMemory: "1Gi"
+          requestGPU: 1
+    asserts:
+    - hasDocuments:
+        count: 1
+    - documentIndex: 0
+      isSubset:
+        path: metadata.labels
+        content:
+          gpu-size: large
+          team: ml-platform
+    - documentIndex: 0
+      isSubset:
+        path: spec.template.metadata.labels
+        content:
+          cost-center: ml-infra
+          gpu-type: a100
+    - documentIndex: 0
+      isNotSubset:
+        path: spec.selector.matchLabels
+        content:
+          gpu-size: large
+    - documentIndex: 0
+      isNotSubset:
+        path: spec.selector.matchLabels
+        content:
+          cost-center: ml-infra
+
   - it: should render two models, one with chat templates
     release:
       name: vllm
