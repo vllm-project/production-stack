@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vllm_router.routers.routing_logic import (
+    RetryConfig,
     RoundRobinRouter,
     RoutingLogic,
     initialize_routing_logic,
@@ -36,7 +37,6 @@ MOCK_HEADERS.items.return_value = [("content-type", "text/event-stream")]
 def setup():
     """Yield (request, background_tasks) with all dependencies patched."""
     router = RoundRobinRouter()
-    router.max_instance_failover_reroute_attempts = 1
 
     sd = MagicMock()
     sd.get_endpoint_info.return_value = ENDPOINTS
@@ -45,6 +45,7 @@ def setup():
 
     state = MagicMock()
     state.router = router
+    state.retry_config = RetryConfig(max_retries=2)
     state.engine_stats_scraper.get_engine_stats.return_value = {}
     state.request_stats_monitor.get_request_stats.return_value = {}
     state.otel_enabled = False
@@ -81,19 +82,10 @@ def setup():
         p.stop()
 
 
-def test_initialize_sets_failover_attempts():
-    assert (
-        initialize_routing_logic(
-            RoutingLogic.ROUND_ROBIN
-        ).max_instance_failover_reroute_attempts
-        == 0
-    )
-    assert (
-        initialize_routing_logic(
-            RoutingLogic.ROUND_ROBIN, max_instance_failover_reroute_attempts=3
-        ).max_instance_failover_reroute_attempts
-        == 3
-    )
+def test_initialize_routing_logic_returns_router():
+    router = initialize_routing_logic(RoutingLogic.ROUND_ROBIN)
+    assert router is not None
+    assert isinstance(router, RoundRobinRouter)
 
 
 @pytest.mark.asyncio
@@ -160,7 +152,7 @@ async def test_raises_after_all_attempts_exhausted(setup):
 @pytest.mark.asyncio
 async def test_no_retry_when_disabled(setup):
     req, router = setup
-    router.max_instance_failover_reroute_attempts = 0
+    req.app.state.retry_config = RetryConfig(max_retries=1)
     call_count = 0
 
     async def fail(*a, **kw):
@@ -183,7 +175,7 @@ async def test_no_retry_when_disabled(setup):
 @pytest.mark.asyncio
 async def test_breaks_when_no_remaining_endpoints(setup):
     req, router = setup
-    router.max_instance_failover_reroute_attempts = 5  # more retries than endpoints
+    req.app.state.retry_config = RetryConfig(max_retries=5)
 
     async def fail(*a, **kw):
         raise ConnectionError("down")
@@ -199,11 +191,11 @@ async def test_breaks_when_no_remaining_endpoints(setup):
 
 
 @pytest.mark.asyncio
-async def test_http_exception_not_retried(setup):
+async def test_non_retryable_http_exception_not_retried(setup):
     from fastapi import HTTPException
 
     req, router = setup
-    router.max_instance_failover_reroute_attempts = 3
+    req.app.state.retry_config = RetryConfig(max_retries=3)
     call_count = 0
 
     async def fail(*a, **kw):
@@ -221,3 +213,60 @@ async def test_http_exception_not_retried(setup):
             await route_general_request(req, "/v1/chat/completions", MagicMock())
 
     assert call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_retryable_http_exception_is_retried(setup):
+    from fastapi import HTTPException
+
+    req, router = setup
+    req.app.state.retry_config = RetryConfig(max_retries=3)
+    call_count = 0
+
+    async def fail_then_ok(*a, **kw):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise HTTPException(status_code=503, detail="service unavailable")
+        yield MOCK_HEADERS, 200
+        yield b"done"
+
+    with patch(
+        "vllm_router.services.request_service.request.process_request",
+        side_effect=fail_then_ok,
+    ):
+        from vllm_router.services.request_service.request import route_general_request
+
+        resp = await route_general_request(req, "/v1/chat/completions", MagicMock())
+
+    assert resp.status_code == 200
+    assert call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_all_endpoints_return_retryable_http_error(setup):
+    """Test that all endpoints returning 503 exhausts retries properly."""
+    from fastapi import HTTPException
+
+    req, router = setup
+    req.app.state.retry_config = RetryConfig(max_retries=3)
+    urls_called = []
+
+    async def always_503(*a, **kw):
+        urls_called.append(a[2])
+        raise HTTPException(status_code=503, detail="service unavailable")
+        yield
+
+    with patch(
+        "vllm_router.services.request_service.request.process_request",
+        side_effect=always_503,
+    ):
+        from vllm_router.services.request_service.request import route_general_request
+
+        with pytest.raises(HTTPException) as exc_info:
+            await route_general_request(req, "/v1/chat/completions", MagicMock())
+
+    assert exc_info.value.status_code == 503
+    assert len(urls_called) == 3
+    assert "http://engine1" in urls_called
+    assert "http://engine2" in urls_called

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import os
 import time
@@ -97,6 +98,26 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
     "transfer-encoding",
     "connection",
 }
+
+
+def is_retryable_status(status_code: int) -> bool:
+    """Check if HTTP status code indicates a retryable error.
+
+    Retryable status codes:
+    - 408: Request Timeout
+    - 429: Too Many Requests
+    - 500: Internal Server Error
+    - 502: Bad Gateway
+    - 503: Service Unavailable
+    - 504: Gateway Timeout
+
+    Args:
+        status_code: HTTP status code
+
+    Returns:
+        True if the status code is retryable
+    """
+    return status_code in {408, 429, 500, 502, 503, 504}
 
 
 async def process_external_provider_request(
@@ -595,13 +616,23 @@ async def route_general_request(
 
     error_urls = set()
     last_error = None
-    max_attempts = request.app.state.router.max_instance_failover_reroute_attempts + 1
+    retry_config = request.app.state.retry_config
+    max_attempts = retry_config.max_retries
 
     for attempt in range(max_attempts):
         if attempt > 0:
             remaining = [ep for ep in endpoints if ep.url not in error_urls]
             if not remaining:
                 break
+
+            # Calculate backoff delay
+            delay = retry_config.calculate_delay(attempt - 1)
+            logger.info(
+                f"Request {request_id} retry attempt {attempt + 1}/{max_attempts}, "
+                f"waiting {delay:.3f}s before retry"
+            )
+            await asyncio.sleep(delay)
+
             if request_endpoint:
                 server_url = remaining[0].url
             elif isinstance(
@@ -622,7 +653,6 @@ async def route_general_request(
             if span is not None:
                 span.set_attribute("vllm.backend_url", server_url)
 
-        media_type = "text/event-stream"
         try:
             stream_generator = process_request(
                 request,
@@ -644,7 +674,14 @@ async def route_general_request(
             headers_dict["X-Request-Id"] = request_id
             last_error = None
             break
-        except HTTPException:
+        except HTTPException as e:
+            last_error = e
+            if is_retryable_status(e.status_code) and attempt + 1 < max_attempts:
+                logger.warning(
+                    f"Request {request_id} got retryable HTTPException {e.status_code} from {server_url}, "
+                    f"will retry (attempt {attempt + 1}/{max_attempts})"
+                )
+                continue
             raise
         except Exception as e:
             error_urls.add(server_url)

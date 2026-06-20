@@ -61,6 +61,41 @@ The router can be configured using command-line arguments. Below are the availab
 - `--sentry-traces-sample-rate`: The sample rate for Sentry traces (0.0 to 1.0). Default is 0.1 (10%).
 - `--sentry-profile-session-sample-rate`: The sample rate for Sentry profiling sessions (0.0 to 1.0). Default is 1.0 (100%).
 
+### Retry Configuration
+
+The router supports automatic retry with exponential backoff for transient failures. **Retries are disabled by default** for fast failover behavior.
+
+**Retryable Status Codes:** 408, 429, 500, 502, 503, 504
+
+**Important Limitation:** Retries only apply to errors that occur before streaming begins. If an error occurs mid-stream (after the first chunk is sent to the client), the error is passed directly to the client without retry. This is intentional because:
+
+- Buffering entire responses would defeat the purpose of streaming
+- HTTP headers have already been sent to the client
+- Clients can implement their own retry logic for incomplete streaming responses
+
+- `--enable-retries`: Enable automatic retry for transient HTTP failures. Disabled by default.
+- `--retry-max-retries`: Maximum total attempts including the initial request. Default is 5 (meaning 1 initial attempt + up to 4 retries). Only used when `--enable-retries` is set.
+- `--retry-initial-backoff-ms`: Initial backoff duration in milliseconds. Default is 50.
+- `--retry-max-backoff-ms`: Maximum backoff duration in milliseconds. Default is 30000.
+- `--retry-backoff-multiplier`: Exponential backoff multiplier. Default is 1.5.
+- `--retry-jitter-factor`: Random jitter factor (0.0-1.0) to prevent thundering herd. Default is 0.2.
+
+**Example with retry configuration:**
+
+```bash
+vllm-router --port 8000 \
+    --service-discovery static \
+    --static-backends "http://localhost:9001,http://localhost:9002" \
+    --static-models "facebook/opt-125m,facebook/opt-125m" \
+    --routing-logic roundrobin \
+    --enable-retries \
+    --retry-max-retries 5 \
+    --retry-initial-backoff-ms 100 \
+    --retry-max-backoff-ms 60000 \
+    --retry-backoff-multiplier 2.0 \
+    --retry-jitter-factor 0.1
+```
+
 ## Build docker image
 
 ```bash

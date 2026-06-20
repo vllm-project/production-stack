@@ -20,6 +20,7 @@ import math
 import random
 import threading
 import uuid
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 import requests
@@ -47,6 +48,43 @@ from vllm_router.stats.request_stats import RequestStats
 from vllm_router.utils import SingletonABCMeta
 
 logger = init_logger(__name__)
+
+
+@dataclass
+class RetryConfig:
+    """Configuration for retry with exponential backoff and jitter.
+
+    This implements the same retry mechanism as sglang model gateway.
+    """
+
+    max_retries: int = 5
+    initial_backoff_ms: int = 50
+    max_backoff_ms: int = 30000
+    backoff_multiplier: float = 1.5
+    jitter_factor: float = 0.2
+
+    def calculate_delay(self, attempt: int) -> float:
+        """Calculate backoff delay with jitter for a given attempt.
+
+        Formula: delay = min(initial_backoff_ms * (multiplier ^ attempt), max_backoff_ms)
+        With jitter: D' = D * (1 + U[-j, +j]) where j is jitter_factor
+
+        Args:
+            attempt: The attempt number (0-based)
+
+        Returns:
+            Delay in seconds
+        """
+        delay_ms = min(
+            self.initial_backoff_ms * (self.backoff_multiplier**attempt),
+            self.max_backoff_ms,
+        )
+
+        if self.jitter_factor > 0:
+            jitter_scale = random.uniform(-self.jitter_factor, self.jitter_factor)
+            delay_ms = max(0, delay_ms * (1 + jitter_scale))
+
+        return delay_ms / 1000.0  # Convert to seconds
 
 
 class RoutingLogic(str, enum.Enum):
@@ -698,9 +736,6 @@ def initialize_routing_logic(
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
-    router.max_instance_failover_reroute_attempts = kwargs.get(
-        "max_instance_failover_reroute_attempts", 0
-    )
     return router
 
 
