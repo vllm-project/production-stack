@@ -42,6 +42,7 @@ from uhashring import HashRing
 
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import EndpointInfo
+from vllm_router.services.metrics_service import routing_decisions_total
 from vllm_router.stats.engine_stats import EngineStats
 from vllm_router.stats.request_stats import RequestStats
 from vllm_router.utils import SingletonABCMeta
@@ -59,6 +60,18 @@ class RoutingLogic(str, enum.Enum):
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
+    ALGORITHM_NAME: str = "unknown"
+
+    def _record_decision(
+        self, server_url: str, model: str, outcome: str = "success"
+    ) -> None:
+        routing_decisions_total.labels(
+            server=server_url or "unknown",
+            model=model or "unknown",
+            algorithm=self.ALGORITHM_NAME,
+            outcome=outcome,
+        ).inc()
+
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
     ) -> str:
@@ -140,6 +153,8 @@ class RoundRobinRouter(RoutingInterface):
     # TODO (ApostaC): when available engines in the endpoints changes, the
     # algorithm may not be "perfectly" round-robin.
 
+    ALGORITHM_NAME = "roundrobin"
+
     # Upper bound on cached endpoint-set entries to prevent unbounded memory
     # growth when endpoints change dynamically (add / remove / update).
     _MAX_CACHE_SIZE = 1024
@@ -192,7 +207,12 @@ class RoundRobinRouter(RoutingInterface):
         ):
             self._next_index.clear()
         self._next_index[endpoint_urls] = idx + 1
-        return endpoint_urls[idx % len(endpoint_urls)]
+        url = endpoint_urls[idx % len(endpoint_urls)]
+        selected = next((e for e in endpoints if e.url == url), endpoints[0])
+        model_names = getattr(selected, "model_names", None) or []
+        model = model_names[0] if model_names else "unknown"
+        self._record_decision(url, model)
+        return url
 
 
 class SessionRouter(RoutingInterface):
@@ -200,6 +220,8 @@ class SessionRouter(RoutingInterface):
     Route the request to the appropriate engine URL based on the session key
     in the request headers
     """
+
+    ALGORITHM_NAME = "session"
 
     def __init__(self, session_key: str = None):
         if hasattr(self, "_initialized"):
@@ -239,12 +261,15 @@ class SessionRouter(RoutingInterface):
         # Update the hash ring with the current list of endpoints
         self._update_hash_ring(endpoints)
 
+        model = request_json.get("model", "unknown") if request_json else "unknown"
         if session_id is None:
             # Route based on QPS if no session ID is present
             url = self._qps_routing(endpoints, request_stats)
+            self._record_decision(url, model, outcome="fallback")
         else:
             # Use the hash ring to get the endpoint for the session ID
             url = self.hash_ring.get_node(session_id)
+            self._record_decision(url, model)
 
         return url
 
@@ -254,6 +279,8 @@ class KvawareRouter(RoutingInterface):
     Route the request to the appropriate engine URL by where the KV cache
     of the longest prefix match is found.
     """
+
+    ALGORITHM_NAME = "kvaware"
 
     def __init__(
         self,
@@ -386,6 +413,7 @@ class KvawareRouter(RoutingInterface):
             ]  # Get the first key
             matched_tokens = instance_id.layout_info[matched_instance_id][1]
 
+        model = request_json.get("model", "unknown") if request_json else "unknown"
         if (
             instance_id is None
             or len(instance_id.layout_info) == 0
@@ -396,11 +424,10 @@ class KvawareRouter(RoutingInterface):
             # Update the hash ring with the current list of endpoints
             self._update_hash_ring(endpoints)
             if session_id is None:
-                # Route based on QPS if no session ID is present
                 url = self._qps_routing(endpoints, request_stats)
             else:
-                # Use the hash ring to get the endpoint for the session ID
                 url = self.hash_ring.get_node(session_id)
+            self._record_decision(url, model, outcome="fallback")
             return url
         else:
             queried_instance_ids = [info for info in instance_id.layout_info]
@@ -425,7 +452,9 @@ class KvawareRouter(RoutingInterface):
             logger.info(
                 f"Routing request to {queried_instance_ids[0]} found by kvaware router"
             )
-            return self.instance_id_to_ip[queried_instance_ids[0]]
+            url = self.instance_id_to_ip[queried_instance_ids[0]]
+            self._record_decision(url, model)
+            return url
 
 
 class PrefixAwareRouter(RoutingInterface):
@@ -435,6 +464,8 @@ class PrefixAwareRouter(RoutingInterface):
 
     In this class, we assume that there is no eviction of prefix cache.
     """
+
+    ALGORITHM_NAME = "prefixaware"
 
     def __init__(self: int):
         if hasattr(self, "_initialized"):
@@ -504,6 +535,8 @@ class PrefixAwareRouter(RoutingInterface):
 
         await self.hashtrie.insert(prompt, selected_endpoint)
 
+        model = request_json.get("model", "unknown") if request_json else "unknown"
+        self._record_decision(selected_endpoint, model)
         return selected_endpoint
 
 
@@ -512,6 +545,8 @@ class DisaggregatedPrefillRouter(RoutingInterface):
     Route the request to the appropriate engine URL by handling prefill and decode operations sequentially.
     First request goes to prefill endpoint, then second request goes to decode endpoint.
     """
+
+    ALGORITHM_NAME = "disaggregated_prefill"
 
     def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
         self.prefill_model_labels = prefill_model_labels
@@ -565,6 +600,8 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
     Load balancing: Uses round-robin across available prefill and decode pods.
     """
 
+    ALGORITHM_NAME = "disaggregated_prefill_orchestrated"
+
     def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
         if hasattr(self, "_initialized"):
             return
@@ -617,7 +654,9 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         return prefiller_endpoints, decoder_endpoints
 
     def select_prefill_endpoint(
-        self, prefiller_endpoints: List[EndpointInfo]
+        self,
+        prefiller_endpoints: List[EndpointInfo],
+        model: str = "unknown",
     ) -> EndpointInfo:
         """Select prefill endpoint using round-robin load balancing."""
         if not prefiller_endpoints:
@@ -626,10 +665,13 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         sorted_endpoints = sorted(prefiller_endpoints, key=lambda e: e.url)
         selected = sorted_endpoints[self.prefill_idx % len(sorted_endpoints)]
         self.prefill_idx += 1
+        self._record_decision(selected.url, model)
         return selected
 
     def select_decode_endpoint(
-        self, decoder_endpoints: List[EndpointInfo]
+        self,
+        decoder_endpoints: List[EndpointInfo],
+        model: str = "unknown",
     ) -> EndpointInfo:
         """Select decode endpoint using round-robin load balancing."""
         if not decoder_endpoints:
@@ -638,6 +680,7 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         sorted_endpoints = sorted(decoder_endpoints, key=lambda e: e.url)
         selected = sorted_endpoints[self.decode_idx % len(sorted_endpoints)]
         self.decode_idx += 1
+        self._record_decision(selected.url, model)
         return selected
 
     async def route_request(
