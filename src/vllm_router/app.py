@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import asyncio
+import logging
 import threading
 from contextlib import asynccontextmanager
 
@@ -101,6 +102,28 @@ except ImportError:
     otel_available = False
 
 logger = init_logger(__name__)
+
+
+class _EndpointAccessLogFilter(logging.Filter):
+    """Suppress uvicorn access-log records for a fixed set of request paths.
+
+    Handy for silencing health/readiness probes (e.g. ``/health``,
+    ``/metrics``) that would otherwise flood the router logs while keeping
+    access logs for real traffic. uvicorn emits each access record with
+    positional ``args`` of ``(client_addr, method, path, http_version,
+    status_code)``; we match on ``path`` (ignoring any query string).
+    """
+
+    def __init__(self, endpoints):
+        super().__init__()
+        self._endpoints = {e.strip() for e in endpoints if e and e.strip()}
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if self._endpoints and record.args and len(record.args) >= 3:
+            path = str(record.args[2]).split("?", 1)[0]
+            if path in self._endpoints:
+                return False
+        return True
 
 
 @asynccontextmanager
@@ -392,6 +415,19 @@ def main():
     # Workaround to avoid footguns where uvicorn drops requests with too
     # many concurrent requests active.
     set_ulimit()
+
+    # Optionally drop access logs for noisy probe endpoints. The filter is
+    # attached to the ``uvicorn.access`` logger before uvicorn configures its
+    # own logging; uvicorn's dictConfig replaces handlers but preserves
+    # existing logger filters, so the suppression survives both text and json
+    # log formats.
+    disabled_endpoints = parse_comma_separated_args(
+        args.disable_access_log_for_endpoints
+    )
+    if disabled_endpoints:
+        logging.getLogger("uvicorn.access").addFilter(
+            _EndpointAccessLogFilter(disabled_endpoints)
+        )
 
     uvicorn_kwargs = {
         "host": args.host,
