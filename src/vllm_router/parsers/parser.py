@@ -448,6 +448,19 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--prefix-min-match-length",
+        type=int,
+        default=0,
+        help="The minimum prefix match length required for prefixaware "
+        "routing to reuse a matched endpoint. If the longest prefix "
+        "match is shorter than this value, the request falls back to "
+        "QPS-based routing. Note: prefix matches are computed in "
+        "chunks (chunk_size, default 128 characters), so this "
+        "threshold is effectively quantized to that granularity. "
+        "Defaults to 0, which disables the threshold.",
+    )
+
+    parser.add_argument(
         "--max-instance-failover-reroute-attempts",
         type=int,
         default=0,

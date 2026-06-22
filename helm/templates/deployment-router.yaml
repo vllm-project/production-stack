@@ -116,6 +116,10 @@ spec:
           {{- end }}
           - "--routing-logic"
           - "{{ .Values.routerSpec.routingLogic }}"
+          {{- if .Values.routerSpec.prefixMinMatchLength }}
+          - "--prefix-min-match-length"
+          - "{{ .Values.routerSpec.prefixMinMatchLength }}"
+          {{- end }}
           {{- if .Values.routerSpec.sessionKey }}
           - "--session-key"
           - "{{ .Values.routerSpec.sessionKey }}"
