@@ -31,6 +31,10 @@ servingEngineSpec:
     annotations: {}
     # -- The annotations to add to the pods
     podAnnotations: {}
+    # -- Additional labels to add to the deployment
+    labels: {}
+    # -- Additional labels to add to the pods
+    podLabels: {}
     # -- The name of the service account to use for the deployment
     serviceAccountName: ""
     # -- The name of the priority class name for the deployment
@@ -437,6 +441,19 @@ routerSpec:
   # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
   containerSecurityContext: {}
 
+  # -- Additional volumes to add to the router pod, in Kubernetes volume format
+  extraVolumes: []
+    # - name: tmp-volume
+    #   emptyDir: {}
+    # - name: home-volume
+    #   emptyDir: {}
+  # -- Additional volume mounts to add to the router container, in Kubernetes volumeMount format
+  extraVolumeMounts: []
+    # - name: tmp-volume
+    #   mountPath: /tmp
+    # - name: home-volume
+    #   mountPath: /home
+
   # -- Image pull secrets for private container registries
   # Example:
   # imagePullSecrets:
@@ -497,6 +514,13 @@ routerSpec:
 
   # -- routing logic, supports "roundrobin", "session", "prefixaware", "kvaware" or "disaggregated_prefill"
   routingLogic: "roundrobin" # @schema enum:[roundrobin,session,prefixaware,kvaware,disaggregated_prefill]
+
+  # -- Minimum prefix match length required for prefixaware routing to reuse a
+  # matched endpoint. If the longest prefix match is shorter than this value,
+  # the request falls back to QPS-based routing. Prefix matches are computed in
+  # chunks (chunk size defaults to 128 characters), so this threshold is
+  # effectively quantized to that granularity. Defaults to 0, which disables it.
+  prefixMinMatchLength: 0
 
   # -- session key if using "session" routing logic
   sessionKey: ""

@@ -517,9 +517,11 @@ async def route_general_request(
     else:
         endpoints = list(
             filter(
-                lambda x: requested_model in x.model_names
-                and x.Id == request_endpoint
-                and not x.sleep,
+                lambda x: (
+                    requested_model in x.model_names
+                    and x.Id == request_endpoint
+                    and not x.sleep
+                ),
                 endpoints,
             )
         )
@@ -682,6 +684,11 @@ async def send_request_to_prefiller(
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
         req_data["max_completion_tokens"] = 1
+    # Avoid min_tokens > max_tokens=1 conflict in vLLM SamplingParams.
+    req_data.pop("min_tokens", None)
+    # Force non-streaming: max_tokens=1 needs no SSE, and SSE would break response.json() below.
+    req_data["stream"] = False
+    req_data.pop("stream_options", None)
 
     headers = {
         "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
@@ -1064,9 +1071,16 @@ async def route_sleep_wakeup_request(
 
     url = server_url + endpoint
 
+    # Forward any additional query parameters (e.g. /sleep `level` and `mode`,
+    # /wake_up `tags`) to the upstream engine. `id` is router-only and is
+    # consumed above to pick the target engine.
+    upstream_params = {k: v for k, v in request.query_params.items() if k != "id"}
+
     async with aiohttp.ClientSession() as client:
         if endpoint == "/is_sleeping":
-            async with client.get(url, headers=headers) as response:
+            async with client.get(
+                url, headers=headers, params=upstream_params
+            ) as response:
                 response.raise_for_status()
                 return await response.json()
         else:
@@ -1074,11 +1088,15 @@ async def route_sleep_wakeup_request(
             response_status = None
             if request_body:
                 req_data = json.loads(request_body)
-                async with client.post(url, json=req_data, headers=headers) as response:
+                async with client.post(
+                    url, json=req_data, headers=headers, params=upstream_params
+                ) as response:
                     response.raise_for_status()
                     response_status = response.status
             else:
-                async with client.post(url, headers=headers) as response:
+                async with client.post(
+                    url, headers=headers, params=upstream_params
+                ) as response:
                     response.raise_for_status()
                     response_status = response.status
 

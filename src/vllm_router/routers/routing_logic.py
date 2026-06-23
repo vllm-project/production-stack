@@ -436,12 +436,16 @@ class PrefixAwareRouter(RoutingInterface):
     In this class, we assume that there is no eviction of prefix cache.
     """
 
-    def __init__(self: int):
+    def __init__(
+        self,
+        prefix_min_match_length: int = 0,
+    ):
         if hasattr(self, "_initialized"):
             return
         from vllm_router.prefix.hashtrie import HashTrie
 
         self.hashtrie = HashTrie()
+        self.prefix_min_match_length = prefix_min_match_length
         self._initialized = True
 
     async def route_request(
@@ -496,9 +500,12 @@ class PrefixAwareRouter(RoutingInterface):
             prompt = request_json["prompt"]
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
-        _, matched_endpoint = await self.hashtrie.longest_prefix_match(
+        match_length, matched_endpoint = await self.hashtrie.longest_prefix_match(
             prompt, available_endpoints
         )
+
+        if match_length < self.prefix_min_match_length:
+            return self._qps_routing(endpoints, request_stats)
 
         selected_endpoint = random.choice(list(matched_endpoint))
 
@@ -684,7 +691,9 @@ def initialize_routing_logic(
         router.start_kv_manager()
     elif routing_logic == RoutingLogic.PREFIXAWARE:
         logger.info("Initializing prefix-aware routing logic")
-        router = PrefixAwareRouter()
+        router = PrefixAwareRouter(
+            prefix_min_match_length=kwargs.get("prefix_min_match_length", 0),
+        )
     elif routing_logic == RoutingLogic.DISAGGREGATED_PREFILL:
         logger.info("Initializing disaggregated prefill routing logic")
         router = DisaggregatedPrefillRouter(
