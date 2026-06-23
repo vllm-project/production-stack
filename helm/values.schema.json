@@ -503,6 +503,14 @@
                     "description": "extra service ports",
                     "type": "array"
                 },
+                "extraVolumeMounts": {
+                    "description": "Additional volume mounts to add to the router container, in Kubernetes volumeMount format",
+                    "type": "array"
+                },
+                "extraVolumes": {
+                    "description": "Additional volumes to add to the router pod, in Kubernetes volume format",
+                    "type": "array"
+                },
                 "hf_token": {
                     "description": "Hugging Face token configuration",
                     "type": "string"
@@ -701,6 +709,10 @@
                 "podAnnotations": {
                     "description": "Customized pod annotations for the router pods",
                     "type": "object"
+                },
+                "prefixMinMatchLength": {
+                    "description": "Minimum prefix match length required for prefixaware routing to reuse a matched endpoint. If the longest prefix match is shorter than this value, the request falls back to QPS-based routing. Prefix matches are computed in chunks (chunk size defaults to 128 characters), so this threshold is effectively quantized to that granularity. Defaults to 0, which disables it.",
+                    "type": "integer"
                 },
                 "priorityClassName": {
                     "description": "Priority Class",
@@ -1309,6 +1321,10 @@
                                     }
                                 }
                             },
+                            "labels": {
+                                "description": "Additional labels to add to the deployment",
+                                "type": "object"
+                            },
                             "limitCPU": {
                                 "description": "The CPU limit for the model. If limitCPU and limitMemory are not specified, only GPU resources will have limits set equal to their requests.",
                                 "type": [
@@ -1378,6 +1394,10 @@
                             },
                             "podAnnotations": {
                                 "description": "The annotations to add to the pods",
+                                "type": "object"
+                            },
+                            "podLabels": {
+                                "description": "Additional labels to add to the pods",
                                 "type": "object"
                             },
                             "priorityClassName": {

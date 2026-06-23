@@ -82,6 +82,8 @@ This table documents all available configuration values for the Production Stack
 |-------|------|---------|-------------|
 | `servingEngineSpec.modelSpec[].annotations` | map | `{}` | (Optional) Annotations to add to the deployment, e.g., {model: "opt125m"} |
 | `servingEngineSpec.modelSpec[].podAnnotations` | map | `{}` | (Optional) Annotations to add to the pod, e.g., {model: "opt125m"} |
+| `servingEngineSpec.modelSpec[].labels` | map | `{}` | (Optional) Additional labels to add to the deployment |
+| `servingEngineSpec.modelSpec[].podLabels` | map | `{}` | (Optional) Additional labels to add to the pods |
 | `servingEngineSpec.modelSpec[].name` | string | `""` | The name of the model, e.g., "example-model" |
 | `servingEngineSpec.modelSpec[].repository` | string | `""` | The repository of the model, e.g., "vllm/vllm-openai" |
 | `servingEngineSpec.modelSpec[].tag` | string | `""` | The tag of the model, e.g., "latest" |
@@ -238,8 +240,11 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static" |
 | `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
 | `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic: `"roundrobin"`, `"session"`, `"prefixaware"`, or `"kvaware"` |
+| `routerSpec.prefixMinMatchLength` | integer | `0` | Minimum prefix match length for `prefixaware` routing to reuse a matched endpoint; below this, requests fall back to QPS routing. Quantized to the prefix chunk size (default 128). `0` disables it |
 | `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic |
 | `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router |
+| `routerSpec.extraVolumes` | list | `[]` | Additional volumes to add to the router pod, in Kubernetes volume format |
+| `routerSpec.extraVolumeMounts` | list | `[]` | Additional volume mounts to add to the router container, in Kubernetes volumeMount format |
 | `routerSpec.engineScrapeInterval` | integer | `15` | Interval in seconds to scrape metrics from the serving engine |
 | `routerSpec.requestStatsWindow` | integer | `60` | Window size in seconds for calculating request statistics |
 | `routerSpec.strategy` | map | `{}` | Deployment strategy for the router pods |
