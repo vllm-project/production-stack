@@ -34,6 +34,9 @@ spec:
           {{- include "chart.engineLabels" . | nindent 10 }}
       spec:
         terminationGracePeriodSeconds: 0
+        {{- if $modelSpec.serviceAccountName }}
+        serviceAccountName: {{ $modelSpec.serviceAccountName }}
+        {{- end }}
         {{- with .Values.servingEngineSpec.securityContext }}
         securityContext:
           {{- toYaml . | nindent 10 }}
@@ -292,6 +295,9 @@ spec:
             helm-release-name: {{ .Release.Name }}
             {{- include "chart.engineLabels" . | nindent 12 }}
         spec:
+          {{- if $modelSpec.serviceAccountName }}
+          serviceAccountName: {{ $modelSpec.serviceAccountName }}
+          {{- end }}
           {{- with .Values.servingEngineSpec.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
