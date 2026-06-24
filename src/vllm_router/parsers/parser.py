@@ -441,6 +441,64 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--routing-threshold",
+        type=int,
+        default=0,
+        help="Token count threshold for conditional disaggregation. Requests with estimated "
+        "input tokens at or above this threshold go through DPD (prefill then decode). Requests "
+        "below this threshold are sent directly to decoder for local prefill. "
+        "Default 0 means always disaggregate (original behavior). Recommended: 4096.",
+    )
+
+    parser.add_argument(
+        "--load-balancing-strategy",
+        type=str,
+        default="round_robin",
+        choices=["round_robin", "least_loaded"],
+        help="Load balancing strategy for disaggregated prefill routing across multiple "
+        "prefill/decode endpoints. 'round_robin' (default) cycles through endpoints. "
+        "'least_loaded' routes to the endpoint with fewest running+queued requests. "
+        "Falls back to round_robin if stats unavailable.",
+    )
+
+    parser.add_argument(
+        "--disagg-connector-type",
+        type=str,
+        default="nixl",
+        choices=["nixl", "lmcache"],
+        help="DPD connector type. 'nixl' uses kv_transfer_params with do_remote_decode. "
+        "'lmcache' uses disagg_spec with ZMQ ports and ret_first_tok protocol. Default: nixl.",
+    )
+    parser.add_argument(
+        "--decoder-host",
+        type=str,
+        default=None,
+        help="Decoder hostname for LMCache disagg_spec. "
+        "Required when --disagg-connector-type=lmcache in single-decoder mode.",
+    )
+    parser.add_argument(
+        "--decoder-init-port",
+        type=str,
+        default=None,
+        help="Comma-separated decoder NIXL init ports for LMCache disagg_spec. "
+        "Required when --disagg-connector-type=lmcache in single-decoder mode.",
+    )
+    parser.add_argument(
+        "--decoder-alloc-port",
+        type=str,
+        default=None,
+        help="Comma-separated decoder NIXL alloc ports for LMCache disagg_spec. "
+        "Required when --disagg-connector-type=lmcache in single-decoder mode.",
+    )
+    parser.add_argument(
+        "--decoder-registry",
+        type=str,
+        default=None,
+        help='JSON string mapping decoder URLs to their NIXL metadata for xPyD mode. '
+        "When provided, --decoder-host/init-port/alloc-port are ignored.",
+    )
+
+    parser.add_argument(
         "--kv-aware-threshold",
         type=int,
         default=2000,
