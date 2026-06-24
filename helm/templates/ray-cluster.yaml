@@ -9,6 +9,10 @@ kind: RayCluster
 metadata:
   name: "{{ .Release.Name }}-{{$modelSpec.name}}-raycluster"
   namespace: {{ .Release.Namespace }}
+  {{- with $modelSpec.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     model: {{ $modelSpec.name }}
     helm-release-name: {{ .Release.Name }}
@@ -20,6 +24,10 @@ spec:
       dashboard-host: "0.0.0.0"
     template:
       metadata:
+        {{- with $modelSpec.podAnnotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         labels:
           model: {{ $modelSpec.name }}
           helm-release-name: {{ .Release.Name }}
@@ -278,6 +286,10 @@ spec:
       groupName: ray
       template:
         metadata:
+          {{- with $modelSpec.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           labels:
             model: {{ $modelSpec.name }}
             helm-release-name: {{ .Release.Name }}
