@@ -171,6 +171,7 @@ def validate_url(url: str) -> bool:
     regex = re.compile(
         r"^(http|https)://"  # Protocol
         r"(([a-zA-Z0-9_-]+\.)+[a-zA-Z]{2,}|"  # Domain name
+        r"(?!-)[a-zA-Z0-9_-]+(?<!-)|"  # single-label
         r"localhost|"  # Or localhost
         r"\d{1,3}(\.\d{1,3}){3})"  # Or IPv4 address
         r"(:\d+)?"  # Optional port
