@@ -49,6 +49,8 @@ servingEngineSpec:
     imagePullSecret: ""
     # -- The URL of the model
     modelURL: "mistralai/Mistral-7B-Instruct-v0.2"
+    # -- Hugging Face model revision (branch, tag, or commit hash) to pin the model version
+    modelRevision: ""
     # -- Chat template (Jinga2) specifying tokenizer configuration
     # chatTemplate: "{% for message in messages %}\n{% if message['role'] == 'user' %}\n{{ 'Question:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'system' %}\n{{ 'System:\n' + message['content'] + '\n\n' }}{% elif message['role'] == 'assistant' %}{{ 'Answer:\n'  + message['content'] + '\n\n' }}{% endif %}\n{% if loop.last and add_generation_prompt %}\n{{ 'Answer:\n' }}{% endif %}{% endfor %}"
     # -- The number of replicas for the model
@@ -151,8 +153,6 @@ servingEngineSpec:
       extraArgs:
         - "--gpu-memory-utilization"
         - "0.4"
-      # -- Hugging Face model revision (branch, tag, or commit hash) to pin the model version
-      revision: ""
     # -- The configuration of the LMCache for KV offloading
     lmcacheConfig:
       # -- Enable LMCache

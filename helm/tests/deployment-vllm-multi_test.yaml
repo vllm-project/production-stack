@@ -364,7 +364,7 @@ tests:
           - name: LMCACHE_P2P_INIT_PORTS
             value: "30081"
 
-  - it: should pass --revision flag when vllmConfig.revision is set
+  - it: should pass --revision flag when modelRevision is set
     release:
       name: vllm
     set:
@@ -380,8 +380,7 @@ tests:
           requestMemory: "16Gi"
           requestGPU: 1
           pvcStorage: "50Gi"
-          vllmConfig:
-            revision: "abc123def"
+          modelRevision: "abc123def"
     asserts:
     - documentIndex: 0
       contains:
@@ -392,7 +391,7 @@ tests:
         path: spec.template.spec.containers[0].command
         content: "abc123def"
 
-  - it: should not pass --revision flag when vllmConfig.revision is empty
+  - it: should not pass --revision flag when modelRevision is empty
     release:
       name: vllm
     set:
@@ -408,8 +407,7 @@ tests:
           requestMemory: "16Gi"
           requestGPU: 1
           pvcStorage: "50Gi"
-          vllmConfig:
-            revision: ""
+          modelRevision: ""
     asserts:
     - documentIndex: 0
       notContains:

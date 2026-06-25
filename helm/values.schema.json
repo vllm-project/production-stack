@@ -1377,6 +1377,10 @@
                                     }
                                 }
                             },
+                            "modelRevision": {
+                                "description": "Hugging Face model revision (branch, tag, or commit hash) to pin the model version",
+                                "type": "string"
+                            },
                             "modelURL": {
                                 "description": "The URL of the model",
                                 "type": "string"
@@ -1584,10 +1588,6 @@
                                     "maxNumSeqs": {
                                         "description": "Maximum number of sequences to be processed in a single iteration.",
                                         "type": "integer"
-                                    },
-                                    "revision": {
-                                        "description": "Hugging Face model revision (branch, tag, or commit hash) to pin the model version",
-                                        "type": "string"
                                     },
                                     "runner": {
                                         "description": "The runner type for the model, can be auto or pooling",
