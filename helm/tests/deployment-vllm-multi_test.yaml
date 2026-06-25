@@ -363,3 +363,53 @@ tests:
             value: "localhost"
           - name: LMCACHE_P2P_INIT_PORTS
             value: "30081"
+
+  - it: should pass --revision flag when modelRevision is set
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "opt125m"
+          repository: "lmcache/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          replicaCount: 1
+          requestCPU: 6
+          requestMemory: "16Gi"
+          requestGPU: 1
+          pvcStorage: "50Gi"
+          modelRevision: "abc123def"
+    asserts:
+    - documentIndex: 0
+      contains:
+        path: spec.template.spec.containers[0].command
+        content: "--revision"
+    - documentIndex: 0
+      contains:
+        path: spec.template.spec.containers[0].command
+        content: "abc123def"
+
+  - it: should not pass --revision flag when modelRevision is empty
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "opt125m"
+          repository: "lmcache/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          replicaCount: 1
+          requestCPU: 6
+          requestMemory: "16Gi"
+          requestGPU: 1
+          pvcStorage: "50Gi"
+          modelRevision: ""
+    asserts:
+    - documentIndex: 0
+      notContains:
+        path: spec.template.spec.containers[0].command
+        content: "--revision"

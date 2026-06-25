@@ -603,3 +603,63 @@ tests:
     - documentIndex: 0
       isNull:
         path: spec.workerGroupSpecs[0].template.spec.serviceAccountName
+
+  - it: should pass --revision flag in the start script when modelRevision is set
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+            modelRevision: "abc123def"
+    asserts:
+    - documentSelector:
+        path: metadata.name
+        value: "test-model-vllm-start-script"
+      matchRegex:
+        path: data["vllm-entrypoint.sh"]
+        pattern: "--revision.*abc123def"
+
+  - it: should not pass --revision flag in the start script when modelRevision is empty
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+            modelRevision: ""
+    asserts:
+    - documentSelector:
+        path: metadata.name
+        value: "test-model-vllm-start-script"
+      notMatchRegex:
+        path: data["vllm-entrypoint.sh"]
+        pattern: "--revision"
