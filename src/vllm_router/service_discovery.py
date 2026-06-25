@@ -937,6 +937,9 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
         self.label_selector = label_selector
+        self.known_models: Set[str] = set()
+        self.known_models_lock = threading.Lock()
+        self._service_to_model: Dict[str, str] = {}
         self.watcher_timeout_seconds = watcher_timeout_seconds
         self.health_check_timeout_seconds = health_check_timeout_seconds
 
@@ -1154,20 +1157,20 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
                 ):
                     service = event["object"]
                     event_type = event["type"]
-                    if event_type == "DELETED":
-                        if service.metadata.name in self.available_engines:
-                            self._delete_engine(service.metadata.name)
-                        continue
                     service_name = service.metadata.name
+                    if event_type == "DELETED":
+                        self._track_known_model(service_name, "DELETED", None)
+                        if service_name in self.available_engines:
+                            self._delete_engine(service_name)
+                        continue
+                    model_label = self._get_model_label(service)
                     is_service_ready = self._check_service_ready(
                         service_name, self.namespace
                     )
                     if is_service_ready:
                         model_names = self._get_model_names(service_name)
-                        model_label = self._get_model_label(service)
                     else:
                         model_names = []
-                        model_label = None
                     self._on_engine_update(
                         service_name,
                         event_type,
@@ -1223,6 +1226,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         model_names: List[str],
         model_label: Optional[str],
     ) -> None:
+        self._track_known_model(engine_name, event, model_label)
         if event == "ADDED":
             if not engine_name:
                 return
@@ -1254,6 +1258,47 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             ) and engine_name in self.available_engines:
                 self._delete_engine(engine_name)
                 return
+
+    def _track_known_model(
+        self,
+        engine_name: str,
+        event: str,
+        model_label: Optional[str],
+    ) -> None:
+        """Record every model observed via Service spec.selector["model"].
+
+        Ensures has_ever_seen_model() returns True even when the backing
+        Deployment is scaled to zero (no Ready pod -> no /v1/models probe
+        -> never registered by _on_engine_update without this hook).
+        Maintains a per-service refcount so the label is only dropped from
+        known_models once the last Service referencing it is gone or
+        relabelled.
+        """
+        with self.known_models_lock:
+            old_label = self._service_to_model.get(engine_name)
+            new_label = model_label if event != "DELETED" else None
+            if old_label == new_label:
+                return
+            if new_label:
+                self._service_to_model[engine_name] = new_label
+                self.known_models.add(new_label)
+            else:
+                self._service_to_model.pop(engine_name, None)
+            if (
+                old_label is not None
+                and old_label not in self._service_to_model.values()
+            ):
+                self.known_models.discard(old_label)
+
+    def has_ever_seen_model(self, model_name: str) -> bool:
+        """Check if we've ever seen this model, even if currently scaled to zero."""
+        with self.known_models_lock:
+            return model_name in self.known_models
+
+    def get_known_models(self) -> Set[str]:
+        """Get all models that have ever been discovered."""
+        with self.known_models_lock:
+            return self.known_models.copy()
 
     def get_endpoint_info(self) -> List[EndpointInfo]:
         """
