@@ -17,7 +17,7 @@ dependencies = [
     "fastapi==0.128.0",
     "aiohttp[speedups]==3.13.3",
     "kubernetes==32.0.0",
-    "numpy==1.26.4",
+    "numpy>=1.26.4",
     "prometheus-client==0.21.1",
     "python-multipart==0.0.32",
     "sentry-sdk[fastapi]==2.27.0",
@@ -42,18 +42,18 @@ Repository = "https://github.com/vllm-project/production-stack"
 [project.optional-dependencies]
 default = []  # leave this empty because pip requires at least one specifier
 semantic_cache = [
-    "sentence-transformers==2.2.2",
+    "sentence-transformers>=3.0.0",
     "faiss-cpu==1.10.0",
-    "huggingface-hub==0.34.0",
+    "huggingface-hub>=1.5.0",
 ]
 lmcache = [
-    "lmcache==0.3.11",
-    "vllm==0.13.0",
+    "lmcache==0.4.7",
+    "vllm==0.22.0",
 ]
 test = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.3",
-    "vllm==0.13.0"
+    "vllm==0.22.0",
 ]
 
 [build-system]
