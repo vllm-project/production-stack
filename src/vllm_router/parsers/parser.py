@@ -385,6 +385,15 @@ def parse_args():
         help="Log output format. 'text' for human-readable colored output, "
         "'json' for structured JSON logging. Default is 'text'.",
     )
+    parser.add_argument(
+        "--disable-access-log-for-endpoints",
+        type=str,
+        default=None,
+        help="Comma-separated list of request paths whose uvicorn access "
+        "logs should be suppressed, e.g. '/health,/metrics'. Useful to keep "
+        "liveness/readiness probe noise out of the router logs while "
+        "preserving access logs for real traffic.",
+    )
 
     parser.add_argument(
         "--sentry-dsn",
