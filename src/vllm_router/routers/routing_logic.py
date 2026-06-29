@@ -115,12 +115,13 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         return val if val is not None else request_json.get(session_key, None)
 
     @abc.abstractmethod
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_json: Dict = {},
     ) -> str:
         """
         Route the request to the appropriate engine URL
@@ -132,6 +133,7 @@ class RoutingInterface(metaclass=SingletonABCMeta):
             request_stats (Dict[str, RequestStats]): The request stats
                 indicating the request-level performance of each engine
             request (Request): The incoming request
+            request_json (Dict): The request body
         """
         raise NotImplementedError
 
@@ -165,12 +167,13 @@ class RoundRobinRouter(RoutingInterface):
             self._sorted_cache[urls] = key
         return key
 
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_json: Dict = {},
     ) -> str:
         """
         Route the request to the appropriate engine URL using a simple
@@ -183,6 +186,7 @@ class RoundRobinRouter(RoutingInterface):
             request_stats (Dict[str, RequestStats]): The request stats
                 indicating the request-level performance of each engine
             request (Request): The incoming request
+            request_json (Dict): Unused for RoundRobinRouter
         """
         endpoint_urls = self._endpoint_key(endpoints)
         idx = self._next_index.get(endpoint_urls, 0)
@@ -497,7 +501,7 @@ class PrefixAwareRouter(RoutingInterface):
                 prompt = ""
         else:
             # Handle regular completions
-            prompt = request_json["prompt"]
+            prompt = request_json.get("prompt", "")
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
         match_length, matched_endpoint = await self.hashtrie.longest_prefix_match(
@@ -525,7 +529,7 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         self.decode_model_labels = decode_model_labels
         self.request_cache = {}  # Cache to store prefill results
 
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
