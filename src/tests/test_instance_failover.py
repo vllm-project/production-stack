@@ -96,6 +96,16 @@ def test_initialize_sets_failover_attempts():
     )
 
 
+@pytest.mark.parametrize("value", [None, -1])
+def test_initialize_normalizes_invalid_failover_attempts(value):
+    assert (
+        initialize_routing_logic(
+            RoutingLogic.ROUND_ROBIN, max_instance_failover_reroute_attempts=value
+        ).max_instance_failover_reroute_attempts
+        == 0
+    )
+
+
 @pytest.mark.asyncio
 async def test_no_retry_on_success(setup):
     req, router = setup
@@ -221,3 +231,46 @@ async def test_http_exception_not_retried(setup):
             await route_general_request(req, "/v1/chat/completions", MagicMock())
 
     assert call_count == 1
+
+
+def test_dynamic_config_reads_failover_attempts_from_yaml(tmp_path):
+    from vllm_router.dynamic_config import DynamicRouterConfig
+
+    config_file = tmp_path / "dynamic_config.yaml"
+    config_file.write_text(
+        "service_discovery: static\n"
+        "routing_logic: roundrobin\n"
+        "max_instance_failover_reroute_attempts: 2\n"
+    )
+
+    config = DynamicRouterConfig.from_yaml(str(config_file))
+
+    assert config.max_instance_failover_reroute_attempts == 2
+
+
+def test_dynamic_config_defaults_failover_attempts(tmp_path):
+    from vllm_router.dynamic_config import DynamicRouterConfig
+
+    config_file = tmp_path / "dynamic_config.yaml"
+    config_file.write_text("service_discovery: static\nrouting_logic: roundrobin\n")
+
+    config = DynamicRouterConfig.from_yaml(str(config_file))
+
+    assert config.max_instance_failover_reroute_attempts == 0
+
+
+def test_reconfigure_applies_failover_attempts():
+    from types import SimpleNamespace
+
+    from vllm_router.dynamic_config import DynamicConfigWatcher, DynamicRouterConfig
+
+    config = DynamicRouterConfig(
+        service_discovery="static",
+        routing_logic="roundrobin",
+        max_instance_failover_reroute_attempts=3,
+    )
+
+    watcher = SimpleNamespace(app=MagicMock())
+    DynamicConfigWatcher.reconfigure_routing_logic(watcher, config)
+
+    assert watcher.app.state.router.max_instance_failover_reroute_attempts == 3
