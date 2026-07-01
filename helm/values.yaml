@@ -275,6 +275,18 @@ servingEngineSpec:
         requestMemory: "1Gi"
         # -- GPU request for the head node
         requestGPU: 1
+        # Readiness probe for the Ray head node (raySpec.headNode.readinessProbe).
+        # If unset, defaults to an httpGet /health probe with failureThreshold 1
+        # and periodSeconds 10. Override it to relax the probe when the model
+        # takes a long time to come up on a multi-node setup, otherwise the head
+        # pod may be marked unready and never receive traffic. Accepts a standard
+        # Kubernetes probe spec, e.g.:
+        # readinessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8000
+        #   failureThreshold: 10
+        #   periodSeconds: 30
 
   # -- Container port
   containerPort: 8000
