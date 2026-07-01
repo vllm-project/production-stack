@@ -41,6 +41,10 @@ spec:
     - backendRefs:
         - name: {{ $serviceName }}
           port: {{ $servicePort }}
+      {{- with $route.timeouts }}
+      timeouts:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with $route.filters }}
       filters:
         {{- toYaml . | nindent 8 }}
