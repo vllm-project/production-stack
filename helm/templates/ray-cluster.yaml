@@ -167,11 +167,15 @@ spec:
               - name: {{ include "chart.container-port-name" . }}
                 containerPort: {{ include "chart.container-port" . }}
             readinessProbe:
+              {{- if $modelSpec.raySpec.headNode.readinessProbe }}
+              {{- toYaml $modelSpec.raySpec.headNode.readinessProbe | nindent 14 }}
+              {{- else }}
               httpGet:
                 path: /health
                 port: {{ include "chart.container-port" . }}
               failureThreshold: 1
               periodSeconds: 10
+              {{- end }}
             livenessProbe:
               exec:
                 command: ["/bin/bash", "-c", "echo TBD"]
