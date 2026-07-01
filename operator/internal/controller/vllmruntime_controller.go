@@ -26,6 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -363,7 +364,13 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 		scaledObject.SetKind("ScaledObject")
 		scaledObject.SetName(vllmRuntime.Name + "-scaledobject")
 		scaledObject.SetNamespace(vllmRuntime.Namespace)
-		if err := r.Delete(ctx, scaledObject); err != nil && !errors.IsNotFound(err) {
+		// Best-effort cleanup of a stale ScaledObject when autoscaling is
+		// disabled. Tolerate IsNoMatchError so the reconcile still succeeds on
+		// clusters where KEDA is not installed (the keda.sh API group is not
+		// registered): there is nothing to delete, and requiring KEDA here
+		// would make the operator unusable on non-autoscaling clusters.
+		if err := r.Delete(ctx, scaledObject); err != nil &&
+			!errors.IsNotFound(err) && !meta.IsNoMatchError(err) {
 			log.Error(err, "Failed to delete ScaledObject")
 			return ctrl.Result{}, err
 		}
