@@ -1,5 +1,9 @@
 {{- if .Values.grafanaDashboards.enabled }}
 {{- range $path, $bytes := .Files.Glob "dashboards/*.json" }}
+{{- $filename := base $path }}
+{{- if and (eq $filename "lmcache-dashboard.json") (not $.Values.cacheserverSpec.enabled) }}
+{{- continue }}
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
