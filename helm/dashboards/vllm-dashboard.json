@@ -369,7 +369,7 @@
       "targets": [
         {
           "editorMode": "builder",
-          "expr": "avg(vllm:time_per_output_token_seconds_sum) / avg(vllm:time_per_output_token_seconds_count)",
+          "expr": "avg(vllm:request_time_per_output_token_seconds_sum) / avg(vllm:request_time_per_output_token_seconds_count)",
           "legendFormat": "Avg ITL",
           "range": true,
           "refId": "A"
@@ -656,6 +656,7 @@
           "color": {
             "mode": "palette-classic"
           },
+          "unit": "percentunit",
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -729,7 +730,7 @@
       "targets": [
         {
           "editorMode": "builder",
-          "expr": "vllm:gpu_cache_usage_perc",
+          "expr": "vllm:kv_cache_usage_perc",
           "legendFormat": "{{instance}}",
           "range": true,
           "refId": "A"
@@ -835,70 +836,6 @@
       "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Requests moved from GPU to CPU",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 39
-      },
-      "id": 21,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.0.0+security-01",
-      "targets": [
-        {
-          "editorMode": "builder",
-          "expr": "vllm:num_requests_swapped",
-          "legendFormat": "Swapped Requests",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Number of Swapped Requests",
-      "type": "stat"
-    },
-    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -921,6 +858,7 @@
           "color": {
             "mode": "palette-classic"
           },
+          "unit": "percentunit",
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
@@ -995,7 +933,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "vllm:gpu_cache_usage_perc",
+          "expr": "vllm:kv_cache_usage_perc",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "GPU Usage",
