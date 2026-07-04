@@ -511,7 +511,8 @@ class PrefixAwareRouter(RoutingInterface):
             # request matches below the threshold, nothing is ever inserted,
             # and prefix affinity never activates.
             selected_endpoint = self._qps_routing(endpoints, request_stats)
-            await self.hashtrie.insert(prompt, selected_endpoint)
+            if selected_endpoint is not None:
+                await self.hashtrie.insert(prompt, selected_endpoint)
             return selected_endpoint
 
         selected_endpoint = random.choice(list(matched_endpoint))
