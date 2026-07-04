@@ -505,7 +505,14 @@ class PrefixAwareRouter(RoutingInterface):
         )
 
         if match_length < self.prefix_min_match_length:
-            return self._qps_routing(endpoints, request_stats)
+            # Fall back to QPS routing, but still record the prompt in the
+            # trie. Without this, a router configured with
+            # prefix_min_match_length > 0 starts with an empty trie, every
+            # request matches below the threshold, nothing is ever inserted,
+            # and prefix affinity never activates.
+            selected_endpoint = self._qps_routing(endpoints, request_stats)
+            await self.hashtrie.insert(prompt, selected_endpoint)
+            return selected_endpoint
 
         selected_endpoint = random.choice(list(matched_endpoint))
 
