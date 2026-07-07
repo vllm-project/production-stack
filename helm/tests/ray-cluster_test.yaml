@@ -663,3 +663,348 @@ tests:
       notMatchRegex:
         path: data["vllm-entrypoint.sh"]
         pattern: "--revision"
+
+  - it: should not render initContainers on head or worker when not configured
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      isNull:
+        path: spec.headGroupSpec.template.spec.initContainers
+    - documentIndex: 0
+      isNull:
+        path: spec.workerGroupSpecs[0].template.spec.initContainers
+
+  - it: should render initContainer on head node from raySpec.headNode.initContainer
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+                initContainer:
+                  name: "head-init"
+                  image: "busybox:latest"
+                  command: ["sh", "-c"]
+                  args: ["echo head-init"]
+                  env:
+                    - name: HEAD_VAR
+                      value: "head-value"
+                  resources:
+                    requests:
+                      cpu: "50m"
+                      memory: "64Mi"
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.initContainers[0].name
+        value: head-init
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.initContainers[0].image
+        value: busybox:latest
+    - documentIndex: 0
+      contains:
+        path: spec.headGroupSpec.template.spec.initContainers[0].env
+        content:
+          name: RELEASE_NAME
+          value: vllm
+        any: true
+    - documentIndex: 0
+      contains:
+        path: spec.headGroupSpec.template.spec.initContainers[0].env
+        content:
+          name: HEAD_VAR
+          value: "head-value"
+        any: true
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.initContainers[0].resources.requests.cpu
+        value: "50m"
+    - documentIndex: 0
+      isNull:
+        path: spec.workerGroupSpecs[0].template.spec.initContainers
+
+  - it: should render initContainer on worker nodes from modelSpec.initContainer
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 2
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            initContainer:
+              name: "worker-init"
+              image: "busybox:latest"
+              command: ["sh", "-c"]
+              args: ["echo worker-init"]
+              env:
+                - name: WORKER_VAR
+                  value: "worker-value"
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      isNull:
+        path: spec.headGroupSpec.template.spec.initContainers
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.initContainers[0].name
+        value: worker-init
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.initContainers[0].image
+        value: busybox:latest
+    - documentIndex: 0
+      contains:
+        path: spec.workerGroupSpecs[0].template.spec.initContainers[0].env
+        content:
+          name: RELEASE_NAME
+          value: vllm
+        any: true
+    - documentIndex: 0
+      contains:
+        path: spec.workerGroupSpecs[0].template.spec.initContainers[0].env
+        content:
+          name: WORKER_VAR
+          value: "worker-value"
+        any: true
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.initContainers[0].resources.requests.memory
+        value: "128Mi"
+
+  - it: should render independent initContainers on head and worker when both are configured
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            initContainer:
+              name: "worker-init"
+              image: "busybox:latest"
+              command: ["sh", "-c"]
+              args: ["echo worker"]
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+                initContainer:
+                  name: "head-init"
+                  image: "busybox:latest"
+                  command: ["sh", "-c"]
+                  args: ["echo head"]
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.initContainers[0].name
+        value: head-init
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.initContainers[0].name
+        value: worker-init
+
+  - it: should honor raySpec.headNode.resources override on the head container
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 0
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 0
+                resources:
+                  requests:
+                    cpu: "3"
+                    memory: "12Gi"
+                    nvidia.com/gpu: "1"
+                  limits:
+                    cpu: "6"
+                    memory: "24Gi"
+                    nvidia.com/gpu: "1"
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.containers[0].resources.requests.cpu
+        value: "3"
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.containers[0].resources.requests.memory
+        value: "12Gi"
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.containers[0].resources.requests["nvidia.com/gpu"]
+        value: "1"
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.containers[0].resources.limits.cpu
+        value: "6"
+
+  - it: should honor modelSpec.resources override on the worker container
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 0
+            resources:
+              requests:
+                cpu: "8"
+                memory: "32Gi"
+                nvidia.com/gpu: "2"
+              limits:
+                cpu: "16"
+                memory: "64Gi"
+                nvidia.com/gpu: "2"
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 0
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].resources.requests.cpu
+        value: "8"
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].resources.requests.memory
+        value: "32Gi"
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].resources.requests["nvidia.com/gpu"]
+        value: "2"
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].resources.limits.memory
+        value: "64Gi"
+
+  - it: should fall back to simplified request* fields when no raw resources override is given
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 4
+            requestMemory: "16Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 2
+                requestMemory: "8Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.containers[0].resources.requests.cpu
+        value: "2"
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.containers[0].resources.requests.memory
+        value: "8Gi"
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].resources.requests.cpu
+        value: "4"
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.containers[0].resources.requests.memory
+        value: "16Gi"
