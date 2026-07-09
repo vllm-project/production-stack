@@ -793,7 +793,7 @@ async def route_orchestrated_disaggregated_request(
 
     try:
         # Use the shared aiohttp client from app state
-        client = request.app.state.aiohttp_client_wrapper()
+        client: aiohttp.ClientSession = request.app.state.aiohttp_client_wrapper()
 
         # Send to Prefill
         async with client.post(
@@ -842,7 +842,7 @@ async def route_orchestrated_disaggregated_request(
         decode_api_url = f"{decode_url}{endpoint}"
         logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
 
-        async with client.post(
+        decode_resp = await client.post(
             decode_api_url,
             json=decode_request,
             headers={
@@ -850,7 +850,8 @@ async def route_orchestrated_disaggregated_request(
                 "X-Request-Id": request_id,
             },
             timeout=aiohttp.ClientTimeout(total=600),
-        ) as decode_resp:
+        )
+        try:
             if decode_resp.status != 200:
                 error_text = await decode_resp.text()
                 logger.error(
@@ -870,6 +871,7 @@ async def route_orchestrated_disaggregated_request(
                             if chunk:
                                 yield chunk
                     finally:
+                        decode_resp.release()
                         curr_time = time.time()
                         logger.info(
                             f"[{request_id}] Orchestrated streaming request completed, total time = {curr_time - in_router_time:.4f}s"
@@ -893,6 +895,9 @@ async def route_orchestrated_disaggregated_request(
                     content=json.loads(response_data),
                     headers={"X-Request-Id": request_id},
                 )
+        except Exception:
+            decode_resp.release()
+            raise
 
     except aiohttp.ClientError as e:
         logger.error(

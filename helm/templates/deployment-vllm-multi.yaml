@@ -197,6 +197,10 @@ spec:
           {{-     end }}
           {{-   end }}
           {{- end }}
+          {{- if $modelSpec.modelRevision }}
+          - "--revision"
+          - {{ $modelSpec.modelRevision | quote }}
+          {{- end }}
           {{- if $modelSpec.lmcacheConfig }}
           {{-   if $modelSpec.lmcacheConfig.enabled }}
           {{-     if hasKey $modelSpec.lmcacheConfig "enablePD" }}

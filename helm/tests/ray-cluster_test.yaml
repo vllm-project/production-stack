@@ -175,6 +175,50 @@ tests:
         path: spec.workerGroupSpecs[0].template.spec.containers[0].image
         value: "vllm/vllm-openai:latest"
 
+  - it: should render annotations and podAnnotations on the RayCluster
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            imagePullSecret: "model-secret"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            annotations:
+              example.com/owner: team-a
+            podAnnotations:
+              k8s.v1.cni.cncf.io/networks: macvlan-conf
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      equal:
+        path: metadata.annotations.["example.com/owner"]
+        value: team-a
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.metadata.annotations.["k8s.v1.cni.cncf.io/networks"]
+        value: macvlan-conf
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.metadata.annotations.["k8s.v1.cni.cncf.io/networks"]
+        value: macvlan-conf
+
   - it: should not render VLLM_API_KEY
     release:
       name: vllm
@@ -456,3 +500,166 @@ tests:
           name: LMCACHE_REMOTE_SERDE
           value: naive
         any: true
+
+  - it: should set serviceAccountName on head and worker when specified
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            serviceAccountName: "my-custom-sa"
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      equal:
+        path: spec.headGroupSpec.template.spec.serviceAccountName
+        value: my-custom-sa
+    - documentIndex: 0
+      equal:
+        path: spec.workerGroupSpecs[0].template.spec.serviceAccountName
+        value: my-custom-sa
+
+  - it: should not set serviceAccountName when not specified
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      isNull:
+        path: spec.headGroupSpec.template.spec.serviceAccountName
+    - documentIndex: 0
+      isNull:
+        path: spec.workerGroupSpecs[0].template.spec.serviceAccountName
+
+  - it: should not set serviceAccountName when set to empty string
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            serviceAccountName: ""
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: kind
+        value: RayCluster
+    - documentIndex: 0
+      isNull:
+        path: spec.headGroupSpec.template.spec.serviceAccountName
+    - documentIndex: 0
+      isNull:
+        path: spec.workerGroupSpecs[0].template.spec.serviceAccountName
+
+  - it: should pass --revision flag in the start script when modelRevision is set
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+            modelRevision: "abc123def"
+    asserts:
+    - documentSelector:
+        path: metadata.name
+        value: "test-model-vllm-start-script"
+      matchRegex:
+        path: data["vllm-entrypoint.sh"]
+        pattern: "--revision.*abc123def"
+
+  - it: should not pass --revision flag in the start script when modelRevision is empty
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+            modelRevision: ""
+    asserts:
+    - documentSelector:
+        path: metadata.name
+        value: "test-model-vllm-start-script"
+      notMatchRegex:
+        path: data["vllm-entrypoint.sh"]
+        pattern: "--revision"
