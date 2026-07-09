@@ -132,6 +132,7 @@ Currently, the dynamic config supports the following fields:
 - (When using `k8s` service discovery) `k8s_namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
 - (When using `k8s` service discovery) `k8s_label_selector`: The label selector to filter vLLM pods when using K8s service discovery.
 - `session_key`: The key (in the header) to identify a session when using session-based routing.
+- `max_instance_failover_reroute_attempts`: The number of reroute attempts to other instances per failed request. Default is `0` (failover disabled).
 
 Here is an example of a dynamic YAML config file:
 
