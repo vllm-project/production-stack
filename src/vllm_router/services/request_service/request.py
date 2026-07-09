@@ -30,9 +30,6 @@ from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillOrchestratedRouter,
     DisaggregatedPrefillRouter,
-    KvawareRouter,
-    PrefixAwareRouter,
-    SessionRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.services.request_service.rewriter import (
@@ -556,16 +553,9 @@ async def route_general_request(
         logger.debug(
             f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
-
-    elif isinstance(
-        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
-    ):
+    else:
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
-        )
-    else:
-        server_url = request.app.state.router.route_request(
-            endpoints, engine_stats, request_stats, request
         )
 
     curr_time = time.time()
@@ -604,16 +594,9 @@ async def route_general_request(
                 break
             if request_endpoint:
                 server_url = remaining[0].url
-            elif isinstance(
-                request.app.state.router,
-                (KvawareRouter, PrefixAwareRouter, SessionRouter),
-            ):
+            else:
                 server_url = await request.app.state.router.route_request(
                     remaining, engine_stats, request_stats, request, request_json
-                )
-            else:
-                server_url = request.app.state.router.route_request(
-                    remaining, engine_stats, request_stats, request
                 )
             logger.info(
                 f"Routing request {request_id} to {server_url} "
@@ -1133,6 +1116,7 @@ async def route_general_transcriptions(
         )
         language: Optional[str] = form.get("language", "en")
         stream: bool = form.get("stream", "false").lower() == "true"
+        session_id: Optional[str] = form.get("session_id", None)
     except KeyError as e:
         return JSONResponse(
             status_code=400,
@@ -1142,13 +1126,14 @@ async def route_general_transcriptions(
     logger.debug("==== Enter audio_transcriptions ====")
     logger.debug("Received upload: %s (%s)", file.filename, file.content_type)
     logger.debug(
-        "Params: model=%s prompt=%r response_format=%r temperature=%r language=%s stream=%s",
+        "Params: model=%s prompt=%r response_format=%r temperature=%r language=%s stream=%s session_id=%s",
         model,
         prompt,
         response_format,
         temperature,
         language,
         stream,
+        session_id,
     )
 
     payload_bytes = await file.read()
@@ -1168,6 +1153,9 @@ async def route_general_transcriptions(
     if stream:
         data["stream"] = "true"
 
+    if session_id:
+        data["session_id"] = str(session_id)
+
     form_data = aiohttp.FormData()
 
     for key, (filename, content, content_type) in files.items():
@@ -1177,7 +1165,7 @@ async def route_general_transcriptions(
         form_data.add_field(key, value)
 
     return await proxy_multipart_request(
-        form_data, model, endpoint, request, stream=stream
+        form_data, model, endpoint, request, data, stream=stream
     )
 
 
@@ -1208,6 +1196,7 @@ async def proxy_multipart_request(
     model: str,
     endpoint: str,
     request: Request,
+    request_json: dict = {},
     *,
     stream: bool = False,
 ):
@@ -1241,11 +1230,8 @@ async def proxy_multipart_request(
     request_stats = request_stats_monitor.get_request_stats(time.time())
 
     # pick one using the router's configured logic (roundrobin, least-loaded, etc.)
-    chosen_url = router.route_request(
-        endpoints,
-        engine_stats,
-        request_stats,
-        request,
+    chosen_url = await router.route_request(
+        endpoints, engine_stats, request_stats, request, request_json
     )
     logger.info(
         "Proxying multi-part form request for model %s to %s", model, chosen_url
