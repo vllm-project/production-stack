@@ -738,6 +738,23 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		})
 	}
 
+	// Mount an emptyDir (medium=Memory) at /dev/shm when a size is requested.
+	// Tensor parallelism communicates over shared memory, and the container
+	// default /dev/shm is usually too small for it.
+	if vllmRuntime.Spec.DeploymentConfig.ShmSize != "" {
+		shmSource := corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
+		}
+		if q, err := resource.ParseQuantity(vllmRuntime.Spec.DeploymentConfig.ShmSize); err == nil {
+			shmSource.EmptyDir.SizeLimit = &q
+		}
+		volumes = append(volumes, corev1.Volume{Name: "dshm", VolumeSource: shmSource})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "dshm",
+			MountPath: "/dev/shm",
+		})
+	}
+
 	var affinity *corev1.Affinity
 
 	if vllmRuntime.Spec.DeploymentConfig.NodeSelectorTerms != nil {
