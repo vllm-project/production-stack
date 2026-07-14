@@ -870,14 +870,15 @@
                     }
                 },
                 "routingLogic": {
-                    "description": "routing logic, supports \"roundrobin\", \"session\", \"prefixaware\", \"kvaware\" or \"disaggregated_prefill\"",
+                    "description": "routing logic, supports \"roundrobin\", \"session\", \"prefixaware\", \"kvaware\", \"disaggregated_prefill\" or \"disaggregated_prefill_orchestrated\"",
                     "type": "string",
                     "enum": [
                         "roundrobin",
                         "session",
                         "prefixaware",
                         "kvaware",
-                        "disaggregated_prefill"
+                        "disaggregated_prefill",
+                        "disaggregated_prefill_orchestrated"
                     ]
                 },
                 "securityContext": {
