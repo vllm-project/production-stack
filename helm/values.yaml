@@ -444,7 +444,7 @@ routerSpec:
   containerSecurityContext: {}
 
   # -- tolerations for router pod 
-  tolerations: {}
+  tolerations: []
     # - key: key
     #   operator: Equal
     #   value: value
