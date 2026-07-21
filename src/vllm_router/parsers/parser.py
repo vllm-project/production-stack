@@ -13,6 +13,7 @@
 # limitations under the License.
 import argparse
 import json
+import os
 import sys
 
 from vllm_router import utils
@@ -218,6 +219,19 @@ def parse_args():
         type=int,
         default=0,
         help="Timeout in seconds for Kubernetes watcher streams (default: 0).",
+    )
+    parser.add_argument(
+        "--k8s-known-models",
+        type=str,
+        default=os.environ.get("VLLM_ROUTER_KNOWN_MODELS", ""),
+        help="Comma-separated list of model names that this router should always "
+        "treat as known when using K8s (pod-ip) service discovery, even before an "
+        "engine serving them has been observed. Requests for these models with no "
+        "live endpoints then return a retryable 503 instead of a fatal 404. This "
+        "matters for scale-to-zero deployments (e.g. KEDA), where a router pod may "
+        "start while a model's deployment sits at 0 replicas and would otherwise "
+        "answer 404 for a model that merely needs a cold start. Falls back to the "
+        "VLLM_ROUTER_KNOWN_MODELS environment variable.",
     )
     parser.add_argument(
         "--backend-health-check-timeout-seconds",
