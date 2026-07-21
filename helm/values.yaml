@@ -443,6 +443,13 @@ routerSpec:
   # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
   containerSecurityContext: {}
 
+  # -- tolerations for router pod 
+  tolerations: {}
+    # - key: key
+    #   operator: Equal
+    #   value: value
+    #   effect: NoSchedule
+
   # -- Additional volumes to add to the router pod, in Kubernetes volume format
   extraVolumes: []
     # - name: tmp-volume
