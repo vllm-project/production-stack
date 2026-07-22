@@ -217,3 +217,26 @@ tests:
         - name: vllm-shared-pvc-storage
           persistentVolumeClaim:
             claimName: "vllm-shared-pvc-storage-claim"
+
+  - it: should use generated service account name by default
+    release:
+      name: vllm
+    set:
+      loraController:
+        enableLoraController: true
+    asserts:
+    - equal:
+        path: spec.template.spec.serviceAccountName
+        value: vllm-lora-controller
+
+  - it: should use custom serviceAccountName when specified
+    release:
+      name: vllm
+    set:
+      loraController:
+        enableLoraController: true
+        serviceAccountName: my-existing-sa
+    asserts:
+    - equal:
+        path: spec.template.spec.serviceAccountName
+        value: my-existing-sa

@@ -38,7 +38,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ .Release.Name }}-lora-controller
+      serviceAccountName: {{ .Values.loraController.serviceAccountName | default (printf "%s-lora-controller" .Release.Name) }}
       securityContext:
         {{- toYaml .Values.loraController.podSecurityContext | nindent 8 }}
       {{- if $.Values.sharedPvcStorage.enabled }}

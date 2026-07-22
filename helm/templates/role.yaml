@@ -1,4 +1,4 @@
-{{- if .Values.routerSpec.enableRouter -}}
+{{- if and .Values.routerSpec.enableRouter (not .Values.routerSpec.serviceAccountName) -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -14,7 +14,7 @@ rules:
   verbs: ["get", "watch", "list", "patch"]
 {{- end }}
 
-{{- if .Values.loraController.enableLoraController }}
+{{- if and .Values.loraController.enableLoraController (not .Values.loraController.serviceAccountName) }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
