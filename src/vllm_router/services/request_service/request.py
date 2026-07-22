@@ -301,6 +301,24 @@ async def process_request(
 
     request_status = "success"
     http_status_code = None
+    stats_released = False
+
+    def _release_in_flight_slot():
+        # Always release this request's in-flight slot exactly once, regardless of
+        # how the request's lifecycle ends: normal completion, an HTTP error status,
+        # a timeout, or a raw connection drop (e.g. aiohttp.ServerDisconnectedError)
+        # when a backend pod is torn down mid-stream. Previously this only ran on
+        # the success path below, inside the try block -- any exception talking to
+        # the backend left the request's slot permanently counted in the router's
+        # own in_prefill_requests/in_decoding_requests bookkeeping, which is what
+        # vllm:num_requests_running reports (production-stack#707-adjacent leak).
+        nonlocal stats_released
+        if stats_released:
+            return
+        stats_released = True
+        request.app.state.request_stats_monitor.on_request_complete(
+            backend_url, request_id, time.time(), reached_decode=first_token
+        )
 
     try:
         async with request.app.state.aiohttp_client_wrapper().request(
@@ -329,11 +347,6 @@ async def process_request(
                 if full_response is not None:
                     full_response.extend(chunk)
                 yield chunk
-
-        end_time = time.time()
-        request.app.state.request_stats_monitor.on_request_complete(
-            backend_url, request_id, end_time
-        )
 
         if http_status_code is not None and http_status_code >= 400:
             request_status = "error"
@@ -374,6 +387,7 @@ async def process_request(
         end_span(span, error=e) if tracing_active else None
         raise
     finally:
+        _release_in_flight_slot()
         request_latency_seconds.labels(
             server=backend_url, model=model_name, status=request_status
         ).observe(time.time() - start_time)
