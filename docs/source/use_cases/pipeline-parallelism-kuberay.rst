@@ -52,7 +52,7 @@ Explanation of Key Items in ``values-15-a-minimal-pipeline-parallel-example-rayc
   - **requestGPU**: Defines the number of GPUs to allocate for the KubeRay head pod. Currently, the Ray head node must also participate in both tensor parallelism and pipeline parallelism. This requirement exists because the ``vllm serve ...`` command is executed on the Ray head node, and vLLM mandates that the pod where this command is run must have at least one visible GPU.
 
 - **name**: The unique identifier for your model deployment.
-- **repository**: The Docker repository containing the model's serving engine image.
+- **repository**: The Docker repository containing the model's serving engine image. RayCluster images must include both the Ray Python package and the ``ray`` CLI because KubeRay uses them to start the head and worker nodes. The example uses ``lmcache/vllm-openai``, which includes the Ray runtime.
 - **tag**: Specifies the version of the model image to use.
 - **modelURL**: The URL pointing to the model on Hugging Face or another hosting service.
 - **replicaCount**: The number of total Kuberay worker pods.
@@ -89,7 +89,7 @@ In the following example, we configure a total of two Ray nodes each equipped wi
      runtimeClassName: ""
      modelSpec:
      - name: "distilgpt2"
-       repository: "vllm/vllm-openai"
+       repository: "lmcache/vllm-openai"
        tag: "latest"
        modelURL: "distilbert/distilgpt2"
 
