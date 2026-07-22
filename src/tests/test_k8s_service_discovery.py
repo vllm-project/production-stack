@@ -9,7 +9,6 @@ from vllm_router.service_discovery import (
     _is_stale_resource_version_error,
 )
 
-
 K8sDiscoveryClass = (
     type[K8sPodIPServiceDiscovery] | type[K8sServiceNameServiceDiscovery]
 )
