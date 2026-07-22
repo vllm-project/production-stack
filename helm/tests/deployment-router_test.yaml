@@ -233,3 +233,29 @@ tests:
               secretKeyRef:
                 name: custom-secret
                 key: custom-apikey
+
+  - it: should not render tolerations by default
+    set:
+      routerSpec:
+        enableRouter: true
+    asserts:
+      - notExists:
+          path: spec.template.spec.tolerations
+
+  - it: should render tolerations when routerSpec.tolerations is set
+    set:
+      routerSpec:
+        enableRouter: true
+        tolerations:
+          - key: dedicated
+            operator: Equal
+            value: router
+            effect: NoSchedule
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations
+          value:
+            - key: dedicated
+              operator: Equal
+              value: router
+              effect: NoSchedule

@@ -676,6 +676,16 @@ routerSpec:
     #     values:
     #     - "NVIDIA-RTX-A6000"
 
+  # -- Tolerations configuration for the router pod (when there are taints on nodes).
+  # Mirrors servingEngineSpec.tolerations for the engine deployment.
+  # Example:
+  # tolerations:
+  #   - key: "dedicated"
+  #     operator: "Equal"
+  #     value: "router"
+  #     effect: "NoSchedule"
+  tolerations: []
+
   # -- Liveness probe configuration for the router pod.
   livenessProbe:
     # -- Number of seconds after the container has started before liveness probe is initiated
