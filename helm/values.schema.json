@@ -997,6 +997,10 @@
                     "description": "docker tag for the router pod",
                     "type": "string"
                 },
+                "tolerations": {
+                    "description": "Tolerations configuration for the router pod (when there are taints on nodes). Mirrors servingEngineSpec.tolerations for the engine deployment.",
+                    "type": "array"
+                },
                 "vllmApiKey": {
                     "description": "API key for securing the vLLM models. Must be an object referencing an existing secret. If not set, it defaults to .Values.servingEngineSpec.vllmApiKey.",
                     "type": "object",

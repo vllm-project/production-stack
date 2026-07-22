@@ -257,6 +257,7 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.podAnnotations` | map | `{}` | (Optional) Annotations to add to the pod, e.g., {model: "opt125m"} |
 | `routerSpec.affinity` | map | {} | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
 | `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
+| `routerSpec.tolerations` | list | `[]` | (Optional) Tolerations configuration for the router pod. Use when the router should schedule onto tainted nodes (e.g., a dedicated node pool). Mirrors `servingEngineSpec.tolerations` for the engine. |
 | `routerSpec.hf_token` | string | `""`| Hugging Face token for router |
 | `routerSpec.lmcacheControllerPort` | integer | `""` | LMCache controller port, used when `routingLogic` is `"kvaware"` (e.g. `9000`) |
 | `routerSpec.lmcacheConfig.logLevel` | string | `"INFO"`| Log level for LMCache in the router when routingLogic is kvaware |
