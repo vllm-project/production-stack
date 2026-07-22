@@ -96,7 +96,7 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Create Role if it doesn't exist
 	role := &rbacv1.Role{}
-	err = r.Get(ctx, types.NamespacedName{Name: "pod-viewer-role", Namespace: router.Namespace}, role)
+	err = r.Get(ctx, types.NamespacedName{Name: podViewerRoleName(router), Namespace: router.Namespace}, role)
 	if err != nil && errors.IsNotFound(err) {
 		role = r.roleForVLLMRouter(router)
 		log.Info("Creating a new Role", "Role.Namespace", role.Namespace, "Role.Name", role.Name)
@@ -114,7 +114,7 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Create RoleBinding if it doesn't exist
 	roleBinding := &rbacv1.RoleBinding{}
-	err = r.Get(ctx, types.NamespacedName{Name: "pod-viewer-binding", Namespace: router.Namespace}, roleBinding)
+	err = r.Get(ctx, types.NamespacedName{Name: podViewerBindingName(router), Namespace: router.Namespace}, roleBinding)
 	if err != nil && errors.IsNotFound(err) {
 		roleBinding = r.roleBindingForVLLMRouter(router)
 		log.Info("Creating a new RoleBinding", "RoleBinding.Namespace", roleBinding.Namespace, "RoleBinding.Name", roleBinding.Name)
@@ -473,11 +473,24 @@ func (r *VLLMRouterReconciler) serviceAccountForVLLMRouter(router *servingv1alph
 	return sa
 }
 
+// podViewerRoleName returns a per-router Role name so that multiple VLLMRouters
+// can coexist in the same namespace without sharing (and garbage-collecting)
+// each other's RBAC objects.
+func podViewerRoleName(router *servingv1alpha1.VLLMRouter) string {
+	return fmt.Sprintf("%s-pod-viewer-role", router.Name)
+}
+
+// podViewerBindingName returns a per-router RoleBinding name, bound to that
+// router's own ServiceAccount.
+func podViewerBindingName(router *servingv1alpha1.VLLMRouter) string {
+	return fmt.Sprintf("%s-pod-viewer-binding", router.Name)
+}
+
 // roleForVLLMRouter returns a Role object
 func (r *VLLMRouterReconciler) roleForVLLMRouter(router *servingv1alpha1.VLLMRouter) *rbacv1.Role {
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "pod-viewer-role",
+			Name:      podViewerRoleName(router),
 			Namespace: router.Namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name":       "production-stack",
@@ -500,7 +513,7 @@ func (r *VLLMRouterReconciler) roleForVLLMRouter(router *servingv1alpha1.VLLMRou
 func (r *VLLMRouterReconciler) roleBindingForVLLMRouter(router *servingv1alpha1.VLLMRouter) *rbacv1.RoleBinding {
 	roleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "pod-viewer-binding",
+			Name:      podViewerBindingName(router),
 			Namespace: router.Namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name":       "production-stack",
@@ -516,7 +529,7 @@ func (r *VLLMRouterReconciler) roleBindingForVLLMRouter(router *servingv1alpha1.
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "Role",
-			Name:     "pod-viewer-role",
+			Name:     podViewerRoleName(router),
 			APIGroup: "rbac.authorization.k8s.io",
 		},
 	}
