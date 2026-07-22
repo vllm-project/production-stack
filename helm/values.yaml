@@ -662,6 +662,9 @@ routerSpec:
         #       - name: X-Custom-Header
         #         value: custom-value
 
+      # -- Timeouts applied to the route rule (https://gateway-api.sigs.k8s.io/api-types/httproute/#timeouts-optional)
+      timeouts: {}
+
       # -- Additional custom rules that can be added to the route
       additionalRules: []
 
