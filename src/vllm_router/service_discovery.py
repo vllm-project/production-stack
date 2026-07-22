@@ -20,6 +20,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
+from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import aiohttp
@@ -43,24 +44,31 @@ _MODEL_INFO_KNOWN_FIELDS = frozenset(
     }
 )
 
+# Lower-case substrings of the authoritative messages emitted by kube-apiserver.
+# These are not exported by the kubernetes Python client so we quote the Go source strings.
 _STALE_RESOURCE_VERSION_PHRASES: Tuple[str, ...] = (
-    "too large resource version",
+    # storage/etcd3/errors.go: "The resourceVersion for the provided list is too old."
+    "the resourceversion for the provided list is too old",
+    # storage/etcd3/errors.go: "The resourceVersion for the provided watch is too old."
+    "the resourceversion for the provided watch is too old",
+    # Legacy etcd-formatted message: "too old resource version: <rv> (<current>)"
     "too old resource version",
-    "resource version is too old",
-    "resourceversion is too old",
+    # storage/errors.go: "Too large resource version"
+    "too large resource version",
 )
 
 # 410 Gone from the Kubernetes API server always means the watch bookmark is stale.
-_STALE_RESOURCE_VERSION_STATUS: int = 410
+# This is the same HTTP status the Kubernetes watch module uses internally.
+_STALE_RESOURCE_VERSION_STATUS: int = HTTPStatus.GONE.value
 
 
 def _is_stale_resource_version_error(exc: Exception) -> bool:
     """Return True if exc indicates the K8s watch bookmark is stale."""
-    status = getattr(exc, "status", None)
-    if isinstance(status, int) and status == _STALE_RESOURCE_VERSION_STATUS:
-        return True
-    message = str(exc).lower()
-    return any(phrase in message for phrase in _STALE_RESOURCE_VERSION_PHRASES)
+    if isinstance(exc, client.rest.ApiException):
+        status = exc.status
+        if isinstance(status, int) and status == _STALE_RESOURCE_VERSION_STATUS:
+            return True
+    return any(phrase in str(exc).lower() for phrase in _STALE_RESOURCE_VERSION_PHRASES)
 
 
 def _reset_k8s_watcher_if_stale(watcher: watch.Watch, exc: Exception) -> watch.Watch:

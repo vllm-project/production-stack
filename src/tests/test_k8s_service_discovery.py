@@ -43,8 +43,9 @@ def k8s_discovery_setup(monkeypatch: pytest.MonkeyPatch) -> None:
     ("message", "expected"),
     [
         ("Timeout: Too large resource version: 123, current: 456", True),
-        ("410 Gone: too old resource version", True),
-        ("resourceVersion is too old", True),
+        ("too old resource version: 100 (110)", True),
+        ("The resourceVersion for the provided list is too old.", True),
+        ("The resourceVersion for the provided watch is too old.", True),
         ("TOO LARGE RESOURCE VERSION", True),
         ("connection refused", False),
         ("Unexpected error", False),
@@ -59,6 +60,7 @@ def test_is_stale_resource_version_error(message: str, expected: bool) -> None:
     ("status", "reason", "expected"),
     [
         (410, "Gone", True),
+        (410, "Gateway timeout", True),
         (504, "Timeout: Too large resource version: 1, current: 2", True),
         (504, "Gateway timeout", False),
         (500, "Internal server error", False),
@@ -119,6 +121,13 @@ def _run_watcher_recovery(
     assert watch_cls.call_count == 2
     assert first_watcher.stream.call_count == 1
     assert second_watcher.stream.call_count == 1
+
+
+def test_is_stale_resource_version_error_uses_full_exception_string() -> None:
+    """Phrases in the ApiException body must be detected, not just the reason."""
+    exc = client.rest.ApiException(status=504, reason="Gateway Timeout")
+    exc.body = "Timeout: Too large resource version: 1, current: 2"
+    assert _is_stale_resource_version_error(exc) is True
 
 
 def test_k8s_pod_ip_service_discovery_recovers_from_stale_resource_version(
