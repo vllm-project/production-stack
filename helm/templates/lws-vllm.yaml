@@ -9,6 +9,10 @@
 {{- $modelSpec := .modelSpec -}}
 {{- $root := .root -}}
 {{- $role := .role -}}
+{{- $kv_role := "kv_both" -}}
+{{- if and $modelSpec.lmcacheConfig $modelSpec.lmcacheConfig.kvRole -}}
+{{- $kv_role = $modelSpec.lmcacheConfig.kvRole -}}
+{{- end -}}
 {{- if eq $modelSpec.repository "lmcache/vllm-openai" }}
 - "/opt/venv/bin/vllm"
 {{- else }}
@@ -42,6 +46,8 @@
 {{- end }}
 {{- if .enablePrefixCaching }}
 - "--enable-prefix-caching"
+{{- else }}
+- "--no-enable-prefix-caching"
 {{- end }}
 {{- if hasKey . "maxModelLen" }}
 - "--max-model-len"
@@ -67,6 +73,14 @@
 - "--max-loras"
 - {{ .maxLoras | quote }}
 {{- end }}
+{{- if hasKey . "runner" }}
+- "--runner"
+- {{ .runner | quote }}
+{{- end }}
+{{- if hasKey . "convert" }}
+- "--convert"
+- {{ .convert | quote }}
+{{- end }}
 {{- range .extraArgs }}
 - {{ . | quote }}
 {{- end }}
@@ -74,6 +88,20 @@
 {{- if $modelSpec.modelRevision }}
 - "--revision"
 - {{ $modelSpec.modelRevision | quote }}
+{{- end }}
+{{- if $modelSpec.lmcacheConfig }}
+{{- if $modelSpec.lmcacheConfig.enabled }}
+{{- if hasKey $modelSpec.lmcacheConfig "enablePD" }}
+- "--kv-transfer-config"
+- '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}","kv_connector_extra_config":{"discard_partial_chunks": false, "lmcache_rpc_port": {{ $modelSpec.lmcacheConfig.nixlRole | quote }}}}'
+{{- else if and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "v0") (eq (toString $modelSpec.vllmConfig.v0) "1") }}
+- "--kv-transfer-config"
+- '{"kv_connector":"LMCacheConnector","kv_role":"{{ $kv_role }}"}'
+{{- else }}
+- "--kv-transfer-config"
+- '{"kv_connector":"LMCacheConnectorV1","kv_role":"{{ $kv_role }}"}'
+{{- end }}
+{{- end }}
 {{- end }}
 {{- if $modelSpec.chatTemplate }}
 - "--chat-template"
@@ -101,6 +129,125 @@
 {{- end }}
 
 {{/*
+  LMCache environment variables shared by leader and worker templates, mirroring
+  deployment-vllm-multi.yaml so KV offloading behaves identically in LWS mode.
+  Usage: include "chart.lwsLmcacheEnv" (dict "modelSpec" $modelSpec "root" $)
+*/}}
+{{- define "chart.lwsLmcacheEnv" -}}
+{{- $modelSpec := .modelSpec -}}
+{{- $root := .root -}}
+{{- if $modelSpec.lmcacheConfig }}
+{{-   if $modelSpec.lmcacheConfig.enabled }}
+- name: LMCACHE_USE_EXPERIMENTAL
+  value: "True"
+- name: VLLM_RPC_TIMEOUT
+  value: "1000000"
+- name: LMCACHE_LOG_LEVEL
+  value: {{ $modelSpec.lmcacheConfig.logLevel | default "INFO" | quote }}
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "cudaVisibleDevices" }}
+- name: CUDA_VISIBLE_DEVICES
+  value: {{ $modelSpec.lmcacheConfig.cudaVisibleDevices | quote }}
+{{-   end }}
+{{-   if and (hasKey $modelSpec.lmcacheConfig "enablePD") ($modelSpec.lmcacheConfig.enablePD) }}
+- name: LMCACHE_LOCAL_CPU
+  value: "False"
+- name: LMCACHE_MAX_LOCAL_CPU_SIZE
+  value: "0"
+- name: LMCACHE_REMOTE_SERDE
+  value: "NULL"
+- name: UCX_TLS
+  value: "cuda_ipc,cuda_copy,tcp"
+{{-     if hasKey $modelSpec.lmcacheConfig "enableNixl" }}
+- name: LMCACHE_ENABLE_NIXL
+  value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.enableNixl | quote }}
+{{-     end }}
+{{-     if hasKey $modelSpec.lmcacheConfig "nixlRole" }}
+- name: LMCACHE_NIXL_ROLE
+  value: {{ $modelSpec.lmcacheConfig.nixlRole | quote }}
+{{-     end }}
+{{-     if hasKey $modelSpec.lmcacheConfig "nixlPeerHost" }}
+- name: LMCACHE_NIXL_RECEIVER_HOST
+  value: {{ $modelSpec.lmcacheConfig.nixlPeerHost | quote }}
+{{-     end }}
+{{-     if hasKey $modelSpec.lmcacheConfig "nixlPeerPort" }}
+- name: LMCACHE_NIXL_RECEIVER_PORT
+  value: {{ $modelSpec.lmcacheConfig.nixlPeerPort | quote }}
+{{-     end }}
+{{-     if hasKey $modelSpec.lmcacheConfig "nixlBufferSize" }}
+- name: LMCACHE_NIXL_BUFFER_SIZE
+  value: "{{ $modelSpec.lmcacheConfig.nixlBufferSize }}"
+{{-     end }}
+{{-     if hasKey $modelSpec.lmcacheConfig "nixlBufferDevice" }}
+- name: LMCACHE_NIXL_BUFFER_DEVICE
+  value: {{ $modelSpec.lmcacheConfig.nixlBufferDevice | quote }}
+{{-     end }}
+{{-     if hasKey $modelSpec.lmcacheConfig "nixlEnableGc" }}
+- name: LMCACHE_NIXL_ENABLE_GC
+  value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.nixlEnableGc | quote }}
+{{-     end }}
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "cpuOffloadingBufferSize" }}
+{{-     if gt (int $modelSpec.lmcacheConfig.cpuOffloadingBufferSize) 0 }}
+- name: LMCACHE_LOCAL_CPU
+  value: "True"
+- name: LMCACHE_MAX_LOCAL_CPU_SIZE
+  value: "{{ $modelSpec.lmcacheConfig.cpuOffloadingBufferSize }}"
+{{-     end }}
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "diskOffloadingBufferSize" }}
+- name: LMCACHE_MAX_LOCAL_DISK_SIZE
+  value: "{{ $modelSpec.lmcacheConfig.diskOffloadingBufferSize }}"
+{{-   end }}
+{{-   if $root.Values.cacheserverSpec.enabled }}
+- name: LMCACHE_REMOTE_URL
+  value: "{{ include "cacheserver.formatRemoteUrl" (dict "service_name" (print $root.Release.Name "-cache-server-service") "port" $root.Values.cacheserverSpec.servicePort) }}"
+{{-     if $root.Values.cacheserverSpec.serde }}
+- name: LMCACHE_REMOTE_SERDE
+  value: "{{ $root.Values.cacheserverSpec.serde }}"
+{{-     end }}
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "enableController" }}
+- name: LMCACHE_ENABLE_CONTROLLER
+  value: {{ ternary "True" "False" $modelSpec.lmcacheConfig.enableController | quote }}
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "instanceId" }}
+- name: LMCACHE_LMCACHE_INSTANCE_ID
+  value: {{ $modelSpec.lmcacheConfig.instanceId | quote }}
+{{-   else }}
+- name: LMCACHE_LMCACHE_INSTANCE_ID
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.name
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "controllerPort" }}
+- name: LMCACHE_CONTROLLER_PULL_URL
+  value: "{{ $root.Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerPort }}"
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "controllerReplyPort" }}
+- name: LMCACHE_CONTROLLER_REPLY_URL
+  value: "{{ $root.Release.Name }}-router-service:{{ $modelSpec.lmcacheConfig.controllerReplyPort }}"
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "workerPorts" }}
+- name: LMCACHE_LMCACHE_WORKER_PORTS
+  value: {{ $modelSpec.lmcacheConfig.workerPorts | quote }}
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "p2pHost" }}
+- name: LMCACHE_P2P_HOST
+  value: {{ $modelSpec.lmcacheConfig.p2pHost | quote }}
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "p2pInitPorts" }}
+- name: LMCACHE_P2P_INIT_PORTS
+  value: {{ $modelSpec.lmcacheConfig.p2pInitPorts | quote }}
+{{-   end }}
+{{-   if hasKey $modelSpec.lmcacheConfig "workerHeartbeatTime" }}
+- name: LMCACHE_LMCACHE_WORKER_HEARTBEAT_TIME
+  value: {{ $modelSpec.lmcacheConfig.workerHeartbeatTime | quote }}
+{{-   end }}
+{{- end }}
+{{- end }}
+
+{{/*
   Pod-level volumes shared by leader and worker templates.
   Usage: include "chart.lwsVolumes" (dict "modelSpec" $modelSpec "root" $)
 */}}
@@ -109,8 +256,18 @@
 {{- $root := .root -}}
 {{- if hasKey $modelSpec "pvcStorage" }}
 - name: {{ $root.Release.Name }}-storage
+  {{- if and (kindIs "map" $modelSpec.pvcStorage) (hasKey $modelSpec.pvcStorage "emptyDir") }}
+  emptyDir:
+    {{- toYaml $modelSpec.pvcStorage.emptyDir | nindent 4 }}
+  {{- else }}
   persistentVolumeClaim:
     claimName: "{{ $root.Release.Name }}-{{ $modelSpec.name }}-storage-claim"
+  {{- end }}
+{{- end }}
+{{- if $root.Values.sharedPvcStorage.enabled }}
+- name: {{ $root.Release.Name }}-shared-pvc-storage
+  persistentVolumeClaim:
+    claimName: "{{ $root.Release.Name }}-shared-pvc-storage-claim"
 {{- end }}
 {{- if and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize") }}
 - name: shm
@@ -145,7 +302,7 @@ securityContext:
 imagePullSecrets:
   - name: {{ $modelSpec.imagePullSecret }}
 {{- end }}
-{{- $vols := or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) $modelSpec.extraVolumes }}
+{{- $vols := or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) $modelSpec.extraVolumes $root.Values.sharedPvcStorage.enabled }}
 {{- if $vols }}
 volumes:
   {{- include "chart.lwsVolumes" (dict "modelSpec" $modelSpec "root" $root) | trim | nindent 2 }}
@@ -211,7 +368,9 @@ affinity:
         fieldRef:
           fieldPath: status.podIP
     - name: HF_HOME
-      {{- if hasKey $modelSpec "pvcStorage" }}
+      {{- if $root.Values.sharedPvcStorage.enabled }}
+      value: /data/shared-pvc-storage
+      {{- else if hasKey $modelSpec "pvcStorage" }}
       value: /data
       {{- else }}
       value: /tmp
@@ -261,10 +420,20 @@ affinity:
     {{- with $modelSpec.env }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-  {{- if $root.Values.servingEngineSpec.configs }}
+    {{- $lmcacheEnv := include "chart.lwsLmcacheEnv" (dict "modelSpec" $modelSpec "root" $root) }}
+    {{- if trim $lmcacheEnv }}
+    {{- $lmcacheEnv | trim | nindent 4 }}
+    {{- end }}
+  {{- if or $root.Values.servingEngineSpec.configs $modelSpec.envFromSecret }}
   envFrom:
+    {{- if $root.Values.servingEngineSpec.configs }}
     - configMapRef:
         name: "{{ $root.Release.Name }}-configs"
+    {{- end }}
+    {{- if $modelSpec.envFromSecret }}
+    - secretRef:
+        name: {{ $modelSpec.envFromSecret.name }}
+    {{- end }}
   {{- end }}
   {{- if eq $role "leader" }}
   ports:
@@ -281,7 +450,7 @@ affinity:
   {{- else }}
   resources: {{- include "chart.resources" $modelSpec | nindent 4 }}
   {{- end }}
-  {{- $mountVolumes := or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) $modelSpec.extraVolumeMounts }}
+  {{- $mountVolumes := or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) $modelSpec.extraVolumeMounts $root.Values.sharedPvcStorage.enabled }}
   {{- if $mountVolumes }}
   volumeMounts:
     {{- if hasKey $modelSpec "pvcStorage" }}
@@ -294,6 +463,10 @@ affinity:
     {{- end }}
     {{- with $modelSpec.extraVolumeMounts }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if $root.Values.sharedPvcStorage.enabled }}
+    - name: {{ $root.Release.Name }}-shared-pvc-storage
+      mountPath: /data/shared-pvc-storage
     {{- end }}
   {{- end }}
 {{- end }}
