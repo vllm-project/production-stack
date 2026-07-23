@@ -1345,6 +1345,11 @@ def _create_service_discovery(
             normalized_type = k8s_discovery_type.strip().lower()
 
         if normalized_type == "service-name":
+            if static_known_models:
+                logger.warning(
+                    "--k8s-known-models is only supported with pod-ip service "
+                    "discovery; ignoring it for service-name discovery."
+                )
             return K8sServiceNameServiceDiscovery(*args, **kwargs)
         else:
             return K8sPodIPServiceDiscovery(
