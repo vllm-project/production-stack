@@ -434,6 +434,10 @@ routerSpec:
   # -- image pull policy for the router pod
   imagePullPolicy: "Always" # @schema enum:[Always,IfNotPresent,Never]
 
+  # -- The name of an existing service account to use for the router deployment.
+  # -- If set, no ServiceAccount will be created and this name will be used directly.
+  serviceAccountName: ""
+
   # -- Hugging Face token configuration
   hf_token: ""
 
@@ -873,6 +877,10 @@ loraController:
   enableLoraController: false
   # -- kubernetes cluster domain
   kubernetesClusterDomain: "cluster.local"
+
+  # -- The name of an existing service account to use for the lora controller deployment.
+  # -- If set, no ServiceAccount will be created and this name will be used directly.
+  serviceAccountName: ""
 
   # -- Number of lora controller replicas
   replicaCount: 1

@@ -1,4 +1,4 @@
-{{- if .Values.routerSpec.enableRouter -}}
+{{- if and .Values.routerSpec.enableRouter (not .Values.routerSpec.serviceAccountName) -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Release.Name }}-router-service-account
+    name: {{ printf "%s-router-service-account" .Release.Name }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: Role
@@ -14,7 +14,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 {{- end }}
 
-{{- if .Values.loraController.enableLoraController }}
+{{- if and .Values.loraController.enableLoraController (not .Values.loraController.serviceAccountName) }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -29,7 +29,7 @@ roleRef:
   name: {{ .Release.Name }}-lora-controller
 subjects:
 - kind: ServiceAccount
-  name: {{ .Release.Name }}-lora-controller
+  name: {{ printf "%s-lora-controller" .Release.Name }}
   namespace: {{ .Release.Namespace }}
 
 ---
@@ -46,6 +46,6 @@ roleRef:
   name: {{ .Release.Name }}-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: {{ .Release.Name }}-lora-controller
+  name: {{ printf "%s-lora-controller" .Release.Name }}
   namespace: {{ .Release.Namespace }}
 {{- end }}

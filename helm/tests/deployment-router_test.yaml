@@ -233,3 +233,26 @@ tests:
               secretKeyRef:
                 name: custom-secret
                 key: custom-apikey
+
+  - it: should use generated service account name by default
+    release:
+      name: vllm
+    set:
+      routerSpec:
+        enableRouter: true
+    asserts:
+    - equal:
+        path: spec.template.spec.serviceAccountName
+        value: vllm-router-service-account
+
+  - it: should use custom serviceAccountName when specified
+    release:
+      name: vllm
+    set:
+      routerSpec:
+        enableRouter: true
+        serviceAccountName: my-existing-sa
+    asserts:
+    - equal:
+        path: spec.template.spec.serviceAccountName
+        value: my-existing-sa

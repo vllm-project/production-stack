@@ -427,6 +427,10 @@
                     "description": "lora controller resources",
                     "type": "object"
                 },
+                "serviceAccountName": {
+                    "description": "The name of an existing service account to use for the lora controller deployment.",
+                    "type": "string"
+                },
                 "tolerations": {
                     "description": "Tolerations",
                     "type": "array"
@@ -883,6 +887,10 @@
                 "securityContext": {
                     "description": "Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core",
                     "type": "object"
+                },
+                "serviceAccountName": {
+                    "description": "The name of an existing service account to use for the router deployment.",
+                    "type": "string"
                 },
                 "serviceAnnotations": {
                     "description": "Service annotations if you use a LoadBalancer or NodePort service type",
