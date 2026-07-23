@@ -1,7 +1,7 @@
 {{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- if ne $modelSpec.enabled false }}
-{{- if not (and (hasKey $modelSpec "raySpec") $modelSpec.raySpec.enabled) }}
+{{- if not (or (and (hasKey $modelSpec "raySpec") $modelSpec.raySpec.enabled) (and (hasKey $modelSpec "lwsSpec") $modelSpec.lwsSpec.enabled)) }}
 {{- $kv_role := "kv_both" }}
 {{- $kv_rank := 0 }}
 {{- $kv_parallel_size := 1 }}

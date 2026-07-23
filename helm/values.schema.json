@@ -1377,6 +1377,28 @@
                                     }
                                 }
                             },
+                            "lwsSpec": {
+                                "description": "LeaderWorkerSet (LWS) configuration, to deploy a single model across multiple nodes using vLLM's multiprocessing (MP) distributed backend instead of Ray. Requires the LeaderWorkerSet controller (https://github.com/kubernetes-sigs/lws) to be installed in the cluster.",
+                                "type": "object",
+                                "properties": {
+                                    "enabled": {
+                                        "description": "Whether to deploy the model as a multi-node LeaderWorkerSet using the multiprocessing backend",
+                                        "type": "boolean"
+                                    },
+                                    "restartPolicy": {
+                                        "description": "Restart policy for a group when any of its pods restart. `RecreateGroupOnPodRestart` recreates the whole group together, which is recommended because the nodes form a single distributed process group.",
+                                        "type": "string",
+                                        "enum": [
+                                            "RecreateGroupOnPodRestart",
+                                            "Default"
+                                        ]
+                                    },
+                                    "size": {
+                                        "description": "Number of nodes (pods) per model replica, i.e. vLLM `--nnodes`. Node 0 is the leader and serves the OpenAI API; nodes 1..(size-1) run as headless workers. The number of independent multi-node replicas is taken from `replicaCount`.",
+                                        "type": "integer"
+                                    }
+                                }
+                            },
                             "modelRevision": {
                                 "description": "Hugging Face model revision (branch, tag, or commit hash) to pin the model version",
                                 "type": "string"

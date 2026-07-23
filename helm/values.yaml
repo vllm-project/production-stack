@@ -276,6 +276,15 @@ servingEngineSpec:
         # -- GPU request for the head node
         requestGPU: 1
 
+    # -- LeaderWorkerSet (LWS) configuration, to deploy a single model across multiple nodes using vLLM's multiprocessing (MP) distributed backend instead of Ray. Requires the LeaderWorkerSet controller (https://github.com/kubernetes-sigs/lws) to be installed in the cluster.
+    lwsSpec:
+      # -- Whether to deploy the model as a multi-node LeaderWorkerSet using the multiprocessing backend
+      enabled: false
+      # -- Number of nodes (pods) per model replica, i.e. vLLM `--nnodes`. Node 0 is the leader and serves the OpenAI API; nodes 1..(size-1) run as headless workers. The number of independent multi-node replicas is taken from `replicaCount`.
+      size: 2
+      # -- Restart policy for a group when any of its pods restart. `RecreateGroupOnPodRestart` recreates the whole group together, which is recommended because the nodes form a single distributed process group.
+      restartPolicy: "RecreateGroupOnPodRestart" # @schema enum:[RecreateGroupOnPodRestart,Default]
+
   # -- Container port
   containerPort: 8000
   # -- Service port

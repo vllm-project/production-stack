@@ -1,0 +1,369 @@
+{{/*
+  Build the `vllm serve ...` command for a multi-node (LeaderWorkerSet) pod.
+  The leader (node-rank 0) serves the OpenAI API; workers run with `--headless`.
+  Both leader and worker share identical model args so the distributed process
+  group is configured consistently across nodes.
+  Usage: include "chart.lwsServeCommand" (dict "modelSpec" $modelSpec "root" $ "role" "leader")
+*/}}
+{{- define "chart.lwsServeCommand" -}}
+{{- $modelSpec := .modelSpec -}}
+{{- $root := .root -}}
+{{- $role := .role -}}
+{{- if eq $modelSpec.repository "lmcache/vllm-openai" }}
+- "/opt/venv/bin/vllm"
+{{- else }}
+- "vllm"
+{{- end }}
+- "serve"
+- {{ $modelSpec.modelURL | quote }}
+{{- if eq $role "leader" }}
+- "--host"
+- "0.0.0.0"
+- "--port"
+- {{ include "chart.container-port" $root | quote }}
+{{- end }}
+{{- if $modelSpec.enableLoRA }}
+- "--enable-lora"
+{{- end }}
+{{- if $modelSpec.enableTool }}
+- "--enable-auto-tool-choice"
+{{- end }}
+{{- if $modelSpec.toolCallParser }}
+- "--tool-call-parser"
+- {{ $modelSpec.toolCallParser | quote }}
+{{- end }}
+{{- with $modelSpec.vllmConfig }}
+{{- if hasKey . "enableChunkedPrefill" }}
+{{- if .enableChunkedPrefill }}
+- "--enable-chunked-prefill"
+{{- else }}
+- "--no-enable-chunked-prefill"
+{{- end }}
+{{- end }}
+{{- if .enablePrefixCaching }}
+- "--enable-prefix-caching"
+{{- end }}
+{{- if hasKey . "maxModelLen" }}
+- "--max-model-len"
+- {{ .maxModelLen | quote }}
+{{- end }}
+{{- if hasKey . "dtype" }}
+- "--dtype"
+- {{ .dtype | quote }}
+{{- end }}
+{{- if hasKey . "tensorParallelSize" }}
+- "--tensor-parallel-size"
+- {{ .tensorParallelSize | quote }}
+{{- end }}
+{{- if hasKey . "maxNumSeqs" }}
+- "--max-num-seqs"
+- {{ .maxNumSeqs | quote }}
+{{- end }}
+{{- if hasKey . "gpuMemoryUtilization" }}
+- "--gpu-memory-utilization"
+- {{ .gpuMemoryUtilization | quote }}
+{{- end }}
+{{- if hasKey . "maxLoras" }}
+- "--max-loras"
+- {{ .maxLoras | quote }}
+{{- end }}
+{{- range .extraArgs }}
+- {{ . | quote }}
+{{- end }}
+{{- end }}
+{{- if $modelSpec.modelRevision }}
+- "--revision"
+- {{ $modelSpec.modelRevision | quote }}
+{{- end }}
+{{- if $modelSpec.chatTemplate }}
+- "--chat-template"
+- {{ $modelSpec.chatTemplate | quote }}
+{{- end }}
+{{- /* Multi-node multiprocessing (MP) distributed settings. LWS injects
+     LWS_GROUP_SIZE, LWS_WORKER_INDEX and LWS_LEADER_ADDRESS into every pod. */}}
+- "--distributed-executor-backend"
+- "mp"
+- "--pipeline-parallel-size"
+{{- if and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "pipelineParallelSize") }}
+- {{ $modelSpec.vllmConfig.pipelineParallelSize | quote }}
+{{- else }}
+- "$(LWS_GROUP_SIZE)"
+{{- end }}
+- "--nnodes"
+- "$(LWS_GROUP_SIZE)"
+- "--node-rank"
+- "$(LWS_WORKER_INDEX)"
+- "--master-addr"
+- "$(LWS_LEADER_ADDRESS)"
+{{- if eq $role "worker" }}
+- "--headless"
+{{- end }}
+{{- end }}
+
+{{/*
+  Pod-level volumes shared by leader and worker templates.
+  Usage: include "chart.lwsVolumes" (dict "modelSpec" $modelSpec "root" $)
+*/}}
+{{- define "chart.lwsVolumes" -}}
+{{- $modelSpec := .modelSpec -}}
+{{- $root := .root -}}
+{{- if hasKey $modelSpec "pvcStorage" }}
+- name: {{ $root.Release.Name }}-storage
+  persistentVolumeClaim:
+    claimName: "{{ $root.Release.Name }}-{{ $modelSpec.name }}-storage-claim"
+{{- end }}
+{{- if and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize") }}
+- name: shm
+  emptyDir:
+    medium: Memory
+    sizeLimit: {{ default "20Gi" $modelSpec.shmSize }}
+{{- end }}
+{{- with $modelSpec.extraVolumes }}
+{{- toYaml . }}
+{{- end }}
+{{- end }}
+
+{{/*
+  Pod-spec fields (everything under `spec:` except `containers:`) shared by the
+  leader and worker templates, so scheduling and security stay identical.
+  Usage: include "chart.lwsPodSpec" (dict "modelSpec" $modelSpec "root" $)
+*/}}
+{{- define "chart.lwsPodSpec" -}}
+{{- $modelSpec := .modelSpec -}}
+{{- $root := .root -}}
+{{- if $modelSpec.priorityClassName }}
+priorityClassName: {{ $modelSpec.priorityClassName | quote }}
+{{- end }}
+{{- if $modelSpec.serviceAccountName }}
+serviceAccountName: {{ $modelSpec.serviceAccountName }}
+{{- end }}
+{{- with $root.Values.servingEngineSpec.securityContext }}
+securityContext:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- if $modelSpec.imagePullSecret }}
+imagePullSecrets:
+  - name: {{ $modelSpec.imagePullSecret }}
+{{- end }}
+{{- $vols := or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) $modelSpec.extraVolumes }}
+{{- if $vols }}
+volumes:
+  {{- include "chart.lwsVolumes" (dict "modelSpec" $modelSpec "root" $root) | trim | nindent 2 }}
+{{- end }}
+{{- with (ternary $modelSpec.runtimeClassName $root.Values.servingEngineSpec.runtimeClassName (hasKey $modelSpec "runtimeClassName")) }}
+runtimeClassName: {{ . }}
+{{- end }}
+{{- if $root.Values.servingEngineSpec.schedulerName }}
+schedulerName: {{ $root.Values.servingEngineSpec.schedulerName }}
+{{- end }}
+{{- $globalTolerations := $root.Values.servingEngineSpec.tolerations | default list }}
+{{- $modelTolerations := $modelSpec.tolerations | default list }}
+{{- $tolerationsPolicy := $modelSpec.tolerationsPolicy | default "append" }}
+{{- $effectiveTolerations := $globalTolerations }}
+{{- if $modelTolerations }}
+{{- if eq $tolerationsPolicy "override" }}
+{{- $effectiveTolerations = $modelTolerations }}
+{{- else }}
+{{- $effectiveTolerations = concat $globalTolerations $modelTolerations }}
+{{- end }}
+{{- end }}
+{{- if $effectiveTolerations }}
+tolerations:
+  {{- toYaml $effectiveTolerations | nindent 2 }}
+{{- end }}
+{{- if $modelSpec.nodeName }}
+nodeName: {{ $modelSpec.nodeName }}
+{{- end }}
+{{- if not (empty $modelSpec.affinity) }}
+affinity:
+  {{- toYaml $modelSpec.affinity | nindent 2 }}
+{{- else if and $modelSpec.nodeSelectorTerms (not $modelSpec.nodeName) }}
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        {{- toYaml $modelSpec.nodeSelectorTerms | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{/*
+  Full vLLM container spec shared by leader and worker templates.
+  Usage: include "chart.lwsContainer" (dict "modelSpec" $modelSpec "root" $ "role" "leader")
+*/}}
+{{- define "chart.lwsContainer" -}}
+{{- $modelSpec := .modelSpec -}}
+{{- $root := .root -}}
+{{- $role := .role -}}
+- name: {{ printf "vllm-%s" $role | quote }}
+  image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+  imagePullPolicy: "{{ $root.Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
+  {{- with $root.Values.servingEngineSpec.containerSecurityContext }}
+  securityContext:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  command:
+    {{- include "chart.lwsServeCommand" (dict "modelSpec" $modelSpec "root" $root "role" $role) | trim | nindent 4 }}
+  env:
+    - name: PYTHONHASHSEED
+      value: "123"
+    - name: VLLM_HOST_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+    - name: HF_HOME
+      {{- if hasKey $modelSpec "pvcStorage" }}
+      value: /data
+      {{- else }}
+      value: /tmp
+      {{- end }}
+    {{- with $modelSpec.vllmConfig }}
+    {{- if and (hasKey . "v0") (eq (toString .v0) "1") }}
+    - name: VLLM_USE_V1
+      value: "0"
+    {{- else }}
+    - name: PROMETHEUS_MULTIPROC_DIR
+      value: {{ default "/tmp" .prometheusMultiprocDir | quote }}
+    {{- end }}
+    {{- end }}
+    {{- if $modelSpec.hf_token }}
+    - name: HF_TOKEN
+      {{- if kindIs "string" $modelSpec.hf_token }}
+      valueFrom:
+        secretKeyRef:
+          name: {{ $root.Release.Name }}-secrets
+          key: hf_token_{{ $modelSpec.name }}
+      {{- else }}
+      valueFrom:
+        secretKeyRef:
+          name: {{ $modelSpec.hf_token.secretName }}
+          key: {{ $modelSpec.hf_token.secretKey }}
+      {{- end }}
+    {{- end }}
+    {{- $vllmApiKey := $root.Values.servingEngineSpec.vllmApiKey }}
+    {{- if $vllmApiKey }}
+    {{- if kindIs "string" $vllmApiKey }}
+    - name: VLLM_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: {{ $root.Release.Name }}-secrets
+          key: vllmApiKey
+    {{- else if and (kindIs "map" $vllmApiKey) $vllmApiKey.secretName $vllmApiKey.secretKey }}
+    - name: VLLM_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: {{ $vllmApiKey.secretName }}
+          key: {{ $vllmApiKey.secretKey }}
+    {{- end }}
+    {{- end }}
+    {{- with $root.Values.servingEngineSpec.env }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with $modelSpec.env }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- if $root.Values.servingEngineSpec.configs }}
+  envFrom:
+    - configMapRef:
+        name: "{{ $root.Release.Name }}-configs"
+  {{- end }}
+  {{- if eq $role "leader" }}
+  ports:
+    - name: {{ include "chart.container-port-name" $root }}
+      containerPort: {{ include "chart.container-port" $root }}
+    - name: zmq-port
+      containerPort: 55555
+    - name: ucx-port
+      containerPort: 9999
+  {{- include "chart.probes" $root | trim | nindent 2 }}
+  {{- end }}
+  {{- if $modelSpec.resources }}
+  resources: {{ toYaml $modelSpec.resources | nindent 4 }}
+  {{- else }}
+  resources: {{- include "chart.resources" $modelSpec | nindent 4 }}
+  {{- end }}
+  {{- $mountVolumes := or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) $modelSpec.extraVolumeMounts }}
+  {{- if $mountVolumes }}
+  volumeMounts:
+    {{- if hasKey $modelSpec "pvcStorage" }}
+    - name: {{ $root.Release.Name }}-storage
+      mountPath: /data
+    {{- end }}
+    {{- if and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize") }}
+    - name: shm
+      mountPath: /dev/shm
+    {{- end }}
+    {{- with $modelSpec.extraVolumeMounts }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.servingEngineSpec.enableEngine }}
+{{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
+{{- if ne $modelSpec.enabled false }}
+{{- if and (hasKey $modelSpec "lwsSpec") $modelSpec.lwsSpec.enabled }}
+{{- with $ }}
+---
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: "{{ .Release.Name }}-{{ $modelSpec.name }}-lws"
+  namespace: {{ .Release.Namespace }}
+  {{- with $modelSpec.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    model: {{ $modelSpec.name }}
+    helm-release-name: {{ .Release.Name }}
+    {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 4 }}
+    {{- include "chart.engineLabels" . | nindent 4 }}
+    {{- with $modelSpec.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ $modelSpec.replicaCount | default 1 }}
+  leaderWorkerTemplate:
+    size: {{ required "Value 'modelSpec.lwsSpec.size' must be defined !" $modelSpec.lwsSpec.size }}
+    restartPolicy: {{ $modelSpec.lwsSpec.restartPolicy | default "RecreateGroupOnPodRestart" }}
+    leaderTemplate:
+      metadata:
+        {{- with $modelSpec.podAnnotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        labels:
+          model: {{ $modelSpec.name }}
+          helm-release-name: {{ .Release.Name }}
+          vllm-role: leader
+          {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 10 }}
+          {{- include "chart.engineLabels" . | nindent 10 }}
+          {{- with $modelSpec.podLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+      spec:
+        {{- include "chart.lwsPodSpec" (dict "modelSpec" $modelSpec "root" $) | trim | nindent 8 }}
+        containers:
+          {{- include "chart.lwsContainer" (dict "modelSpec" $modelSpec "root" $ "role" "leader") | nindent 10 }}
+    workerTemplate:
+      metadata:
+        {{- with $modelSpec.podAnnotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        labels:
+          model: {{ $modelSpec.name }}
+          helm-release-name: {{ .Release.Name }}
+          vllm-role: worker
+          {{- with $modelSpec.podLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+      spec:
+        {{- include "chart.lwsPodSpec" (dict "modelSpec" $modelSpec "root" $) | trim | nindent 8 }}
+        containers:
+          {{- include "chart.lwsContainer" (dict "modelSpec" $modelSpec "root" $ "role" "worker") | nindent 10 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
