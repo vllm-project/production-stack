@@ -1111,17 +1111,10 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 		}
 	}
 
-	// Detect drift in the /dev/shm volume (driven by shmSize). Without this,
-	// toggling shmSize on an existing VLLMRuntime is seen as "no change" and
-	// the running Deployment never picks up (or drops) the mount.
-	//
-	// We compare the "dshm" volume/mount specifically rather than the whole
-	// Volumes slice: the API server defaults fields on some volume sources
-	// (e.g. ConfigMap DefaultMode, used by the chat-template volume) that the
-	// freshly generated expected spec does not carry, so a blanket
-	// reflect.DeepEqual would report a permanent mismatch and cause an endless
-	// reconcile loop. The dshm emptyDir/mount have no such server-side
-	// defaulting, so comparing them directly is safe.
+	// Detect drift in the /dev/shm volume (driven by shmSize). We compare the
+	// "dshm" volume/mount specifically instead of the whole Volumes slice,
+	// whose server-side defaults (e.g. ConfigMap DefaultMode) would otherwise
+	// cause a permanent mismatch and an endless reconcile loop.
 	if !reflect.DeepEqual(
 		findVolumeByName(expectedDep.Spec.Template.Spec.Volumes, "dshm"),
 		findVolumeByName(dep.Spec.Template.Spec.Volumes, "dshm"),
