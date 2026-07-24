@@ -1,0 +1,62 @@
+name: Gatekeeper
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+  checks: read
+  statuses: read
+
+concurrency:
+  group: gatekeeper-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  all-checks-passed:
+    name: All Checks Passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+      SELF_NAME: All Checks Passed
+    steps:
+      - name: Wait for other checks to complete successfully
+        run: |
+          echo "Giving sibling workflows time to register..."
+          sleep 60
+
+          while true; do
+            CHECKS=$(gh pr view "$PR_NUMBER" -R "$REPO" --json statusCheckRollup --jq \
+              '[.statusCheckRollup[] | select(.name != env.SELF_NAME and .context != env.SELF_NAME)]')
+
+            PENDING=$(echo "$CHECKS" | jq '[.[] | select(
+                ((.status // "") | test("QUEUED|IN_PROGRESS|PENDING|WAITING|REQUESTED"; "i")) or
+                ((.state  // "") | test("PENDING|EXPECTED"; "i"))
+              )] | length')
+
+            if [ "$PENDING" -gt 0 ]; then
+              echo "$PENDING checks still running. Waiting 20s..."
+              sleep 20
+              continue
+            fi
+
+            FAILED=$(echo "$CHECKS" | jq '[.[] | select(
+                ((.conclusion // "") | test("FAILURE|CANCELLED|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE"; "i")) or
+                ((.state      // "") | test("FAILURE|ERROR"; "i"))
+              )] | length')
+
+            if [ "$FAILED" -gt 0 ]; then
+              echo "Failed checks:"
+              echo "$CHECKS" | jq -r '.[] | select(
+                  ((.conclusion // "") | test("FAILURE|CANCELLED|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE"; "i")) or
+                  ((.state      // "") | test("FAILURE|ERROR"; "i"))
+                ) | "\(.name // .context): \(.conclusion // .state)"'
+              exit 1
+            fi
+
+            echo "All triggered checks green (or skipped)."
+            break
+          done
