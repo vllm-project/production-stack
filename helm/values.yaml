@@ -514,8 +514,8 @@ routerSpec:
   staticBackends: ""
   staticModels: ""
 
-  # -- routing logic, supports "roundrobin", "session", "prefixaware", "kvaware" or "disaggregated_prefill"
-  routingLogic: "roundrobin" # @schema enum:[roundrobin,session,prefixaware,kvaware,disaggregated_prefill]
+  # -- routing logic, supports "roundrobin", "session", "prefixaware", "kvaware", "disaggregated_prefill" or "disaggregated_prefill_orchestrated"
+  routingLogic: "roundrobin" # @schema enum:[roundrobin,session,prefixaware,kvaware,disaggregated_prefill,disaggregated_prefill_orchestrated]
 
   # -- Minimum prefix match length required for prefixaware routing to reuse a
   # matched endpoint. If the longest prefix match is shorter than this value,
