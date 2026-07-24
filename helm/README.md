@@ -203,6 +203,28 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.metricType` | string | `"AverageValue"` | Metric type (AverageValue or Value) |
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.formula` | string | - | Formula to compose metrics together |
 
+#### Ray Cluster Configuration
+
+Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as a multi-node `RayCluster` (via KubeRay) instead of a standard `Deployment`. Worker resources and the worker init container are taken from the top-level `modelSpec` (`requestCPU`/`requestMemory`/`requestGPU` or `resources`, and `initContainer`), while head-node resources and the head-node init container are configured under `raySpec.headNode`.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `servingEngineSpec.modelSpec[].raySpec.enabled` | boolean | `false` | Deploy the model as a `RayCluster` instead of a `Deployment` |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.requestCPU` | integer | `1` | CPU request for the Ray head node container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.requestMemory` | string | `"1Gi"` | Memory request for the Ray head node container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.requestGPU` | integer | `1` | GPU request for the Ray head node container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.resources` | map | `{}` | (Optional) Raw Kubernetes `resources` block for the head container. When set, overrides the `request*` fields above |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.name` | string | - | (Optional) Name of an init container to run before the Ray head container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.image` | string | - | (Optional) Image for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.command` | list | `[]` | (Optional) Command for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.args` | list | `[]` | (Optional) Args for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.env` | list | `[]` | (Optional) Environment variables for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.resources` | map | `{}` | (Optional) Resource requests/limits for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.mountPvcStorage` | boolean | `false` | (Optional) Mount the model's PVC into the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.extraVolumeMounts` | list | `[]` | (Optional) Additional volume mounts for the head init container |
+
+> **Note**: Ray worker pods reuse the top-level `modelSpec` fields — set `modelSpec.requestCPU`/`requestMemory`/`requestGPU` (or `modelSpec.resources` for a raw override) to size the workers, and `modelSpec.initContainer` to inject an init container into each worker pod.
+
 #### Serving Engine Monitoring Configuration
 
 | Field | Type | Default | Description |

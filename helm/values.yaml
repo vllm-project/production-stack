@@ -275,6 +275,29 @@ servingEngineSpec:
         requestMemory: "1Gi"
         # -- GPU request for the head node
         requestGPU: 1
+        # -- Raw Kubernetes resources block for the head node container. When set, overrides the request*/limit* fields above.
+        # resources:
+        #   requests:
+        #     cpu: "2"
+        #     memory: "8Gi"
+        #     nvidia.com/gpu: "1"
+        #   limits:
+        #     cpu: "4"
+        #     memory: "16Gi"
+        #     nvidia.com/gpu: "1"
+        # -- Optional init container run before the Ray head container starts. Mirrors modelSpec.initContainer.
+        # initContainer:
+        #   name: "init"
+        #   image: "busybox:latest"
+        #   command: ["sh", "-c"]
+        #   args: ["ls"]
+        #   env: []
+        #   resources: {}
+        #   mountPvcStorage: true
+        #   extraVolumeMounts: []
+      # Worker nodes reuse the top-level modelSpec fields:
+      #   - resources come from modelSpec.requestCPU / requestMemory / requestGPU (or modelSpec.resources for a raw override)
+      #   - the optional init container comes from modelSpec.initContainer
 
   # -- Container port
   containerPort: 8000
