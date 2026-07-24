@@ -738,6 +738,30 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		})
 	}
 
+	// Mount an emptyDir (medium=Memory) at /dev/shm when a size is requested.
+	// Tensor parallelism communicates over shared memory, and the container
+	// default /dev/shm is usually too small for it.
+	if vllmRuntime.Spec.DeploymentConfig.ShmSize != "" {
+		shmSource := corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
+		}
+		if q, err := resource.ParseQuantity(vllmRuntime.Spec.DeploymentConfig.ShmSize); err == nil {
+			shmSource.EmptyDir.SizeLimit = &q
+		} else {
+			// Don't silently mount an unbounded /dev/shm on a typo: surface the
+			// bad value so the misconfiguration is visible instead of defaulting
+			// to the node's memory limit without any indication.
+			log.Log.Error(err, "Invalid shmSize; mounting /dev/shm without a size limit",
+				"vllmRuntime", vllmRuntime.Name,
+				"shmSize", vllmRuntime.Spec.DeploymentConfig.ShmSize)
+		}
+		volumes = append(volumes, corev1.Volume{Name: "dshm", VolumeSource: shmSource})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "dshm",
+			MountPath: "/dev/shm",
+		})
+	}
+
 	var affinity *corev1.Affinity
 
 	if vllmRuntime.Spec.DeploymentConfig.NodeSelectorTerms != nil {
@@ -1087,7 +1111,48 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 		}
 	}
 
+	// Detect drift in the /dev/shm volume (driven by shmSize). We compare the
+	// "dshm" volume/mount specifically instead of the whole Volumes slice,
+	// whose server-side defaults (e.g. ConfigMap DefaultMode) would otherwise
+	// cause a permanent mismatch and an endless reconcile loop.
+	if !reflect.DeepEqual(
+		findVolumeByName(expectedDep.Spec.Template.Spec.Volumes, "dshm"),
+		findVolumeByName(dep.Spec.Template.Spec.Volumes, "dshm"),
+	) {
+		log.Info("shm volume mismatch")
+		return true
+	}
+
+	if len(dep.Spec.Template.Spec.Containers) > 0 &&
+		!reflect.DeepEqual(
+			findVolumeMountByName(expectedDep.Spec.Template.Spec.Containers[0].VolumeMounts, "dshm"),
+			findVolumeMountByName(dep.Spec.Template.Spec.Containers[0].VolumeMounts, "dshm"),
+		) {
+		log.Info("shm volume mount mismatch")
+		return true
+	}
+
 	return false
+}
+
+// findVolumeByName returns a pointer to the named volume, or nil if absent.
+func findVolumeByName(volumes []corev1.Volume, name string) *corev1.Volume {
+	for i := range volumes {
+		if volumes[i].Name == name {
+			return &volumes[i]
+		}
+	}
+	return nil
+}
+
+// findVolumeMountByName returns a pointer to the named volume mount, or nil.
+func findVolumeMountByName(mounts []corev1.VolumeMount, name string) *corev1.VolumeMount {
+	for i := range mounts {
+		if mounts[i].Name == name {
+			return &mounts[i]
+		}
+	}
+	return nil
 }
 
 // updateStatus updates the status of the VLLMRuntime
