@@ -20,7 +20,7 @@ import math
 import random
 import threading
 import uuid
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import requests
 from fastapi import HTTPException, Request
@@ -149,6 +149,9 @@ class RoundRobinRouter(RoutingInterface):
             return
         self._next_index: dict[tuple[str, ...], int] = {}
         self._sorted_cache: dict[frozenset[str], tuple[str, ...]] = {}
+        # The router is a singleton shared by every concurrent request handler,
+        # so the cursor and caches below need to be guarded.
+        self._lock = threading.Lock()
         self._initialized = True
 
     def _endpoint_key(self, endpoints: List[EndpointInfo]) -> tuple[str, ...]:
@@ -164,6 +167,40 @@ class RoundRobinRouter(RoutingInterface):
             key = tuple(sorted(urls))
             self._sorted_cache[urls] = key
         return key
+
+    def pick_admissible_endpoint(
+        self,
+        endpoints: List[EndpointInfo],
+        is_admissible: Callable[[EndpointInfo], bool],
+    ) -> Optional[EndpointInfo]:
+        """Return the next round-robin endpoint accepted by ``is_admissible``.
+
+        Walks the endpoint set in round-robin order starting at the current
+        cursor and returns the first endpoint the predicate accepts, advancing
+        the cursor past it. Returns None when no endpoint is admissible; the
+        cursor is left untouched in that case so no endpoint is skipped.
+
+        ``is_admissible`` runs while the router lock is held, so it must be
+        cheap and must not block on locks another thread could hold while
+        waiting on this router.
+        """
+        with self._lock:
+            endpoint_urls = self._endpoint_key(endpoints)
+            endpoints_by_url = {e.url: e for e in endpoints}
+            idx = self._next_index.get(endpoint_urls, 0)
+            if (
+                len(self._next_index) >= self._MAX_CACHE_SIZE
+                and endpoint_urls not in self._next_index
+            ):
+                self._next_index.clear()
+
+            total = len(endpoint_urls)
+            for offset in range(total):
+                endpoint = endpoints_by_url[endpoint_urls[(idx + offset) % total]]
+                if is_admissible(endpoint):
+                    self._next_index[endpoint_urls] = idx + offset + 1
+                    return endpoint
+            return None
 
     def route_request(
         self,
@@ -184,15 +221,22 @@ class RoundRobinRouter(RoutingInterface):
                 indicating the request-level performance of each engine
             request (Request): The incoming request
         """
-        endpoint_urls = self._endpoint_key(endpoints)
-        idx = self._next_index.get(endpoint_urls, 0)
-        if (
-            len(self._next_index) >= self._MAX_CACHE_SIZE
-            and endpoint_urls not in self._next_index
-        ):
-            self._next_index.clear()
-        self._next_index[endpoint_urls] = idx + 1
-        return endpoint_urls[idx % len(endpoint_urls)]
+        # Phase 1: router queueing is not wired into the request path yet, so
+        # the admissibility check is always skipped and this is a plain
+        # round-robin pick. Once the admission controller lands, the check will
+        # also be skipped whenever the router queue is disabled.
+        chosen = self.pick_admissible_endpoint(endpoints, lambda _: True)
+        if chosen is None:
+            # Unreachable while the predicate is always-true (_endpoint_key
+            # already rejects an empty endpoint list), but guard it so a real
+            # admission predicate cannot turn "nothing admissible" into an
+            # AttributeError on the request path.
+            raise HTTPException(
+                status_code=503,
+                detail="NO_ADMISSIBLE_ENDPOINT: All endpoints are over the "
+                "configured queue threshold",
+            )
+        return chosen.url
 
 
 class SessionRouter(RoutingInterface):
