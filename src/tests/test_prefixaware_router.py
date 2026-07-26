@@ -38,6 +38,11 @@ async def test_route_falls_back_to_qps_when_match_below_threshold():
     When the longest prefix match is shorter than prefix_min_match_length,
     the request should NOT use the matched endpoint. It should fall back to
     QPS-based routing and pick the engine with the lowest QPS.
+
+    The prompt must still be inserted into the trie, attributed to the
+    QPS-selected endpoint. Otherwise a router that starts with an empty trie
+    never seeds it (every request matches below the threshold), and prefix
+    affinity never activates.
     """
 
     endpoints = [
@@ -66,7 +71,57 @@ async def test_route_falls_back_to_qps_when_match_below_threshold():
 
     assert url == "http://engine2.com"
 
-    fake_hashtrie.insert.assert_not_awaited()
+    fake_hashtrie.insert.assert_awaited_once_with(
+        "some prompt text", "http://engine2.com"
+    )
+
+
+@pytest.mark.asyncio
+async def test_below_threshold_seeding_enables_later_pinning():
+    """
+    Regression test for the trie never seeding when
+    prefix_min_match_length > 0.
+
+    Uses the real HashTrie. The first request has no prefix match, so it is
+    routed by QPS — but it must seed the trie. A follow-up request extending
+    the same prompt then matches above the threshold and must pin to the
+    endpoint that served the first request, even when QPS stats would prefer
+    the other endpoint.
+    """
+
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+    request = Request(headers={})
+
+    # 128 = one HashTrie chunk; the first chunk of both prompts is identical.
+    router = PrefixAwareRouter(prefix_min_match_length=128)
+
+    first_prompt = "x" * 128 + "y" * 72
+    followup_prompt = first_prompt + "z" * 40
+
+    # First request: cold trie, match below threshold -> QPS picks engine1.
+    request_stats = {
+        "http://engine1.com": RequestStats(qps=5),
+        "http://engine2.com": RequestStats(qps=10),
+    }
+    url = await router.route_request(
+        endpoints, None, request_stats, request, {"prompt": first_prompt}
+    )
+    assert url == "http://engine1.com"
+
+    # Follow-up: shares the first 128-char chunk, so it matches at the
+    # threshold and must pin to engine1 even though engine2 now has the
+    # lower QPS.
+    request_stats = {
+        "http://engine1.com": RequestStats(qps=10),
+        "http://engine2.com": RequestStats(qps=5),
+    }
+    url = await router.route_request(
+        endpoints, None, request_stats, request, {"prompt": followup_prompt}
+    )
+    assert url == "http://engine1.com"
 
 
 @pytest.mark.asyncio

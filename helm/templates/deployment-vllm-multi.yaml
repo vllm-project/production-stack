@@ -471,7 +471,7 @@ spec:
             {{- toYaml $modelSpec.pvcStorage.emptyDir | nindent 12 }}
         {{- else if kindIs "string" $modelSpec.pvcStorage }}
           persistentVolumeClaim:
-            claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
+            claimName: {{ $modelSpec.pvcExistingClaimName | default (printf "%s-%s-storage-claim" .Release.Name $modelSpec.name) | quote }}
         {{- end }}
         {{- end }}
         {{- if $.Values.sharedPvcStorage.enabled }}

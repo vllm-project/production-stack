@@ -96,6 +96,7 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
     "content-encoding",
     "transfer-encoding",
     "connection",
+    "server",
 }
 
 
