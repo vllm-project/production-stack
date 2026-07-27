@@ -42,6 +42,10 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
+      {{- with .Values.routerSpec.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.routerSpec.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
