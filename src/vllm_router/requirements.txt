@@ -2,7 +2,7 @@ aiofiles==24.1.0
 aiohttp[speedups]==3.13.3
 fastapi==0.128.0
 kubernetes==32.0.0
-numpy==1.26.4
+numpy>=1.26.4
 
 # OpenTelemetry tracing (optional)
 opentelemetry-api==1.28.0
