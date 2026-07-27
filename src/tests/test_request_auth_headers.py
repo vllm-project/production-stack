@@ -32,7 +32,7 @@ def _build_request(headers=None):
     state.callbacks = None
     state.request_stats_monitor.get_request_stats.return_value = {}
     state.engine_stats_scraper.get_engine_stats.return_value = {}
-    state.router.route_request.return_value = "http://whisper-engine"
+    state.router.route_request = AsyncMock(return_value="http://whisper-engine")
 
     request = MagicMock()
     request.headers = headers or {}
