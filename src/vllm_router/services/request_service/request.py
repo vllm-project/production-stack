@@ -415,7 +415,19 @@ async def route_general_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_body = await request.body()
-    request_json = json.loads(request_body) if request_body else {}
+    try:
+        request_json = json.loads(request_body) if request_body else {}
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: request body must be valid JSON."},
+        )
+
+    if not isinstance(request_json, dict):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: request body must be a JSON object."},
+        )
 
     # OpenTelemetry tracing: extract incoming context and create parent span
     span, span_context = None, None
@@ -1138,6 +1150,11 @@ async def route_general_transcriptions(
         return JSONResponse(
             status_code=400,
             content={"error": f"Invalid request: missing '{e.args[0]}' in form data."},
+        )
+    except (TypeError, ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: 'temperature' must be a number."},
         )
 
     logger.debug("==== Enter audio_transcriptions ====")
