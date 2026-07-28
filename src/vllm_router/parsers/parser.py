@@ -396,14 +396,14 @@ def parse_args():
         "--sentry-traces-sample-rate",
         type=float,
         default=0.1,
-        help="The sample rate for Sentry traces. Default is 0.1 (10%)",
+        help="The sample rate for Sentry traces. Default is 0.1 (10%%)",
     )
 
     parser.add_argument(
         "--sentry-profile-session-sample-rate",
         type=float,
         default=1.0,
-        help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%)",
+        help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%%)",
     )
 
     # OpenTelemetry tracing arguments
