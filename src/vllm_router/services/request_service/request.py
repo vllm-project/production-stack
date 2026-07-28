@@ -32,6 +32,7 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillRouter,
     KvawareRouter,
     PrefixAwareRouter,
+    PriorityRouter,
     SessionRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
@@ -559,7 +560,8 @@ async def route_general_request(
         )
 
     elif isinstance(
-        request.app.state.router, (KvawareRouter, PrefixAwareRouter, SessionRouter)
+        request.app.state.router,
+        (KvawareRouter, PrefixAwareRouter, SessionRouter, PriorityRouter),
     ):
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
@@ -568,6 +570,12 @@ async def route_general_request(
         server_url = request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request
         )
+
+    if isinstance(request.app.state.router, PriorityRouter):
+        # PriorityRouter injects the resolved priority into request_json so
+        # vLLM's own priority scheduler can preempt within the engine.
+        request_body = json.dumps(request_json)
+        update_content_length(request, request_body)
 
     curr_time = time.time()
     # Extract actual session ID from request headers for logging
@@ -607,7 +615,7 @@ async def route_general_request(
                 server_url = remaining[0].url
             elif isinstance(
                 request.app.state.router,
-                (KvawareRouter, PrefixAwareRouter, SessionRouter),
+                (KvawareRouter, PrefixAwareRouter, SessionRouter, PriorityRouter),
             ):
                 server_url = await request.app.state.router.route_request(
                     remaining, engine_stats, request_stats, request, request_json

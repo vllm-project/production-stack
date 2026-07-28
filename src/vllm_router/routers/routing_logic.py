@@ -56,6 +56,7 @@ class RoutingLogic(str, enum.Enum):
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
     DISAGGREGATED_PREFILL_ORCHESTRATED = "disaggregated_prefill_orchestrated"
+    PRIORITY = "priority"
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -522,6 +523,120 @@ class PrefixAwareRouter(RoutingInterface):
         return selected_endpoint
 
 
+class PriorityRouter(RoutingInterface):
+    """
+    Route the request to the appropriate engine URL based on a per-request
+    priority value (lower means higher priority, matching vLLM's convention).
+
+    Requests whose priority is more important than `priority_threshold` are
+    steered to the least-loaded engine (by live request-stats load); all
+    other requests round-robin across every healthy engine, including the
+    least-loaded one, so no engine is ever reserved and left idle.
+    """
+
+    def __init__(
+        self,
+        priority_header: str = "x-request-priority",
+        priority_field: str = "priority",
+        priority_default: int = 0,
+        priority_threshold: Optional[int] = None,
+    ):
+        if hasattr(self, "_initialized"):
+            return
+        self.priority_header = priority_header
+        self.priority_field = priority_field
+        self.priority_default = priority_default
+        self.priority_threshold = (
+            priority_threshold if priority_threshold is not None else priority_default
+        )
+        self._next_index: Dict[tuple, int] = {}
+        self._warned_scheduling_policy = False
+        self._initialized = True
+
+    def extract_priority(self, request: Request, request_json: Dict) -> int:
+        """
+        Resolve the request priority: header > body field > default.
+        Malformed (non-integer) values are treated as missing.
+        """
+        header_val = request.headers.get(self.priority_header)
+        if header_val is not None:
+            try:
+                return int(header_val)
+            except (TypeError, ValueError):
+                logger.warning(
+                    f"Invalid priority header value {header_val!r}; "
+                    f"falling back to body field / default."
+                )
+
+        body_val = request_json.get(self.priority_field)
+        if body_val is not None:
+            try:
+                return int(body_val)
+            except (TypeError, ValueError):
+                logger.warning(
+                    f"Invalid priority body field value {body_val!r}; "
+                    f"falling back to default."
+                )
+
+        return self.priority_default
+
+    def _engine_load(self, url: str, request_stats: Dict[str, RequestStats]) -> float:
+        """Live, router-local load: in-flight prefill + decode requests."""
+        stat = request_stats.get(url)
+        if stat is None:
+            return 0
+        return stat.in_prefill_requests + stat.in_decoding_requests
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        """
+        Route the request based on its priority.
+
+        Args:
+            endpoints (List[EndpointInfo]): The list of engine URLs
+            engine_stats (Dict[str, EngineStats]): The engine stats indicating
+                the 'physical' load of each engine
+            request_stats (Dict[str, RequestStats]): The request stats
+                indicating the request-level performance of each engine
+            request (Request): The incoming request
+            request_json (Dict): The request body; the resolved priority is
+                injected back into this dict so it can be forwarded to the
+                engine for in-engine preemption.
+        """
+        if not endpoints:
+            raise ValueError("PriorityRouter requires at least one endpoint")
+
+        if not self._warned_scheduling_policy:
+            logger.warning(
+                "routing-logic=priority is enabled; ensure the serving "
+                "engines are started with --scheduling-policy priority for "
+                "in-engine preemption to take effect. The router cannot "
+                "verify this automatically."
+            )
+            self._warned_scheduling_policy = True
+
+        priority = self.extract_priority(request, request_json)
+        request_json[self.priority_field] = priority
+
+        endpoint_urls = tuple(sorted(endpoint.url for endpoint in endpoints))
+
+        if priority < self.priority_threshold:
+            return min(
+                endpoint_urls,
+                key=lambda url: self._engine_load(url, request_stats),
+            )
+
+        idx = self._next_index.get(endpoint_urls, 0)
+        self._next_index[endpoint_urls] = idx + 1
+        return endpoint_urls[idx % len(endpoint_urls)]
+
+
 class DisaggregatedPrefillRouter(RoutingInterface):
     """
     Route the request to the appropriate engine URL by handling prefill and decode operations sequentially.
@@ -712,6 +827,14 @@ def initialize_routing_logic(
         return DisaggregatedPrefillOrchestratedRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
+    elif routing_logic == RoutingLogic.PRIORITY:
+        logger.info(f"Initializing priority routing logic with kwargs: {kwargs}")
+        router = PriorityRouter(
+            priority_header=kwargs.get("priority_header", "x-request-priority"),
+            priority_field=kwargs.get("priority_field", "priority"),
+            priority_default=kwargs.get("priority_default", 0),
+            priority_threshold=kwargs.get("priority_threshold"),
+        )
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -738,6 +861,7 @@ def get_routing_logic() -> RoutingInterface:
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
         DisaggregatedPrefillOrchestratedRouter,
+        PriorityRouter,
     ):
         if cls in SingletonABCMeta._instances:
             return cls()
@@ -753,6 +877,7 @@ def cleanup_routing_logic():
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
         DisaggregatedPrefillOrchestratedRouter,
+        PriorityRouter,
     ):
         if cls in SingletonABCMeta._instances:
             instance = cls()
