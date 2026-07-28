@@ -9,12 +9,16 @@ on:
       - 'docker/**'
       - 'pyproject.toml'
       - '.github/**'
+      - 'tests/assets/**'
+      - 'tests/scripts/**'
   pull_request:
     paths:
       - 'src/vllm_router/**'
       - 'docker/**'
       - 'pyproject.toml'
       - '.github/**'
+      - 'tests/assets/**'
+      - 'tests/scripts/**'
   workflow_dispatch:
 
 jobs:
@@ -175,8 +179,8 @@ jobs:
         run: |
           echo "🚀 Starting vLLM serve backend"
           mkdir -p "$LOG_DIR"
-          CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
-          CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 --chat-template .github/template-chatml.jinja > "$LOG_DIR/backend2.log" 2>&1 &
+          CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template tests/assets/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
+          CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 --chat-template tests/assets/template-chatml.jinja > "$LOG_DIR/backend2.log" 2>&1 &
 
       - name: Wait for backends to be ready
         run: |
