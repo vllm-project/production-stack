@@ -38,8 +38,8 @@ jobs:
               )] | length')
 
             if [ "$PENDING" -gt 0 ]; then
-              echo "$PENDING checks still running. Waiting 20s..."
-              sleep 20
+              echo "$PENDING checks still running. Waiting 60s..."
+              sleep 60
               continue
             fi
 
