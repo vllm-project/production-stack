@@ -94,6 +94,11 @@ servingEngineSpec:
     pvcLabels: {}
     # -- The annotations to add to the PVC
     pvcAnnotations: {}
+    # Use an externally-managed PersistentVolumeClaim instead of one created by
+    # this chart. When set, the chart skips rendering the PVC and mounts the
+    # named claim directly (useful for GitOps setups where PVCs are managed
+    # outside the chart). Leave unset to have the chart create the PVC.
+    # pvcExistingClaimName: "my-existing-claim"
     # -- Additional volumes to add to the pod, in Kubernetes volume format
     extraVolumes: []
       # - name: tmp-volume
@@ -275,6 +280,29 @@ servingEngineSpec:
         requestMemory: "1Gi"
         # -- GPU request for the head node
         requestGPU: 1
+        # -- Raw Kubernetes resources block for the head node container. When set, overrides the request*/limit* fields above.
+        # resources:
+        #   requests:
+        #     cpu: "2"
+        #     memory: "8Gi"
+        #     nvidia.com/gpu: "1"
+        #   limits:
+        #     cpu: "4"
+        #     memory: "16Gi"
+        #     nvidia.com/gpu: "1"
+        # -- Optional init container run before the Ray head container starts. Mirrors modelSpec.initContainer.
+        # initContainer:
+        #   name: "init"
+        #   image: "busybox:latest"
+        #   command: ["sh", "-c"]
+        #   args: ["ls"]
+        #   env: []
+        #   resources: {}
+        #   mountPvcStorage: true
+        #   extraVolumeMounts: []
+      # Worker nodes reuse the top-level modelSpec fields:
+      #   - resources come from modelSpec.requestCPU / requestMemory / requestGPU (or modelSpec.resources for a raw override)
+      #   - the optional init container comes from modelSpec.initContainer
 
   # -- Container port
   containerPort: 8000
@@ -514,8 +542,8 @@ routerSpec:
   staticBackends: ""
   staticModels: ""
 
-  # -- routing logic, supports "roundrobin", "session", "prefixaware", "kvaware" or "disaggregated_prefill"
-  routingLogic: "roundrobin" # @schema enum:[roundrobin,session,prefixaware,kvaware,disaggregated_prefill]
+  # -- routing logic, supports "roundrobin", "session", "prefixaware", "kvaware", "disaggregated_prefill" or "disaggregated_prefill_orchestrated"
+  routingLogic: "roundrobin" # @schema enum:[roundrobin,session,prefixaware,kvaware,disaggregated_prefill,disaggregated_prefill_orchestrated]
 
   # -- Minimum prefix match length required for prefixaware routing to reuse a
   # matched endpoint. If the longest prefix match is shorter than this value,
