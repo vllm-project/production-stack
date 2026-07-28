@@ -2,7 +2,7 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
   - name: "distilgpt2-raycluster"
-    repository: "vllm/vllm-openai"
+    repository: "lmcache/vllm-openai"
     tag: "latest"
     modelURL: "distilbert/distilgpt2"
 

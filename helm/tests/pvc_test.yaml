@@ -66,3 +66,16 @@ tests:
           path: spec.selector.matchLabels
           value:
             model: "mistral"
+
+  - it: should not render a PVC when an existing claim is provided
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            pvcStorage: "50Gi"
+            pvcExistingClaimName: "my-existing-claim"
+    asserts:
+      - template: pvc.yaml
+        hasDocuments:
+          count: 0
