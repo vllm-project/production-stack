@@ -46,7 +46,7 @@ This tutorial provides a step-by-step guide for configuring and deploying the vL
   - **`requestMemory`**: Memory allocation for Kuberay head pod. Sufficient memory is required to load the model.
   - **`requestGPU`**: Defines the number of GPUs to allocate for the KubeRay head pod. Currently, the Ray head node must also participate in both tensor parallelism and pipeline parallelism. This requirement exists because the `vllm serve ...` command is executed on the Ray head node, and vLLM mandates that the pod where this command is run must have at least one visible GPU.
 - **`name`**: The unique identifier for your model deployment.
-- **`repository`**: The Docker repository containing the model's serving engine image.
+- **`repository`**: The Docker repository containing the model's serving engine image. RayCluster images must include both the Ray Python package and the `ray` CLI because KubeRay uses them to start the head and worker nodes. The example uses `lmcache/vllm-openai`, which includes the Ray runtime.
 - **`tag`**: Specifies the version of the model image to use.
 - **`modelURL`**: The URL pointing to the model on Hugging Face or another hosting service.
 - **`replicaCount`**: The number of total Kuberay worker pods.
@@ -76,7 +76,7 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
   - name: "distilgpt2"
-    repository: "vllm/vllm-openai"
+    repository: "lmcache/vllm-openai"
     tag: "latest"
     modelURL: "distilbert/distilgpt2"
 
@@ -108,7 +108,7 @@ Deploy the configuration using Helm:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm vllm/vllm-stack -f tutorials/assets/values-15-minimal-pipeline-parallel-example.yaml
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-15-a-minimal-pipeline-parallel-example-raycluster.yaml
 ```
 
 Expected output:
