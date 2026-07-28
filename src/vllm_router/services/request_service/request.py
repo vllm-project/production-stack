@@ -96,6 +96,7 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
     "content-encoding",
     "transfer-encoding",
     "connection",
+    "server",
 }
 
 
@@ -1241,12 +1242,37 @@ async def proxy_multipart_request(
     request_stats = request_stats_monitor.get_request_stats(time.time())
 
     # pick one using the router's configured logic (roundrobin, least-loaded, etc.)
-    chosen_url = router.route_request(
-        endpoints,
-        engine_stats,
-        request_stats,
-        request,
-    )
+    if isinstance(
+        router,
+        (
+            KvawareRouter,
+            PrefixAwareRouter,
+            SessionRouter,
+            DisaggregatedPrefillOrchestratedRouter,
+        ),
+    ):
+        chosen_url = await router.route_request(
+            endpoints,
+            engine_stats,
+            request_stats,
+            request,
+            {},  # no JSON body for multipart/form-data
+        )
+    elif isinstance(router, DisaggregatedPrefillRouter):
+        chosen_url = router.route_request(
+            endpoints,
+            engine_stats,
+            request_stats,
+            request,
+            {},  # no JSON body for multipart/form-data
+        )
+    else:
+        chosen_url = router.route_request(
+            endpoints,
+            engine_stats,
+            request_stats,
+            request,
+        )
     logger.info(
         "Proxying multi-part form request for model %s to %s", model, chosen_url
     )
