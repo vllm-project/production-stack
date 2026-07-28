@@ -115,12 +115,13 @@ class RoutingInterface(metaclass=SingletonABCMeta):
         return val if val is not None else request_json.get(session_key, None)
 
     @abc.abstractmethod
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_json: Optional[Dict] = None,
     ) -> str:
         """
         Route the request to the appropriate engine URL
@@ -132,6 +133,8 @@ class RoutingInterface(metaclass=SingletonABCMeta):
             request_stats (Dict[str, RequestStats]): The request stats
                 indicating the request-level performance of each engine
             request (Request): The incoming request
+            request_json (Optional[Dict]): The parsed JSON body of the
+                request, if any (used by routers that inspect the body)
         """
         raise NotImplementedError
 
@@ -165,12 +168,13 @@ class RoundRobinRouter(RoutingInterface):
             self._sorted_cache[urls] = key
         return key
 
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
+        request_json: Optional[Dict] = None,
     ) -> str:
         """
         Route the request to the appropriate engine URL using a simple
@@ -183,6 +187,8 @@ class RoundRobinRouter(RoutingInterface):
             request_stats (Dict[str, RequestStats]): The request stats
                 indicating the request-level performance of each engine
             request (Request): The incoming request
+            request_json (Optional[Dict]): The request body (unused by this
+                router)
         """
         endpoint_urls = self._endpoint_key(endpoints)
         idx = self._next_index.get(endpoint_urls, 0)
@@ -216,7 +222,7 @@ class SessionRouter(RoutingInterface):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
-        request_json: Dict,
+        request_json: Optional[Dict] = None,
     ) -> str:
         """
         Route the request to the appropriate engine URL by the 'session id' in
@@ -231,8 +237,10 @@ class SessionRouter(RoutingInterface):
             request_stats (Dict[str, RequestStats]): The request stats
                 indicating the request-level performance of each engine
             request (Request): The incoming request
-            request_json (Dict): The request body (needed for finding the session id)
+            request_json (Optional[Dict]): The request body (needed for finding the session id)
         """
+        if request_json is None:
+            request_json = {}
         session_id = self.extract_session_id(request, request_json)
         logger.debug(f"Got session id: {session_id}")
 
@@ -335,7 +343,7 @@ class KvawareRouter(RoutingInterface):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
-        request_json: Dict,
+        request_json: Optional[Dict] = None,
     ) -> str:
         """
         Route the request to the appropriate engine URL by where the KV cache
@@ -350,9 +358,11 @@ class KvawareRouter(RoutingInterface):
             request_stats (Dict[str, RequestStats]): The request stats
                indicating the request-level performance of each engine
             request (Request): The incoming request
-            request_json (Dict): The request body (needed for finding the
-            longest prefix match)
+            request_json (Optional[Dict]): The request body (needed for
+            finding the longest prefix match)
         """
+        if request_json is None:
+            request_json = {}
         token_ids = None
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         # TODO (Yuhan): Handle chat completions
@@ -454,7 +464,7 @@ class PrefixAwareRouter(RoutingInterface):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
-        request_json: Dict,
+        request_json: Optional[Dict] = None,
     ) -> str:
         """
         Route the request to the appropriate engine URL by where the longest
@@ -469,9 +479,11 @@ class PrefixAwareRouter(RoutingInterface):
             request_stats (Dict[str, RequestStats]): The request stats
                indicating the request-level performance of each engine
             request (Request): The incoming request
-            request_json (Dict): The request body (needed for finding the
-            longest prefix match)
+            request_json (Optional[Dict]): The request body (needed for
+            finding the longest prefix match)
         """
+        if request_json is None:
+            request_json = {}
 
         # Handle chat completions
         if "messages" in request_json:
@@ -533,18 +545,20 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         self.decode_model_labels = decode_model_labels
         self.request_cache = {}  # Cache to store prefill results
 
-    def route_request(
+    async def route_request(
         self,
         endpoints: List[EndpointInfo],
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
-        request_json: Dict,
+        request_json: Optional[Dict] = None,
     ) -> str:
         """
         Route the request to appropriate endpoints for prefill and decode operations.
         First request goes to prefill endpoint, then second request goes to decode endpoint.
         """
+        if request_json is None:
+            request_json = {}
         # Find prefill and decode endpoints
         is_prefill = request_json.get("max_tokens", 0) == 1
         if is_prefill:
@@ -661,7 +675,7 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         engine_stats: Dict[str, EngineStats],
         request_stats: Dict[str, RequestStats],
         request: Request,
-        request_json: Dict,
+        request_json: Optional[Dict] = None,
     ) -> str:
         """
         This method is called by the router framework but for orchestrated routing,
