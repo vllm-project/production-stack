@@ -10,10 +10,12 @@ from vllm_router.services.request_service.request import (
     route_general_transcriptions,
 )
 
+REQUEST_ID = "test-request-id"
+
 
 def _json_request(body: bytes):
     return SimpleNamespace(
-        headers={},
+        headers={"X-Request-Id": REQUEST_ID},
         query_params={},
         app=SimpleNamespace(
             state=SimpleNamespace(
@@ -42,18 +44,20 @@ async def test_general_request_rejects_invalid_json_body(body):
 
     assert response.status_code == 400
     assert json.loads(response.body)["error"]
+    assert response.headers["X-Request-Id"] == REQUEST_ID
 
 
 @pytest.mark.asyncio
 async def test_transcription_rejects_non_numeric_temperature():
     request = SimpleNamespace(
+        headers={"X-Request-Id": REQUEST_ID},
         form=AsyncMock(
             return_value={
                 "file": object(),
                 "model": "whisper-model",
                 "temperature": "not-a-number",
             }
-        )
+        ),
     )
 
     response = await route_general_transcriptions(
@@ -61,4 +65,5 @@ async def test_transcription_rejects_non_numeric_temperature():
     )
 
     assert response.status_code == 400
-    assert json.loads(response.body)["error"]
+    assert json.loads(response.body) == {"error": "Invalid multipart/form-data request"}
+    assert response.headers["X-Request-Id"] == REQUEST_ID

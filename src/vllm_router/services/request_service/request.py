@@ -421,12 +421,14 @@ async def route_general_request(
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid request: request body must be valid JSON."},
+            headers={"X-Request-Id": request_id},
         )
 
     if not isinstance(request_json, dict):
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid request: request body must be a JSON object."},
+            headers={"X-Request-Id": request_id},
         )
 
     # OpenTelemetry tracing: extract incoming context and create parent span
@@ -1133,6 +1135,8 @@ async def route_general_transcriptions(
 ):
     """Handles audio transcription requests by parsing form data and proxying to backend."""
 
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+
     try:
         form = await request.form()
 
@@ -1150,11 +1154,13 @@ async def route_general_transcriptions(
         return JSONResponse(
             status_code=400,
             content={"error": f"Invalid request: missing '{e.args[0]}' in form data."},
+            headers={"X-Request-Id": request_id},
         )
     except (TypeError, ValueError):
         return JSONResponse(
             status_code=400,
-            content={"error": "Invalid request: 'temperature' must be a number."},
+            content={"error": "Invalid multipart/form-data request"},
+            headers={"X-Request-Id": request_id},
         )
 
     logger.debug("==== Enter audio_transcriptions ====")
