@@ -396,14 +396,14 @@ def parse_args():
         "--sentry-traces-sample-rate",
         type=float,
         default=0.1,
-        help="The sample rate for Sentry traces. Default is 0.1 (10%)",
+        help="The sample rate for Sentry traces. Default is 0.1 (10%%)",
     )
 
     parser.add_argument(
         "--sentry-profile-session-sample-rate",
         type=float,
         default=1.0,
-        help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%)",
+        help="The sample rate for Sentry profiling sessions. Default is 1.0 (100%%)",
     )
 
     # OpenTelemetry tracing arguments
@@ -445,6 +445,19 @@ def parse_args():
         type=int,
         default=2000,
         help="The threshold for kv-aware routing.",
+    )
+
+    parser.add_argument(
+        "--prefix-min-match-length",
+        type=int,
+        default=0,
+        help="The minimum prefix match length required for prefixaware "
+        "routing to reuse a matched endpoint. If the longest prefix "
+        "match is shorter than this value, the request falls back to "
+        "QPS-based routing. Note: prefix matches are computed in "
+        "chunks (chunk_size, default 128 characters), so this "
+        "threshold is effectively quantized to that granularity. "
+        "Defaults to 0, which disables the threshold.",
     )
 
     parser.add_argument(

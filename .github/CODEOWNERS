@@ -1,0 +1,6 @@
+# CODEOWNERS file for vllm-project/production-stack
+# This file defines code ownership to automatically request reviews from maintainers.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @ApostaC @YuhanLiu11 @Shaoting-Feng @ruizhang0101

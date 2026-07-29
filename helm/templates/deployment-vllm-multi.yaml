@@ -26,6 +26,9 @@ metadata:
     helm-release-name: {{ .Release.Name }}
   {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 4 }}
   {{- include "chart.engineLabels" . | nindent 4 }}
+  {{- with $modelSpec.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
 {{- if not (and $modelSpec.keda $modelSpec.keda.enabled) }}
   replicas: {{ $modelSpec.replicaCount }}
@@ -49,6 +52,9 @@ spec:
         helm-release-name: {{ .Release.Name }}
       {{- include "chart.engineStandardLabels" (dict "releaseName" .Release.Name "modelName" $modelSpec.name "chartName" .Chart.Name) | nindent 8 }}
       {{- include "chart.engineLabels" . | nindent 8 }}
+      {{- with $modelSpec.podLabels }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- if $modelSpec.priorityClassName }}
       priorityClassName: {{ $modelSpec.priorityClassName | quote }}
@@ -190,6 +196,10 @@ spec:
           - {{ . | quote }}
           {{-     end }}
           {{-   end }}
+          {{- end }}
+          {{- if $modelSpec.modelRevision }}
+          - "--revision"
+          - {{ $modelSpec.modelRevision | quote }}
           {{- end }}
           {{- if $modelSpec.lmcacheConfig }}
           {{-   if $modelSpec.lmcacheConfig.enabled }}
@@ -461,7 +471,7 @@ spec:
             {{- toYaml $modelSpec.pvcStorage.emptyDir | nindent 12 }}
         {{- else if kindIs "string" $modelSpec.pvcStorage }}
           persistentVolumeClaim:
-            claimName: "{{ .Release.Name }}-{{$modelSpec.name}}-storage-claim"
+            claimName: {{ $modelSpec.pvcExistingClaimName | default (printf "%s-%s-storage-claim" .Release.Name $modelSpec.name) | quote }}
         {{- end }}
         {{- end }}
         {{- if $.Values.sharedPvcStorage.enabled }}

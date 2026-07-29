@@ -1,0 +1,70 @@
+# Tesla V100 SXM2 16GB (Volta, CUDA Compute Capability 7.0) - Multi GPU (TP=4)
+# Validated on: OKD 4.19 / Kubernetes v1.32.8, vllm-stack-0.1.11
+# Model: Qwen/Qwen2.5-14B-Instruct
+#
+# A 14B model in FP16 needs ~28GB for weights alone, so it must be sharded
+# across at least 4x 16GB V100. TP=4 generates 4-way all-reduce traffic on
+# every layer, so schedule on a host where all four GPUs share a full NVLink
+# mesh; otherwise PCIe becomes the bottleneck.
+#
+# Deploy with:
+#   helm install vllm vllm/vllm-stack -f values-25-v100-multi-gpu-tp4.yaml
+servingEngineSpec:
+  runtimeClassName: "nvidia"
+
+  # Recreate is REQUIRED for multi-GPU. RollingUpdate deadlocks on GPU nodes:
+  # the new pod cannot get GPUs the old pod still holds, and the old pod is
+  # not torn down until the new one is Ready.
+  strategy:
+    type: Recreate
+
+  modelSpec:
+  - name: "qwen14b"
+    # Pin to v0.8.5 - the last image with Volta (CC 7.0) CUDA kernels.
+    repository: "vllm/vllm-openai"
+    tag: "v0.8.5"
+    modelURL: "Qwen/Qwen2.5-14B-Instruct"
+    replicaCount: 1
+
+    requestCPU: 16
+    requestMemory: "64Gi"
+    requestGPU: 4
+
+    pvcStorage: "80Gi"
+    pvcAccessMode:
+      - ReadWriteOnce
+
+    vllmConfig:
+      # FP16 - V100 (CC 7.0) has no native BF16 datapath.
+      dtype: "half"
+      # Legacy V0 engine - the V1 engine needs CC >= 8.0 kernels.
+      v0: "1"
+      # tensorParallelSize MUST be in vllmConfig (renders --tensor-parallel-size).
+      # If placed in extraArgs it is silently ignored, TP stays at 1, and the
+      # 14B model cannot fit on one GPU.
+      tensorParallelSize: 4
+      maxModelLen: 8192
+      gpuMemoryUtilization: 0.9
+      # Disable CUDA graphs - unstable on Volta with the v0.8.5 image.
+      extraArgs:
+        - "--enforce-eager"
+
+    env:
+      # CUDA forward compatibility (PTX JIT) for Volta.
+      - name: VLLM_ENABLE_CUDA_COMPATIBILITY
+        value: "1"
+
+    # /dev/shm (tmpfs) size for 4-way NCCL shared-memory transport. The
+    # Kubernetes default (64Mi) is too small; the chart defaults to 20Gi when
+    # tensorParallelSize is set. We pin a smaller, resource-friendly 4Gi that
+    # is still sufficient.
+    shmSize: "4Gi"
+
+    # gpu-node-02 has 4x V100 in a full NVLink mesh - every GPU is directly
+    # connected to every other, which is what TP=4 needs.
+    nodeSelectorTerms:
+      - matchExpressions:
+          - key: "kubernetes.io/hostname"
+            operator: "In"
+            values:
+              - "gpu-node-02"

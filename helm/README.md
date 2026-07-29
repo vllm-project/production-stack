@@ -82,6 +82,8 @@ This table documents all available configuration values for the Production Stack
 |-------|------|---------|-------------|
 | `servingEngineSpec.modelSpec[].annotations` | map | `{}` | (Optional) Annotations to add to the deployment, e.g., {model: "opt125m"} |
 | `servingEngineSpec.modelSpec[].podAnnotations` | map | `{}` | (Optional) Annotations to add to the pod, e.g., {model: "opt125m"} |
+| `servingEngineSpec.modelSpec[].labels` | map | `{}` | (Optional) Additional labels to add to the deployment |
+| `servingEngineSpec.modelSpec[].podLabels` | map | `{}` | (Optional) Additional labels to add to the pods |
 | `servingEngineSpec.modelSpec[].name` | string | `""` | The name of the model, e.g., "example-model" |
 | `servingEngineSpec.modelSpec[].repository` | string | `""` | The repository of the model, e.g., "vllm/vllm-openai" |
 | `servingEngineSpec.modelSpec[].tag` | string | `""` | The tag of the model, e.g., "latest" |
@@ -201,6 +203,28 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.metricType` | string | `"AverageValue"` | Metric type (AverageValue or Value) |
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.formula` | string | - | Formula to compose metrics together |
 
+#### Ray Cluster Configuration
+
+Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as a multi-node `RayCluster` (via KubeRay) instead of a standard `Deployment`. Worker resources and the worker init container are taken from the top-level `modelSpec` (`requestCPU`/`requestMemory`/`requestGPU` or `resources`, and `initContainer`), while head-node resources and the head-node init container are configured under `raySpec.headNode`.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `servingEngineSpec.modelSpec[].raySpec.enabled` | boolean | `false` | Deploy the model as a `RayCluster` instead of a `Deployment` |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.requestCPU` | integer | `1` | CPU request for the Ray head node container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.requestMemory` | string | `"1Gi"` | Memory request for the Ray head node container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.requestGPU` | integer | `1` | GPU request for the Ray head node container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.resources` | map | `{}` | (Optional) Raw Kubernetes `resources` block for the head container. When set, overrides the `request*` fields above |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.name` | string | - | (Optional) Name of an init container to run before the Ray head container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.image` | string | - | (Optional) Image for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.command` | list | `[]` | (Optional) Command for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.args` | list | `[]` | (Optional) Args for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.env` | list | `[]` | (Optional) Environment variables for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.resources` | map | `{}` | (Optional) Resource requests/limits for the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.mountPvcStorage` | boolean | `false` | (Optional) Mount the model's PVC into the head init container |
+| `servingEngineSpec.modelSpec[].raySpec.headNode.initContainer.extraVolumeMounts` | list | `[]` | (Optional) Additional volume mounts for the head init container |
+
+> **Note**: Ray worker pods reuse the top-level `modelSpec` fields — set `modelSpec.requestCPU`/`requestMemory`/`requestGPU` (or `modelSpec.resources` for a raw override) to size the workers, and `modelSpec.initContainer` to inject an init container into each worker pod.
+
 #### Serving Engine Monitoring Configuration
 
 | Field | Type | Default | Description |
@@ -237,9 +261,12 @@ This table documents all available configuration values for the Production Stack
 | `routerSpec.k8sServiceDiscoveryType` | string | `"pod-ip"` | Service discovery Type ("pod-ip" or "service-name") if serviceDiscovery is "k8s" |
 | `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static" |
 | `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
-| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic: `"roundrobin"`, `"session"`, `"prefixaware"`, or `"kvaware"` |
+| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic: `"roundrobin"`, `"session"`, `"prefixaware"`, `"kvaware"`, `"disaggregated_prefill"`, or `"disaggregated_prefill_orchestrated"` |
+| `routerSpec.prefixMinMatchLength` | integer | `0` | Minimum prefix match length for `prefixaware` routing to reuse a matched endpoint; below this, requests fall back to QPS routing. Quantized to the prefix chunk size (default 128). `0` disables it |
 | `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic |
 | `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router |
+| `routerSpec.extraVolumes` | list | `[]` | Additional volumes to add to the router pod, in Kubernetes volume format |
+| `routerSpec.extraVolumeMounts` | list | `[]` | Additional volume mounts to add to the router container, in Kubernetes volumeMount format |
 | `routerSpec.engineScrapeInterval` | integer | `15` | Interval in seconds to scrape metrics from the serving engine |
 | `routerSpec.requestStatsWindow` | integer | `60` | Window size in seconds for calculating request statistics |
 | `routerSpec.strategy` | map | `{}` | Deployment strategy for the router pods |
@@ -453,6 +480,10 @@ kubectl port-forward svc/<release-name>-grafana 8080:80
 ```
 
 Open the webpage at `http://<IP of your node>:8080` to access the Grafana web page. The default user name is `admin` and the password can be configured in the values (default is generated by helm and stored in a secret `<release-name>-grafana`).
+
+### LMCache Dashboard
+
+If you use the LMCache image in the production stack, the chart includes a dedicated LMCache dashboard (provisioned automatically alongside the main vLLM dashboard when `grafanaDashboards.enabled` is set to `true`). It contains six fields showing the benefits of CPU offloading: Average time to first token (sec), Cache hit rate (%) in last 1 minute, LMCache retrieve speed (K Tokens / sec), Local CPU cache usage (GB), Number of requested tokens in total, and Number of hit tokens in total.
 
 ### Use Prometheus Adapter to export vLLM metrics
 

@@ -96,6 +96,7 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
     "content-encoding",
     "transfer-encoding",
     "connection",
+    "server",
 }
 
 
@@ -517,9 +518,11 @@ async def route_general_request(
     else:
         endpoints = list(
             filter(
-                lambda x: requested_model in x.model_names
-                and x.Id == request_endpoint
-                and not x.sleep,
+                lambda x: (
+                    requested_model in x.model_names
+                    and x.Id == request_endpoint
+                    and not x.sleep
+                ),
                 endpoints,
             )
         )
@@ -682,6 +685,11 @@ async def send_request_to_prefiller(
     req_data["max_tokens"] = 1
     if "max_completion_tokens" in req_data:
         req_data["max_completion_tokens"] = 1
+    # Avoid min_tokens > max_tokens=1 conflict in vLLM SamplingParams.
+    req_data.pop("min_tokens", None)
+    # Force non-streaming: max_tokens=1 needs no SSE, and SSE would break response.json() below.
+    req_data["stream"] = False
+    req_data.pop("stream_options", None)
 
     headers = {
         "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
@@ -786,7 +794,7 @@ async def route_orchestrated_disaggregated_request(
 
     try:
         # Use the shared aiohttp client from app state
-        client = request.app.state.aiohttp_client_wrapper()
+        client: aiohttp.ClientSession = request.app.state.aiohttp_client_wrapper()
 
         # Send to Prefill
         async with client.post(
@@ -835,7 +843,7 @@ async def route_orchestrated_disaggregated_request(
         decode_api_url = f"{decode_url}{endpoint}"
         logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
 
-        async with client.post(
+        decode_resp = await client.post(
             decode_api_url,
             json=decode_request,
             headers={
@@ -843,7 +851,8 @@ async def route_orchestrated_disaggregated_request(
                 "X-Request-Id": request_id,
             },
             timeout=aiohttp.ClientTimeout(total=600),
-        ) as decode_resp:
+        )
+        try:
             if decode_resp.status != 200:
                 error_text = await decode_resp.text()
                 logger.error(
@@ -863,6 +872,7 @@ async def route_orchestrated_disaggregated_request(
                             if chunk:
                                 yield chunk
                     finally:
+                        decode_resp.release()
                         curr_time = time.time()
                         logger.info(
                             f"[{request_id}] Orchestrated streaming request completed, total time = {curr_time - in_router_time:.4f}s"
@@ -886,6 +896,9 @@ async def route_orchestrated_disaggregated_request(
                     content=json.loads(response_data),
                     headers={"X-Request-Id": request_id},
                 )
+        except Exception:
+            decode_resp.release()
+            raise
 
     except aiohttp.ClientError as e:
         logger.error(
@@ -1059,9 +1072,16 @@ async def route_sleep_wakeup_request(
 
     url = server_url + endpoint
 
+    # Forward any additional query parameters (e.g. /sleep `level` and `mode`,
+    # /wake_up `tags`) to the upstream engine. `id` is router-only and is
+    # consumed above to pick the target engine.
+    upstream_params = {k: v for k, v in request.query_params.items() if k != "id"}
+
     async with aiohttp.ClientSession() as client:
         if endpoint == "/is_sleeping":
-            async with client.get(url, headers=headers) as response:
+            async with client.get(
+                url, headers=headers, params=upstream_params
+            ) as response:
                 response.raise_for_status()
                 return await response.json()
         else:
@@ -1069,11 +1089,15 @@ async def route_sleep_wakeup_request(
             response_status = None
             if request_body:
                 req_data = json.loads(request_body)
-                async with client.post(url, json=req_data, headers=headers) as response:
+                async with client.post(
+                    url, json=req_data, headers=headers, params=upstream_params
+                ) as response:
                     response.raise_for_status()
                     response_status = response.status
             else:
-                async with client.post(url, headers=headers) as response:
+                async with client.post(
+                    url, headers=headers, params=upstream_params
+                ) as response:
                     response.raise_for_status()
                     response_status = response.status
 
@@ -1218,12 +1242,37 @@ async def proxy_multipart_request(
     request_stats = request_stats_monitor.get_request_stats(time.time())
 
     # pick one using the router's configured logic (roundrobin, least-loaded, etc.)
-    chosen_url = router.route_request(
-        endpoints,
-        engine_stats,
-        request_stats,
-        request,
-    )
+    if isinstance(
+        router,
+        (
+            KvawareRouter,
+            PrefixAwareRouter,
+            SessionRouter,
+            DisaggregatedPrefillOrchestratedRouter,
+        ),
+    ):
+        chosen_url = await router.route_request(
+            endpoints,
+            engine_stats,
+            request_stats,
+            request,
+            {},  # no JSON body for multipart/form-data
+        )
+    elif isinstance(router, DisaggregatedPrefillRouter):
+        chosen_url = router.route_request(
+            endpoints,
+            engine_stats,
+            request_stats,
+            request,
+            {},  # no JSON body for multipart/form-data
+        )
+    else:
+        chosen_url = router.route_request(
+            endpoints,
+            engine_stats,
+            request_stats,
+            request,
+        )
     logger.info(
         "Proxying multi-part form request for model %s to %s", model, chosen_url
     )

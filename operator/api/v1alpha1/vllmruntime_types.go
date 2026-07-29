@@ -42,8 +42,15 @@ type DeploymentConfig struct {
 	DeployStrategy string `json:"deploymentStrategy,omitempty"`
 
 	// RuntimeClass
-	// +kubebuilder:default=nividia
+	// +kubebuilder:default=nvidia
 	RuntimeClass string `json:"runtimeClass,omitempty"`
+
+	// ShmSize, when set, mounts an emptyDir with medium=Memory at /dev/shm
+	// sized to this value (e.g. "24Gi"). Tensor parallelism uses shared
+	// memory for inter-process communication and the container default
+	// /dev/shm (typically 64Mi) is too small. Accepts any Kubernetes quantity.
+	// +optional
+	ShmSize string `json:"shmSize,omitempty"`
 
 	// Resource requirements
 	Resources ResourceRequirements `json:"resources"`
