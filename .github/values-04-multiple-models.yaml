@@ -2,25 +2,25 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
   - name: "opt125m"
-    repository: "vllm/vllm-openai"
+    repository: "zhuohangu/vllm-test"
     tag: "latest"
     modelURL: "facebook/opt-125m"
     replicaCount: 1
     requestCPU: 6
     requestMemory: "16Gi"
-    requestGPU: 1
+    requestGPU: 0
     pvcStorage: "10Gi"
     pvcAccessMode:
       - ReadWriteOnce
 
   - name: "smol135m"
-    repository: "vllm/vllm-openai"
+    repository: "zhuohangu/vllm-test"
     tag: "latest"
     modelURL: "HuggingFaceTB/SmolLM2-135M-Instruct"
     replicaCount: 1
     requestCPU: 6
     requestMemory: "16Gi"
-    requestGPU: 1
+    requestGPU: 0
     pvcStorage: "10Gi"
     pvcAccessMode:
       - ReadWriteOnce
