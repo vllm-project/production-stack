@@ -26,7 +26,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ .Release.Name }}-router-service-account
+      serviceAccountName: {{ .Values.routerSpec.serviceAccountName | default (printf "%s-router-service-account" .Release.Name) }}
       {{- if .Values.routerSpec.priorityClassName }}
       priorityClassName: {{ .Values.routerSpec.priorityClassName | quote }}
       {{- end }}
