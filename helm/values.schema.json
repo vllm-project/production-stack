@@ -427,6 +427,10 @@
                     "description": "lora controller resources",
                     "type": "object"
                 },
+                "serviceAccountName": {
+                    "description": "The name of an existing service account to use for the lora controller deployment.",
+                    "type": "string"
+                },
                 "tolerations": {
                     "description": "Tolerations",
                     "type": "array"
@@ -884,6 +888,10 @@
                 "securityContext": {
                     "description": "Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core",
                     "type": "object"
+                },
+                "serviceAccountName": {
+                    "description": "The name of an existing service account to use for the router deployment.",
+                    "type": "string"
                 },
                 "serviceAnnotations": {
                     "description": "Service annotations if you use a LoadBalancer or NodePort service type",
@@ -1455,54 +1463,6 @@
                                             "requestMemory": {
                                                 "description": "Memory request for the head node",
                                                 "type": "string"
-                                            },
-                                            "resources": {
-                                                "description": "Raw Kubernetes resources block for the head node container. If specified, takes priority over the simplified request* fields.",
-                                                "type": "object"
-                                            },
-                                            "initContainer": {
-                                                "description": "The configuration for an init container to be run before the Ray head container starts.",
-                                                "type": "object",
-                                                "properties": {
-                                                    "args": {
-                                                        "description": "Additional arguments to pass to the command",
-                                                        "type": "array",
-                                                        "items": {
-                                                            "type": "string"
-                                                        }
-                                                    },
-                                                    "command": {
-                                                        "description": "The command to run in the init container",
-                                                        "type": "array",
-                                                        "items": {
-                                                            "type": "string"
-                                                        }
-                                                    },
-                                                    "env": {
-                                                        "description": "List of environment variables to set in the container",
-                                                        "type": "array"
-                                                    },
-                                                    "extraVolumeMounts": {
-                                                        "description": "Additional volume mounts to add to the init container, in Kubernetes volumeMount format.",
-                                                        "type": "array"
-                                                    },
-                                                    "image": {
-                                                        "description": "The Docker image for the init container",
-                                                        "type": "string"
-                                                    },
-                                                    "mountPvcStorage": {
-                                                        "description": "Whether to mount the model's PVC storage into the init container",
-                                                        "type": "boolean"
-                                                    },
-                                                    "name": {
-                                                        "description": "The name of the init container",
-                                                        "type": "string"
-                                                    },
-                                                    "resources": {
-                                                        "description": "The resource requests and limits for the init container",
-                                                        "type": "object"
-                                                    }
-                                                }
                                             }
                                         }
                                     }
