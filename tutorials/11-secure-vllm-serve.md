@@ -32,7 +32,7 @@ how to specify the model details, set up necessary environment variables (like
    - Write your actual vllmApiKey in `vllmApiKey: <YOUR VLLM API KEY>` in the
      yaml file.
 
-### Explanation of Key Items in `values-11-secure-vllm-serve.yaml`
+### Explanation of Key Items in `values-11-secure-vllm.yaml`
 
 - **`vllmApiKey`**: The api key to secure the model serving with vllm.
 - **`name`**: The unique identifier for your model deployment.
@@ -95,7 +95,7 @@ Deploy the configuration using Helm:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm vllm/vllm-stack -f tutorials/assets/values-11-secure-vllm-serve.yaml
+helm install vllm vllm/vllm-stack -f tutorials/assets/values-11-secure-vllm.yaml
 ```
 
 Expected output:

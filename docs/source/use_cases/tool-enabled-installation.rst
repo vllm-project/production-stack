@@ -58,7 +58,7 @@ Create a Kubernetes secret with your Hugging Face token:
 3.1: Use the Example Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We'll use the example configuration file located at ``tutorials/assets/values-08-tool-enabled.yaml``. This file contains all the necessary settings for enabling tool calling:
+We'll use the example configuration file located at ``tutorials/assets/values-13-tool-enabled.yaml``. This file contains all the necessary settings for enabling tool calling:
 
 .. code-block:: yaml
 
@@ -113,7 +113,7 @@ We'll use the example configuration file located at ``tutorials/assets/values-08
    helm repo add vllm https://vllm-project.github.io/production-stack
 
    # Deploy the vLLM stack with tool calling support using the example configuration
-   helm install vllm-tool vllm/vllm-stack -f tutorials/assets/values-08-tool-enabled.yaml
+   helm install vllm-tool vllm/vllm-stack -f tutorials/assets/values-13-tool-enabled.yaml
 
 The deployment will:
 
