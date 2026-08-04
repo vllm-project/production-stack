@@ -637,7 +637,7 @@
                     }
                 },
                 "lmcacheControllerHeartbeatPort": {
-                    "description": "lmcache controller heartbeat port. Enables workers to re-register with the controller after a router restart.",
+                    "description": "lmcache controller heartbeat port. Strongly recommended when routingLogic is \"kvaware\": without it, workers cannot re-register after a router restart, so KV-aware routing degrades to QPS routing until the engines are restarted too.",
                     "type": [
                         "integer",
                         "string"
@@ -651,7 +651,7 @@
                     ]
                 },
                 "lmcacheControllerReplyPort": {
-                    "description": "lmcache controller reply port. Engines are pointed at this port on the router Service (see LMCACHE_CONTROLLER_REPLY_URL), so setting it here is what opens it.",
+                    "description": "lmcache controller reply port. Required when routingLogic is \"kvaware\": engines are pointed at this port on the router Service (see LMCACHE_CONTROLLER_REPLY_URL), and worker registration blocks silently if it is not open.",
                     "type": [
                         "integer",
                         "string"
