@@ -417,7 +417,7 @@ async def route_general_request(
     request_body = await request.body()
     try:
         request_json = json.loads(request_body) if request_body else {}
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
         return JSONResponse(
             status_code=400,
             content={"error": "Invalid request: request body must be valid JSON."},

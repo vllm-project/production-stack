@@ -13,6 +13,7 @@ from vllm_router.services.request_service.request import (
 REQUEST_ID = "test-request-id"
 
 
+# Build a minimal request with only the attributes needed for JSON validation.
 def _json_request(body: bytes):
     return SimpleNamespace(
         headers={"X-Request-Id": REQUEST_ID},
@@ -34,6 +35,7 @@ def _json_request(body: bytes):
         b'{"model":"test-model"',
         b"\xff",
         b"[]",
+        b"[" * 2_000 + b"]" * 2_000,
     ],
 )
 @pytest.mark.asyncio
