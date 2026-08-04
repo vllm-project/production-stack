@@ -28,7 +28,7 @@ Prerequisites
 Step 1: Configuring Remote KV Cache Storage
 --------------------------------------------
 
-Locate the file `tutorials/assets/values-06-remote-shared-storage.yaml <https://github.com/vllm-project/production-stack/blob/main/tutorials/assets/values-06-remote-shared-storage.yaml>`_ with the following content:
+Locate the file `tutorials/assets/values-06-shared-storage.yaml <https://github.com/vllm-project/production-stack/blob/main/tutorials/assets/values-06-shared-storage.yaml>`_ with the following content:
 
 .. code-block:: yaml
 
