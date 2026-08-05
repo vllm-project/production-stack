@@ -144,6 +144,15 @@ jobs:
             --timeout 20
         timeout-minutes: 20
 
+      - name: Cleanup k8s discovery resources
+        if: always()
+        run: |
+          if helm status vllm >/dev/null 2>&1; then
+            helm uninstall vllm --wait
+          else
+            echo "No vllm Helm release found; skipping cleanup."
+          fi
+
       - name: Archive k8s discovery routing test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
