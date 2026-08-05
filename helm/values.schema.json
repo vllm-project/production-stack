@@ -459,6 +459,10 @@
                     "description": "Affinity configuration",
                     "type": "object"
                 },
+                "tolerations": {
+                    "description": "Tolerations configuration",
+                    "type": "array"
+                },
                 "autoscaling": {
                     "description": "autoscaling configuration",
                     "type": "object",
