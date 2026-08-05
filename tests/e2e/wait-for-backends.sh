@@ -17,8 +17,9 @@ print_backend_log() {
 
     if [ -n "$log_file" ] && [ -f "$log_file" ]; then
         echo "Last 50 lines from ${backend_name} log (${log_file}):"
-        tail -n 50 "$log_file"
+        tail -n 50 "$log_file" || true
     fi
+    return 0
 }
 
 check_backend_process() {
@@ -31,6 +32,7 @@ check_backend_process() {
         print_backend_log "$backend_name" "$log_file"
         return 1
     fi
+    return 0
 }
 
 start_time=$(date +%s)
