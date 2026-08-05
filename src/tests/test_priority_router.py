@@ -75,13 +75,19 @@ async def test_high_priority_request_selects_least_loaded_engine():
         EndpointInfo(url="http://engine2.com"),
     ]
     request_stats = {
-        "http://engine1.com": RequestStats(in_prefill_requests=5, in_decoding_requests=5),
-        "http://engine2.com": RequestStats(in_prefill_requests=1, in_decoding_requests=0),
+        "http://engine1.com": RequestStats(
+            in_prefill_requests=5, in_decoding_requests=5
+        ),
+        "http://engine2.com": RequestStats(
+            in_prefill_requests=1, in_decoding_requests=0
+        ),
     }
     request = Request(headers={"x-request-priority": "-1"})
     request_json: Dict[str, Any] = {}
 
-    url = await router.route_request(endpoints, None, request_stats, request, request_json)
+    url = await router.route_request(
+        endpoints, None, request_stats, request, request_json
+    )
 
     assert url == "http://engine2.com"
     # Priority must be injected back into the forwarded body.
@@ -101,15 +107,21 @@ async def test_default_priority_is_not_treated_as_high_priority():
         EndpointInfo(url="http://engine2.com"),
     ]
     request_stats = {
-        "http://engine1.com": RequestStats(in_prefill_requests=5, in_decoding_requests=5),
-        "http://engine2.com": RequestStats(in_prefill_requests=0, in_decoding_requests=0),
+        "http://engine1.com": RequestStats(
+            in_prefill_requests=5, in_decoding_requests=5
+        ),
+        "http://engine2.com": RequestStats(
+            in_prefill_requests=0, in_decoding_requests=0
+        ),
     }
     request = Request(headers={})
     request_json: Dict[str, Any] = {}
 
     # No priority given -> resolves to default (0), which is not < threshold
     # (0), so it must round-robin rather than jump straight to engine2.
-    url = await router.route_request(endpoints, None, request_stats, request, request_json)
+    url = await router.route_request(
+        endpoints, None, request_stats, request, request_json
+    )
 
     assert url == "http://engine1.com"
 
@@ -130,9 +142,7 @@ async def test_round_robin_candidates_include_least_loaded_engine():
 
     seen = set()
     for _ in range(4):
-        url = await router.route_request(
-            endpoints, None, request_stats, request, {}
-        )
+        url = await router.route_request(endpoints, None, request_stats, request, {})
         seen.add(url)
 
     assert seen == {"http://engine1.com", "http://engine2.com"}
