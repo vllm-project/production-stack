@@ -168,7 +168,15 @@ spec:
           - name: "router-port"
             containerPort: {{ .Values.routerSpec.containerPort }}
           - name: "lmcache-port"
-            containerPort: 9000
+            containerPort: {{ .Values.routerSpec.lmcacheControllerPort | default 9000 }}
+          {{- if .Values.routerSpec.lmcacheControllerReplyPort }}
+          - name: "lmcache-reply"
+            containerPort: {{ .Values.routerSpec.lmcacheControllerReplyPort }}
+          {{- end }}
+          {{- if .Values.routerSpec.lmcacheControllerHeartbeatPort }}
+          - name: "lmcache-hbeat"
+            containerPort: {{ .Values.routerSpec.lmcacheControllerHeartbeatPort }}
+          {{- end }}
         {{- with .Values.routerSpec.livenessProbe }}
         livenessProbe:
           {{- toYaml . | nindent 10 }}

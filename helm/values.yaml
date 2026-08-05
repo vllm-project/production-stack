@@ -598,8 +598,18 @@ routerSpec:
     # -- LMCache log level for the router deployment.
     logLevel: "INFO"
 
-  # -- lmcache controller port, used when routingLogic is "kvaware"
+  # -- lmcache controller pull port, used when routingLogic is "kvaware"
   lmcacheControllerPort: "" # @schema type:[integer, string]
+
+  # -- lmcache controller reply port. Required when routingLogic is "kvaware": engines are
+  # pointed at this port on the router Service (see LMCACHE_CONTROLLER_REPLY_URL), and worker
+  # registration blocks silently if it is not open.
+  lmcacheControllerReplyPort: "" # @schema type:[integer, string]
+
+  # -- lmcache controller heartbeat port. Strongly recommended when routingLogic is "kvaware":
+  # without it, workers cannot re-register after a router restart, so KV-aware routing degrades
+  # to QPS routing until the engines are restarted too.
+  lmcacheControllerHeartbeatPort: "" # @schema type:[integer, string]
 
   # -- router resource requests and limits
   resources:
