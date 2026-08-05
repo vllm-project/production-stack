@@ -189,13 +189,24 @@ jobs:
           echo "🚀 Starting vLLM serve backend"
           mkdir -p "$LOG_DIR"
           CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template tests/assets/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
+          backend_1_pid=$!
+          echo "STATIC_BACKEND_1_PID=$backend_1_pid" >> "$GITHUB_ENV"
           CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 --chat-template tests/assets/template-chatml.jinja > "$LOG_DIR/backend2.log" 2>&1 &
+          backend_2_pid=$!
+          echo "STATIC_BACKEND_2_PID=$backend_2_pid" >> "$GITHUB_ENV"
 
       - name: Wait for backends to be ready
         run: |
           echo "⏳ Waiting for backends to be ready"
           chmod +x tests/e2e/wait-for-backends.sh
-          ./tests/e2e/wait-for-backends.sh 180 "http://localhost:8001" "http://localhost:8002"
+          ./tests/e2e/wait-for-backends.sh \
+            180 \
+            "http://localhost:8001" \
+            "http://localhost:8002" \
+            "$STATIC_BACKEND_1_PID" \
+            "$STATIC_BACKEND_2_PID" \
+            "$LOG_DIR/backend1.log" \
+            "$LOG_DIR/backend2.log"
 
       - name: Run All Static Discovery Routing Tests
         run: |
