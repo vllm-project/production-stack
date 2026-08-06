@@ -12,7 +12,7 @@ INFERENCE_NAMESPACE=${INFERENCE_NAMESPACE:-default}
 
 kubectl apply --server-side -f \
   "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml"
-kubectl apply -f \
+kubectl apply --server-side -f \
   "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/${INFERENCE_EXTENSION_VERSION}/manifests.yaml"
 
 helm upgrade -i --create-namespace \

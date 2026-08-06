@@ -37,4 +37,5 @@ if [[ "${DELETE_SHARED_CRDS:-false}" == "true" ]]; then
   kubectl delete -f \
     "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml" \
     --ignore-not-found=true
+  kubectl delete namespace agentgateway-system --ignore-not-found=true
 fi

@@ -10,7 +10,7 @@ INFERENCE_EXTENSION_VERSION=${INFERENCE_EXTENSION_VERSION:-v1.5.0}
 AGENTGATEWAY_VERSION=${AGENTGATEWAY_VERSION:-v1.4.1}
 LLM_D_ROUTER_VERSION=${LLM_D_ROUTER_VERSION:-v0.9.0}
 KIND_CLUSTER_NAME=${KIND_CLUSTER_NAME:-vllm-agentgateway-smoke}
-USE_EXISTING_CLUSTER=${USE_EXISTING_CLUSTER:-false}
+port_forward_log="${TMPDIR:-/tmp}/agentgateway-port-forward.log"
 
 for command_name in curl helm kind kubectl; do
   if ! command -v "${command_name}" >/dev/null 2>&1; then
@@ -39,18 +39,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [[ "${USE_EXISTING_CLUSTER}" != "true" ]]; then
-  if kind get clusters | grep -Fxq "${KIND_CLUSTER_NAME}"; then
-    echo "Refusing to replace existing kind cluster: ${KIND_CLUSTER_NAME}" >&2
-    exit 1
-  fi
-  kind create cluster --name "${KIND_CLUSTER_NAME}" --wait 120s
-  created_cluster=true
+if kind get clusters | grep -Fxq "${KIND_CLUSTER_NAME}"; then
+  echo "Refusing to replace existing kind cluster: ${KIND_CLUSTER_NAME}" >&2
+  exit 1
 fi
+kind create cluster --name "${KIND_CLUSTER_NAME}" --wait 120s
+created_cluster=true
 
 kubectl apply --server-side -f \
   "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml"
-kubectl apply -f \
+kubectl apply --server-side -f \
   "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/${INFERENCE_EXTENSION_VERSION}/manifests.yaml"
 
 helm upgrade -i --create-namespace \
@@ -85,7 +83,7 @@ kubectl wait \
   --timeout=120s httproute/vllm-qwen3-32b
 
 kubectl port-forward service/inference-gateway 18080:80 \
-  >"${TMPDIR:-/tmp}/agentgateway-port-forward.log" 2>&1 &
+  >"${port_forward_log}" 2>&1 &
 port_forward_pid=$!
 
 for attempt in $(seq 1 30); do
@@ -110,4 +108,11 @@ echo "Gateway Inference Extension smoke test failed" >&2
 kubectl describe gateway inference-gateway >&2 || true
 kubectl describe httproute vllm-qwen3-32b >&2 || true
 kubectl logs deployment/vllm-qwen3-32b-epp >&2 || true
+kubectl logs deployment/vllm-qwen3-32b >&2 || true
+kubectl logs --namespace agentgateway-system deployment/agentgateway >&2 || true
+kubectl get events --sort-by=.lastTimestamp >&2 || true
+if [[ -f "${port_forward_log}" ]]; then
+  echo "=== Port-forward logs ===" >&2
+  sed -n '1,240p' "${port_forward_log}" >&2
+fi
 exit 1
