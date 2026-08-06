@@ -1,136 +1,101 @@
-Gateway Inference Extension
-===========================
+Gateway API Inference Extension
+===============================
 
-This tutorial guides you through setting up and using the Gateway Inference Extension in a production environment. The extension enables inference capabilities through the gateway, supporting both individual inference models and inference pools.
+This guide deploys agentgateway as an inference gateway for a pool of vLLM
+model servers. The Kubernetes Gateway API Inference Extension defines the
+``InferencePool`` contract, and the llm-d Router Endpoint Picker (EPP) selects
+a model-server pod for each request.
+
+The request path is:
+
+.. code-block:: text
+
+   Client -> agentgateway -> HTTPRoute -> InferencePool
+                                         -> llm-d Router EPP -> vLLM pod
+
+The example pins Gateway API ``v1.6.0``, Inference Extension ``v1.5.0``,
+agentgateway ``v1.4.1``, and llm-d Router ``v0.9.0``.
 
 Prerequisites
 -------------
 
-Before starting this tutorial, ensure you have:
+- A Kubernetes cluster with at least two GPU nodes
+- ``kubectl`` configured for the cluster
+- Helm 3
+- A Hugging Face token with access to
+  ``meta-llama/Llama-3.2-1B-Instruct``
 
-- A Kubernetes cluster with GPU nodes available
-- ``kubectl`` configured to access your cluster
-- ``helm`` installed
-- A Hugging Face account with API token
-- Basic understanding of Kubernetes concepts
-
-Overview
---------
-
-The Gateway Inference Extension provides:
-
-- **Individual Model Inference**: Direct access to specific models
-- **Inference Pools**: Load-balanced access to multiple model instances
-- **Gateway API Integration**: Standard Kubernetes Gateway API for routing
-- **vLLM Integration**: High-performance inference engine support
-
-Step 1: Environment Setup
--------------------------
-
-1.1 Create Hugging Face Token Secret
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-First, create a Kubernetes secret with your Hugging Face token:
+Create the model credential
+---------------------------
 
 .. code-block:: bash
 
-   # Replace <YOUR_HF_TOKEN> with your actual Hugging Face token
-   kubectl create secret generic hf-token --from-literal=token=<YOUR_HF_TOKEN>
+   kubectl create secret generic hf-token \
+     --from-literal=token='<YOUR_HF_TOKEN>'
 
-1.2 Install Gateway API CRDs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Install the required Custom Resource Definitions (CRDs):
-
-.. code-block:: bash
-
-   # Install Kgateway CRDs
-   KGTW_VERSION=v2.0.2
-   helm upgrade -i --create-namespace --namespace kgateway-system --version $KGTW_VERSION kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds
-
-   # Install Gateway API CRDs
-   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
-
-   # Install Gateway API inference extension CRDs
-   VERSION=v0.3.0
-   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/$VERSION/manifests.yaml
-
-1.3 Install Kgateway with Inference Extension
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-   # Install Kgateway with inference extension enabled
-   helm upgrade -i --namespace kgateway-system --version $KGTW_VERSION kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway --set inferenceExtension.enabled=true
-
-Step 2: Deploy vLLM Models
---------------------------
-
-2.1 Understanding vLLM Runtime
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The vLLM Runtime is a custom resource that manages model deployments. Please check ``configs/vllm/gpu-deployment.yaml`` for an example config.
-
-2.2 Apply vLLM Deployment
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-   # Apply the vLLM deployment configuration
-   kubectl apply -f configs/vllm/gpu-deployment.yaml
-
-**Production Considerations**:
-
-- Adjust resource requests/limits based on your model size and GPU capacity
-- Consider using multiple replicas for high availability
-- Monitor GPU utilization and adjust accordingly
-
-Step 3: Configure Inference Resources
--------------------------------------
-
-3.1 Individual Model Configuration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Create an InferenceModel resource for direct model access:
-
-.. code-block:: yaml
-
-   apiVersion: inference.networking.x-k8s.io/v1alpha2
-   kind: InferenceModel
-   metadata:
-     name: legogpt
-   spec:
-     modelName: legogpt
-     criticality: Standard
-     poolRef:
-       name: vllm-llama3-1b-instruct
-     targetModels:
-     - name: legogpt
-       weight: 100
-
-3.2 Inference Pool Configuration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For routing to multiple model instances, check ``configs/inferencepool-resources.yaml`` for example.
-
-3.3 Apply Inference Resources
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-   # Apply individual model configuration
-   kubectl apply -f configs/inferencemodel.yaml
-
-   # Apply inference pool configuration
-   kubectl apply -f configs/inferencepool-resources.yaml
-
-Step 4: Configure Gateway Routing
+Install the APIs and agentgateway
 ---------------------------------
 
-4.1 Gateway Configuration
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Install the pinned Gateway API and Inference Extension CRDs:
 
-The gateway acts as the entry point for inference requests:
+.. code-block:: bash
+
+   export GATEWAY_API_VERSION=v1.6.0
+   export INFERENCE_EXTENSION_VERSION=v1.5.0
+
+   kubectl apply --server-side -f \
+     "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml"
+
+   kubectl apply --server-side -f \
+     "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/${INFERENCE_EXTENSION_VERSION}/manifests.yaml"
+
+Install agentgateway with Inference Extension support:
+
+.. code-block:: bash
+
+   export AGENTGATEWAY_VERSION=v1.4.1
+
+   helm upgrade -i --create-namespace \
+     --namespace agentgateway-system \
+     --version "${AGENTGATEWAY_VERSION}" \
+     agentgateway-crds oci://cr.agentgateway.dev/charts/agentgateway-crds
+
+   helm upgrade -i \
+     --namespace agentgateway-system \
+     --version "${AGENTGATEWAY_VERSION}" \
+     --set inferenceExtension.enabled=true \
+     agentgateway oci://cr.agentgateway.dev/charts/agentgateway
+
+Deploy vLLM
+-----------
+
+The example runs two replicas of ``meta-llama/Llama-3.2-1B-Instruct`` and
+labels them with ``app: vllm-llama3-1b-instruct``. The InferencePool uses that
+label to discover model servers.
+
+.. code-block:: bash
+
+   kubectl apply -f \
+     src/gateway_inference_extension/configs/vllm/gpu-deployment.yaml
+
+   kubectl rollout status deployment/vllm-llama3-1b-instruct \
+     --timeout=15m
+
+Adjust GPU resources, replica count, and model-server arguments before using
+the example in production.
+
+Create the agentgateway Gateway
+-------------------------------
+
+.. code-block:: bash
+
+   kubectl apply -f \
+     src/gateway_inference_extension/configs/gateway/agentgateway/gateway.yaml
+
+   kubectl wait --for=condition=Programmed --timeout=120s \
+     gateway/inference-gateway
+
+The Gateway selects the agentgateway GatewayClass:
 
 .. code-block:: yaml
 
@@ -139,148 +104,121 @@ The gateway acts as the entry point for inference requests:
    metadata:
      name: inference-gateway
    spec:
-     gatewayClassName: kgateway
+     gatewayClassName: agentgateway
      listeners:
-     - name: http
-       port: 80
-       protocol: HTTP
+       - name: http
+         port: 80
+         protocol: HTTP
 
-4.2 HTTPRoute Configuration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Install the llm-d Router
+------------------------
 
-HTTPRoute defines how requests are routed to inference resources:
-
-.. code-block:: yaml
-
-   apiVersion: gateway.networking.k8s.io/v1
-   kind: HTTPRoute
-   metadata:
-     name: llm-route
-   spec:
-     parentRefs:
-     - group: gateway.networking.k8s.io
-       kind: Gateway
-       name: inference-gateway
-     rules:
-     - backendRefs:
-       - group: inference.networking.x-k8s.io
-         kind: InferencePool
-         name: vllm-llama3-1b-instruct
-       matches:
-       - path:
-           type: PathPrefix
-           value: /
-
-4.3 Apply Gateway Resources
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The llm-d Router Gateway chart creates the current
+``inference.networking.k8s.io/v1`` InferencePool, EPP Deployment and Service,
+RBAC, and an HTTPRoute attached to ``inference-gateway``.
 
 .. code-block:: bash
 
-   # Apply gateway configuration
-   kubectl apply -f configs/gateway/kgateway/gateway.yaml
+   export LLM_D_ROUTER_VERSION=v0.9.0
 
-   # Apply HTTP route configuration
-   kubectl apply -f configs/httproute.yaml
+   helm upgrade -i vllm-llama3-1b-instruct \
+     oci://ghcr.io/llm-d/charts/llm-d-router-gateway \
+     --version "${LLM_D_ROUTER_VERSION}" \
+     -f src/gateway_inference_extension/configs/llm-d-router-values.yaml
 
-Step 5: Testing the Setup
+   kubectl rollout status deployment/vllm-llama3-1b-instruct-epp \
+     --timeout=120s
+
+The values set ``provider.name=none`` because agentgateway processes the
+chart-created HTTPRoute and InferencePool directly. The values also select the
+vLLM pods through ``router.modelServers.matchLabels``.
+
+Verify the deployment
+---------------------
+
+.. code-block:: bash
+
+   kubectl get gateway inference-gateway
+   kubectl get httproute vllm-llama3-1b-instruct
+   kubectl get inferencepool vllm-llama3-1b-instruct
+   kubectl get deployment vllm-llama3-1b-instruct-epp
+
+For troubleshooting, inspect status conditions and component logs:
+
+.. code-block:: bash
+
+   kubectl describe gateway inference-gateway
+   kubectl describe httproute vllm-llama3-1b-instruct
+   kubectl logs deployment/vllm-llama3-1b-instruct-epp
+   kubectl logs -n agentgateway-system deployment/agentgateway
+
+Send an inference request
 -------------------------
 
-5.1 Get Gateway IP Address
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Port-forward the Gateway Service:
 
 .. code-block:: bash
 
-   # Get the external IP of the gateway
-   IP=$(kubectl get gateway/inference-gateway -o jsonpath='{.status.addresses[0].value}')
-   PORT=80
+   kubectl port-forward service/inference-gateway 8080:80
 
-   echo "Gateway IP: $IP"
-   echo "Gateway Port: $PORT"
-
-5.2 Send Test Inference Request
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a separate terminal, send an OpenAI-compatible completion request:
 
 .. code-block:: bash
 
-   # Test with a simple completion request
-   curl -i http://${IP}:${PORT}/v1/completions \
+   curl -i http://localhost:8080/v1/completions \
      -H 'Content-Type: application/json' \
      -d '{
-       "model": "legogpt",
+       "model": "meta-llama/Llama-3.2-1B-Instruct",
        "prompt": "Write as if you were a critic: San Francisco",
        "max_tokens": 100,
        "temperature": 0.5
      }'
 
-5.3 Test Chat Completion
-~~~~~~~~~~~~~~~~~~~~~~~~
+Use agentgateway AI policies
+----------------------------
+
+The default route points directly to the InferencePool. This is appropriate
+when only endpoint selection is needed. To use token-based rate limiting,
+guardrails, transformations, or LLM observability, route to an
+``AgentgatewayBackend`` whose custom provider references the InferencePool.
+See the `agentgateway inference routing guide
+<https://agentgateway.dev/docs/kubernetes/latest/llm/inference/inference-routing/>`_.
+
+Uninstall
+---------
 
 .. code-block:: bash
 
-   # Test chat completion endpoint
-   curl -i http://${IP}:${PORT}/v1/chat/completions \
-     -H 'Content-Type: application/json' \
-     -d '{
-       "model": "legogpt",
-       "messages": [
-         {"role": "user", "content": "Hello, how are you?"}
-       ],
-       "max_tokens": 50,
-       "temperature": 0.7
-     }'
+   ./src/gateway_inference_extension/delete.sh
 
-Step 6: Monitoring and Troubleshooting
---------------------------------------
-
-6.1 Check Resource Status
-~~~~~~~~~~~~~~~~~~~~~~~~~
+The cleanup script retains shared agentgateway, Gateway API, and Inference
+Extension CRDs. On a dedicated test cluster, remove them explicitly:
 
 .. code-block:: bash
 
-   # Check vLLM runtime status
-   kubectl get vllmruntime
+   DELETE_SHARED_CRDS=true ./src/gateway_inference_extension/delete.sh
 
-   # Check inference model status
-   kubectl get inferencemodel
+Migration from kgateway
+-----------------------
 
-   # Check inference pool status
-   kubectl get inferencepool
+Kgateway's inference-extension operation without agentgateway was deprecated
+in kgateway 2.1 and is unsupported in 2.2. The Production Stack inference
+example no longer includes a kgateway configuration or locally patched EPP.
 
-   # Check gateway status
-   kubectl get gateway
+For an existing installation:
 
-6.2 View Logs
-~~~~~~~~~~~~~
+1. Install agentgateway and change ``gatewayClassName`` from ``kgateway`` to
+   ``agentgateway``.
+2. Upgrade ``InferencePool`` from
+   ``inference.networking.x-k8s.io/v1alpha2`` to
+   ``inference.networking.k8s.io/v1``.
+3. Replace ``targetPortNumber`` with ``targetPorts`` and ``extensionRef`` with
+   ``endpointPickerRef``.
+4. Remove obsolete ``InferenceModel`` resources.
+5. Replace the custom EPP Deployment, Service, and RBAC with the llm-d Router
+   Gateway chart.
+6. Remove the kgateway releases only after the agentgateway route reports
+   ``Accepted=True`` and an inference request succeeds.
 
-.. code-block:: bash
-
-   # Get vLLM runtime logs
-   kubectl logs -l app=vllm-runtime
-
-   # Get gateway logs
-   kubectl logs -n kgateway-system -l app=kgateway
-
-Step 7: Uninstall
------------------
-
-To uninstall all the resources installed on the cluster, run the following:
-
-.. code-block:: bash
-
-   # Delete the inference extension
-   kubectl delete -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/raw/main/config/manifests/gateway/kgateway/gateway.yaml --ignore-not-found=true
-
-   # Delete the inference model and pool resources
-   kubectl delete -f configs/inferencemodel.yaml --ignore-not-found=true
-   kubectl delete -f configs/inferencepool-resources.yaml --ignore-not-found=true
-
-   # Delete the VLLM deployment
-   kubectl delete -f configs/vllm/gpu-deployment.yaml --ignore-not-found=true
-   kubectl delete -f https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v0.3.0/manifests.yaml --ignore-not-found=true
-
-   # Delete helm releases
-   helm uninstall kgateway -n kgateway-system
-   helm uninstall kgateway-crds -n kgateway-system
-
-   # Delete the namespace last to ensure all resources are removed
-   kubectl delete ns kgateway-system --ignore-not-found=true
+This deprecation does not apply to kgateway used as a generic Gateway API
+ingress controller.
