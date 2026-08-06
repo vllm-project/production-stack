@@ -3,6 +3,7 @@ from collections import Counter
 from typing import Dict, List, Tuple
 
 import pytest
+from fastapi import HTTPException
 
 from vllm_router.routers.routing_logic import RoundRobinRouter, cleanup_routing_logic
 
@@ -133,3 +134,45 @@ def test_roundrobin_rejects_empty_endpoint_list():
 
     with pytest.raises(ValueError, match="at least one endpoint"):
         router.route_request([], {}, {}, generate_request())
+
+
+def test_pick_admissible_endpoint_skips_inadmissible_endpoints():
+    """The cursor walks past rejected endpoints and lands on the first accepted one."""
+    router = RoundRobinRouter()
+    endpoints = [EndpointInfo(url=f"e{i}") for i in range(4)]
+
+    # e0 is next in round-robin order, but only e2 is admissible.
+    chosen = router.pick_admissible_endpoint(endpoints, lambda e: e.url == "e2")
+    assert chosen.url == "e2"
+
+    # The cursor advanced past e2, so an always-admissible pick resumes at e3.
+    assert router.pick_admissible_endpoint(endpoints, lambda _: True).url == "e3"
+
+
+def test_pick_admissible_endpoint_returns_none_when_nothing_admissible():
+    router = RoundRobinRouter()
+    endpoints = [EndpointInfo(url="e0"), EndpointInfo(url="e1")]
+
+    assert router.pick_admissible_endpoint(endpoints, lambda _: False) is None
+
+
+def test_pick_admissible_endpoint_keeps_cursor_when_nothing_admissible():
+    """A fully-rejected pass must not consume a slot, or endpoints get starved."""
+    router = RoundRobinRouter()
+    endpoints = [EndpointInfo(url="e0"), EndpointInfo(url="e1")]
+
+    assert router.pick_admissible_endpoint(endpoints, lambda _: False) is None
+    assert router.pick_admissible_endpoint(endpoints, lambda _: True).url == "e0"
+
+
+def test_route_request_raises_503_when_no_endpoint_admissible(monkeypatch):
+    """Guards the `chosen is None` path once a real admission predicate exists."""
+    router = RoundRobinRouter()
+    endpoints = [EndpointInfo(url="e0")]
+    monkeypatch.setattr(router, "pick_admissible_endpoint", lambda *a, **kw: None)
+
+    with pytest.raises(HTTPException) as exc_info:
+        router.route_request(endpoints, {}, {}, generate_request())
+
+    assert exc_info.value.status_code == 503
+    assert "NO_ADMISSIBLE_ENDPOINT" in exc_info.value.detail
