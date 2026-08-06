@@ -1,0 +1,21 @@
+router:
+  modelServers:
+    matchLabels:
+      app: vllm-llama3-1b-instruct
+  epp:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+# Agentgateway processes the chart-created HTTPRoute and InferencePool. The
+# chart must not create configuration for another gateway implementation.
+provider:
+  name: none
+
+httpRoute:
+  create: true
+  inferenceGatewayName: inference-gateway
+  requestTimeout: 300s
