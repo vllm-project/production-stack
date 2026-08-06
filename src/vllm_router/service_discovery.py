@@ -408,6 +408,13 @@ class StaticServiceDiscovery(ServiceDiscovery):
             self.loop.close()
 
 
+def _parse_static_known_models(raw: str | None) -> Set[str]:
+    """Parse a comma-separated list of model names into a set, dropping blanks."""
+    if not raw:
+        return set()
+    return {name.strip() for name in raw.split(",") if name.strip()}
+
+
 class K8sPodIPServiceDiscovery(ServiceDiscovery):
     def __init__(
         self,
@@ -419,6 +426,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         decode_model_labels: List[str] | None = None,
         watcher_timeout_seconds: int = 0,
         health_check_timeout_seconds: int = 10,
+        static_known_models: str | None = None,
     ):
         """
         Initialize the Kubernetes service discovery module. This module
@@ -439,7 +447,10 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         self.port = port
         self.available_engines: Dict[str, EndpointInfo] = {}
         self.available_engines_lock = threading.Lock()
-        self.known_models: Set[str] = set()
+        # Pre-seed with statically-declared models so a router pod that starts
+        # while a model's deployment is scaled to zero still reports the model as
+        # "seen" (retryable 503) instead of a fatal 404. See issue #1003.
+        self.known_models: Set[str] = _parse_static_known_models(static_known_models)
         self.known_models_lock = threading.Lock()
         self.label_selector = label_selector
         self.watcher_timeout_seconds = watcher_timeout_seconds
@@ -1325,15 +1336,25 @@ def _create_service_discovery(
         return StaticServiceDiscovery(*args, **kwargs)
     elif service_discovery_type == ServiceDiscoveryType.K8S:
         k8s_discovery_type = kwargs.pop("k8s_service_discovery_type", "pod-ip")
+        # Only the pod-ip discovery tracks per-process "known models"; drop the
+        # option here so it is never forwarded to the service-name variant.
+        static_known_models = kwargs.pop("static_known_models", None)
         if k8s_discovery_type is None or not k8s_discovery_type.strip():
             normalized_type = "pod-ip"
         else:
             normalized_type = k8s_discovery_type.strip().lower()
 
         if normalized_type == "service-name":
+            if static_known_models:
+                logger.warning(
+                    "--k8s-known-models is only supported with pod-ip service "
+                    "discovery; ignoring it for service-name discovery."
+                )
             return K8sServiceNameServiceDiscovery(*args, **kwargs)
         else:
-            return K8sPodIPServiceDiscovery(*args, **kwargs)
+            return K8sPodIPServiceDiscovery(
+                *args, static_known_models=static_known_models, **kwargs
+            )
     elif service_discovery_type == ServiceDiscoveryType.EXTERNAL_ONLY:
         return ExternalOnlyServiceDiscovery()
     else:
