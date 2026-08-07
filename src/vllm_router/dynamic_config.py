@@ -68,6 +68,7 @@ class DynamicRouterConfig:
 
     # Routing logic configurations
     session_key: Optional[str] = None
+    max_instance_failover_reroute_attempts: Optional[int] = 0
 
     # Logging Options
     callbacks: Optional[str] = None
@@ -103,6 +104,7 @@ class DynamicRouterConfig:
             # Routing logic configurations
             routing_logic=args.routing_logic,
             session_key=args.session_key,
+            max_instance_failover_reroute_attempts=args.max_instance_failover_reroute_attempts,
             # Logging Options
             callbacks=args.callbacks,
         )
@@ -212,7 +214,9 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         Reconfigures the router with the given config.
         """
         routing_logic = reconfigure_routing_logic(
-            config.routing_logic, session_key=config.session_key
+            config.routing_logic,
+            session_key=config.session_key,
+            max_instance_failover_reroute_attempts=config.max_instance_failover_reroute_attempts,
         )
         self.app.state.router = routing_logic
         logger.info("DynamicConfigWatcher: Routing logic reconfiguration complete")
