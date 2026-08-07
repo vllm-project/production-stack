@@ -295,6 +295,9 @@ class KvawareRouter(RoutingInterface):
         self.session_key = session_key
         self.hash_ring = HashRing()
         self.tokenizer = None
+        # Set when the tokenizer load has failed once (e.g. alias model name or
+        # egress-blocked huggingface.co); skips retrying on every request.
+        self._tokenizer_load_failed = False
         self.threshold = kv_aware_threshold
 
     def start_kv_manager(self):
@@ -357,12 +360,22 @@ class KvawareRouter(RoutingInterface):
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         # TODO (Yuhan): Handle chat completions
         try:
-            if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    endpoints[0].model_names[0]
-                )
-            token_ids = self.tokenizer.encode(request_json.get("prompt", ""))
+            if not self._tokenizer_load_failed:
+                if self.tokenizer is None:
+                    # The load is network-bound (HF hub fetch) and can hang for
+                    # seconds; run it off the event loop so /health probes and
+                    # other requests stay responsive (#1016).
+                    self.tokenizer = await asyncio.to_thread(
+                        AutoTokenizer.from_pretrained,
+                        endpoints[0].model_names[0],
+                    )
+                token_ids = self.tokenizer.encode(request_json.get("prompt", ""))
         except Exception:
+            if self.tokenizer is None:
+                # Cache the doomed load as failed; otherwise it is retried (and
+                # re-blocks) on every single request (#1016).
+                self._tokenizer_load_failed = True
+        if token_ids is None:
             # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
             remote_url = endpoints[0].url + "/tokenize"
             headers = {"Content-Type": "application/json"}
@@ -370,8 +383,12 @@ class KvawareRouter(RoutingInterface):
                 "model": endpoints[0].model_names[0],
                 "prompt": request_json.get("prompt", ""),
             }
-            body = requests.post(
-                remote_url, headers=headers, json=data, timeout=10
+            # Offloaded for the same reason as the tokenizer load: this POST
+            # carries the full prompt and has a 10s timeout (#1016).
+            body = (
+                await asyncio.to_thread(
+                    requests.post, remote_url, headers=headers, json=data, timeout=10
+                )
             ).json()
             token_ids = body["tokens"]
 
