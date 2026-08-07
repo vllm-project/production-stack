@@ -5,6 +5,7 @@ import json
 import re
 import resource
 import wave
+from dataclasses import dataclass
 from typing import Optional
 
 import requests
@@ -215,12 +216,76 @@ def parse_comma_separated_args(comma_separated_string: Optional[str]):
     return comma_separated_string.split(",")
 
 
-def parse_static_aliases(static_aliases: str):
-    aliases = {}
-    for alias_and_model in static_aliases.split(","):
-        alias, model = alias_and_model.split(":")
-        aliases[alias] = model
-    logger.info(f"Loaded aliases {aliases}")
+VALID_REASONING_EFFORTS = ("none", "low", "medium", "high")
+
+
+@dataclass(frozen=True)
+class AliasConfig:
+    """Configuration for a model alias with optional request overrides."""
+
+    model: str
+    reasoning_effort: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if self.reasoning_effort is None:
+            return
+        if self.reasoning_effort not in VALID_REASONING_EFFORTS:
+            raise ValueError(
+                f"Invalid reasoning_effort '{self.reasoning_effort}' "
+                f"(expected one of {VALID_REASONING_EFFORTS})"
+            )
+
+
+def normalize_alias_config(alias_name: str, value: object) -> AliasConfig:
+    if isinstance(value, AliasConfig):
+        return value
+    if isinstance(value, str):
+        return AliasConfig(model=value)
+    raise TypeError(
+        f"Invalid alias value for '{alias_name}': expected str or AliasConfig, "
+        f"got {type(value).__name__}"
+    )
+
+
+def _parse_alias_entry(entry: str) -> tuple[str, AliasConfig]:
+    alias_and_model, *raw_params = entry.split("|")
+    alias, separator, model = alias_and_model.partition(":")
+    alias = alias.strip()
+    model = model.strip()
+
+    if not separator or not alias or not model:
+        raise ValueError(
+            "Invalid alias entry "
+            f"'{entry}'. Expected format alias:model[|reasoning_effort=value]"
+        )
+
+    reasoning_effort = None
+    for raw_param in raw_params:
+        param = raw_param.strip()
+        key, separator, value = param.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if not separator or not key or not value:
+            raise ValueError(f"Invalid alias parameter '{param}' in entry '{entry}'")
+        if key != "reasoning_effort":
+            raise ValueError(
+                f"Unknown alias parameter '{key}' in entry '{entry}'. "
+                "Supported parameters: reasoning_effort"
+            )
+        reasoning_effort = value
+
+    return alias, AliasConfig(model=model, reasoning_effort=reasoning_effort)
+
+
+def parse_static_aliases(static_aliases: str) -> dict[str, AliasConfig]:
+    aliases: dict[str, AliasConfig] = {}
+    for raw_entry in static_aliases.split(","):
+        entry = raw_entry.strip()
+        if not entry:
+            continue
+        alias, config = _parse_alias_entry(entry)
+        aliases[alias] = config
+    logger.info("Loaded aliases %s", aliases)
     return aliases
 
 
