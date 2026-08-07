@@ -1,0 +1,42 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: "llama"
+    repository: "vllm/vllm-openai"
+    tag: "latest"
+    modelURL: "meta-llama/Llama-3.2-1B-Instruct"
+    replicaCount: 2
+    requestCPU: 6
+    requestMemory: "30Gi"
+    requestGPU: 1
+    pvcStorage: "50Gi"
+    vllmConfig:
+      enablePrefixCaching: true
+      maxModelLen: 16384
+      # Required so vLLM's in-engine scheduler actually preempts
+      # lower-priority requests for the injected "priority" field to matter.
+      extraArgs: ["--scheduling-policy", "priority"]
+
+    env: []
+    hf_token: <YOUR HF TOKEN>
+
+routerSpec:
+  repository: "lmcache/lmstack-router"
+  tag: "latest"
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2G"
+    limits:
+      cpu: "1"
+      memory: "2G"
+  routingLogic: "priority"
+  extraArgs:
+    - "--priority-header"
+    - "x-request-priority"
+    - "--priority-field"
+    - "priority"
+    - "--priority-default"
+    - "0"
+    - "--priority-threshold"
+    - "0"
