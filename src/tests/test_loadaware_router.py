@@ -28,15 +28,17 @@ from vllm_router.routers.routing_logic import (
 
 @pytest.fixture(autouse=True)
 def lookup_msg_stub(monkeypatch):
-    """`LookupMsg` comes from the optional lmcache dependency; stub it when
-    absent so the route_request tests run without the lmcache extra."""
-    if not hasattr(routing_logic, "LookupMsg"):
+    """`LookupMsg`/`QueryInstMsg` come from the optional lmcache dependency;
+    stub them when absent so the routing tests run without the lmcache
+    extra."""
 
-        class _Msg:
-            def __init__(self, **kwargs):
-                self.__dict__.update(kwargs)
+    class _Msg:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
 
-        monkeypatch.setattr(routing_logic, "LookupMsg", _Msg, raising=False)
+    for name in ("LookupMsg", "QueryInstMsg"):
+        if not hasattr(routing_logic, name):
+            monkeypatch.setattr(routing_logic, name, _Msg, raising=False)
 
 
 URL_A = "http://10.0.0.1:8000"
@@ -349,6 +351,47 @@ async def test_no_cached_prefix_anywhere_falls_back_to_qps():
         endpoints(URL_A, URL_B), {}, stats, Request(), {"prompt": "x"}
     )
     assert url == URL_B
+
+
+@pytest.mark.asyncio
+async def test_no_endpoints_is_a_503_not_a_crash():
+    from fastapi import HTTPException
+
+    router = make_router()
+    with pytest.raises(HTTPException) as exc_info:
+        await router.route_request([], {}, {}, None, {"prompt": "x"})
+    assert exc_info.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_instance_map_refresh_queries_endpoints_concurrently():
+    """The refresh must gather its controller round-trips, not serialize
+    them: with two endpoints, both queries must be in flight together."""
+    import asyncio
+
+    router = make_router(mapped=False)
+    in_flight = 0
+    max_in_flight = 0
+
+    class InstRet:
+        def __init__(self, instance_id):
+            self.instance_id = instance_id
+
+    async def query_manager(msg):
+        nonlocal in_flight, max_in_flight
+        in_flight += 1
+        max_in_flight = max(max_in_flight, in_flight)
+        await asyncio.sleep(0.01)
+        in_flight -= 1
+        return InstRet("instance-" + msg.ip)
+
+    router.query_manager = query_manager
+    await router.refresh_instance_map(endpoints(URL_A, URL_B), {})
+    assert max_in_flight == 2
+    assert router.instance_id_to_ip == {
+        "instance-10.0.0.1": URL_A,
+        "instance-10.0.0.2": URL_B,
+    }
 
 
 # --- configuration ------------------------------------------------------------

@@ -22,6 +22,7 @@ import random
 import threading
 import uuid
 from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
 import requests
 from fastapi import HTTPException, Request
@@ -678,24 +679,29 @@ class LoadAwareRouter(KvawareRouter):
         """
         if not self.instance_map_is_stale(endpoints, layout_info):
             return
-        for endpoint in endpoints:
+
+        async def query_endpoint(endpoint: EndpointInfo) -> None:
             event_id = "QueryInst" + str(uuid.uuid4())
-            query_ip = endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[0].split(
-                "//"
-            )[1]
+            url = endpoint.url if "//" in endpoint.url else "//" + endpoint.url
+            query_ip = urlparse(url).hostname or ""
             query_message = QueryInstMsg(ip=query_ip, event_id=event_id)
             endpoint_instance_id = await self.query_manager(query_message)
             logger.debug(
                 f"Query ip: {query_ip}, return instance id: {endpoint_instance_id}"
             )
             self.instance_id_to_ip[endpoint_instance_id.instance_id] = endpoint.url
+
+        await asyncio.gather(*(query_endpoint(e) for e in endpoints))
         logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
 
-    def tokenize_prompt(
+    async def tokenize_prompt(
         self, endpoints: List[EndpointInfo], request_json: Dict
     ) -> List[int]:
-        """Local-first tokenization with the remote `/tokenize` fallback,
-        matching `KvawareRouter.route_request`."""
+        """Local-first tokenization with the remote `/tokenize` fallback.
+
+        The remote fallback is a blocking HTTP call, so it runs in an
+        executor rather than on the event loop.
+        """
         try:
             if self.tokenizer is None:
                 self.tokenizer = AutoTokenizer.from_pretrained(
@@ -709,10 +715,14 @@ class LoadAwareRouter(KvawareRouter):
                 "model": endpoints[0].model_names[0],
                 "prompt": request_json.get("prompt", ""),
             }
-            body = requests.post(
-                remote_url, headers=headers, json=data, timeout=10
-            ).json()
-            return body["tokens"]
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    remote_url, headers=headers, json=data, timeout=10
+                ),
+            )
+            return response.json()["tokens"]
 
     def fallback_url(
         self,
@@ -752,8 +762,16 @@ class LoadAwareRouter(KvawareRouter):
             request (Request): The incoming request
             request_json (Dict): The request body (needed for the prefix
                match)
+
+        Raises:
+            HTTPException: 503 if no endpoints are available.
         """
-        token_ids = self.tokenize_prompt(endpoints, request_json)
+        if not endpoints:
+            raise HTTPException(
+                status_code=503, detail="No backend endpoints available"
+            )
+
+        token_ids = await self.tokenize_prompt(endpoints, request_json)
 
         event_id = "Lookup" + str(uuid.uuid4())
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
