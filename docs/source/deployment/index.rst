@@ -20,6 +20,8 @@ Deployment Options
    Deploy using Kubernetes CRDs for more advanced configurations and operator-based management. This option provides greater flexibility and integration with Kubernetes-native workflows.
 
 **Gateway Inference Extension**
-   Advanced deployment option that enables inference capabilities through gateway infrastructure, supporting both individual inference models and inference pools with sophisticated routing capabilities.
+   Advanced deployment option that uses agentgateway, the Gateway API
+   Inference Extension, and the llm-d Router to route requests across pools of
+   vLLM model servers.
 
 Choose the deployment option that best fits your infrastructure requirements and use case complexity.
