@@ -1,0 +1,44 @@
+name: Gateway Inference Extension
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/gateway-inference-extension.yml'
+      - 'src/gateway_inference_extension/**'
+      - 'tests/e2e/assets/gateway-inference-extension-simulator.yaml'
+      - 'tests/e2e/run-gateway-inference-extension-test.sh'
+      - 'tutorials/21-gateway-inference-extension.md'
+      - 'docs/source/deployment/gateway-inference-extension.rst'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/gateway-inference-extension.yml'
+      - 'src/gateway_inference_extension/**'
+      - 'tests/e2e/assets/gateway-inference-extension-simulator.yaml'
+      - 'tests/e2e/run-gateway-inference-extension-test.sh'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-test:
+    name: Agentgateway smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Helm
+        uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4.2.0
+
+      - name: Install kind and kubectl
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        with:
+          install_only: true
+
+      - name: Run Gateway Inference Extension smoke test
+        run: ./tests/e2e/run-gateway-inference-extension-test.sh

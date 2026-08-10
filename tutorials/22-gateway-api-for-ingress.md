@@ -51,7 +51,7 @@ KGTW_VERSION=v2.0.3
 # Install KGateway CRDs
 helm upgrade -i --create-namespace --namespace kgateway-system --version $KGTW_VERSION kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds
 
-# Install KGateway with inference extension enabled
+# Install KGateway as a generic Gateway API controller
 helm upgrade -i --namespace kgateway-system --version $KGTW_VERSION kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway
 ```
 
