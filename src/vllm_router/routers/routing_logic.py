@@ -63,12 +63,8 @@ class RoutingLogic(str, enum.Enum):
 
 # The single tunable of the `loadaware` routing logic. beta = 1.0 reads as: an
 # endpoint sitting 100% above fleet-average load is docked one full cache hit's
-# worth of preference. That statement mentions no hardware, model, request rate
-# or fleet size, which is what makes it a defensible default rather than a
-# number calibrated on one cluster.
-#
-# There is no second weight on the benefit term: an argmax is invariant under
-# positive scaling, so only the ratio of two weights would matter anyway.
+# worth of preference. Both score terms are dimensionless, which is what makes
+# this a defensible default rather than a number calibrated on one cluster.
 DEFAULT_LOADAWARE_BETA = 1.0
 
 
@@ -464,45 +460,22 @@ class KvawareRouter(RoutingInterface):
 
 
 class LoadAwareRouter(KvawareRouter):
-    """KV-cache-aware placement that also weighs live engine load.
+    """KV-cache-aware placement weighted by live engine load.
 
-    `kvaware` maximizes cache-hit benefit alone: it takes the first instance
-    reported in `layout_info` and sends the request there however busy that
-    instance is. Under a workload with popular shared prefixes this
-    concentrates load: every request for a hot prefix lands on the one engine
-    holding it, which queues while its peers idle.
-
-    `loadaware` scores **every** endpoint
+    Scores every endpoint with
 
         score(i) = matched_tokens(i) / prompt_tokens - beta * relative_load(i)
 
         relative_load(i) = (load(i) - mean_load) / max(1, mean_load)
 
     and routes to the argmax, so a warm-but-saturated instance can lose to a
-    cold-but-idle one. It subclasses `KvawareRouter` and overrides only the
-    selection step, so `kvaware` behaviour is unchanged.
+    cold-but-idle one. Subclasses `KvawareRouter` and overrides only the
+    selection step; when the controller reports no cache holder at all,
+    placement falls back to the upstream session-hash / QPS route, exactly
+    like `kvaware`.
 
-    Design notes:
-
-    1. **Benefit is normalized** to the fraction of the prompt already cached
-       ([0, 1]) rather than a raw token count, so one beta means the same
-       policy for a 500-token and a 4000-token prompt.
-    2. **Load is normalized against the fleet's own mean**, which is what lets
-       a single beta default ship: an absolute in-flight count has no bounded
-       scale (it depends on request rate, prompt length and GPU), so the same
-       beta would be a different policy on every deployment. The denominator
-       is clamped at 1 so an essentially idle fleet reports no imbalance to
-       act on.
-    3. **Every endpoint is scored**, not only the holders in `layout_info`. An
-       endpoint absent from `layout_info` scores benefit 0 - that is what
-       makes "cold but idle beats warm but loaded" expressible at all.
-    4. **`kv_aware_threshold` is not applied.** `kvaware` needs that band
-       because it cannot weigh a small match against anything; the argmax can
-       (a small match simply loses to load). The parameter is still accepted
-       and forwarded for interface compatibility.
-
-    When the controller reports no holder at all, placement falls back to the
-    upstream session-hash / QPS route, exactly like `kvaware`.
+    See ``docs/source/use_cases/loadaware-routing.rst`` for the design
+    rationale and how to tune ``beta``.
     """
 
     def __init__(
@@ -532,12 +505,11 @@ class LoadAwareRouter(KvawareRouter):
 
     @staticmethod
     def load_penalty(request_stats: Dict[str, RequestStats], url: str) -> int:
-        """In-flight requests on `url` - prefilling plus decoding.
+        """In-flight requests on `url` (prefilling + decoding).
 
-        `request_stats` is the fresh, event-driven stats source (the scraped
-        `engine_stats` lags by `--engine-stats-interval`). A URL missing from
-        it has served no requests yet, which is load 0 - the same reading
-        `_qps_routing` gives an unseen endpoint.
+        Uses `request_stats` because it is event-driven and fresh, unlike the
+        scrape-lagged `engine_stats`. A URL missing from it has served no
+        requests yet, which is load 0.
         """
         stats = request_stats.get(url) if request_stats else None
         if stats is None:
@@ -551,14 +523,9 @@ class LoadAwareRouter(KvawareRouter):
         """Each endpoint's load as a signed fraction of the fleet mean.
 
         `(load - mean) / max(1, mean)`: 0.0 is "average", +1.0 is "twice the
-        fleet average" and -1.0 is "idle while the fleet is busy". The mean is
-        recomputed per request from the same live `request_stats` the raw
-        counts come from, so beta is self-calibrating.
-
-        Clamping the denominator at 1 keeps a near-idle fleet quiet: without
-        it a mean of 0.1 turns one in-flight request into a relative load of
-        9.0, and the policy would thrash on noise at exactly the load level
-        where there is nothing worth balancing.
+        fleet average". Clamping the denominator at 1 keeps a near-idle fleet
+        from amplifying one in-flight request into a large relative load and
+        thrashing on noise.
         """
         loads = {
             endpoint.url: cls.load_penalty(request_stats, endpoint.url)
@@ -574,14 +541,10 @@ class LoadAwareRouter(KvawareRouter):
     ) -> float:
         """`cache_hit_benefit - beta * relative_load` for one endpoint.
 
-        Both terms are dimensionless: benefit is a fraction of *this prompt*,
-        relative_load a fraction of *this fleet's* mean, so beta is a pure
-        exchange rate between the two and carries no unit from the deployment.
-
-        `matched_tokens` can come back larger than `prompt_tokens` when the
-        match is rounded up to the token database's chunk boundary; the
-        `min()` guard keeps benefit from exceeding 1.0 and outranking a
-        genuine full hit.
+        The `min()` guard is needed because `matched_tokens` can exceed
+        `prompt_tokens` when a match is rounded up to the token database's
+        chunk boundary; without it a rounded match would outrank a genuine
+        full hit.
         """
         benefit = min(matched_tokens, prompt_tokens) / max(prompt_tokens, 1)
         return benefit - self.beta * relative_load
@@ -589,14 +552,12 @@ class LoadAwareRouter(KvawareRouter):
     def matched_tokens_by_url(self, layout_info: Dict) -> Dict[str, int]:
         """Re-key the controller's answer from instance_id to engine URL.
 
-        One URL can carry two instance_ids: a restarted engine registers under
-        a fresh id while the dead one lingers both in this bridge and in the
-        controller's `kv_pool`, so `lookup()` can still name the dead id as a
-        holder. Only the **live** id may be credited: the restarted engine came
-        back with an empty cache, so the dead id's match is phantom. Inverting
-        the bridge resolves it - dicts preserve insertion order and
-        `refresh_instance_map` appends ids as it learns them, so the last id
-        written for a URL is the live one.
+        A restarted engine registers under a fresh id while its dead id
+        lingers in the controller's `kv_pool`, so `lookup()` can name the
+        dead id as a holder whose match is phantom (the restart emptied the
+        cache). Inverting the bridge credits only the live id: dicts preserve
+        insertion order, so the last id `refresh_instance_map` wrote for a
+        URL wins.
         """
         url_to_instance = {url: iid for iid, url in self.instance_id_to_ip.items()}
         matched = {}
@@ -615,13 +576,10 @@ class LoadAwareRouter(KvawareRouter):
     ) -> Optional[str]:
         """The placement decision. Pure: no I/O, no awaits.
 
-        `layout_info` is keyed by instance_id and `request_stats` by engine
-        URL; `self.instance_id_to_ip` bridges them, so it must be populated
-        for every endpoint before this runs (`refresh_instance_map`).
-
-        Ties break by lexicographic URL so a run is reproducible; returns None
-        if there is nothing to route to, which the caller turns into the
-        upstream fallback.
+        Requires `self.instance_id_to_ip` to be populated for every endpoint
+        (`refresh_instance_map`) since it bridges `layout_info`'s instance_id
+        keys to `request_stats`' URL keys. Ties break by lexicographic URL
+        for reproducibility; returns None if there is nothing to route to.
         """
         matched_by_url = self.matched_tokens_by_url(layout_info)
         relative = self.relative_loads(request_stats, endpoints)
@@ -646,17 +604,10 @@ class LoadAwareRouter(KvawareRouter):
     ) -> bool:
         """Does the instance_id -> URL bridge still cover what we must score?
 
-        Two ways it goes stale, and a count of entries catches neither,
-        because the bridge only ever grows:
-
-        - an endpoint we cannot score: some URL is not a value in the map, so
-          its cache credit would read as 0 whatever it actually holds;
-        - an unknown holder: `layout_info` names an instance_id the bridge has
-          never seen - what an engine restart looks like, since the new
-          process registers under a fresh id while the old one lingers here.
-
-        Miss the second and placement silently degenerates to least-loaded
-        for the life of the router, with nothing in the logs to say so.
+        Stale means an endpoint URL the bridge cannot score, or an
+        instance_id in `layout_info` the bridge has never seen (an engine
+        restart). Missing the latter silently degenerates placement to
+        least-loaded for the life of the router.
         """
         mapped_urls = set(self.instance_id_to_ip.values())
         if any(endpoint.url not in mapped_urls for endpoint in endpoints):
@@ -670,12 +621,10 @@ class LoadAwareRouter(KvawareRouter):
     ) -> None:
         """Populate instance_id -> URL for every endpoint, on demand.
 
-        `KvawareRouter` builds this lazily and only far enough to translate
-        the one instance it already picked; scoring needs the whole bridge.
-        Each rebuild costs one awaited round-trip per endpoint to the
-        controller (#1016: this path blocks the event loop), so it must stay a
-        once-per-fleet-change cost, not a per-request one - hence the
-        `instance_map_is_stale` gate rather than an unconditional refresh.
+        Scoring needs the whole bridge, not just the one instance
+        `KvawareRouter` translates lazily. A rebuild costs one controller
+        round-trip per endpoint, so the `instance_map_is_stale` gate keeps it
+        a once-per-fleet-change cost rather than a per-request one.
         """
         if not self.instance_map_is_stale(endpoints, layout_info):
             return
