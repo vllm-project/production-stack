@@ -17,10 +17,12 @@ import asyncio
 import concurrent.futures
 import enum
 import math
+import os
 import random
 import threading
 import uuid
 from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
 import requests
 from fastapi import HTTPException, Request
@@ -53,9 +55,38 @@ class RoutingLogic(str, enum.Enum):
     ROUND_ROBIN = "roundrobin"
     SESSION_BASED = "session"
     KVAWARE = "kvaware"
+    LOADAWARE = "loadaware"
     PREFIXAWARE = "prefixaware"
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
     DISAGGREGATED_PREFILL_ORCHESTRATED = "disaggregated_prefill_orchestrated"
+
+
+# The single tunable of the `loadaware` routing logic. beta = 1.0 reads as: an
+# endpoint sitting 100% above fleet-average load is docked one full cache hit's
+# worth of preference. Both score terms are dimensionless, which is what makes
+# this a defensible default rather than a number calibrated on one cluster.
+DEFAULT_LOADAWARE_BETA = 1.0
+
+
+def _loadaware_beta(override: Optional[float]) -> float:
+    """Resolve the loadaware beta: explicit value > LOADAWARE_BETA env > default.
+
+    The environment fallback lets the weight be adjusted on a running
+    deployment without changing the router's command line.
+    """
+    if override is not None:
+        return float(override)
+    raw = os.environ.get("LOADAWARE_BETA")
+    if raw is None or raw.strip() == "":
+        return DEFAULT_LOADAWARE_BETA
+    try:
+        return float(raw)
+    except ValueError:
+        logger.warning(
+            f"Ignoring non-numeric LOADAWARE_BETA={raw!r}, "
+            f"using {DEFAULT_LOADAWARE_BETA}"
+        )
+        return DEFAULT_LOADAWARE_BETA
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
@@ -428,6 +459,287 @@ class KvawareRouter(RoutingInterface):
             return self.instance_id_to_ip[queried_instance_ids[0]]
 
 
+class LoadAwareRouter(KvawareRouter):
+    """KV-cache-aware placement weighted by live engine load.
+
+    Scores every endpoint with
+
+        score(i) = matched_tokens(i) / prompt_tokens - beta * relative_load(i)
+
+        relative_load(i) = (load(i) - mean_load) / max(1, mean_load)
+
+    and routes to the argmax, so a warm-but-saturated instance can lose to a
+    cold-but-idle one. Subclasses `KvawareRouter` and overrides only the
+    selection step; when the controller reports no cache holder at all,
+    placement falls back to the upstream session-hash / QPS route, exactly
+    like `kvaware`.
+
+    See ``docs/source/use_cases/loadaware-routing.rst`` for the design
+    rationale and how to tune ``beta``.
+    """
+
+    def __init__(
+        self,
+        lmcache_controller_port: int,
+        session_key: str,
+        kv_aware_threshold: int = 2000,
+        lmcache_health_check_interval: int = 5,
+        lmcache_worker_timeout: int = 30,
+        lmcache_controller_reply_port: Optional[int] = None,
+        lmcache_controller_heartbeat_port: Optional[int] = None,
+        loadaware_beta: Optional[float] = None,
+    ):
+        super().__init__(
+            lmcache_controller_port,
+            session_key,
+            kv_aware_threshold if kv_aware_threshold is not None else 2000,
+            lmcache_health_check_interval=lmcache_health_check_interval,
+            lmcache_worker_timeout=lmcache_worker_timeout,
+            lmcache_controller_reply_port=lmcache_controller_reply_port,
+            lmcache_controller_heartbeat_port=lmcache_controller_heartbeat_port,
+        )
+        #: Weight on the load penalty, in units of "full cache hits per 100%
+        #: above fleet-average load".
+        self.beta = _loadaware_beta(loadaware_beta)
+        logger.info(f"Initialized LoadAwareRouter with beta={self.beta}")
+
+    @staticmethod
+    def load_penalty(request_stats: Dict[str, RequestStats], url: str) -> int:
+        """In-flight requests on `url` (prefilling + decoding).
+
+        Uses `request_stats` because it is event-driven and fresh, unlike the
+        scrape-lagged `engine_stats`. A URL missing from it has served no
+        requests yet, which is load 0.
+        """
+        stats = request_stats.get(url) if request_stats else None
+        if stats is None:
+            return 0
+        return stats.in_prefill_requests + stats.in_decoding_requests
+
+    @classmethod
+    def relative_loads(
+        cls, request_stats: Dict[str, RequestStats], endpoints: List[EndpointInfo]
+    ) -> Dict[str, float]:
+        """Each endpoint's load as a signed fraction of the fleet mean.
+
+        `(load - mean) / max(1, mean)`: 0.0 is "average", +1.0 is "twice the
+        fleet average". Clamping the denominator at 1 keeps a near-idle fleet
+        from amplifying one in-flight request into a large relative load and
+        thrashing on noise.
+        """
+        loads = {
+            endpoint.url: cls.load_penalty(request_stats, endpoint.url)
+            for endpoint in endpoints
+        }
+        if not loads:
+            return {}
+        mean = sum(loads.values()) / len(loads)
+        return {url: (load - mean) / max(1.0, mean) for url, load in loads.items()}
+
+    def score_endpoint(
+        self, matched_tokens: int, prompt_tokens: int, relative_load: float
+    ) -> float:
+        """`cache_hit_benefit - beta * relative_load` for one endpoint.
+
+        The `min()` guard is needed because `matched_tokens` can exceed
+        `prompt_tokens` when a match is rounded up to the token database's
+        chunk boundary; without it a rounded match would outrank a genuine
+        full hit.
+        """
+        benefit = min(matched_tokens, prompt_tokens) / max(prompt_tokens, 1)
+        return benefit - self.beta * relative_load
+
+    def matched_tokens_by_url(self, layout_info: Dict) -> Dict[str, int]:
+        """Re-key the controller's answer from instance_id to engine URL.
+
+        A restarted engine registers under a fresh id while its dead id
+        lingers in the controller's `kv_pool`, so `lookup()` can name the
+        dead id as a holder whose match is phantom (the restart emptied the
+        cache). Inverting the bridge credits only the live id: dicts preserve
+        insertion order, so the last id `refresh_instance_map` wrote for a
+        URL wins.
+        """
+        url_to_instance = {url: iid for iid, url in self.instance_id_to_ip.items()}
+        matched = {}
+        for url, instance_id in url_to_instance.items():
+            info = layout_info.get(instance_id)
+            if info is not None:
+                matched[url] = info[1]
+        return matched
+
+    def select_url(
+        self,
+        endpoints: List[EndpointInfo],
+        request_stats: Dict[str, RequestStats],
+        layout_info: Dict,
+        prompt_tokens: int,
+    ) -> Optional[str]:
+        """The placement decision. Pure: no I/O, no awaits.
+
+        Requires `self.instance_id_to_ip` to be populated for every endpoint
+        (`refresh_instance_map`) since it bridges `layout_info`'s instance_id
+        keys to `request_stats`' URL keys. Ties break by lexicographic URL
+        for reproducibility; returns None if there is nothing to route to.
+        """
+        matched_by_url = self.matched_tokens_by_url(layout_info)
+        relative = self.relative_loads(request_stats, endpoints)
+        best_url = None
+        best_score = -math.inf
+        for info in sorted(endpoints, key=lambda e: e.url):
+            matched_tokens = matched_by_url.get(info.url, 0)
+            relative_load = relative.get(info.url, 0.0)
+            score = self.score_endpoint(matched_tokens, prompt_tokens, relative_load)
+            logger.debug(
+                f"loadaware score {info.url}: "
+                f"matched={matched_tokens}/{prompt_tokens} "
+                f"rel_load={relative_load:+.3f} score={score:.4f}"
+            )
+            if score > best_score:
+                best_score = score
+                best_url = info.url
+        return best_url
+
+    def instance_map_is_stale(
+        self, endpoints: List[EndpointInfo], layout_info: Dict
+    ) -> bool:
+        """Does the instance_id -> URL bridge still cover what we must score?
+
+        Stale means an endpoint URL the bridge cannot score, or an
+        instance_id in `layout_info` the bridge has never seen (an engine
+        restart). Missing the latter silently degenerates placement to
+        least-loaded for the life of the router.
+        """
+        mapped_urls = set(self.instance_id_to_ip.values())
+        if any(endpoint.url not in mapped_urls for endpoint in endpoints):
+            return True
+        return any(
+            instance_id not in self.instance_id_to_ip for instance_id in layout_info
+        )
+
+    async def refresh_instance_map(
+        self, endpoints: List[EndpointInfo], layout_info: Dict
+    ) -> None:
+        """Populate instance_id -> URL for every endpoint, on demand.
+
+        Scoring needs the whole bridge, not just the one instance
+        `KvawareRouter` translates lazily. A rebuild costs one controller
+        round-trip per endpoint, so the `instance_map_is_stale` gate keeps it
+        a once-per-fleet-change cost rather than a per-request one.
+        """
+        if not self.instance_map_is_stale(endpoints, layout_info):
+            return
+
+        async def query_endpoint(endpoint: EndpointInfo) -> None:
+            event_id = "QueryInst" + str(uuid.uuid4())
+            url = endpoint.url if "//" in endpoint.url else "//" + endpoint.url
+            query_ip = urlparse(url).hostname or ""
+            query_message = QueryInstMsg(ip=query_ip, event_id=event_id)
+            endpoint_instance_id = await self.query_manager(query_message)
+            logger.debug(
+                f"Query ip: {query_ip}, return instance id: {endpoint_instance_id}"
+            )
+            self.instance_id_to_ip[endpoint_instance_id.instance_id] = endpoint.url
+
+        await asyncio.gather(*(query_endpoint(e) for e in endpoints))
+        logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
+
+    async def tokenize_prompt(
+        self, endpoints: List[EndpointInfo], request_json: Dict
+    ) -> List[int]:
+        """Local-first tokenization with the remote `/tokenize` fallback.
+
+        The remote fallback is a blocking HTTP call, so it runs in an
+        executor rather than on the event loop.
+        """
+        try:
+            if self.tokenizer is None:
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    endpoints[0].model_names[0]
+                )
+            return self.tokenizer.encode(request_json.get("prompt", ""))
+        except Exception:
+            remote_url = endpoints[0].url + "/tokenize"
+            headers = {"Content-Type": "application/json"}
+            data = {
+                "model": endpoints[0].model_names[0],
+                "prompt": request_json.get("prompt", ""),
+            }
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    remote_url, headers=headers, json=data, timeout=10
+                ),
+            )
+            return response.json()["tokens"]
+
+    def fallback_url(
+        self,
+        endpoints: List[EndpointInfo],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        """Upstream's no-cache-info route: session hash if any, else lowest
+        QPS."""
+        session_id = self.extract_session_id(request, request_json)
+        logger.debug(f"Fallback to using session id: {session_id}")
+        self._update_hash_ring(endpoints)
+        if session_id is None:
+            return self._qps_routing(endpoints, request_stats)
+        return self.hash_ring.get_node(session_id)
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        """
+        Route the request to the engine with the best
+        `cache_hit_benefit - beta * relative_load`.
+
+        Args:
+            endpoints (List[EndpointInfo]): The list of engine URLs
+            engine_stats (Dict[str, EngineStats]): The engine stats indicating
+               the 'physical' load of each engine. Unused: it is
+               scrape-lagged, `request_stats` carries the live signal.
+            request_stats (Dict[str, RequestStats]): The request stats
+               indicating the request-level performance of each engine
+            request (Request): The incoming request
+            request_json (Dict): The request body (needed for the prefix
+               match)
+
+        Raises:
+            HTTPException: 503 if no endpoints are available.
+        """
+        if not endpoints:
+            raise HTTPException(
+                status_code=503, detail="No backend endpoints available"
+            )
+
+        token_ids = await self.tokenize_prompt(endpoints, request_json)
+
+        event_id = "Lookup" + str(uuid.uuid4())
+        msg = LookupMsg(tokens=token_ids, event_id=event_id)
+        lookup_ret = await self.query_manager(msg)
+        logger.debug(f"Lookup return message: {lookup_ret}")
+        layout_info = getattr(lookup_ret, "layout_info", None) or {}
+
+        if not layout_info:
+            # Nothing cached anywhere - no benefit term to weigh.
+            return self.fallback_url(endpoints, request_stats, request, request_json)
+
+        await self.refresh_instance_map(endpoints, layout_info)
+        url = self.select_url(endpoints, request_stats, layout_info, len(token_ids))
+        if url is None:
+            return self.fallback_url(endpoints, request_stats, request, request_json)
+        logger.info(f"Routing request to {url} found by loadaware router")
+        return url
+
+
 class PrefixAwareRouter(RoutingInterface):
     """
     Route the request to the appropriate engine URL by where the longest
@@ -697,6 +1009,21 @@ def initialize_routing_logic(
             ),
         )
         router.start_kv_manager()
+    elif routing_logic == RoutingLogic.LOADAWARE:
+        logger.info("Initializing loadaware routing logic")
+        router = LoadAwareRouter(
+            lmcache_controller_port=kwargs.get("lmcache_controller_port"),
+            session_key=kwargs.get("session_key"),
+            kv_aware_threshold=kwargs.get("kv_aware_threshold"),
+            lmcache_health_check_interval=kwargs.get("lmcache_health_check_interval"),
+            lmcache_worker_timeout=kwargs.get("lmcache_worker_timeout"),
+            lmcache_controller_reply_port=kwargs.get("lmcache_controller_reply_port"),
+            lmcache_controller_heartbeat_port=kwargs.get(
+                "lmcache_controller_heartbeat_port"
+            ),
+            loadaware_beta=kwargs.get("loadaware_beta"),
+        )
+        router.start_kv_manager()
     elif routing_logic == RoutingLogic.PREFIXAWARE:
         logger.info("Initializing prefix-aware routing logic")
         router = PrefixAwareRouter(
@@ -735,6 +1062,7 @@ def get_routing_logic() -> RoutingInterface:
         SessionRouter,
         RoundRobinRouter,
         KvawareRouter,
+        LoadAwareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
         DisaggregatedPrefillOrchestratedRouter,
@@ -750,6 +1078,7 @@ def cleanup_routing_logic():
         SessionRouter,
         RoundRobinRouter,
         KvawareRouter,
+        LoadAwareRouter,
         PrefixAwareRouter,
         DisaggregatedPrefillRouter,
         DisaggregatedPrefillOrchestratedRouter,

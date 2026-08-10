@@ -232,6 +232,7 @@ def parse_args():
             "roundrobin",
             "session",
             "kvaware",
+            "loadaware",
             "prefixaware",
             "disaggregated_prefill",
             "disaggregated_prefill_orchestrated",
@@ -445,6 +446,15 @@ def parse_args():
         type=int,
         default=2000,
         help="The threshold for kv-aware routing.",
+    )
+
+    parser.add_argument(
+        "--loadaware-beta",
+        type=float,
+        default=None,
+        help="Weight on the load penalty for loadaware routing: "
+        "score = cached_fraction - beta * relative_load. Falls back to the "
+        "LOADAWARE_BETA environment variable, then to 1.0.",
     )
 
     parser.add_argument(
