@@ -66,6 +66,7 @@ Documentation
    :caption: Use Cases
 
    use_cases/kv-cache-aware-routing
+   use_cases/loadaware-routing
    use_cases/prefix-aware-routing
    use_cases/disaggregated-prefill
    use_cases/sharing-kv-cache

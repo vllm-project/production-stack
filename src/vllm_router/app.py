@@ -279,6 +279,7 @@ def initialize_all(app: FastAPI, args):
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
         kv_aware_threshold=args.kv_aware_threshold,
+        loadaware_beta=args.loadaware_beta,
         prefix_min_match_length=args.prefix_min_match_length,
         priority_header=args.priority_header,
         priority_field=args.priority_field,
