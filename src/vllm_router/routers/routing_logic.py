@@ -89,6 +89,33 @@ def _loadaware_beta(override: Optional[float]) -> float:
         return DEFAULT_LOADAWARE_BETA
 
 
+def _prompt_to_trie_key(prompt) -> str:
+    """Normalize a `/v1/completions` prompt into a string for `HashTrie`.
+
+    The OpenAI completions API accepts token ids as well as text: `prompt` may
+    be `str`, `list[str]`, `list[int]`, or `list[list[int]]`. `HashTrie` slices
+    the value by characters and feeds each slice to `xxhash`, so anything that
+    is not a string raises `TypeError` and fails the request.
+
+    Rendering token ids to a stable decimal string keeps the trie's algorithm
+    unchanged -- prompts sharing a token prefix still share a character prefix,
+    so prefix affinity works as intended, only the alphabet differs.
+    """
+    if isinstance(prompt, str):
+        return prompt
+    if isinstance(prompt, list):
+        if not prompt:
+            return ""
+        # list[list[int]]: a batch of token-id sequences.
+        if isinstance(prompt[0], list):
+            return " ".join(",".join(str(t) for t in seq) for seq in prompt)
+        # list[str]: already text. list[int]: token ids.
+        if isinstance(prompt[0], str):
+            return " ".join(prompt)
+        return ",".join(str(t) for t in prompt)
+    return str(prompt)
+
+
 class RoutingInterface(metaclass=SingletonABCMeta):
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
@@ -809,7 +836,7 @@ class PrefixAwareRouter(RoutingInterface):
                 prompt = ""
         else:
             # Handle regular completions
-            prompt = request_json["prompt"]
+            prompt = _prompt_to_trie_key(request_json["prompt"])
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
         match_length, matched_endpoint = await self.hashtrie.longest_prefix_match(
