@@ -1,30 +1,42 @@
-import subprocess
-import sys
-from pathlib import Path
+import threading
 
-HELPER_PATH = Path(__file__).parent / "helpers" / "dynamic_config_watcher_process.py"
+import pytest
+from fastapi import FastAPI
+
+from vllm_router.dynamic_config import (
+    DynamicConfigWatcher,
+    DynamicRouterConfig,
+    initialize_dynamic_config_watcher,
+)
+from vllm_router.utils import SingletonMeta
 
 
-def run_watcher_scenario(tmp_path, scenario):
-    config_path = tmp_path / "dynamic-config.json"
-    config_path.write_text(
-        '{"service_discovery": "static", "routing_logic": "roundrobin"}'
+def _initialize_watcher(app):
+    return initialize_dynamic_config_watcher(
+        "unused.json",
+        "JSON",
+        60,
+        DynamicRouterConfig(service_discovery="static", routing_logic="roundrobin"),
+        app,
     )
-    return subprocess.run(
-        [sys.executable, HELPER_PATH, scenario, config_path],
-        capture_output=True,
-        text=True,
-        timeout=3,
-    )
 
 
-def test_watcher_does_not_keep_process_alive_when_not_closed(tmp_path):
-    completed = run_watcher_scenario(tmp_path, "unclosed-watcher")
+def test_watcher_thread_is_daemon(monkeypatch):
+    monkeypatch.delitem(SingletonMeta._instances, DynamicConfigWatcher, raising=False)
+    monkeypatch.setattr(threading.Thread, "start", lambda _: None)
 
-    assert completed.returncode == 0
+    watcher = _initialize_watcher(FastAPI())
+
+    assert watcher.watcher_thread.daemon is True
 
 
-def test_invalid_app_does_not_start_watcher(tmp_path):
-    completed = run_watcher_scenario(tmp_path, "invalid-app")
+def test_invalid_app_is_rejected_before_watcher_starts(monkeypatch):
+    monkeypatch.delitem(SingletonMeta._instances, DynamicConfigWatcher, raising=False)
 
-    assert completed.returncode == 0
+    def fail_if_started(_):
+        pytest.fail("watcher started before app validation")
+
+    monkeypatch.setattr(threading.Thread, "start", fail_if_started)
+
+    with pytest.raises(AssertionError):
+        _initialize_watcher(object())
