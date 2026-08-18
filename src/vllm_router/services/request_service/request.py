@@ -20,6 +20,7 @@ import uuid
 from typing import Optional
 
 import aiohttp
+import anyio
 
 # --- Request Processing & Routing ---
 from aiohttp import FormData
@@ -101,8 +102,7 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
     "server",
 }
 
-# Non-standard status code used by nginx and others to record that the client
-# went away before a response could be sent. Never reaches the client.
+# Client went away before a response could be sent; never reaches the client.
 _CLIENT_CLOSED_REQUEST = 499
 
 
@@ -227,6 +227,11 @@ def _build_backend_request_headers(
     return headers
 
 
+def _log_safe(value: str) -> str:
+    """Strip CR/LF so a crafted X-Request-Id can't forge a fake log line."""
+    return value.replace("\r", "").replace("\n", "")
+
+
 async def _listen_for_disconnect(request: Request) -> None:
     """Return once the client has disconnected."""
     while True:
@@ -235,16 +240,40 @@ async def _listen_for_disconnect(request: Request) -> None:
             return
 
 
+async def _cancel_and_wait(task: asyncio.Task) -> None:
+    """Cancel a task and wait for it to finish unwinding.
+
+    ``task.cancelled()`` can't tell our own cancel() apart from an unrelated
+    cancellation of the caller that propagated into ``task`` via its
+    ``_fut_waiter``, since both leave ``task`` cancelled either way. The
+    caller's own ``cancelling()`` count is unaffected by that propagation, so
+    it is what actually distinguishes the two.
+
+    Args:
+        task (asyncio.Task): The task to cancel.
+
+    Raises:
+        asyncio.CancelledError: If the caller itself was independently
+            cancelled while waiting, rather than only as a side effect of
+            cancelling ``task``.
+    """
+    current = asyncio.current_task()
+    pending_before = current.cancelling() if current else 0
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        if current is not None and current.cancelling() > pending_before:
+            raise
+    except Exception:
+        # A backend error that raced the disconnect is irrelevant now.
+        pass
+
+
 async def _anext_or_disconnect(stream_generator, request: Request):
     """Wait for the backend response headers, or for the client to disconnect.
 
-    The ASGI ``http.disconnect`` message is only delivered while ``receive()`` is
-    being awaited, and ``StreamingResponse`` only starts awaiting it once it has
-    been returned to the ASGI server. Until then a client going away is invisible
-    to us. That matters most for non-streaming requests, where the backend sends
-    no response headers until the engine has finished generating: without this,
-    an abandoned request runs to completion and the engine is never told to
-    abort. Same approach as ``vllm.entrypoints.utils.with_cancellation``.
+    Same approach as ``vllm.entrypoints.utils.with_cancellation``.
 
     Args:
         stream_generator: The ``process_request`` generator for this attempt.
@@ -265,19 +294,15 @@ async def _anext_or_disconnect(stream_generator, request: Request):
         if headers_task.done():
             return headers_task.result()
     finally:
-        # Let StreamingResponse do the listening from here on.
-        disconnect_task.cancel()
+        # Hand listening off to StreamingResponse from here on.
+        await _cancel_and_wait(disconnect_task)
 
-    # Cancelling the pending anext() unwinds process_request, which closes the
-    # backend connection. That close is what makes the engine abort the request.
-    headers_task.cancel()
-    try:
-        await headers_task
-    except (asyncio.CancelledError, Exception):
-        # Expected: we just cancelled it. A backend error that raced the
-        # disconnect is equally irrelevant now.
-        pass
-    await stream_generator.aclose()
+    # Unwinds process_request and closes the backend connection.
+    await _cancel_and_wait(headers_task)
+
+    # Shielded: a cancellation during cleanup must not leave the connection half-closed.
+    with anyio.CancelScope(shield=True):
+        await stream_generator.aclose()
     raise ClientDisconnect()
 
 
@@ -430,10 +455,7 @@ async def process_request(
         end_span(span, error=e) if tracing_active else None
         raise
     finally:
-        # Must run on every path, not just on success. A cancelled request is
-        # torn down with GeneratorExit and a failed one raises, and in both cases
-        # leaving the request counted as in-flight permanently skews the load
-        # reported for this engine to the routing logic.
+        # Must run on every exit path or the engine stays counted as in-flight forever.
         request.app.state.request_stats_monitor.on_request_complete(
             backend_url, request_id, time.time()
         )
@@ -723,8 +745,8 @@ async def route_general_request(
             break
         except ClientDisconnect:
             logger.info(
-                f"Client disconnected before request {request_id} was answered by "
-                f"{server_url}, aborted the backend request"
+                f"Client disconnected before request {_log_safe(request_id)} was "
+                f"answered by {server_url}, aborted the backend request"
             )
             if tracing_active:
                 end_span(span, status_code=_CLIENT_CLOSED_REQUEST)

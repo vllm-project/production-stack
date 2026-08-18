@@ -214,3 +214,43 @@ async def test_fully_consumed_stream_is_marked_complete_once():
 
     assert chunks[1:] == [b"a", b"b"]
     monitor.on_request_complete.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_cancel_and_wait_swallows_only_its_own_cancellation():
+    """Cancelling `task` alone must not raise out of `_cancel_and_wait`."""
+    from vllm_router.services.request_service.request import _cancel_and_wait
+
+    task = asyncio.ensure_future(asyncio.sleep(1000))
+    await _cancel_and_wait(task)  # must not raise
+    assert task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_cancel_and_wait_reraises_an_unrelated_caller_cancellation():
+    """A caller cancelled independently while inside `_cancel_and_wait` must see
+    that cancellation, not have it absorbed by the cancellation of `task`.
+
+    `task.cancelled()` can't tell the two apart, since cancelling the caller
+    while it awaits `task` also cancels `task` via `_fut_waiter` propagation --
+    this is what the `cancelling()`-based check exists to fix.
+    """
+    from vllm_router.services.request_service.request import _cancel_and_wait
+
+    task = asyncio.ensure_future(asyncio.sleep(1000))
+    outcome = {}
+
+    async def caller():
+        try:
+            await _cancel_and_wait(task)
+            outcome["raised"] = False
+        except asyncio.CancelledError:
+            outcome["raised"] = True
+
+    caller_task = asyncio.ensure_future(caller())
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)  # let caller_task reach `await task` inside _cancel_and_wait
+    caller_task.cancel()  # aimed at the caller, not at `task`
+    await asyncio.wait([caller_task])
+
+    assert outcome["raised"] is True
