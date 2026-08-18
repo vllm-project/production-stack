@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import os
 import time
@@ -23,8 +24,9 @@ import aiohttp
 # --- Request Processing & Routing ---
 from aiohttp import FormData
 from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from requests import JSONDecodeError
+from starlette.requests import ClientDisconnect
 
 from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import (
@@ -98,6 +100,10 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
     "connection",
     "server",
 }
+
+# Non-standard status code used by nginx and others to record that the client
+# went away before a response could be sent. Never reaches the client.
+_CLIENT_CLOSED_REQUEST = 499
 
 
 async def process_external_provider_request(
@@ -221,6 +227,60 @@ def _build_backend_request_headers(
     return headers
 
 
+async def _listen_for_disconnect(request: Request) -> None:
+    """Return once the client has disconnected."""
+    while True:
+        message = await request.receive()
+        if message["type"] == "http.disconnect":
+            return
+
+
+async def _anext_or_disconnect(stream_generator, request: Request):
+    """Wait for the backend response headers, or for the client to disconnect.
+
+    The ASGI ``http.disconnect`` message is only delivered while ``receive()`` is
+    being awaited, and ``StreamingResponse`` only starts awaiting it once it has
+    been returned to the ASGI server. Until then a client going away is invisible
+    to us. That matters most for non-streaming requests, where the backend sends
+    no response headers until the engine has finished generating: without this,
+    an abandoned request runs to completion and the engine is never told to
+    abort. Same approach as ``vllm.entrypoints.utils.with_cancellation``.
+
+    Args:
+        stream_generator: The ``process_request`` generator for this attempt.
+        request (Request): The incoming HTTP request.
+
+    Returns:
+        The backend response headers and status code.
+
+    Raises:
+        ClientDisconnect: If the client disconnected before the backend replied.
+    """
+    headers_task = asyncio.ensure_future(anext(stream_generator))
+    disconnect_task = asyncio.ensure_future(_listen_for_disconnect(request))
+    try:
+        await asyncio.wait(
+            (headers_task, disconnect_task), return_when=asyncio.FIRST_COMPLETED
+        )
+        if headers_task.done():
+            return headers_task.result()
+    finally:
+        # Let StreamingResponse do the listening from here on.
+        disconnect_task.cancel()
+
+    # Cancelling the pending anext() unwinds process_request, which closes the
+    # backend connection. That close is what makes the engine abort the request.
+    headers_task.cancel()
+    try:
+        await headers_task
+    except (asyncio.CancelledError, Exception):
+        # Expected: we just cancelled it. A backend error that raced the
+        # disconnect is equally irrelevant now.
+        pass
+    await stream_generator.aclose()
+    raise ClientDisconnect()
+
+
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
@@ -331,11 +391,6 @@ async def process_request(
                     full_response.extend(chunk)
                 yield chunk
 
-        end_time = time.time()
-        request.app.state.request_stats_monitor.on_request_complete(
-            backend_url, request_id, end_time
-        )
-
         if http_status_code is not None and http_status_code >= 400:
             request_status = "error"
 
@@ -375,6 +430,13 @@ async def process_request(
         end_span(span, error=e) if tracing_active else None
         raise
     finally:
+        # Must run on every path, not just on success. A cancelled request is
+        # torn down with GeneratorExit and a failed one raises, and in both cases
+        # leaving the request counted as in-flight permanently skews the load
+        # reported for this engine to the routing logic.
+        request.app.state.request_stats_monitor.on_request_complete(
+            backend_url, request_id, time.time()
+        )
         request_latency_seconds.labels(
             server=backend_url, model=model_name, status=request_status
         ).observe(time.time() - start_time)
@@ -648,7 +710,7 @@ async def route_general_request(
                 background_tasks,
                 parent_span_context=span_context,
             )
-            headers, status = await anext(stream_generator)
+            headers, status = await _anext_or_disconnect(stream_generator, request)
             media_type = headers.get("content-type", "text/event-stream")
             headers_dict = {
                 key: value
@@ -659,6 +721,14 @@ async def route_general_request(
             headers_dict["X-Request-Id"] = request_id
             last_error = None
             break
+        except ClientDisconnect:
+            logger.info(
+                f"Client disconnected before request {request_id} was answered by "
+                f"{server_url}, aborted the backend request"
+            )
+            if tracing_active:
+                end_span(span, status_code=_CLIENT_CLOSED_REQUEST)
+            return Response(status_code=_CLIENT_CLOSED_REQUEST)
         except HTTPException:
             raise
         except Exception as e:
