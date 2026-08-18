@@ -150,11 +150,12 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         self.current_config = init_config
         self.app = app
 
+        assert hasattr(self.app, "state")
+
         # Watcher thread
         self.running = True
-        self.watcher_thread = threading.Thread(target=self._watch_worker)
+        self.watcher_thread = threading.Thread(target=self._watch_worker, daemon=True)
         self.watcher_thread.start()
-        assert hasattr(self.app, "state")
 
     def get_current_config(self) -> DynamicRouterConfig:
         return self.current_config
