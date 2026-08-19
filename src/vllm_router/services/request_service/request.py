@@ -227,11 +227,11 @@ def _build_backend_request_headers(
 
     return headers
 
+
 def _log_safe(value: str) -> str:
     """Strip CR/LF so a crafted X-Request-Id can't forge a fake log line."""
     if not isinstance(value, str):
         value = str(value)
-    return value.replace("\r", "").replace("\n", "")
     return value.replace("\r", "").replace("\n", "")
 
 
@@ -289,6 +289,7 @@ async def _anext_or_disconnect(stream_generator, request: Request):
         ClientDisconnect: If the client disconnected before the backend replied.
     """
     headers_task = asyncio.ensure_future(anext(stream_generator))
+    disconnect_task = asyncio.ensure_future(_listen_for_disconnect(request))
     try:
         await asyncio.wait(
             (headers_task, disconnect_task), return_when=asyncio.FIRST_COMPLETED
@@ -297,12 +298,13 @@ async def _anext_or_disconnect(stream_generator, request: Request):
             return headers_task.result()
         raise ClientDisconnect()
     finally:
+        # Runs on every exit path, including our own cancellation before a winner
+        # was picked: asyncio.wait() leaves its member tasks running.
         await _cancel_and_wait(disconnect_task)
         if not headers_task.done():
             await _cancel_and_wait(headers_task)
             with anyio.CancelScope(shield=True):
                 await stream_generator.aclose()
-    raise ClientDisconnect()
 
 
 # TODO: (Brian) check if request is json beforehand
