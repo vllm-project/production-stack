@@ -289,23 +289,19 @@ async def _anext_or_disconnect(stream_generator, request: Request):
         ClientDisconnect: If the client disconnected before the backend replied.
     """
     headers_task = asyncio.ensure_future(anext(stream_generator))
-    disconnect_task = asyncio.ensure_future(_listen_for_disconnect(request))
     try:
         await asyncio.wait(
             (headers_task, disconnect_task), return_when=asyncio.FIRST_COMPLETED
         )
         if headers_task.done():
             return headers_task.result()
+        raise ClientDisconnect()
     finally:
-        # Hand listening off to StreamingResponse from here on.
         await _cancel_and_wait(disconnect_task)
-
-    # Unwinds process_request and closes the backend connection.
-    await _cancel_and_wait(headers_task)
-
-    # Shielded: a cancellation during cleanup must not leave the connection half-closed.
-    with anyio.CancelScope(shield=True):
-        await stream_generator.aclose()
+        if not headers_task.done():
+            await _cancel_and_wait(headers_task)
+            with anyio.CancelScope(shield=True):
+                await stream_generator.aclose()
     raise ClientDisconnect()
 
 
