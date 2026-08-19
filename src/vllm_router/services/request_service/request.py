@@ -227,9 +227,11 @@ def _build_backend_request_headers(
 
     return headers
 
-
 def _log_safe(value: str) -> str:
     """Strip CR/LF so a crafted X-Request-Id can't forge a fake log line."""
+    if not isinstance(value, str):
+        value = str(value)
+    return value.replace("\r", "").replace("\n", "")
     return value.replace("\r", "").replace("\n", "")
 
 
