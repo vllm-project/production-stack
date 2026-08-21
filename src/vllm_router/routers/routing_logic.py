@@ -90,6 +90,71 @@ def _loadaware_beta(override: Optional[float]) -> float:
         return DEFAULT_LOADAWARE_BETA
 
 
+def _normalize_chat_messages(messages: List[Dict]) -> List[Dict]:
+    """Text-only view of an OpenAI chat ``messages`` array for local
+    chat-template application.
+
+    Multimodal content parts (a list of ``{"type": ...}`` dicts) are
+    flattened to their text parts - mirroring ``PrefixAwareRouter`` - because
+    plain HF chat templates expect string content. ``None`` content (e.g.
+    assistant tool-call turns) becomes ``""``. Messages that already carry
+    string content pass through untouched, so template-relevant fields
+    (``role``, ``name``, ``tool_calls``, ...) are preserved. The input is
+    never mutated.
+    """
+    normalized = []
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, list):
+            text_content = " ".join(
+                part.get("text", "")
+                for part in content
+                if isinstance(part, dict) and part.get("type") == "text"
+            )
+            message = {**message, "content": text_content}
+        elif content is None:
+            message = {**message, "content": ""}
+        normalized.append(message)
+    return normalized
+
+
+def _extract_token_ids(tokenizer, request_json: Dict) -> List[int]:
+    """Token ids as the serving engine would see them for this request body.
+
+    Chat-completion bodies (``messages``) are tokenized through the model's
+    chat template with ``add_generation_prompt=True``: vLLM engines cache KV
+    for the token ids *after* template application, so encoding the raw
+    message text would never line up with the engine-side prefix. Completion
+    bodies keep the plain ``encode`` path, unchanged. May raise (e.g. the
+    tokenizer defines no chat template) - callers fall back to the engine's
+    ``/tokenize`` API.
+    """
+    if "messages" in request_json:
+        return tokenizer.apply_chat_template(
+            _normalize_chat_messages(request_json["messages"]),
+            add_generation_prompt=True,
+            tokenize=True,
+        )
+    return tokenizer.encode(request_json.get("prompt", ""))
+
+
+def _tokenize_request_payload(model: str, request_json: Dict) -> Dict:
+    """Request body for the engine's ``/tokenize`` fallback.
+
+    Chat bodies map to vLLM's ``TokenizeChatRequest`` (the engine applies its
+    own chat template, multimodal content included), completion bodies to
+    ``TokenizeCompletionRequest``. ``add_generation_prompt=True`` is vLLM's
+    chat-completions default; sent explicitly to pin the alignment.
+    """
+    if "messages" in request_json:
+        return {
+            "model": model,
+            "messages": request_json["messages"],
+            "add_generation_prompt": True,
+        }
+    return {"model": model, "prompt": request_json.get("prompt", "")}
+
+
 class RoutingInterface(metaclass=SingletonABCMeta):
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
@@ -387,21 +452,17 @@ class KvawareRouter(RoutingInterface):
         """
         token_ids = None
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
-        # TODO (Yuhan): Handle chat completions
         try:
             if self.tokenizer is None:
                 self.tokenizer = AutoTokenizer.from_pretrained(
                     endpoints[0].model_names[0]
                 )
-            token_ids = self.tokenizer.encode(request_json.get("prompt", ""))
+            token_ids = _extract_token_ids(self.tokenizer, request_json)
         except Exception:
             # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
             remote_url = endpoints[0].url + "/tokenize"
             headers = {"Content-Type": "application/json"}
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json.get("prompt", ""),
-            }
+            data = _tokenize_request_payload(endpoints[0].model_names[0], request_json)
             body = requests.post(
                 remote_url, headers=headers, json=data, timeout=10
             ).json()
@@ -649,22 +710,21 @@ class LoadAwareRouter(KvawareRouter):
     ) -> List[int]:
         """Local-first tokenization with the remote `/tokenize` fallback.
 
-        The remote fallback is a blocking HTTP call, so it runs in an
-        executor rather than on the event loop.
+        Chat-completion bodies go through the chat template so the token ids
+        match what the engine caches KV for (see `_extract_token_ids`). The
+        remote fallback is a blocking HTTP call, so it runs in an executor
+        rather than on the event loop.
         """
         try:
             if self.tokenizer is None:
                 self.tokenizer = AutoTokenizer.from_pretrained(
                     endpoints[0].model_names[0]
                 )
-            return self.tokenizer.encode(request_json.get("prompt", ""))
+            return _extract_token_ids(self.tokenizer, request_json)
         except Exception:
             remote_url = endpoints[0].url + "/tokenize"
             headers = {"Content-Type": "application/json"}
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json.get("prompt", ""),
-            }
+            data = _tokenize_request_payload(endpoints[0].model_names[0], request_json)
             loop = asyncio.get_running_loop()
             response = await loop.run_in_executor(
                 None,
