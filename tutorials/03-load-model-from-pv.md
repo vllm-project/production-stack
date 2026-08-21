@@ -145,6 +145,7 @@ Populate the PV backing directory before installing the chart. Run the following
 sudo mkdir -p /data/llama3/Llama-3.1-8B-Instruct
 sudo cp -a /path/to/downloaded/Llama-3.1-8B-Instruct/. \
   /data/llama3/Llama-3.1-8B-Instruct/
+sudo chmod -R a+rX /data/llama3/Llama-3.1-8B-Instruct
 test -f /data/llama3/Llama-3.1-8B-Instruct/config.json
 ```
 
