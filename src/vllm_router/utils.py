@@ -2,6 +2,7 @@ import abc
 import enum
 import io
 import json
+import os
 import re
 import resource
 import wave
@@ -238,22 +239,26 @@ def update_content_length(request: Request, request_body: str):
 
 def is_model_healthy(url: str, model: str, model_type: str, timeout: int = 10) -> bool:
     model_url = ModelType.get_url(model_type)
+    api_key = os.getenv("VLLM_API_KEY")
+    auth_headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
     try:
         if model_type == "transcription":
             # for transcription, the backend expects multipart/form-data with a file
             # we will use pre-generated silent wav bytes
-            response = requests.post(
-                f"{url}{model_url}",
-                files=ModelType.get_test_payload(model_type),  # multipart/form-data
-                data={"model": model},
-                timeout=timeout,
-            )
+            request_kwargs = {
+                "files": ModelType.get_test_payload(model_type),
+                "data": {"model": model},
+                "timeout": timeout,
+            }
+            if auth_headers:
+                request_kwargs["headers"] = auth_headers
+            response = requests.post(f"{url}{model_url}", **request_kwargs)
         else:
             # for other model types (chat, completion, etc.)
             response = requests.post(
                 f"{url}{model_url}",
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json"} | auth_headers,
                 json={"model": model} | ModelType.get_test_payload(model_type),
                 timeout=timeout,
             )

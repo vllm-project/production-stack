@@ -99,6 +99,56 @@ def test_is_model_healthy_when_requests_responds_with_status_code_200_returns_tr
     assert utils.is_model_healthy("http://localhost", "test", "chat") is True
 
 
+def test_is_model_healthy_json_request_includes_api_key_and_content_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VLLM_API_KEY", "test-api-key")
+    request_mock = MagicMock(return_value=MagicMock(status_code=200))
+    monkeypatch.setattr("requests.post", request_mock)
+
+    assert utils.is_model_healthy("http://localhost", "test", "chat") is True
+
+    request_kwargs = request_mock.call_args.kwargs
+    assert request_kwargs["headers"] == {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer test-api-key",
+    }
+
+
+def test_is_model_healthy_transcription_request_includes_api_key_and_multipart_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VLLM_API_KEY", "test-api-key")
+    request_mock = MagicMock(return_value=MagicMock(status_code=200))
+    monkeypatch.setattr("requests.post", request_mock)
+
+    assert utils.is_model_healthy("http://localhost", "test", "transcription") is True
+
+    request_kwargs = request_mock.call_args.kwargs
+    assert request_kwargs["headers"] == {"Authorization": "Bearer test-api-key"}
+    assert "Content-Type" not in request_kwargs["headers"]
+    assert request_kwargs["files"] == utils.ModelType.get_test_payload("transcription")
+    assert request_kwargs["data"] == {"model": "test"}
+
+
+@pytest.mark.parametrize("api_key", (None, ""))
+@pytest.mark.parametrize("model_type", ("chat", "transcription"))
+def test_is_model_healthy_without_api_key_omits_authorization_header(
+    monkeypatch: pytest.MonkeyPatch, api_key: str | None, model_type: str
+) -> None:
+    if api_key is None:
+        monkeypatch.delenv("VLLM_API_KEY", raising=False)
+    else:
+        monkeypatch.setenv("VLLM_API_KEY", api_key)
+    request_mock = MagicMock(return_value=MagicMock(status_code=200))
+    monkeypatch.setattr("requests.post", request_mock)
+
+    assert utils.is_model_healthy("http://localhost", "test", model_type) is True
+
+    request_headers = request_mock.call_args.kwargs.get("headers", {})
+    assert "Authorization" not in request_headers
+
+
 def test_is_model_healthy_when_requests_raises_exception_returns_false(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
