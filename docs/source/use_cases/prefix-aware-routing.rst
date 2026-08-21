@@ -26,7 +26,7 @@ Prefix-aware and :doc:`KV-cache-aware routing <kv-cache-aware-routing>` both aim
      - Requires LMCache controller connectivity plus tokenization and controller lookups.
    * - Request handling
      - Reads completion prompts and extracts text from chat messages.
-     - The current implementation tokenizes the completion ``prompt`` path; it does not reconstruct chat messages for lookup.
+     - The current implementation tokenizes the completion ``prompt`` field; it does not reconstruct chat messages for lookup.
    * - Fallback
      - Uses the longest remembered match. If it is shorter than a configured ``prefixMinMatchLength``, routing falls back to QPS-based placement. With the default threshold of zero and no history, it selects from the available endpoints and records that placement.
      - If no sufficient cache match exists, uses session affinity when a session ID is available and QPS-based placement otherwise.
