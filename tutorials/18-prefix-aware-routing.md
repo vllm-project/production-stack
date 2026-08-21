@@ -2,7 +2,23 @@
 
 ## Introduction
 
-This tutorial demonstrates how to use prefix aware routing in the vLLM Production Stack. Prefix aware routing ensures that subsequent requests with the same prompt prefix are routed to the same instance, maximizing KV cache utilization and improving performance.
+This tutorial demonstrates how to use prefix aware routing in the vLLM Production Stack. Prefix-aware routing records prompt-prefix-to-endpoint history in the router and tries to reuse that placement for subsequent requests. It does not inspect the current KV cache contents on an endpoint.
+
+## How Prefix-Aware Routing Differs
+
+Prefix-aware and [KV-cache-aware routing](17-kv-aware-routing.md) both aim to improve cache reuse, but they use different routing signals and can choose different endpoints.
+
+| Aspect | Prefix-aware routing | KV-cache-aware routing |
+| --- | --- | --- |
+| Routing signal | Router-local prompt-prefix history stored in an in-memory `HashTrie`. | Live, token-level cache-location data queried from the LMCache controller. |
+| Cache accuracy | Remembers where a prefix was previously sent and assumes that placement is still useful; it does not observe cache eviction. | Uses the cache layout reported by LMCache, so placement reflects which instances currently hold matching cache data. |
+| Dependencies and overhead | Uses an in-process trie and requires no controller lookup for routing. | Requires LMCache controller connectivity plus tokenization and controller lookups. |
+| Request handling | Reads completion prompts and extracts text from chat messages. | The current implementation tokenizes the completion `prompt` path; it does not reconstruct chat messages for lookup. |
+| Fallback | Uses the longest remembered match. If it is shorter than a configured `prefixMinMatchLength`, routing falls back to QPS-based placement. With the default threshold of zero and no history, it selects from the available endpoints and records that placement. | If no sufficient cache match exists, uses session affinity when a session ID is available and QPS-based placement otherwise. |
+
+For example, suppose the router records that a prompt prefix was sent to endpoint A. If A later evicts that cache entry while endpoint B currently holds it, prefix-aware routing may still choose A because its local trie retains the original mapping. KV-cache-aware routing queries the controller and can choose B; if no endpoint reports a sufficient match, it uses its fallback behavior.
+
+Use prefix-aware routing when you want simple, low-overhead affinity and cache eviction is limited or predictable. Use KV-cache-aware routing when accurate cache locality across replicas matters enough to justify the LMCache controller and per-request lookup overhead.
 
 ## Table of Contents
 
