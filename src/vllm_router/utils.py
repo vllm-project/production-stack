@@ -246,14 +246,13 @@ def is_model_healthy(url: str, model: str, model_type: str, timeout: int = 10) -
         if model_type == "transcription":
             # for transcription, the backend expects multipart/form-data with a file
             # we will use pre-generated silent wav bytes
-            request_kwargs = {
-                "files": ModelType.get_test_payload(model_type),
-                "data": {"model": model},
-                "timeout": timeout,
-            }
-            if auth_headers:
-                request_kwargs["headers"] = auth_headers
-            response = requests.post(f"{url}{model_url}", **request_kwargs)
+            response = requests.post(
+                f"{url}{model_url}",
+                files=ModelType.get_test_payload(model_type),
+                data={"model": model},
+                headers=auth_headers,
+                timeout=timeout,
+            )
         else:
             # for other model types (chat, completion, etc.)
             response = requests.post(
