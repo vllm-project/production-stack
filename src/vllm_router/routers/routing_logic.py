@@ -107,7 +107,7 @@ def _normalize_chat_messages(messages: List[Dict]) -> List[Dict]:
         content = message.get("content")
         if isinstance(content, list):
             text_content = " ".join(
-                part.get("text", "")
+                part.get("text") or ""
                 for part in content
                 if isinstance(part, dict) and part.get("type") == "text"
             )
@@ -459,14 +459,20 @@ class KvawareRouter(RoutingInterface):
                 )
             token_ids = _extract_token_ids(self.tokenizer, request_json)
         except Exception:
-            # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
+            # Remote /tokenize fallback (let errors bubble up to keep behavior
+            # simple). requests is synchronous - run it in an executor so the
+            # fallback does not block the router's event loop.
             remote_url = endpoints[0].url + "/tokenize"
             headers = {"Content-Type": "application/json"}
             data = _tokenize_request_payload(endpoints[0].model_names[0], request_json)
-            body = requests.post(
-                remote_url, headers=headers, json=data, timeout=10
-            ).json()
-            token_ids = body["tokens"]
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    remote_url, headers=headers, json=data, timeout=10
+                ),
+            )
+            token_ids = response.json()["tokens"]
 
         event_id = "Lookup" + str(uuid.uuid4())
         msg = LookupMsg(tokens=token_ids, event_id=event_id)

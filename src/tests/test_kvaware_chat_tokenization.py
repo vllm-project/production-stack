@@ -141,6 +141,23 @@ def test_multimodal_content_parts_are_flattened_to_their_text():
     assert isinstance(messages[0]["content"], list)
 
 
+def test_null_text_part_becomes_an_empty_string():
+    # {"type": "text", "text": null} is valid JSON a client can send; .get
+    # with a default only covers a MISSING key, so an explicit null must not
+    # reach " ".join as None.
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": None},
+                {"type": "text", "text": "hello"},
+            ],
+        }
+    ]
+    normalized = _normalize_chat_messages(messages)
+    assert normalized == [{"role": "user", "content": " hello"}]
+
+
 def test_none_content_becomes_an_empty_string():
     messages = [{"role": "assistant", "content": None, "tool_calls": [{"id": "1"}]}]
     normalized = _normalize_chat_messages(messages)
