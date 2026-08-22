@@ -5,9 +5,6 @@
 # Default owners for everything in the repo
 * @ApostaC @YuhanLiu11 @ruizhang0101
 
-# Area-specific owners. The last matching pattern takes precedence, so the
-# default owners are re-listed here to keep their coverage on these paths.
-
 # Router
 /src/vllm_router/ @ApostaC @YuhanLiu11 @Shaoting-Feng @ruizhang0101
 
