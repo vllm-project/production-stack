@@ -18,7 +18,7 @@ servingEngineSpec:
         model: "opt125m"
     requestCPU: 6
     requestMemory: "16Gi"
-    requestGPU: 0.5
+    requestGPU: 1
 
     pvcStorage: "10Gi"
     pvcAccessMode:
