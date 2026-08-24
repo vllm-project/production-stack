@@ -106,10 +106,16 @@ def _normalize_chat_messages(messages: List[Dict]) -> List[Dict]:
     for message in messages:
         content = message.get("content")
         if isinstance(content, list):
+            # Join only non-empty string parts: empty/null parts would inject
+            # stray spaces into the normalized text, drifting it away from
+            # what a text-only chat template would render.
             text_content = " ".join(
-                part.get("text") or ""
+                part["text"]
                 for part in content
-                if isinstance(part, dict) and part.get("type") == "text"
+                if isinstance(part, dict)
+                and part.get("type") == "text"
+                and isinstance(part.get("text"), str)
+                and part["text"]
             )
             message = {**message, "content": text_content}
         elif content is None:
@@ -454,13 +460,25 @@ class KvawareRouter(RoutingInterface):
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         try:
             if self.tokenizer is None:
-                # from_pretrained is blocking I/O (possibly a hub download on
-                # first use) - keep it off the event loop too.
-                loop = asyncio.get_running_loop()
-                self.tokenizer = await loop.run_in_executor(
-                    None,
-                    lambda: AutoTokenizer.from_pretrained(endpoints[0].model_names[0]),
-                )
+                # Double-checked lock: concurrent cold-start requests would
+                # otherwise each load the tokenizer (benign but redundant -
+                # duplicated disk/CPU work, and possible hub rate-limiting).
+                # The lock is created lazily; there is no await between the
+                # hasattr check and the assignment, so coroutines on one
+                # event loop cannot race it.
+                if not hasattr(self, "_tokenizer_lock"):
+                    self._tokenizer_lock = asyncio.Lock()
+                async with self._tokenizer_lock:
+                    if self.tokenizer is None:
+                        # from_pretrained is blocking I/O (possibly a hub
+                        # download on first use) - keep it off the event loop.
+                        loop = asyncio.get_running_loop()
+                        self.tokenizer = await loop.run_in_executor(
+                            None,
+                            lambda: AutoTokenizer.from_pretrained(
+                                endpoints[0].model_names[0]
+                            ),
+                        )
             token_ids = _extract_token_ids(self.tokenizer, request_json)
         except Exception:
             # Remote /tokenize fallback. requests is synchronous - run it in
@@ -743,13 +761,25 @@ class LoadAwareRouter(KvawareRouter):
         """
         try:
             if self.tokenizer is None:
-                # from_pretrained is blocking I/O (possibly a hub download on
-                # first use) - keep it off the event loop too.
-                loop = asyncio.get_running_loop()
-                self.tokenizer = await loop.run_in_executor(
-                    None,
-                    lambda: AutoTokenizer.from_pretrained(endpoints[0].model_names[0]),
-                )
+                # Double-checked lock: concurrent cold-start requests would
+                # otherwise each load the tokenizer (benign but redundant -
+                # duplicated disk/CPU work, and possible hub rate-limiting).
+                # The lock is created lazily; there is no await between the
+                # hasattr check and the assignment, so coroutines on one
+                # event loop cannot race it.
+                if not hasattr(self, "_tokenizer_lock"):
+                    self._tokenizer_lock = asyncio.Lock()
+                async with self._tokenizer_lock:
+                    if self.tokenizer is None:
+                        # from_pretrained is blocking I/O (possibly a hub
+                        # download on first use) - keep it off the event loop.
+                        loop = asyncio.get_running_loop()
+                        self.tokenizer = await loop.run_in_executor(
+                            None,
+                            lambda: AutoTokenizer.from_pretrained(
+                                endpoints[0].model_names[0]
+                            ),
+                        )
             return _extract_token_ids(self.tokenizer, request_json)
         except Exception:
             try:
