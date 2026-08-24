@@ -454,8 +454,12 @@ class KvawareRouter(RoutingInterface):
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         try:
             if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    endpoints[0].model_names[0]
+                # from_pretrained is blocking I/O (possibly a hub download on
+                # first use) - keep it off the event loop too.
+                loop = asyncio.get_running_loop()
+                self.tokenizer = await loop.run_in_executor(
+                    None,
+                    lambda: AutoTokenizer.from_pretrained(endpoints[0].model_names[0]),
                 )
             token_ids = _extract_token_ids(self.tokenizer, request_json)
         except Exception:
@@ -739,8 +743,12 @@ class LoadAwareRouter(KvawareRouter):
         """
         try:
             if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    endpoints[0].model_names[0]
+                # from_pretrained is blocking I/O (possibly a hub download on
+                # first use) - keep it off the event loop too.
+                loop = asyncio.get_running_loop()
+                self.tokenizer = await loop.run_in_executor(
+                    None,
+                    lambda: AutoTokenizer.from_pretrained(endpoints[0].model_names[0]),
                 )
             return _extract_token_ids(self.tokenizer, request_json)
         except Exception:
