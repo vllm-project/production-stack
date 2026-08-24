@@ -144,25 +144,43 @@ def _extract_token_ids(tokenizer, request_json: Dict) -> List[int]:
     return tokenizer.encode(request_json.get("prompt", ""))
 
 
-async def _ensure_tokenizer(router, model_name: str):
+async def _ensure_tokenizer(router, endpoints: List[EndpointInfo]):
     """Load the router's tokenizer once and return it.
 
     Double-checked lock: concurrent cold-start requests would otherwise each
     load the tokenizer (benign but redundant - duplicated disk/CPU work and
     possible hub rate-limiting). The lock is created lazily and there is no
     await between the check and the assignment, so its creation cannot race
-    on one event loop. from_pretrained is blocking I/O (possibly a hub
+    on one event loop. ``from_pretrained`` is blocking I/O (possibly a hub
     download on first use), so it runs in an executor.
+
+    The model name is resolved from the endpoint list only when a load
+    actually happens, and a failed load is remembered per name: a served-model
+    alias (e.g. a vLLM ``--served-model-name``) is not a real tokenizer id and
+    can never load, so without the negative cache every request would pay a
+    doomed hub lookup before reaching the remote ``/tokenize`` fallback.
     """
     if router.tokenizer is None:
+        model_name = endpoints[0].model_names[0]
+        if model_name in getattr(router, "_tokenizer_load_failures", ()):
+            raise ValueError(
+                f"tokenizer load for '{model_name}' already failed; "
+                f"using the remote /tokenize fallback"
+            )
         if not hasattr(router, "_tokenizer_lock"):
             router._tokenizer_lock = asyncio.Lock()
         async with router._tokenizer_lock:
             if router.tokenizer is None:
                 loop = asyncio.get_running_loop()
-                router.tokenizer = await loop.run_in_executor(
-                    None, lambda: AutoTokenizer.from_pretrained(model_name)
-                )
+                try:
+                    router.tokenizer = await loop.run_in_executor(
+                        None, lambda: AutoTokenizer.from_pretrained(model_name)
+                    )
+                except Exception:
+                    if not hasattr(router, "_tokenizer_load_failures"):
+                        router._tokenizer_load_failures = set()
+                    router._tokenizer_load_failures.add(model_name)
+                    raise
     return router.tokenizer
 
 

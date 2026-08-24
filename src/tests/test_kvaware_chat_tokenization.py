@@ -310,3 +310,61 @@ async def test_loadaware_tokenize_returns_none_when_both_paths_fail(monkeypatch)
     monkeypatch.setattr(routing_logic.requests, "post", dead_post)
     ids = await router.tokenize_prompt(endpoints(URL_A), {"messages": MESSAGES})
     assert ids is None
+
+
+@pytest.mark.asyncio
+async def test_failed_tokenizer_load_is_not_retried_per_request(monkeypatch):
+    """A served-model alias (vLLM --served-model-name) is not a hub id, so
+    the local load always fails - the failure must be cached, not re-paid as
+    a hub lookup on every request before the remote /tokenize fallback."""
+    router = LoadAwareRouter.__new__(LoadAwareRouter)
+    router.tokenizer = None
+    load_attempts = []
+
+    class FailingAuto:
+        @staticmethod
+        def from_pretrained(name):
+            load_attempts.append(name)
+            raise OSError("not a local folder and not a valid repo id")
+
+    # transformers may be absent in the test env (the module import is
+    # guarded), so set the module attribute itself with raising=False
+    monkeypatch.setattr(routing_logic, "AutoTokenizer", FailingAuto, raising=False)
+
+    class Response:
+        @staticmethod
+        def raise_for_status():
+            pass
+
+        @staticmethod
+        def json():
+            return {"count": len(CHAT_IDS), "tokens": CHAT_IDS}
+
+    monkeypatch.setattr(routing_logic.requests, "post", lambda *a, **k: Response())
+    for _ in range(3):
+        ids = await router.tokenize_prompt(endpoints(URL_A), {"messages": MESSAGES})
+        assert ids == CHAT_IDS
+    assert load_attempts == [MODEL]  # exactly one hub attempt, not three
+
+
+@pytest.mark.asyncio
+async def test_cold_tokenizer_load_receives_the_model_name(monkeypatch):
+    """_ensure_tokenizer must resolve endpoints -> model name at load time;
+    a successful cold load caches the tokenizer for subsequent requests."""
+    router = LoadAwareRouter.__new__(LoadAwareRouter)
+    router.tokenizer = None
+    loaded = []
+
+    class FakeAuto:
+        @staticmethod
+        def from_pretrained(name):
+            loaded.append(name)
+            return ChatTokenizer()
+
+    monkeypatch.setattr(routing_logic, "AutoTokenizer", FakeAuto, raising=False)
+    ids = await router.tokenize_prompt(endpoints(URL_A), {"messages": MESSAGES})
+    assert ids == CHAT_IDS
+    assert loaded == [MODEL]  # the NAME string, not the endpoint list
+    ids2 = await router.tokenize_prompt(endpoints(URL_A), {"messages": MESSAGES})
+    assert ids2 == CHAT_IDS
+    assert loaded == [MODEL]  # cached - no second load
