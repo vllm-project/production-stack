@@ -459,31 +459,45 @@ class KvawareRouter(RoutingInterface):
                 )
             token_ids = _extract_token_ids(self.tokenizer, request_json)
         except Exception:
-            # Remote /tokenize fallback (let errors bubble up to keep behavior
-            # simple). requests is synchronous - run it in an executor so the
-            # fallback does not block the router's event loop.
-            remote_url = endpoints[0].url + "/tokenize"
-            headers = {"Content-Type": "application/json"}
-            data = _tokenize_request_payload(endpoints[0].model_names[0], request_json)
-            loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: requests.post(
-                    remote_url, headers=headers, json=data, timeout=10
-                ),
-            )
-            token_ids = response.json()["tokens"]
+            # Remote /tokenize fallback. requests is synchronous - run it in
+            # an executor so the fallback does not block the router's event
+            # loop. A failure here (engine timeout, connection error, non-2xx)
+            # must not fail the request: the session/QPS fallback below routes
+            # fine without token ids.
+            try:
+                remote_url = endpoints[0].url + "/tokenize"
+                headers = {"Content-Type": "application/json"}
+                data = _tokenize_request_payload(
+                    endpoints[0].model_names[0], request_json
+                )
+                loop = asyncio.get_running_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: requests.post(
+                        remote_url, headers=headers, json=data, timeout=10
+                    ),
+                )
+                response.raise_for_status()
+                token_ids = response.json()["tokens"]
+            except Exception as e:
+                logger.warning(
+                    f"Tokenization failed locally and via remote /tokenize "
+                    f"({e}); falling back to session/QPS routing"
+                )
+                token_ids = None
 
-        event_id = "Lookup" + str(uuid.uuid4())
-        msg = LookupMsg(tokens=token_ids, event_id=event_id)
-        instance_id = await self.query_manager(msg)
+        instance_id = None
         matched_tokens = math.inf
-        logger.debug(f"Lookup return message: {instance_id}")
-        if len(list(instance_id.layout_info.keys())) > 0:
-            matched_instance_id = list(instance_id.layout_info.keys())[
-                0
-            ]  # Get the first key
-            matched_tokens = instance_id.layout_info[matched_instance_id][1]
+        if token_ids is not None:
+            event_id = "Lookup" + str(uuid.uuid4())
+            msg = LookupMsg(tokens=token_ids, event_id=event_id)
+            instance_id = await self.query_manager(msg)
+            logger.debug(f"Lookup return message: {instance_id}")
+            if len(list(instance_id.layout_info.keys())) > 0:
+                matched_instance_id = list(instance_id.layout_info.keys())[
+                    0
+                ]  # Get the first key
+                matched_tokens = instance_id.layout_info[matched_instance_id][1]
 
         if (
             instance_id is None
@@ -713,13 +727,15 @@ class LoadAwareRouter(KvawareRouter):
 
     async def tokenize_prompt(
         self, endpoints: List[EndpointInfo], request_json: Dict
-    ) -> List[int]:
+    ) -> Optional[List[int]]:
         """Local-first tokenization with the remote `/tokenize` fallback.
 
         Chat-completion bodies go through the chat template so the token ids
         match what the engine caches KV for (see `_extract_token_ids`). The
         remote fallback is a blocking HTTP call, so it runs in an executor
-        rather than on the event loop.
+        rather than on the event loop. Returns ``None`` when both paths fail
+        (the caller then routes via `fallback_url` instead of erroring the
+        request).
         """
         try:
             if self.tokenizer is None:
@@ -728,17 +744,27 @@ class LoadAwareRouter(KvawareRouter):
                 )
             return _extract_token_ids(self.tokenizer, request_json)
         except Exception:
-            remote_url = endpoints[0].url + "/tokenize"
-            headers = {"Content-Type": "application/json"}
-            data = _tokenize_request_payload(endpoints[0].model_names[0], request_json)
-            loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: requests.post(
-                    remote_url, headers=headers, json=data, timeout=10
-                ),
-            )
-            return response.json()["tokens"]
+            try:
+                remote_url = endpoints[0].url + "/tokenize"
+                headers = {"Content-Type": "application/json"}
+                data = _tokenize_request_payload(
+                    endpoints[0].model_names[0], request_json
+                )
+                loop = asyncio.get_running_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: requests.post(
+                        remote_url, headers=headers, json=data, timeout=10
+                    ),
+                )
+                response.raise_for_status()
+                return response.json()["tokens"]
+            except Exception as e:
+                logger.warning(
+                    f"Tokenization failed locally and via remote /tokenize "
+                    f"({e}); falling back to session/QPS routing"
+                )
+                return None
 
     def fallback_url(
         self,
@@ -788,6 +814,8 @@ class LoadAwareRouter(KvawareRouter):
             )
 
         token_ids = await self.tokenize_prompt(endpoints, request_json)
+        if token_ids is None:
+            return self.fallback_url(endpoints, request_stats, request, request_json)
 
         event_id = "Lookup" + str(uuid.uuid4())
         msg = LookupMsg(tokens=token_ids, event_id=event_id)

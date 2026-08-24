@@ -245,6 +245,10 @@ async def test_remote_tokenize_fallback_sends_the_messages_for_chat(monkeypatch)
 
     class Response:
         @staticmethod
+        def raise_for_status():
+            pass
+
+        @staticmethod
         def json():
             return {"count": len(CHAT_IDS), "tokens": CHAT_IDS}
 
@@ -260,3 +264,47 @@ async def test_remote_tokenize_fallback_sends_the_messages_for_chat(monkeypatch)
     assert captured["json"]["messages"] == MESSAGES
     assert captured["json"]["add_generation_prompt"] is True
     assert "prompt" not in captured["json"]
+
+
+# --- tokenization failure degrades to fallback routing, never a 500 -----------
+
+
+@pytest.mark.asyncio
+async def test_kvaware_falls_back_to_qps_when_tokenization_fails(monkeypatch):
+    """A dead /tokenize endpoint (plus no usable local template) must not
+    fail the request - the router still has session/QPS routing."""
+    router = KvawareRouter.__new__(KvawareRouter)
+    router.tokenizer = TemplatelessTokenizer()
+    router.threshold = 2000
+    router.instance_id_to_ip = {}
+    router.session_key = None
+    router.hash_ring = HashRing()
+    lookups = []
+
+    async def query_manager(msg):
+        lookups.append(msg)
+
+    router.query_manager = query_manager
+
+    def dead_post(url, headers=None, json=None, timeout=None):
+        raise ConnectionError("engine unreachable")
+
+    monkeypatch.setattr(routing_logic.requests, "post", dead_post)
+    url = await router.route_request(
+        endpoints(URL_A, URL_B), {}, {}, None, {"messages": MESSAGES}
+    )
+    assert url == URL_A  # QPS routing with no stats picks the first endpoint
+    assert lookups == []  # no KV lookup without token ids
+
+
+@pytest.mark.asyncio
+async def test_loadaware_tokenize_returns_none_when_both_paths_fail(monkeypatch):
+    router = LoadAwareRouter.__new__(LoadAwareRouter)
+    router.tokenizer = TemplatelessTokenizer()
+
+    def dead_post(url, headers=None, json=None, timeout=None):
+        raise ConnectionError("engine unreachable")
+
+    monkeypatch.setattr(routing_logic.requests, "post", dead_post)
+    ids = await router.tokenize_prompt(endpoints(URL_A), {"messages": MESSAGES})
+    assert ids is None
