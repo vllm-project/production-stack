@@ -130,17 +130,23 @@ def _extract_token_ids(tokenizer, request_json: Dict) -> List[int]:
     Chat-completion bodies (``messages``) are tokenized through the model's
     chat template with ``add_generation_prompt=True``: vLLM engines cache KV
     for the token ids *after* template application, so encoding the raw
-    message text would never line up with the engine-side prefix. Completion
+    message text would never line up with the engine-side prefix. The
+    template is rendered to TEXT and then encoded (``add_special_tokens=
+    False`` - the rendered template already carries its special tokens):
+    ``apply_chat_template(..., tokenize=True)``'s return type varies across
+    transformers versions (plain ids vs ``Encoding`` objects), and feeding
+    the non-id form to the KV lookup silently never matches. Completion
     bodies keep the plain ``encode`` path, unchanged. May raise (e.g. the
     tokenizer defines no chat template) - callers fall back to the engine's
     ``/tokenize`` API.
     """
     if "messages" in request_json:
-        return tokenizer.apply_chat_template(
+        text = tokenizer.apply_chat_template(
             _normalize_chat_messages(request_json["messages"]),
             add_generation_prompt=True,
-            tokenize=True,
+            tokenize=False,
         )
+        return tokenizer.encode(text, add_special_tokens=False)
     return tokenizer.encode(request_json.get("prompt", ""))
 
 

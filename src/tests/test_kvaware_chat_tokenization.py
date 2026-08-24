@@ -79,6 +79,8 @@ class ChatTokenizer:
         self.chat_template_calls = []
         self.encode_calls = []
 
+    RENDERED = "<chat-template-rendered>"
+
     def apply_chat_template(
         self, messages, add_generation_prompt=False, tokenize=False
     ):
@@ -89,10 +91,20 @@ class ChatTokenizer:
                 "tokenize": tokenize,
             }
         )
-        return list(CHAT_IDS)
+        # tokenize=True return types vary across transformers versions
+        # (ids vs Encoding objects) - the router must NOT use that form.
+        assert tokenize is False, "router must render text, not tokenize=True"
+        return self.RENDERED
 
-    def encode(self, prompt):
-        self.encode_calls.append(prompt)
+    def encode(self, prompt, add_special_tokens=True):
+        self.encode_calls.append(
+            {"prompt": prompt, "add_special_tokens": add_special_tokens}
+        )
+        if prompt == self.RENDERED:
+            # the rendered template must be encoded WITHOUT re-adding
+            # special tokens (the template already carries them)
+            assert add_special_tokens is False
+            return list(CHAT_IDS)
         return [1] * len(prompt)
 
 
@@ -113,7 +125,9 @@ def test_messages_tokenize_through_the_chat_template():
     assert ids == CHAT_IDS
     call = tokenizer.chat_template_calls[0]
     assert call["add_generation_prompt"] is True
-    assert call["tokenize"] is True
+    # rendered to text, then encoded without re-adding special tokens - the
+    # tokenize=True return type varies across transformers versions
+    assert call["tokenize"] is False
     assert tokenizer.encode_calls == []
 
 
