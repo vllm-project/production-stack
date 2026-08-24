@@ -144,6 +144,28 @@ def _extract_token_ids(tokenizer, request_json: Dict) -> List[int]:
     return tokenizer.encode(request_json.get("prompt", ""))
 
 
+async def _ensure_tokenizer(router, model_name: str):
+    """Load the router's tokenizer once and return it.
+
+    Double-checked lock: concurrent cold-start requests would otherwise each
+    load the tokenizer (benign but redundant - duplicated disk/CPU work and
+    possible hub rate-limiting). The lock is created lazily and there is no
+    await between the check and the assignment, so its creation cannot race
+    on one event loop. from_pretrained is blocking I/O (possibly a hub
+    download on first use), so it runs in an executor.
+    """
+    if router.tokenizer is None:
+        if not hasattr(router, "_tokenizer_lock"):
+            router._tokenizer_lock = asyncio.Lock()
+        async with router._tokenizer_lock:
+            if router.tokenizer is None:
+                loop = asyncio.get_running_loop()
+                router.tokenizer = await loop.run_in_executor(
+                    None, lambda: AutoTokenizer.from_pretrained(model_name)
+                )
+    return router.tokenizer
+
+
 def _tokenize_request_payload(model: str, request_json: Dict) -> Dict:
     """Request body for the engine's ``/tokenize`` fallback.
 
@@ -459,26 +481,7 @@ class KvawareRouter(RoutingInterface):
         token_ids = None
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         try:
-            if self.tokenizer is None:
-                # Double-checked lock: concurrent cold-start requests would
-                # otherwise each load the tokenizer (benign but redundant -
-                # duplicated disk/CPU work, and possible hub rate-limiting).
-                # The lock is created lazily; there is no await between the
-                # hasattr check and the assignment, so coroutines on one
-                # event loop cannot race it.
-                if not hasattr(self, "_tokenizer_lock"):
-                    self._tokenizer_lock = asyncio.Lock()
-                async with self._tokenizer_lock:
-                    if self.tokenizer is None:
-                        # from_pretrained is blocking I/O (possibly a hub
-                        # download on first use) - keep it off the event loop.
-                        loop = asyncio.get_running_loop()
-                        self.tokenizer = await loop.run_in_executor(
-                            None,
-                            lambda: AutoTokenizer.from_pretrained(
-                                endpoints[0].model_names[0]
-                            ),
-                        )
+            await _ensure_tokenizer(self, endpoints)
             token_ids = _extract_token_ids(self.tokenizer, request_json)
         except Exception:
             # Remote /tokenize fallback. requests is synchronous - run it in
@@ -760,26 +763,7 @@ class LoadAwareRouter(KvawareRouter):
         request).
         """
         try:
-            if self.tokenizer is None:
-                # Double-checked lock: concurrent cold-start requests would
-                # otherwise each load the tokenizer (benign but redundant -
-                # duplicated disk/CPU work, and possible hub rate-limiting).
-                # The lock is created lazily; there is no await between the
-                # hasattr check and the assignment, so coroutines on one
-                # event loop cannot race it.
-                if not hasattr(self, "_tokenizer_lock"):
-                    self._tokenizer_lock = asyncio.Lock()
-                async with self._tokenizer_lock:
-                    if self.tokenizer is None:
-                        # from_pretrained is blocking I/O (possibly a hub
-                        # download on first use) - keep it off the event loop.
-                        loop = asyncio.get_running_loop()
-                        self.tokenizer = await loop.run_in_executor(
-                            None,
-                            lambda: AutoTokenizer.from_pretrained(
-                                endpoints[0].model_names[0]
-                            ),
-                        )
+            await _ensure_tokenizer(self, endpoints)
             return _extract_token_ids(self.tokenizer, request_json)
         except Exception:
             try:
