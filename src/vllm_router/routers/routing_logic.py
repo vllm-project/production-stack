@@ -398,10 +398,23 @@ class KvawareRouter(RoutingInterface):
             # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
             remote_url = endpoints[0].url + "/tokenize"
             headers = {"Content-Type": "application/json"}
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json.get("prompt", ""),
-            }
+            # Chat-completions bodies carry `messages`, not `prompt` - send
+            # them as vLLM's TokenizeChatRequest so the engine applies its
+            # own chat template (`add_generation_prompt=True` is the
+            # chat-completions default, pinned explicitly). Sending the old
+            # prompt-form payload for a chat body tokenizes "" and the KV
+            # lookup keys on garbage.
+            if "messages" in request_json:
+                data = {
+                    "model": endpoints[0].model_names[0],
+                    "messages": request_json["messages"],
+                    "add_generation_prompt": True,
+                }
+            else:
+                data = {
+                    "model": endpoints[0].model_names[0],
+                    "prompt": request_json.get("prompt", ""),
+                }
             body = requests.post(
                 remote_url, headers=headers, json=data, timeout=10
             ).json()
@@ -661,10 +674,23 @@ class LoadAwareRouter(KvawareRouter):
         except Exception:
             remote_url = endpoints[0].url + "/tokenize"
             headers = {"Content-Type": "application/json"}
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json.get("prompt", ""),
-            }
+            # Chat-completions bodies carry `messages`, not `prompt` - send
+            # them as vLLM's TokenizeChatRequest so the engine applies its
+            # own chat template (`add_generation_prompt=True` is the
+            # chat-completions default, pinned explicitly). Sending the old
+            # prompt-form payload for a chat body tokenizes "" and the KV
+            # lookup keys on garbage.
+            if "messages" in request_json:
+                data = {
+                    "model": endpoints[0].model_names[0],
+                    "messages": request_json["messages"],
+                    "add_generation_prompt": True,
+                }
+            else:
+                data = {
+                    "model": endpoints[0].model_names[0],
+                    "prompt": request_json.get("prompt", ""),
+                }
             loop = asyncio.get_running_loop()
             response = await loop.run_in_executor(
                 None,
