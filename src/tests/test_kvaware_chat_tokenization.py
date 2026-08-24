@@ -128,7 +128,10 @@ def test_messages_tokenize_through_the_chat_template():
     # rendered to text, then encoded without re-adding special tokens - the
     # tokenize=True return type varies across transformers versions
     assert call["tokenize"] is False
-    assert tokenizer.encode_calls == []
+    # exactly one encode: the rendered template text, no special re-adding
+    assert tokenizer.encode_calls == [
+        {"prompt": ChatTokenizer.RENDERED, "add_special_tokens": False}
+    ]
 
 
 def test_prompt_requests_keep_the_plain_encode_path():
