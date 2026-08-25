@@ -216,6 +216,16 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         )
         self.finished_requests[engine_url] += 1
 
+        first_token_time = self.first_token_time.get((engine_url, request_id))
+        if first_token_time is not None:
+            if engine_url not in self.decoding_length_monitors:
+                self.decoding_length_monitors[engine_url] = MovingAverageMonitor(
+                    self.sliding_window_size
+                )
+            self.decoding_length_monitors[engine_url].update(
+                timestamp, timestamp - first_token_time
+            )
+
         if request_start_time := self.request_start_time.get((engine_url, request_id)):
             self.latency_monitors[engine_url].update(
                 timestamp, time.time() - request_start_time
@@ -272,6 +282,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             finished = self.finished_requests.get(engine_url, 0)
 
             if engine_url in self.decoding_length_monitors:
+                self.decoding_length_monitors[engine_url].update_no_value(current_time)
                 avg_dec_len = self.decoding_length_monitors[engine_url].get_average()
             else:
                 avg_dec_len = -1
