@@ -372,8 +372,8 @@ class KvawareRouter(RoutingInterface):
         """
         Route the request to the appropriate engine URL by where the KV cache
         of the longest prefix match is found.
-        If there is no session id in the request header, it will pick a server
-        with round robin.
+        If there is no session id in the request, it falls back to QPS-based
+        routing.
 
         Args:
             endpoints (List[EndpointInfo]): The list of engine URLs
