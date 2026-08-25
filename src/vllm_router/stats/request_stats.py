@@ -108,10 +108,9 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
     Monitors the request statistics of all serving engines.
     """
 
-    # NOTE (ApostaC): Currently, QPS is calculated based on the number of
-    # arrived requests in the sliding window, but the inter_token_latency and
-    # ttft are calculated based on the number of completed requests in the
-    # sliding window.
+    # NOTE (ApostaC): Currently, QPS is calculated based on requests arriving
+    # in the sliding window, while TTFT is calculated when the first response
+    # token is received for requests in the sliding window.
     def __init__(self, sliding_window_size: float = None):
         if hasattr(self, "_initialized"):
             return
@@ -173,12 +172,12 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
 
     def on_request_response(self, engine_url: str, request_id: str, timestamp: float):
         """
-        Tell the monitor that a response token has been received for a request.
+        Tell the monitor that the first response token has been received.
 
         Args:
             engine_url: The URL of the serving engine
             request_id: The global request ID
-            timestamp: The timestamp when the response token was received
+            timestamp: The timestamp when the first response token was received
         """
         if (engine_url, request_id) not in self.request_start_time:
             return
@@ -245,8 +244,8 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         Returns:
             A dictionary where the key is the serving engine URL and the value
             is the request statistics for that engine.
-            The TTFT and inter token latency will be -1 if there is no requests
-            finished in the sliding window.
+            TTFT will be -1 if no request received its first response token in
+            the sliding window.
         """
         ret = {}
         urls = set(self.in_prefill_requests.keys()).union(
