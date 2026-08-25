@@ -45,8 +45,8 @@ Minor issues such as informational disclosures, logging errors, non-exploitable 
 
 When a security report is accepted, the fix process depends on the severity:
 
-* **CRITICAL and HIGH severity**: Fixes are developed in a private security fork and coordinated with the prenotification group before public disclosure.
-* **MODERATE and LOW severity**: Fixes are developed and submitted as public pull requests. These issues do not require embargo since they do not enable arbitrary code execution or significant data breach, and public visibility accelerates community review and adoption of the fix.
+- **CRITICAL and HIGH severity**: Fixes are developed in a private security fork and coordinated with the prenotification group before public disclosure.
+- **MODERATE and LOW severity**: Fixes are developed and submitted as public pull requests. These issues do not require embargo since they do not enable arbitrary code execution or significant data breach, and public visibility accelerates community review and adoption of the fix.
 
 The vulnerability management team reserves the right to adjust the disclosure approach on a case-by-case basis, taking into account factors such as active exploitation, unusual attack surface, or coordination requirements with downstream vendors.
 
@@ -54,6 +54,6 @@ The vulnerability management team reserves the right to adjust the disclosure ap
 
 For certain security issues of CRITICAL, HIGH, or MODERATE severity level, we may prenotify certain organizations or vendors that ship production-stack or vLLM. The purpose of this prenotification is to allow for a coordinated release of fixes for severe issues.
 
-* This prenotification will be in the form of a private email notification. It may also include adding security contacts to the GitHub security advisory, typically a few days before release.
+- This prenotification will be in the form of a private email notification. It may also include adding security contacts to the GitHub security advisory, typically a few days before release.
 
-* If you wish to be added to the prenotification group, please send an email to the members of the [vLLM vulnerability management team](https://docs.vllm.ai/en/latest/contributing/vulnerability_management.html).
+- If you wish to be added to the prenotification group, please send an email to the members of the [vLLM vulnerability management team](https://docs.vllm.ai/en/latest/contributing/vulnerability_management.html).
