@@ -2,8 +2,12 @@ servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
   - name: "distilgpt2-raycluster"
-    repository: "lmcache/vllm-openai"
-    tag: "latest"
+    # KubeRay starts the head and worker containers with a generated `ray start`
+    # command, so this image must ship the `ray` CLI. vllm/vllm-openai removed
+    # Ray from its image dependencies in v0.18.0; v0.17.1 is the last tag that
+    # includes it. Current lmcache/vllm-openai tags do not include Ray either.
+    repository: "vllm/vllm-openai"
+    tag: "v0.17.1"
     modelURL: "distilbert/distilgpt2"
 
     replicaCount: 1
