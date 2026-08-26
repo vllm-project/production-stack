@@ -110,7 +110,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
 
     # NOTE (ApostaC): Currently, QPS is calculated based on requests arriving
     # in the sliding window, while TTFT is calculated when the first response
-    # token is received for requests in the sliding window.
+    # signal is observed for requests in the sliding window.
     def __init__(self, sliding_window_size: float = None):
         if hasattr(self, "_initialized"):
             return
@@ -124,7 +124,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
 
         # The time when the request is coming (engine_url, request_id) -> timestamp
         self.request_start_time: Dict[Tuple[str, str], float] = {}
-        # Record time when first token is received: (engine_url, request_id) -> timestamp
+        # First response signal time: (engine_url, request_id) -> timestamp
         self.first_token_time: Dict[Tuple[str, str], float] = {}
 
         # Number of requests in different stages (from the start of the router)
@@ -172,12 +172,15 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
 
     def on_request_response(self, engine_url: str, request_id: str, timestamp: float):
         """
-        Tell the monitor that the first response token has been received.
+        Tell the monitor that the first response signal has been observed.
+
+        This is the first response body chunk for response-body proxy paths
+        and the response headers for non-streaming multipart responses.
 
         Args:
             engine_url: The URL of the serving engine
             request_id: The global request ID
-            timestamp: The timestamp when the first response token was received
+            timestamp: The timestamp when the first response signal was observed
         """
         if (engine_url, request_id) not in self.request_start_time:
             return
@@ -244,8 +247,8 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         Returns:
             A dictionary where the key is the serving engine URL and the value
             is the request statistics for that engine.
-            TTFT will be -1 if no request received its first response token in
-            the sliding window.
+            TTFT will be -1 if no request produced its first response signal
+            in the sliding window.
         """
         ret = {}
         urls = set(self.in_prefill_requests.keys()).union(
