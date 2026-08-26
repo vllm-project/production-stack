@@ -20,4 +20,5 @@ def test_avg_decoding_length_tracks_decode_duration():
 
     monitor.on_request_complete(engine_url, "request-1", 105.0)
     assert monitor.get_request_stats(105.0)[engine_url].avg_decoding_length == 4.0
+    assert (engine_url, "request-1") not in monitor.first_token_time
     assert monitor.get_request_stats(166.0)[engine_url].avg_decoding_length == -1

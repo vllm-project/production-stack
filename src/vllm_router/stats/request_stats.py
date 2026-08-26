@@ -216,7 +216,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         )
         self.finished_requests[engine_url] += 1
 
-        first_token_time = self.first_token_time.get((engine_url, request_id))
+        first_token_time = self.first_token_time.pop((engine_url, request_id), None)
         if first_token_time is not None:
             if engine_url not in self.decoding_length_monitors:
                 self.decoding_length_monitors[engine_url] = MovingAverageMonitor(
