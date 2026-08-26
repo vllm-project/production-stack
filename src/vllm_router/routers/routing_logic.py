@@ -411,11 +411,12 @@ class KvawareRouter(RoutingInterface):
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
         instance_id = await self.query_manager(msg)
         matched_tokens = math.inf
+        matched_instance_id = None
         logger.debug(f"Lookup return message: {instance_id}")
         if len(list(instance_id.layout_info.keys())) > 0:
-            matched_instance_id = list(instance_id.layout_info.keys())[
-                0
-            ]  # Get the first key
+            matched_instance_id = max(
+                instance_id.layout_info, key=lambda key: instance_id.layout_info[key][1]
+            )
             matched_tokens = instance_id.layout_info[matched_instance_id][1]
 
         if (
@@ -435,8 +436,7 @@ class KvawareRouter(RoutingInterface):
                 url = self.hash_ring.get_node(session_id)
             return url
         else:
-            queried_instance_ids = [info for info in instance_id.layout_info]
-            if queried_instance_ids[0] not in self.instance_id_to_ip:
+            if matched_instance_id not in self.instance_id_to_ip:
                 for endpoint in endpoints:
                     event_id = "QueryInst" + str(uuid.uuid4())
                     query_ip = endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
@@ -455,9 +455,9 @@ class KvawareRouter(RoutingInterface):
                     )
                 logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
             logger.info(
-                f"Routing request to {queried_instance_ids[0]} found by kvaware router"
+                f"Routing request to {matched_instance_id} found by kvaware router"
             )
-            return self.instance_id_to_ip[queried_instance_ids[0]]
+            return self.instance_id_to_ip[matched_instance_id]
 
 
 class LoadAwareRouter(KvawareRouter):
