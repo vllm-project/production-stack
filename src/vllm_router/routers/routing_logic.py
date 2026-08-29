@@ -384,7 +384,15 @@ class KvawareRouter(RoutingInterface):
             request (Request): The incoming request
             request_json (Dict): The request body (needed for finding the
             longest prefix match)
+
+        Raises:
+            HTTPException: 503 if no endpoints are available.
         """
+        if not endpoints:
+            raise HTTPException(
+                status_code=503, detail="No backend endpoints available"
+            )
+
         token_ids = None
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         # TODO (Yuhan): Handle chat completions
@@ -454,10 +462,27 @@ class KvawareRouter(RoutingInterface):
                         endpoint.url
                     )
                 logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
+            url = self.instance_id_to_ip.get(queried_instance_ids[0])
+            if url is None:
+                # The lookup matched an instance the ip mapping cannot place
+                # (e.g. several engines sharing one IP - QueryInstMsg keys
+                # instances by IP alone - or a stale registration). Routing
+                # can still proceed without the cache hit; an unhandled
+                # KeyError here fails the whole request with a 500.
+                logger.warning(
+                    f"kvaware matched instance {queried_instance_ids[0]} has no "
+                    f"known endpoint mapping ({self.instance_id_to_ip}); falling "
+                    f"back to session/QPS routing"
+                )
+                session_id = self.extract_session_id(request, request_json)
+                self._update_hash_ring(endpoints)
+                if session_id is None:
+                    return self._qps_routing(endpoints, request_stats)
+                return self.hash_ring.get_node(session_id)
             logger.info(
                 f"Routing request to {queried_instance_ids[0]} found by kvaware router"
             )
-            return self.instance_id_to_ip[queried_instance_ids[0]]
+            return url
 
 
 class LoadAwareRouter(KvawareRouter):
