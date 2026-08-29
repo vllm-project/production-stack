@@ -402,16 +402,14 @@ class KvawareRouter(RoutingInterface):
                 "model": endpoints[0].model_names[0],
                 "prompt": request_json.get("prompt", ""),
             }
-            # Run the blocking HTTP call in an executor so it does not
-            # stall the event loop (mirrors tokenize_prompt fallback).
-            loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: requests.post(
-                    remote_url, headers=headers, json=data, timeout=10
-                ),
-            )
-            token_ids = response.json()["tokens"]
+            # Use the shared aiohttp session so connections are reused and
+            # the event loop is not blocked (mirrors route_general_request).
+            client = request.app.state.aiohttp_client_wrapper()
+            async with client.post(
+                remote_url, headers=headers, json=data, timeout=10
+            ) as response:
+                response_json = await response.json()
+                token_ids = response_json["tokens"]
 
         event_id = "Lookup" + str(uuid.uuid4())
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
