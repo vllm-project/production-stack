@@ -47,10 +47,12 @@ main_router = APIRouter()
 
 logger = init_logger(__name__)
 
-# OpenAPI request body schema for endpoints that accept a JSON body.
-# These routes use raw Request objects (forwarded to the backend), so
-# FastAPI cannot infer the body schema automatically.  Adding this
-# explicitly allows the Swagger "Try it out" feature to work.
+# OpenAPI request body schemas for endpoints that use raw Request objects
+# (forwarded to the backend).  FastAPI cannot infer the body schema from
+# Request alone, so we add it explicitly to make the Swagger "Try it out"
+# feature work.
+
+# JSON body (most LLM inference endpoints: chat, completions, embeddings, etc.)
 _REQUEST_BODY_SCHEMA: dict = {
     "requestBody": {
         "content": {
@@ -58,6 +60,21 @@ _REQUEST_BODY_SCHEMA: dict = {
                 "schema": {
                     "type": "object",
                     "description": "Request body forwarded to the backend model server.",
+                }
+            }
+        },
+        "required": True,
+    }
+}
+
+# Multipart form-data body (audio transcriptions, image edits, etc.)
+_FORM_BODY_SCHEMA: dict = {
+    "requestBody": {
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "description": "Multipart form-data forwarded to the backend model server.",
                 }
             }
         },
@@ -123,12 +140,12 @@ async def route_score(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/score", background_tasks)
 
 
-@main_router.post("/sleep", openapi_extra=_REQUEST_BODY_SCHEMA)
+@main_router.post("/sleep")
 async def route_sleep(request: Request, background_tasks: BackgroundTasks):
     return await route_sleep_wakeup_request(request, "/sleep", background_tasks)
 
 
-@main_router.post("/wake_up", openapi_extra=_REQUEST_BODY_SCHEMA)
+@main_router.post("/wake_up")
 async def route_wake_up(request: Request, background_tasks: BackgroundTasks):
     return await route_sleep_wakeup_request(request, "/wake_up", background_tasks)
 
@@ -265,7 +282,7 @@ async def health() -> Response:
         return JSONResponse(content={"status": "healthy"}, status_code=200)
 
 
-@main_router.post("/v1/audio/transcriptions", openapi_extra=_REQUEST_BODY_SCHEMA)
+@main_router.post("/v1/audio/transcriptions", openapi_extra=_FORM_BODY_SCHEMA)
 async def route_v1_audio_transcriptions(
     request: Request, background_tasks: BackgroundTasks
 ):
@@ -308,7 +325,7 @@ async def route_v1_images_generations(
     )
 
 
-@main_router.post("/v1/images/edits", openapi_extra=_REQUEST_BODY_SCHEMA)
+@main_router.post("/v1/images/edits", openapi_extra=_FORM_BODY_SCHEMA)
 async def route_v1_images_edit(request: Request, background_tasks: BackgroundTasks):
     return await route_image_edit_request(request, "/v1/images/edits", background_tasks)
 
