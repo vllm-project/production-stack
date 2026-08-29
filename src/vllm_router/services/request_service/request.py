@@ -283,14 +283,14 @@ async def process_request(
         request_json = json.loads(body)
         is_streaming = request_json.get("stream", False)
         model_name = request_json.get("model", "unknown")
-    except (JSONDecodeError, UnicodeDecodeError, ValueError) as e:
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
         # If we can't parse the body as JSON, assume it's not streaming
         logger.warning(
             f"Failed to parse request body in process_request: {e}. "
             f"Body length: {len(body)} bytes"
         )
         raise HTTPException(
-            status=400,
+            status_code=400,
             detail=f"Request body is not JSON parsable: {e}",
         )
 
