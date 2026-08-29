@@ -327,7 +327,7 @@ class KvawareRouter(RoutingInterface):
         self.instance_id_to_ip = {}
         self.session_key = session_key
         self.hash_ring = HashRing()
-        self.tokenizers = {}
+        self.tokenizers: Dict[str, AutoTokenizer] = {}
         self.threshold = kv_aware_threshold
 
     def _get_tokenizer(self, endpoints: List[EndpointInfo]):
@@ -395,15 +395,28 @@ class KvawareRouter(RoutingInterface):
         token_ids = None
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         # TODO (Yuhan): Handle chat completions
+        model_name = request_json.get("model", "")
+        # Find the endpoint serving this model
+        model_endpoint = next(
+            (ep for ep in endpoints if model_name in ep.model_names),
+            endpoints[0] if endpoints else None,
+        )
         try:
-            tokenizer = self._get_tokenizer(endpoints)
-            token_ids = tokenizer.encode(request_json.get("prompt", ""))
+            if model_name not in self.tokenizers:
+                self.tokenizers[model_name] = AutoTokenizer.from_pretrained(
+                    model_name
+                )
+            token_ids = self.tokenizers[model_name].encode(
+                request_json.get("prompt", "")
+            )
         except Exception:
             # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
-            remote_url = endpoints[0].url + "/tokenize"
+            if model_endpoint is None:
+                raise
+            remote_url = model_endpoint.url + "/tokenize"
             headers = {"Content-Type": "application/json"}
             data = {
-                "model": endpoints[0].model_names[0],
+                "model": model_name,
                 "prompt": request_json.get("prompt", ""),
             }
             body = requests.post(
