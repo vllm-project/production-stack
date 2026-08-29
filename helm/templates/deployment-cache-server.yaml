@@ -78,7 +78,7 @@ spec:
             failureThreshold: {{ .Values.cacheserverSpec.livenessProbe.failureThreshold | default 3 }}
             timeoutSeconds: {{ .Values.cacheserverSpec.livenessProbe.timeoutSeconds | default 5 }}
             tcpSocket:
-              port: {{ .Values.cacheserverSpec.containerPort }}
+              port: caserver-cport
           {{- end }}
           {{- with .Values.cacheserverSpec.containerSecurityContext }}
           securityContext:

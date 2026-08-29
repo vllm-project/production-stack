@@ -173,7 +173,7 @@ tests:
           failureThreshold: 6
           timeoutSeconds: 10
           tcpSocket:
-            port: 8000
+            port: caserver-cport
     - equal:
         path: spec.template.spec.containers[0].securityContext
         value:
