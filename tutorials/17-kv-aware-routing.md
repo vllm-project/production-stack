@@ -82,6 +82,49 @@ To clean up the deployment:
 helm uninstall vllm
 ```
 
+## Troubleshooting: the silent-miss preconditions
+
+KV-aware routing fails **silently**: when any precondition below is violated,
+requests still succeed - the router just falls back to session/QPS placement
+and every KV lookup misses. If routing never reports cache hits, check these
+in order (each was hit in a real deployment):
+
+1. **Same lmcache version on router and engines.** The controller<->worker
+   ZMQ messages are not a stable protocol across lmcache versions - an old
+   controller rejects a newer worker's `RegisterMsg` as an unknown message
+   type, the worker never registers, and every lookup misses. The router
+   image and engine images must carry the same lmcache.
+2. **The router needs the engines' vLLM installed.** KV chunk hashes are
+   rooted in vLLM's `NONE_HASH` and hash function. A router without vLLM
+   falls back to `NONE_HASH=0` and a plain Python hash - a different hash
+   chain from the engines', so no lookup can ever match. This is why
+   `docker/Dockerfile.kvaware` builds the router FROM a vLLM image.
+3. **Set `PYTHONHASHSEED` identically on router and engines** when the
+   builtin hash is in use - Python's `hash()` is seed-randomized per
+   process, and unseeded processes can never agree on chunk hashes.
+   (lmcache logs a warning about this at startup; it is easy to miss.)
+4. **Worker heartbeats must be enabled** (`lmcacheConfig.workerHeartbeatTime`
+   in this tutorial's values, mapping to
+   `LMCACHE_LMCACHE_WORKER_HEARTBEAT_TIME`). lmcache workers default to
+   never sending heartbeats while the controller reaps silent workers after
+   ~30 seconds - with the default, the KV index silently empties shortly
+   after startup and hits stop "for no reason". Hand-rolled engine configs
+   must set this explicitly.
+5. **One cache-owning instance per IP.** The controller attributes
+   instances to endpoints by IP alone (`QueryInstMsg`), so several engines
+   sharing one IP (e.g. one multi-GPU host with host networking) are
+   indistinguishable and requests kv-followed to the unmapped ones fall
+   back (older routers crashed with a 500 - see the fix in the router
+   changelog). Give each engine a distinct routable IP.
+6. **Sliding-window / hybrid-attention models pay a hidden KV cost.**
+   `LMCacheConnectorV1` does not support vLLM's hybrid KV cache manager,
+   so configuring it makes vLLM silently disable that manager - on models
+   with sliding-window layers (Gemma-family and others) this inflates
+   per-token KV usage several-fold, shrinking the effective KV budget by
+   as much as ~10x. Only a startup log line warns about it. lmcache's
+   `LMCacheMPConnector` (multiprocess cache server) is the HMA-capable
+   path for such models.
+
 ## Conclusion
 
 In this tutorial, we've demonstrated how to:
