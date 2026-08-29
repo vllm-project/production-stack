@@ -194,7 +194,8 @@ async def check_semantic_cache(request: Request) -> Optional[JSONResponse]:
         return None
 
     # Get the request body
-    body = await request.json()
+    body = await request.body()
+    body = json.loads(body) if body else {}
     logger.info("Checking semantic cache for potential cache hit")
 
     # Check if semantic cache is initialized
