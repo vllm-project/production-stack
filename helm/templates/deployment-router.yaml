@@ -101,7 +101,7 @@ spec:
           {{- if eq .Values.routerSpec.serviceDiscovery "k8s" }}
           - "--k8s-namespace"
           - "{{ .Release.Namespace }}"
-          {{- if and .Values.routerSpec.k8sServiceDiscoveryType (ne .Values.routerSpec.k8sServiceDiscoveryType "pod-ip") }}
+          {{- if .Values.routerSpec.k8sServiceDiscoveryType }}
           - "--k8s-service-discovery-type"
           - "{{ .Values.routerSpec.k8sServiceDiscoveryType }}"
           {{- end }}
