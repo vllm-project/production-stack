@@ -105,7 +105,9 @@ in order (each was hit in a real deployment):
    (lmcache logs a warning about this at startup; it is easy to miss.)
 4. **Worker heartbeats must be enabled** (`lmcacheConfig.workerHeartbeatTime`
    in this tutorial's values, mapping to
-   `LMCACHE_LMCACHE_WORKER_HEARTBEAT_TIME`). lmcache workers default to
+   `LMCACHE_LMCACHE_WORKER_HEARTBEAT_TIME`; the chart consumes the key via a
+   `hasKey` guard in `helm/templates/deployment-vllm-multi.yaml`, so it does
+   not appear in `values.yaml` defaults). lmcache workers default to
    never sending heartbeats while the controller reaps silent workers after
    ~30 seconds - with the default, the KV index silently empties shortly
    after startup and hits stop "for no reason". Hand-rolled engine configs
