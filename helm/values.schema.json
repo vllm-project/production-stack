@@ -1114,6 +1114,20 @@
                                 "description": "The annotations to add to the deployment",
                                 "type": "object"
                             },
+                            "args": {
+                                "description": "Optional container args for the main vLLM container. Used with command to override the default vllm serve invocation.",
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "command": {
+                                "description": "Optional container command for the main vLLM container. Replaces the default vllm serve invocation.",
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
                             "enableLoRA": {
                                 "description": "Whether to enable LoRA",
                                 "type": "boolean"
