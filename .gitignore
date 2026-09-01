@@ -181,3 +181,6 @@ docs/book/src/docs
 
 # Sub charts
 helm/charts/*.tgz
+
+# local virtual environments
+.venv/

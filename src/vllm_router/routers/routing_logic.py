@@ -361,6 +361,23 @@ class KvawareRouter(RoutingInterface):
                 pass
             self.lmcache_cluster_monitor_task = None
 
+    def fallback_url(
+        self,
+        endpoints: List[EndpointInfo],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        """Route without cache information: session hash if any, else lowest
+        QPS. Shared by the lookup-miss and mapping-miss paths here and by
+        LoadAwareRouter."""
+        session_id = self.extract_session_id(request, request_json)
+        logger.debug(f"Fallback to using session id: {session_id}")
+        self._update_hash_ring(endpoints)
+        if session_id is None:
+            return self._qps_routing(endpoints, request_stats)
+        return self.hash_ring.get_node(session_id)
+
     async def route_request(
         self,
         endpoints: List[EndpointInfo],
@@ -431,17 +448,7 @@ class KvawareRouter(RoutingInterface):
             or len(instance_id.layout_info) == 0
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
-            session_id = self.extract_session_id(request, request_json)
-            logger.debug(f"Fallback to using session id: {session_id}")
-            # Update the hash ring with the current list of endpoints
-            self._update_hash_ring(endpoints)
-            if session_id is None:
-                # Route based on QPS if no session ID is present
-                url = self._qps_routing(endpoints, request_stats)
-            else:
-                # Use the hash ring to get the endpoint for the session ID
-                url = self.hash_ring.get_node(session_id)
-            return url
+            return self.fallback_url(endpoints, request_stats, request, request_json)
         else:
             queried_instance_ids = [info for info in instance_id.layout_info]
             if queried_instance_ids[0] not in self.instance_id_to_ip:
@@ -474,11 +481,9 @@ class KvawareRouter(RoutingInterface):
                     f"known endpoint mapping ({self.instance_id_to_ip}); falling "
                     f"back to session/QPS routing"
                 )
-                session_id = self.extract_session_id(request, request_json)
-                self._update_hash_ring(endpoints)
-                if session_id is None:
-                    return self._qps_routing(endpoints, request_stats)
-                return self.hash_ring.get_node(session_id)
+                return self.fallback_url(
+                    endpoints, request_stats, request, request_json
+                )
             logger.info(
                 f"Routing request to {queried_instance_ids[0]} found by kvaware router"
             )
@@ -698,22 +703,6 @@ class LoadAwareRouter(KvawareRouter):
                 ),
             )
             return response.json()["tokens"]
-
-    def fallback_url(
-        self,
-        endpoints: List[EndpointInfo],
-        request_stats: Dict[str, RequestStats],
-        request: Request,
-        request_json: Dict,
-    ) -> str:
-        """Upstream's no-cache-info route: session hash if any, else lowest
-        QPS."""
-        session_id = self.extract_session_id(request, request_json)
-        logger.debug(f"Fallback to using session id: {session_id}")
-        self._update_hash_ring(endpoints)
-        if session_id is None:
-            return self._qps_routing(endpoints, request_stats)
-        return self.hash_ring.get_node(session_id)
 
     async def route_request(
         self,
