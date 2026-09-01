@@ -90,6 +90,123 @@ def _loadaware_beta(override: Optional[float]) -> float:
         return DEFAULT_LOADAWARE_BETA
 
 
+def _normalize_chat_messages(messages: List[Dict]) -> List[Dict]:
+    """Text-only view of an OpenAI chat ``messages`` array for local
+    chat-template application.
+
+    Multimodal content parts (a list of ``{"type": ...}`` dicts) are
+    flattened to their text parts - mirroring ``PrefixAwareRouter`` - because
+    plain HF chat templates expect string content. ``None`` content (e.g.
+    assistant tool-call turns) becomes ``""``. Messages that already carry
+    string content pass through untouched, so template-relevant fields
+    (``role``, ``name``, ``tool_calls``, ...) are preserved. The input is
+    never mutated.
+    """
+    normalized = []
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, list):
+            # Join only non-empty string parts: empty/null parts would inject
+            # stray spaces into the normalized text, drifting it away from
+            # what a text-only chat template would render.
+            text_content = " ".join(
+                part["text"]
+                for part in content
+                if isinstance(part, dict)
+                and part.get("type") == "text"
+                and isinstance(part.get("text"), str)
+                and part["text"]
+            )
+            message = {**message, "content": text_content}
+        elif content is None:
+            message = {**message, "content": ""}
+        normalized.append(message)
+    return normalized
+
+
+def _extract_token_ids(tokenizer, request_json: Dict) -> List[int]:
+    """Token ids as the serving engine would see them for this request body.
+
+    Chat-completion bodies (``messages``) are tokenized through the model's
+    chat template with ``add_generation_prompt=True``: vLLM engines cache KV
+    for the token ids *after* template application, so encoding the raw
+    message text would never line up with the engine-side prefix. The
+    template is rendered to TEXT and then encoded (``add_special_tokens=
+    False`` - the rendered template already carries its special tokens):
+    ``apply_chat_template(..., tokenize=True)``'s return type varies across
+    transformers versions (plain ids vs ``Encoding`` objects), and feeding
+    the non-id form to the KV lookup silently never matches. Completion
+    bodies keep the plain ``encode`` path, unchanged. May raise (e.g. the
+    tokenizer defines no chat template) - callers fall back to the engine's
+    ``/tokenize`` API.
+    """
+    if "messages" in request_json:
+        text = tokenizer.apply_chat_template(
+            _normalize_chat_messages(request_json["messages"]),
+            add_generation_prompt=True,
+            tokenize=False,
+        )
+        return tokenizer.encode(text, add_special_tokens=False)
+    return tokenizer.encode(request_json.get("prompt", ""))
+
+
+async def _ensure_tokenizer(router, endpoints: List[EndpointInfo]):
+    """Load the router's tokenizer once and return it.
+
+    Double-checked lock: concurrent cold-start requests would otherwise each
+    load the tokenizer (benign but redundant - duplicated disk/CPU work and
+    possible hub rate-limiting). The lock is created lazily and there is no
+    await between the check and the assignment, so its creation cannot race
+    on one event loop. ``from_pretrained`` is blocking I/O (possibly a hub
+    download on first use), so it runs in an executor.
+
+    The model name is resolved from the endpoint list only when a load
+    actually happens, and a failed load is remembered per name: a served-model
+    alias (e.g. a vLLM ``--served-model-name``) is not a real tokenizer id and
+    can never load, so without the negative cache every request would pay a
+    doomed hub lookup before reaching the remote ``/tokenize`` fallback.
+    """
+    if router.tokenizer is None:
+        model_name = endpoints[0].model_names[0]
+        if model_name in getattr(router, "_tokenizer_load_failures", ()):
+            raise ValueError(
+                f"tokenizer load for '{model_name}' already failed; "
+                f"using the remote /tokenize fallback"
+            )
+        if not hasattr(router, "_tokenizer_lock"):
+            router._tokenizer_lock = asyncio.Lock()
+        async with router._tokenizer_lock:
+            if router.tokenizer is None:
+                loop = asyncio.get_running_loop()
+                try:
+                    router.tokenizer = await loop.run_in_executor(
+                        None, lambda: AutoTokenizer.from_pretrained(model_name)
+                    )
+                except Exception:
+                    if not hasattr(router, "_tokenizer_load_failures"):
+                        router._tokenizer_load_failures = set()
+                    router._tokenizer_load_failures.add(model_name)
+                    raise
+    return router.tokenizer
+
+
+def _tokenize_request_payload(model: str, request_json: Dict) -> Dict:
+    """Request body for the engine's ``/tokenize`` fallback.
+
+    Chat bodies map to vLLM's ``TokenizeChatRequest`` (the engine applies its
+    own chat template, multimodal content included), completion bodies to
+    ``TokenizeCompletionRequest``. ``add_generation_prompt=True`` is vLLM's
+    chat-completions default; sent explicitly to pin the alignment.
+    """
+    if "messages" in request_json:
+        return {
+            "model": model,
+            "messages": request_json["messages"],
+            "add_generation_prompt": True,
+        }
+    return {"model": model, "prompt": request_json.get("prompt", "")}
+
+
 class RoutingInterface(metaclass=SingletonABCMeta):
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
@@ -387,36 +504,49 @@ class KvawareRouter(RoutingInterface):
         """
         token_ids = None
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
-        # TODO (Yuhan): Handle chat completions
         try:
-            if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    endpoints[0].model_names[0]
-                )
-            token_ids = self.tokenizer.encode(request_json.get("prompt", ""))
+            await _ensure_tokenizer(self, endpoints)
+            token_ids = _extract_token_ids(self.tokenizer, request_json)
         except Exception:
-            # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
-            remote_url = endpoints[0].url + "/tokenize"
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json.get("prompt", ""),
-            }
-            body = requests.post(
-                remote_url, headers=headers, json=data, timeout=10
-            ).json()
-            token_ids = body["tokens"]
+            # Remote /tokenize fallback. requests is synchronous - run it in
+            # an executor so the fallback does not block the router's event
+            # loop. A failure here (engine timeout, connection error, non-2xx)
+            # must not fail the request: the session/QPS fallback below routes
+            # fine without token ids.
+            try:
+                remote_url = endpoints[0].url + "/tokenize"
+                headers = {"Content-Type": "application/json"}
+                data = _tokenize_request_payload(
+                    endpoints[0].model_names[0], request_json
+                )
+                loop = asyncio.get_running_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: requests.post(
+                        remote_url, headers=headers, json=data, timeout=10
+                    ),
+                )
+                response.raise_for_status()
+                token_ids = response.json()["tokens"]
+            except Exception as e:
+                logger.warning(
+                    f"Tokenization failed locally and via remote /tokenize "
+                    f"({e}); falling back to session/QPS routing"
+                )
+                token_ids = None
 
-        event_id = "Lookup" + str(uuid.uuid4())
-        msg = LookupMsg(tokens=token_ids, event_id=event_id)
-        instance_id = await self.query_manager(msg)
+        instance_id = None
         matched_tokens = math.inf
-        logger.debug(f"Lookup return message: {instance_id}")
-        if len(list(instance_id.layout_info.keys())) > 0:
-            matched_instance_id = list(instance_id.layout_info.keys())[
-                0
-            ]  # Get the first key
-            matched_tokens = instance_id.layout_info[matched_instance_id][1]
+        if token_ids is not None:
+            event_id = "Lookup" + str(uuid.uuid4())
+            msg = LookupMsg(tokens=token_ids, event_id=event_id)
+            instance_id = await self.query_manager(msg)
+            logger.debug(f"Lookup return message: {instance_id}")
+            if len(list(instance_id.layout_info.keys())) > 0:
+                matched_instance_id = list(instance_id.layout_info.keys())[
+                    0
+                ]  # Get the first key
+                matched_tokens = instance_id.layout_info[matched_instance_id][1]
 
         if (
             instance_id is None
@@ -646,33 +776,41 @@ class LoadAwareRouter(KvawareRouter):
 
     async def tokenize_prompt(
         self, endpoints: List[EndpointInfo], request_json: Dict
-    ) -> List[int]:
+    ) -> Optional[List[int]]:
         """Local-first tokenization with the remote `/tokenize` fallback.
 
-        The remote fallback is a blocking HTTP call, so it runs in an
-        executor rather than on the event loop.
+        Chat-completion bodies go through the chat template so the token ids
+        match what the engine caches KV for (see `_extract_token_ids`). The
+        remote fallback is a blocking HTTP call, so it runs in an executor
+        rather than on the event loop. Returns ``None`` when both paths fail
+        (the caller then routes via `fallback_url` instead of erroring the
+        request).
         """
         try:
-            if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    endpoints[0].model_names[0]
-                )
-            return self.tokenizer.encode(request_json.get("prompt", ""))
+            await _ensure_tokenizer(self, endpoints)
+            return _extract_token_ids(self.tokenizer, request_json)
         except Exception:
-            remote_url = endpoints[0].url + "/tokenize"
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json.get("prompt", ""),
-            }
-            loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: requests.post(
-                    remote_url, headers=headers, json=data, timeout=10
-                ),
-            )
-            return response.json()["tokens"]
+            try:
+                remote_url = endpoints[0].url + "/tokenize"
+                headers = {"Content-Type": "application/json"}
+                data = _tokenize_request_payload(
+                    endpoints[0].model_names[0], request_json
+                )
+                loop = asyncio.get_running_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: requests.post(
+                        remote_url, headers=headers, json=data, timeout=10
+                    ),
+                )
+                response.raise_for_status()
+                return response.json()["tokens"]
+            except Exception as e:
+                logger.warning(
+                    f"Tokenization failed locally and via remote /tokenize "
+                    f"({e}); falling back to session/QPS routing"
+                )
+                return None
 
     def fallback_url(
         self,
@@ -722,6 +860,8 @@ class LoadAwareRouter(KvawareRouter):
             )
 
         token_ids = await self.tokenize_prompt(endpoints, request_json)
+        if token_ids is None:
+            return self.fallback_url(endpoints, request_stats, request, request_json)
 
         event_id = "Lookup" + str(uuid.uuid4())
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
