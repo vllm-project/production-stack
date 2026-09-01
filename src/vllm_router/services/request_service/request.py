@@ -1193,8 +1193,10 @@ async def route_general_transcriptions(
 
     data = {"model": model}
 
-    if language:
-        data["language"] = language
+    if isinstance(language, str):
+        language_stripped = language.strip()
+        if language_stripped and language_stripped.lower() not in ("none", "null", "undefined"):
+            data["language"] = language_stripped
 
     if prompt:
         data["prompt"] = prompt
