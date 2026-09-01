@@ -580,9 +580,10 @@
                     }
                 },
                 "k8sServiceDiscoveryType": {
-                    "description": "Service discovery mode type, supports \"pod-ip\" or \"service-name\". Defaults to \"pod-ip\" if not set.",
+                    "description": "Service discovery mode type, supports \"pod-ip\" or \"service-name\". Defaults to empty (use container default, which is pod-ip).",
                     "type": "string",
                     "enum": [
+                        "",
                         "pod-ip",
                         "service-name"
                     ]
