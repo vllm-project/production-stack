@@ -112,6 +112,11 @@ def validate_args(args):
         raise ValueError("Log stats interval must be greater than 0.")
     if args.engine_stats_interval <= 0:
         raise ValueError("Engine stats interval must be greater than 0.")
+    if (
+        args.engine_stats_scrape_timeout is not None
+        and args.engine_stats_scrape_timeout <= 0
+    ):
+        raise ValueError("Engine stats scrape timeout must be greater than 0.")
     if args.request_stats_window <= 0:
         raise ValueError("Request stats window must be greater than 0.")
     if not (0.0 <= args.sentry_traces_sample_rate <= 1.0):
@@ -316,6 +321,13 @@ def parse_args():
         type=int,
         default=30,
         help="The interval in seconds to scrape engine statistics.",
+    )
+    parser.add_argument(
+        "--engine-stats-scrape-timeout",
+        type=float,
+        default=None,
+        help="The read timeout in seconds for a single engine /metrics scrape. "
+        "Defaults to --engine-stats-interval.",
     )
     parser.add_argument(
         "--request-stats-window",
