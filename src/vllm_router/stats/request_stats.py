@@ -209,17 +209,29 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             request_id: The global request ID
             timestamp: The timestamp when the request was completed
         """
+        key = (engine_url, request_id)
+        
+        if key not in self.request_start_time:
+            return
+
         if engine_url not in self.finished_requests:
             self.finished_requests[engine_url] = 0
-        self.in_decoding_requests[engine_url] = max(
-            0, self.in_decoding_requests.get(engine_url, 1) - 1
-        )
+        
+        if key in self.first_token_time: # first_token_time is set, so the request reached decode stage
+            self.in_decoding_requests[engine_url] = max(
+                0, self.in_decoding_requests.get(engine_url, 1) - 1
+            )
+        else: # failed in prefill stage
+            self.in_prefill_requests[engine_url] = max(
+                0, self.in_prefill_requests.get(engine_url, 1) - 1
+            )
         self.finished_requests[engine_url] += 1
 
-        if request_start_time := self.request_start_time.get((engine_url, request_id)):
-            self.latency_monitors[engine_url].update(
-                timestamp, time.time() - request_start_time
-            )
+        request_start_time = self.request_start_time.pop(key)
+        self.first_token_time.pop(key, None)
+        self.latency_monitors[engine_url].update(
+            timestamp, time.time() - request_start_time
+        )
 
     def on_request_swapped(self, engine_url: str, request_id: str, timestamp: float):
         # This function should be called if a request is determined to be swapped from GPU to CPU.

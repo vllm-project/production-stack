@@ -337,11 +337,6 @@ async def process_request(
                     full_response.extend(chunk)
                 yield chunk
 
-        end_time = time.time()
-        request.app.state.request_stats_monitor.on_request_complete(
-            backend_url, request_id, end_time
-        )
-
         if http_status_code is not None and http_status_code >= 400:
             request_status = "error"
 
@@ -381,6 +376,11 @@ async def process_request(
         end_span(span, error=e) if tracing_active else None
         raise
     finally:
+        # In finally so backend-error and client-disconnect paths also release
+        # the in-flight slot; on_request_complete is idempotent.
+        request.app.state.request_stats_monitor.on_request_complete(
+            backend_url, request_id, time.time()
+        )
         request_latency_seconds.labels(
             server=backend_url, model=model_name, status=request_status
         ).observe(time.time() - start_time)
