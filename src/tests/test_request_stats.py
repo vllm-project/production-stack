@@ -3,6 +3,7 @@ import time
 import types
 
 import pytest
+from fastapi import HTTPException
 
 from vllm_router.services.request_service.request import process_request
 from vllm_router.stats.request_stats import RequestStatsMonitor, SingletonMeta
@@ -114,6 +115,24 @@ async def test_process_request_releases_slot_when_backend_errors(monitor):
     stats = monitor.get_request_stats(time.time())
     assert stats[URL].in_prefill_requests == 0
     assert stats[URL].in_decoding_requests == 0
+
+
+@pytest.mark.asyncio
+async def test_process_request_releases_slot_on_unparsable_body(monitor):
+    # on_new_request runs before the body is parsed; a non-JSON body must still
+    # release the slot and surface as a 400.
+    request = _fake_request(monitor, _OkRequestCM)  # backend never reached
+    gen = process_request(
+        request, b"not json", URL, "req-1", "/v1/chat/completions", None
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        async for _ in gen:
+            pass
+    assert exc.value.status_code == 400
+
+    stats = monitor.get_request_stats(time.time())
+    assert stats[URL].in_prefill_requests == 0
 
 
 @pytest.mark.asyncio

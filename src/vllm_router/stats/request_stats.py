@@ -232,7 +232,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         request_start_time = self.request_start_time.pop(key)
         self.first_token_time.pop(key, None)
         self.latency_monitors[engine_url].update(
-            timestamp, time.time() - request_start_time
+            timestamp, timestamp - request_start_time
         )
 
     def on_request_swapped(self, engine_url: str, request_id: str, timestamp: float):

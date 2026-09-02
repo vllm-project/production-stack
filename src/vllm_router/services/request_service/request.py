@@ -283,33 +283,39 @@ async def process_request(
     request.app.state.request_stats_monitor.on_new_request(
         backend_url, request_id, start_time
     )
-    # Check if this is a streaming request and extract model name
-    try:
-        request_json = json.loads(body)
-        is_streaming = request_json.get("stream", False)
-        model_name = request_json.get("model", "unknown")
-    except (JSONDecodeError, UnicodeDecodeError, ValueError):
-        # If we can't parse the body as JSON, assume it's not streaming
-        raise HTTPException(status=400, detail="Request body is not JSON parsable.")
 
-    # Add streaming info to span after parsing
-    if span is not None:
-        span.set_attribute("vllm.is_streaming", is_streaming)
-
-    # Sanitize the request headers
-    headers = _build_backend_request_headers(request, request_id)
-
-    # Inject trace context into outgoing headers
-    if tracing_active:
-        inject_context(headers, span_context)
-
-    # For non-streaming requests, collect the full response to cache it properly
-    full_response = bytearray()
-
-    request_status = "success"
+    model_name = "unknown"
+    request_status = "error"
     http_status_code = None
 
     try:
+        # Check if this is a streaming request and extract model name
+        try:
+            request_json = json.loads(body)
+            is_streaming = request_json.get("stream", False)
+            model_name = request_json.get("model", "unknown")
+        except (JSONDecodeError, UnicodeDecodeError, ValueError):
+            # If we can't parse the body as JSON, assume it's not streaming
+            raise HTTPException(
+                status_code=400, detail="Request body is not JSON parsable."
+            )
+
+        # Add streaming info to span after parsing
+        if span is not None:
+            span.set_attribute("vllm.is_streaming", is_streaming)
+
+        # Sanitize the request headers
+        headers = _build_backend_request_headers(request, request_id)
+
+        # Inject trace context into outgoing headers
+        if tracing_active:
+            inject_context(headers, span_context)
+
+        # For non-streaming requests, collect the full response to cache it properly
+        full_response = bytearray()
+
+        request_status = "success"
+
         async with request.app.state.aiohttp_client_wrapper().request(
             method=request.method,
             url=backend_url + endpoint,
