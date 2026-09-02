@@ -6,32 +6,80 @@ import requests
 from starlette.datastructures import MutableHeaders
 
 from vllm_router import utils
+from vllm_router.utils import AliasConfig, normalize_alias_config
 
 
 @pytest.mark.parametrize(
     "aliases,expected_result",
     (
-        ("gpt-4:mistral-nemo-instruct-2407", {"gpt-4": "mistral-nemo-instruct-2407"}),
+        (
+            "gpt-4:mistral-nemo-instruct-2407",
+            {"gpt-4": AliasConfig(model="mistral-nemo-instruct-2407")},
+        ),
         (
             "gpt-4:mistral-nemo-instruct-2407,gpt-3.5:mistral-nemo-instruct-2407",
             {
-                "gpt-4": "mistral-nemo-instruct-2407",
-                "gpt-3.5": "mistral-nemo-instruct-2407",
+                "gpt-4": AliasConfig(model="mistral-nemo-instruct-2407"),
+                "gpt-3.5": AliasConfig(model="mistral-nemo-instruct-2407"),
             },
         ),
         (
             "gpt-4:deepseek-r1-distill-qwen-7b,mistral-7b-instruct:mistral-nemo-instruct-2407",
             {
-                "gpt-4": "deepseek-r1-distill-qwen-7b",
-                "mistral-7b-instruct": "mistral-nemo-instruct-2407",
+                "gpt-4": AliasConfig(model="deepseek-r1-distill-qwen-7b"),
+                "mistral-7b-instruct": AliasConfig(model="mistral-nemo-instruct-2407"),
+            },
+        ),
+        (
+            "reasoning:deepseek-r1-distill-qwen-7b|reasoning_effort=high",
+            {
+                "reasoning": AliasConfig(
+                    model="deepseek-r1-distill-qwen-7b", reasoning_effort="high"
+                )
+            },
+        ),
+        (
+            "text:mistral-nemo-instruct-2407,reasoning:deepseek-r1-distill-qwen-7b|reasoning_effort=low",
+            {
+                "text": AliasConfig(model="mistral-nemo-instruct-2407"),
+                "reasoning": AliasConfig(
+                    model="deepseek-r1-distill-qwen-7b", reasoning_effort="low"
+                ),
             },
         ),
     ),
 )
-def test_parse_static_aliases_when_aliases_as_string_supplied_returns_dict(
-    aliases: str, expected_result: dict
-) -> None:
+def test_parse_static_aliases(aliases: str, expected_result: dict) -> None:
     assert utils.parse_static_aliases(aliases) == expected_result
+
+
+def test_alias_config_rejects_invalid_reasoning_effort() -> None:
+    with pytest.raises(ValueError, match="Invalid reasoning_effort"):
+        AliasConfig(model="test", reasoning_effort="invalid")
+
+
+def test_normalize_alias_config_accepts_plain_string() -> None:
+    assert normalize_alias_config("gpt-4", "llama3") == AliasConfig(model="llama3")
+
+
+def test_normalize_alias_config_accepts_alias_config() -> None:
+    config = AliasConfig(model="llama3", reasoning_effort="high")
+    assert normalize_alias_config("reasoning", config) == config
+
+
+def test_normalize_alias_config_rejects_invalid_value() -> None:
+    with pytest.raises(TypeError, match="expected str or AliasConfig"):
+        normalize_alias_config("bad", 123)
+
+
+def test_parse_static_aliases_rejects_unknown_parameter() -> None:
+    with pytest.raises(ValueError, match="Unknown alias parameter 'reasoning_effrot'"):
+        utils.parse_static_aliases("r1:llama3|reasoning_effrot=high")
+
+
+def test_parse_static_aliases_rejects_invalid_entry() -> None:
+    with pytest.raises(ValueError, match="Invalid alias entry"):
+        utils.parse_static_aliases("missing-model")
 
 
 def test_replace_model_in_request_body_replaces_model() -> None:
@@ -110,7 +158,6 @@ def test_is_model_healthy_when_requests_raises_exception_returns_false(
 def test_is_model_healthy_when_requests_status_with_status_code_not_200_returns_false(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-
     # Mock an internal server error response
     mock_response = MagicMock(status_code=500)
 
