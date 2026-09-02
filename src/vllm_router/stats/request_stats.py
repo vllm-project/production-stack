@@ -210,18 +210,20 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             timestamp: The timestamp when the request was completed
         """
         key = (engine_url, request_id)
-        
+
         if key not in self.request_start_time:
             return
 
         if engine_url not in self.finished_requests:
             self.finished_requests[engine_url] = 0
-        
-        if key in self.first_token_time: # first_token_time is set, so the request reached decode stage
+
+        if (
+            key in self.first_token_time
+        ):  # first_token_time is set, so the request reached decode stage
             self.in_decoding_requests[engine_url] = max(
                 0, self.in_decoding_requests.get(engine_url, 1) - 1
             )
-        else: # failed in prefill stage
+        else:  # failed in prefill stage
             self.in_prefill_requests[engine_url] = max(
                 0, self.in_prefill_requests.get(engine_url, 1) - 1
             )
