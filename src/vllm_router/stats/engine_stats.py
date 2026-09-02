@@ -23,6 +23,8 @@ from vllm_router.log import init_logger
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.utils import SingletonMeta
 
+_CONNECT_TIMEOUT_SECONDS = 3.05
+
 logger = init_logger(__name__)
 
 
@@ -129,7 +131,14 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             url (str): The URL of the serving engine (does not contain endpoint)
         """
         try:
-            response = requests.get(url + "/metrics", timeout=self.scrape_timeout)
+            # (connect, read): the read budget may legitimately be large to ride
+            # out a long chunked prefill, but a dead or unreachable backend must
+            # not hold the sequential scrape loop for that long. 3.05 s is the
+            # connect timeout the requests docs recommend.
+            response = requests.get(
+                url + "/metrics",
+                timeout=(_CONNECT_TIMEOUT_SECONDS, self.scrape_timeout),
+            )
             response.raise_for_status()
             engine_stats = EngineStats.from_vllm_scrape(response.text)
         except Exception as e:

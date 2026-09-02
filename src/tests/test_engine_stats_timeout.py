@@ -46,7 +46,7 @@ def test_scrape_one_endpoint_uses_scrape_timeout() -> None:
     response = MagicMock(text="")
     with patch.object(engine_stats.requests, "get", return_value=response) as get:
         scraper._scrape_one_endpoint("http://engine:8000")
-    assert get.call_args.kwargs["timeout"] == 90.5
+    assert get.call_args.kwargs["timeout"] == (3.05, 90.5)
 
 
 def test_initialize_engine_stats_scraper_passes_timeout() -> None:
