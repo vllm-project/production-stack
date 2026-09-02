@@ -14,7 +14,7 @@
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Optional
 
 import requests
 from prometheus_client.parser import text_string_to_metric_families
@@ -40,12 +40,14 @@ class EngineStats:
     gpu_cache_usage_perc: float = 0.0
 
     @staticmethod
-    def from_vllm_scrape(vllm_scrape: str):
+    def from_vllm_scrape(vllm_scrape: str, url: Optional[str] = None):
         """
         Parse the vllm scrape string and return a EngineStats object
 
         Args:
             vllm_scrape (str): The vllm scrape string
+            url (str): The URL the scrape was fetched from, used only for
+                logging when no recognized metric names are found
 
         Returns:
             EngineStats: The EngineStats object
@@ -60,20 +62,44 @@ class EngineStats:
         gpu_prefix_cache_queries_total = 0
         gpu_cache_usage_perc = 0.0
 
+        num_matched_samples = 0
+        seen_metric_names = set()
+
         for family in text_string_to_metric_families(vllm_scrape):
             for sample in family.samples:
+                seen_metric_names.add(sample.name)
                 if sample.name == "vllm:num_requests_running":
                     num_running_reqs = sample.value
+                    num_matched_samples += 1
                 elif sample.name == "vllm:num_requests_waiting":
                     num_queuing_reqs = sample.value
+                    num_matched_samples += 1
                 elif sample.name == "vllm:gpu_prefix_cache_hit_rate":
                     gpu_prefix_cache_hit_rate = sample.value
+                    num_matched_samples += 1
                 elif sample.name == "vllm:gpu_prefix_cache_hits_total":
                     gpu_prefix_cache_hits_total = sample.value
+                    num_matched_samples += 1
                 elif sample.name == "vllm:gpu_prefix_cache_queries_total":
                     gpu_prefix_cache_queries_total = sample.value
+                    num_matched_samples += 1
                 elif sample.name == "vllm:gpu_cache_usage_perc":
                     gpu_cache_usage_perc = sample.value
+                    num_matched_samples += 1
+
+        if seen_metric_names and num_matched_samples == 0:
+            # The payload parsed as valid Prometheus text but none of the
+            # sample names matched a known vllm: metric, so every field
+            # below is a fabricated zero rather than a real reading. Left
+            # unlogged, this is indistinguishable from a genuinely idle
+            # engine to every downstream consumer (routing, dashboards).
+            logger.warning(
+                "No recognized vllm: metric names found while scraping %s; "
+                "returning an all-zero EngineStats. Saw metric names such as: %s. "
+                "Load-aware routing signal for this backend will be degraded.",
+                url or "<unknown endpoint>",
+                ", ".join(sorted(seen_metric_names)[:5]),
+            )
 
         return EngineStats(
             num_running_requests=num_running_reqs,
@@ -126,7 +152,7 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         try:
             response = requests.get(url + "/metrics", timeout=self.scrape_interval)
             response.raise_for_status()
-            engine_stats = EngineStats.from_vllm_scrape(response.text)
+            engine_stats = EngineStats.from_vllm_scrape(response.text, url)
         except Exception as e:
             logger.error(f"Failed to scrape metrics from {url}: {e}")
             return None
