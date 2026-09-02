@@ -165,7 +165,8 @@ async def test_audio_transcription_preserves_plain_text_response():
         received.update(
             model=form["model"],
             response_format=form["response_format"],
-            language=form["language"],
+            # absent by default so the backend auto-detects; None documents that
+            language=form.get("language"),
             filename=upload.filename,
             content_type=upload.content_type,
             content=upload.file.read(),
@@ -186,7 +187,7 @@ async def test_audio_transcription_preserves_plain_text_response():
     assert received == {
         "model": AUDIO_MODEL,
         "response_format": "text",
-        "language": "en",
+        "language": None,
         "filename": "speech.wav",
         "content_type": "audio/wav",
         "content": b"fake-audio",

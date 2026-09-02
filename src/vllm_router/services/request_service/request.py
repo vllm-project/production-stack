@@ -1161,7 +1161,7 @@ async def route_general_transcriptions(
         temperature: Optional[float] = (
             float(temperature_str) if temperature_str is not None else None
         )
-        language: Optional[str] = form.get("language", "en")
+        language: Optional[str] = form.get("language")
         stream: bool = form.get("stream", "false").lower() == "true"
     except KeyError as e:
         return JSONResponse(
@@ -1191,7 +1191,16 @@ async def route_general_transcriptions(
     payload_bytes = await file.read()
     files = {"file": (file.filename, payload_bytes, file.content_type)}
 
-    data = {"model": model, "language": language}
+    data = {"model": model}
+
+    if isinstance(language, str):
+        language_stripped = language.strip()
+        if language_stripped and language_stripped.lower() not in (
+            "none",
+            "null",
+            "undefined",
+        ):
+            data["language"] = language_stripped
 
     if prompt:
         data["prompt"] = prompt
