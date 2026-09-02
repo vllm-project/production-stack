@@ -413,3 +413,42 @@ tests:
       notContains:
         path: spec.template.spec.containers[0].command
         content: "--revision"
+
+  - it: should use custom command and args on the main container
+    release:
+      name: vllm
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "opt125m"
+          repository: "lmcache/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          replicaCount: 1
+          requestCPU: 6
+          requestMemory: "16Gi"
+          requestGPU: 1
+          pvcStorage: "50Gi"
+          command:
+            - "sh"
+            - "-c"
+          args:
+            - "mkdir -p /tmp/lmcache_prometheus && exec vllm serve facebook/opt-125m --host 0.0.0.0 --port 8000"
+    asserts:
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.containers[0].command
+        value:
+          - "sh"
+          - "-c"
+    - documentIndex: 0
+      equal:
+        path: spec.template.spec.containers[0].args
+        value:
+          - "mkdir -p /tmp/lmcache_prometheus && exec vllm serve facebook/opt-125m --host 0.0.0.0 --port 8000"
+    - documentIndex: 0
+      notContains:
+        path: spec.template.spec.containers[0].command
+        content: "serve"
+

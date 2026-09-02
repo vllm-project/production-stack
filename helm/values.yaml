@@ -109,6 +109,14 @@ servingEngineSpec:
     extraVolumeMounts: []
       # - name: tmp-volume
       #   mountPath: /tmp
+    # -- Optional command for the main vLLM container. Replaces the default `vllm serve` invocation.
+    # command:
+    #   - "sh"
+    #   - "-c"
+    # -- Optional args for the main vLLM container. Use with command to wrap startup
+    # (for example mkdir before exec vllm serve).
+    # args:
+    #   - "mkdir -p /tmp/lmcache_prometheus && exec vllm serve MODEL --host 0.0.0.0 --port 8000"
     # -- The configuration for the init container to be run before the main container.
     initContainer:
     # -- The name of the init container
