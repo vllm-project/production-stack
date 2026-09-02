@@ -14,7 +14,7 @@
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Optional
 
 import requests
 from prometheus_client.parser import text_string_to_metric_families
@@ -40,7 +40,7 @@ class EngineStats:
     gpu_cache_usage_perc: float = 0.0
 
     @staticmethod
-    def from_vllm_scrape(vllm_scrape: str, url: str = None):
+    def from_vllm_scrape(vllm_scrape: str, url: Optional[str] = None):
         """
         Parse the vllm scrape string and return a EngineStats object
 
@@ -98,7 +98,7 @@ class EngineStats:
                 "returning an all-zero EngineStats. Saw metric names such as: %s. "
                 "Load-aware routing signal for this backend will be degraded.",
                 url or "<unknown endpoint>",
-                sorted(seen_metric_names)[:5],
+                ", ".join(sorted(seen_metric_names)[:5]),
             )
 
         return EngineStats(
