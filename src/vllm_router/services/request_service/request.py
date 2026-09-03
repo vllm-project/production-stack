@@ -31,8 +31,12 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillOrchestratedRouter,
     DisaggregatedPrefillRouter,
     KvawareRouter,
+    LoadAwareRouter,
     PrefixAwareRouter,
     PriorityRouter,
+    RoundRobinRouter,
+    RoutingDecision,
+    RoutingLogic,
     SessionRouter,
 )
 from vllm_router.service_discovery import get_service_discovery
@@ -74,6 +78,7 @@ from vllm_router.services.metrics_service import (
     input_tokens_total,
     num_incoming_requests_total,
     output_tokens_total,
+    record_routing_decision,
     request_errors_total,
     request_latency_seconds,
 )
@@ -104,6 +109,45 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
 def _is_json_media_type(content_type: str) -> bool:
     media_type = content_type.partition(";")[0].strip().lower()
     return media_type == "application/json" or media_type.endswith("+json")
+
+
+def _configured_routing_algorithm(router) -> str:
+    router_algorithms = (
+        (LoadAwareRouter, RoutingLogic.LOADAWARE.value),
+        (KvawareRouter, RoutingLogic.KVAWARE.value),
+        (PrefixAwareRouter, RoutingLogic.PREFIXAWARE.value),
+        (PriorityRouter, RoutingLogic.PRIORITY.value),
+        (SessionRouter, RoutingLogic.SESSION_BASED.value),
+        (RoundRobinRouter, RoutingLogic.ROUND_ROBIN.value),
+        (
+            DisaggregatedPrefillOrchestratedRouter,
+            RoutingLogic.DISAGGREGATED_PREFILL_ORCHESTRATED.value,
+        ),
+        (DisaggregatedPrefillRouter, RoutingLogic.DISAGGREGATED_PREFILL.value),
+    )
+    return next(
+        (
+            algorithm
+            for router_type, algorithm in router_algorithms
+            if isinstance(router, router_type)
+        ),
+        "unknown",
+    )
+
+
+def _record_backend_selection(
+    selection: str,
+    endpoints,
+    *,
+    decision: str | None = None,
+    reason: str | None = None,
+) -> None:
+    """Count one selection using only bounded routing dimensions."""
+    record_routing_decision(
+        algorithm=getattr(selection, "algorithm", "unknown"),
+        decision=decision or getattr(selection, "decision", "unknown"),
+        reason=reason or getattr(selection, "reason", "unknown"),
+    )
 
 
 async def process_external_provider_request(
@@ -573,7 +617,12 @@ async def route_general_request(
 
     logger.debug(f"Routing request {request_id} for model: {requested_model}")
     if request_endpoint:
-        server_url = endpoints[0].url
+        server_url = RoutingDecision(
+            endpoints[0].url,
+            algorithm=_configured_routing_algorithm(request.app.state.router),
+            decision="primary",
+            reason="requested_endpoint",
+        )
         logger.debug(
             f"Routing request {request_id} to engine with Id: {endpoints[0].Id}"
         )
@@ -652,6 +701,15 @@ async def route_general_request(
 
         media_type = "text/event-stream"
         try:
+            if attempt == 0:
+                _record_backend_selection(server_url, endpoints)
+            else:
+                _record_backend_selection(
+                    server_url,
+                    endpoints,
+                    decision="retry",
+                    reason="backend_error",
+                )
             stream_generator = process_request(
                 request,
                 request_body,
@@ -824,6 +882,15 @@ async def route_orchestrated_disaggregated_request(
         client: aiohttp.ClientSession = request.app.state.aiohttp_client_wrapper()
 
         # Send to Prefill
+        _record_backend_selection(
+            RoutingDecision(
+                prefill_url,
+                algorithm=RoutingLogic.DISAGGREGATED_PREFILL_ORCHESTRATED.value,
+                decision="primary",
+                reason="prefill",
+            ),
+            endpoints,
+        )
         async with client.post(
             prefill_api_url,
             json=prefill_request_json,
@@ -870,6 +937,15 @@ async def route_orchestrated_disaggregated_request(
         decode_api_url = f"{decode_url}{endpoint}"
         logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
 
+        _record_backend_selection(
+            RoutingDecision(
+                decode_url,
+                algorithm=RoutingLogic.DISAGGREGATED_PREFILL_ORCHESTRATED.value,
+                decision="primary",
+                reason="decode",
+            ),
+            endpoints,
+        )
         decode_resp = await client.post(
             decode_api_url,
             json=decode_request,
@@ -957,6 +1033,7 @@ async def route_disaggregated_prefill_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
+    endpoints = get_service_discovery().get_endpoint_info()
 
     # Save original request for decode phase
     orig_request_json = request_json.copy()
@@ -969,6 +1046,15 @@ async def route_disaggregated_prefill_request(
 
     st = time.time()
     try:
+        _record_backend_selection(
+            RoutingDecision(
+                str(request.app.state.prefill_client._base_url).rstrip("/"),
+                algorithm=RoutingLogic.DISAGGREGATED_PREFILL.value,
+                decision="primary",
+                reason="prefill",
+            ),
+            endpoints,
+        )
         await send_request_to_prefiller(
             request.app.state.prefill_client, endpoint, request_json, request_id
         )
@@ -1008,6 +1094,15 @@ async def route_disaggregated_prefill_request(
 
     async def generate_stream():
         try:
+            _record_backend_selection(
+                RoutingDecision(
+                    str(request.app.state.decode_client._base_url).rstrip("/"),
+                    algorithm=RoutingLogic.DISAGGREGATED_PREFILL.value,
+                    decision="primary",
+                    reason="decode",
+                ),
+                endpoints,
+            )
             async for chunk in send_request_to_decode(
                 request.app.state.decode_client, endpoint, request_json, request_id
             ):
@@ -1284,6 +1379,7 @@ async def proxy_multipart_request(
             KvawareRouter,
             PrefixAwareRouter,
             SessionRouter,
+            PriorityRouter,
             DisaggregatedPrefillOrchestratedRouter,
         ),
     ):
@@ -1324,6 +1420,7 @@ async def proxy_multipart_request(
         request_stats_monitor.on_new_request(chosen_url, request_id, time.time())
 
         try:
+            _record_backend_selection(chosen_url, endpoints)
             backend_response = await client.post(
                 f"{chosen_url}{endpoint}",
                 data=form_data,

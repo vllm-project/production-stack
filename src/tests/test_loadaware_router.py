@@ -74,6 +74,11 @@ class LookupRet:
         self.layout_info = layout_info
 
 
+class InstRet:
+    def __init__(self, instance_id: str):
+        self.instance_id = instance_id
+
+
 def endpoints(*urls):
     return [EndpointInfo(url=url) for url in urls]
 
@@ -311,8 +316,10 @@ async def test_route_request_scores_and_routes_to_the_argmax():
 
     router.tokenizer = Tokenizer()
 
-    async def query_manager(_msg):
-        return LookupRet({INST_A: (LOCAL, PROMPT_TOKENS)})
+    async def query_manager(msg):
+        if hasattr(msg, "tokens"):
+            return LookupRet({INST_A: (LOCAL, PROMPT_TOKENS)})
+        return InstRet(INST_A)
 
     router.query_manager = query_manager
     stats = {URL_A: busy(in_prefill=4, in_decoding=8), URL_B: busy()}
@@ -320,6 +327,11 @@ async def test_route_request_scores_and_routes_to_the_argmax():
         endpoints(URL_A, URL_B), {}, stats, None, {"prompt": "x"}
     )
     assert url == URL_B
+    assert (url.algorithm, url.decision, url.reason) == (
+        "loadaware",
+        "primary",
+        "load_aware",
+    )
 
 
 @pytest.mark.asyncio
@@ -351,6 +363,132 @@ async def test_no_cached_prefix_anywhere_falls_back_to_qps():
         endpoints(URL_A, URL_B), {}, stats, Request(), {"prompt": "x"}
     )
     assert url == URL_B
+    assert (url.algorithm, url.decision, url.reason) == (
+        "loadaware",
+        "fallback",
+        "no_cache_match",
+    )
+
+
+@pytest.mark.asyncio
+async def test_same_url_restart_does_not_credit_the_old_instance_id():
+    """A restart can retain its URL while changing LMCache identity. Even when
+    the old holder is already known, routing must validate the endpoint's live
+    identity before awarding cache credit."""
+    from uhashring import HashRing
+
+    router = make_router()
+
+    class Tokenizer:
+        def encode(self, _prompt):
+            return list(range(PROMPT_TOKENS))
+
+    router.tokenizer = Tokenizer()
+    queried_ips = []
+
+    async def query_manager(msg):
+        if hasattr(msg, "tokens"):
+            return LookupRet({INST_A: (LOCAL, PROMPT_TOKENS)})
+        queried_ips.append(msg.ip)
+        return InstRet(RESTARTED_A)
+
+    router.query_manager = query_manager
+    router.session_key = "x-user-id"
+    router.hash_ring = HashRing()
+
+    class Request:
+        headers: Dict[str, str] = {}
+
+    stats = {URL_A: busy(qps=5.0), URL_B: busy(qps=1.0)}
+    url = await router.route_request(
+        endpoints(URL_A, URL_B), {}, stats, Request(), {"prompt": "x"}
+    )
+
+    assert queried_ips == ["10.0.0.1"]
+    assert url == URL_B
+    assert (url.algorithm, url.decision, url.reason) == (
+        "loadaware",
+        "fallback",
+        "no_live_holder",
+    )
+
+
+@pytest.mark.asyncio
+async def test_only_unavailable_cache_holders_fall_back_to_qps():
+    from uhashring import HashRing
+
+    router = make_router(mapped=False)
+    router.instance_id_to_ip = {
+        INST_A: URL_A,
+        RESTARTED_A: URL_A,
+        INST_B: URL_B,
+    }
+
+    class Tokenizer:
+        def encode(self, _prompt):
+            return list(range(PROMPT_TOKENS))
+
+    router.tokenizer = Tokenizer()
+
+    async def query_manager(msg):
+        if hasattr(msg, "tokens"):
+            return LookupRet({INST_A: (LOCAL, PROMPT_TOKENS)})
+        return InstRet(RESTARTED_A)
+
+    router.query_manager = query_manager
+    router.session_key = "x-user-id"
+    router.hash_ring = HashRing()
+
+    class Request:
+        headers: Dict[str, str] = {}
+
+    stats = {URL_A: busy(qps=5.0), URL_B: busy(qps=1.0)}
+    url = await router.route_request(
+        endpoints(URL_A, URL_B), {}, stats, Request(), {"prompt": "x"}
+    )
+
+    assert url == URL_B
+    assert (url.algorithm, url.decision, url.reason) == (
+        "loadaware",
+        "fallback",
+        "no_live_holder",
+    )
+
+
+@pytest.mark.asyncio
+async def test_only_stale_holder_url_outside_current_endpoints_falls_back_to_qps():
+    from uhashring import HashRing
+
+    router = make_router()
+    router.instance_id_to_ip["instance-c"] = URL_C
+
+    class Tokenizer:
+        def encode(self, _prompt):
+            return list(range(PROMPT_TOKENS))
+
+    router.tokenizer = Tokenizer()
+
+    async def query_manager(_msg):
+        return LookupRet({"instance-c": (LOCAL, PROMPT_TOKENS)})
+
+    router.query_manager = query_manager
+    router.session_key = "x-user-id"
+    router.hash_ring = HashRing()
+
+    class Request:
+        headers: Dict[str, str] = {}
+
+    stats = {URL_A: busy(qps=5.0), URL_B: busy(qps=1.0)}
+    url = await router.route_request(
+        endpoints(URL_A, URL_B), {}, stats, Request(), {"prompt": "x"}
+    )
+
+    assert url == URL_B
+    assert (url.algorithm, url.decision, url.reason) == (
+        "loadaware",
+        "fallback",
+        "no_live_holder",
+    )
 
 
 @pytest.mark.asyncio
@@ -372,10 +510,6 @@ async def test_instance_map_refresh_queries_endpoints_concurrently():
     router = make_router(mapped=False)
     in_flight = 0
     max_in_flight = 0
-
-    class InstRet:
-        def __init__(self, instance_id):
-            self.instance_id = instance_id
 
     async def query_manager(msg):
         nonlocal in_flight, max_in_flight

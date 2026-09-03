@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -26,7 +26,10 @@ def cleanup_singletons():
         del SingletonABCMeta._instances[cls]
 
 
-ENDPOINTS = [EndpointInfo(url="http://engine1"), EndpointInfo(url="http://engine2")]
+ENDPOINTS = [
+    EndpointInfo(url="http://engine1", Id="engine-id-1"),
+    EndpointInfo(url="http://engine2", Id="engine-id-2"),
+]
 
 MOCK_HEADERS = MagicMock()
 MOCK_HEADERS.items.return_value = [("content-type", "text/event-stream")]
@@ -104,15 +107,61 @@ async def test_no_retry_on_success(setup):
         yield MOCK_HEADERS, 200
         yield b"done"
 
-    with patch(
-        "vllm_router.services.request_service.request.process_request", side_effect=ok
-    ) as mock:
+    with (
+        patch(
+            "vllm_router.services.request_service.request.process_request",
+            side_effect=ok,
+        ) as process_mock,
+        patch(
+            "vllm_router.services.request_service.request.record_routing_decision"
+        ) as metric_mock,
+    ):
         from vllm_router.services.request_service.request import route_general_request
 
         resp = await route_general_request(req, "/v1/chat/completions", MagicMock())
 
     assert resp.status_code == 200
-    assert mock.call_count == 1
+    assert process_mock.call_count == 1
+    assert metric_mock.call_args_list == [
+        call(
+            algorithm="roundrobin",
+            decision="primary",
+            reason="round_robin",
+        )
+    ]
+    assert "http://engine1" not in str(metric_mock.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_requested_endpoint_selection_is_counted(setup):
+    req, router = setup
+    router.max_instance_failover_reroute_attempts = 0
+    req.query_params = {"id": "engine-id-2"}
+
+    async def ok(*a, **kw):
+        yield MOCK_HEADERS, 200
+        yield b"done"
+
+    with (
+        patch(
+            "vllm_router.services.request_service.request.process_request",
+            side_effect=ok,
+        ),
+        patch(
+            "vllm_router.services.request_service.request.record_routing_decision"
+        ) as metric_mock,
+    ):
+        from vllm_router.services.request_service.request import route_general_request
+
+        response = await route_general_request(req, "/v1/chat/completions", MagicMock())
+
+    assert response.status_code == 200
+    metric_mock.assert_called_once_with(
+        algorithm="roundrobin",
+        decision="primary",
+        reason="requested_endpoint",
+    )
+    assert "http://engine2" not in str(metric_mock.call_args)
 
 
 @pytest.mark.asyncio
@@ -127,9 +176,14 @@ async def test_retries_on_failure_with_different_url(setup):
         yield MOCK_HEADERS, 200
         yield b"done"
 
-    with patch(
-        "vllm_router.services.request_service.request.process_request",
-        side_effect=fail_then_ok,
+    with (
+        patch(
+            "vllm_router.services.request_service.request.process_request",
+            side_effect=fail_then_ok,
+        ),
+        patch(
+            "vllm_router.services.request_service.request.record_routing_decision"
+        ) as metric_mock,
     ):
         from vllm_router.services.request_service.request import route_general_request
 
@@ -138,6 +192,18 @@ async def test_retries_on_failure_with_different_url(setup):
     assert resp.status_code == 200
     assert len(urls_called) == 2
     assert urls_called[0] != urls_called[1]
+    assert metric_mock.call_args_list == [
+        call(
+            algorithm="roundrobin",
+            decision="primary",
+            reason="round_robin",
+        ),
+        call(
+            algorithm="roundrobin",
+            decision="retry",
+            reason="backend_error",
+        ),
+    ]
 
 
 @pytest.mark.asyncio
