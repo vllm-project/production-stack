@@ -21,7 +21,8 @@ import os
 import random
 import threading
 import uuid
-from typing import Dict, List, Optional
+import weakref
+from typing import Dict, List, Optional, Self
 from urllib.parse import urlparse
 
 import requests
@@ -60,6 +61,93 @@ class RoutingLogic(str, enum.Enum):
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
     DISAGGREGATED_PREFILL_ORCHESTRATED = "disaggregated_prefill_orchestrated"
     PRIORITY = "priority"
+
+
+ROUTING_DECISION_KINDS = frozenset({"primary", "fallback", "retry", "unknown"})
+ROUTING_DECISION_REASONS = frozenset(
+    {
+        "round_robin",
+        "session_affinity",
+        "missing_session",
+        "cache_hit",
+        "no_cache_match",
+        "no_live_holder",
+        "below_threshold",
+        "load_aware",
+        "prefix_match",
+        "priority",
+        "prefill",
+        "decode",
+        "requested_endpoint",
+        "backend_error",
+        "unknown",
+    }
+)
+ROUTING_ALGORITHMS = frozenset({logic.value for logic in RoutingLogic} | {"unknown"})
+
+_ROUTING_DECISION_METADATA = {}
+
+
+class RoutingDecision(str):
+    """A URL string carrying immutable, bounded routing metadata."""
+
+    __slots__ = ("__weakref__",)
+
+    def __new__(cls, value: str, *, algorithm: str, decision: str, reason: str) -> Self:
+        instance = super().__new__(cls, value)
+        metadata = (
+            algorithm if algorithm in ROUTING_ALGORITHMS else "unknown",
+            decision if decision in ROUTING_DECISION_KINDS else "unknown",
+            reason if reason in ROUTING_DECISION_REASONS else "unknown",
+        )
+
+        identity = id(instance)
+
+        def discard_metadata(reference, *, identity=identity):
+            entry = _ROUTING_DECISION_METADATA.get(identity)
+            if entry is not None and entry[0] is reference:
+                del _ROUTING_DECISION_METADATA[identity]
+
+        reference = weakref.ref(instance, discard_metadata)
+        _ROUTING_DECISION_METADATA[identity] = (reference, metadata)
+        return instance
+
+    @property
+    def _metadata(self):
+        reference, metadata = _ROUTING_DECISION_METADATA[id(self)]
+        if reference() is not self:
+            raise RuntimeError("RoutingDecision metadata identity mismatch")
+        return metadata
+
+    @property
+    def algorithm(self):
+        return self._metadata[0]
+
+    @property
+    def decision(self):
+        return self._metadata[1]
+
+    @property
+    def reason(self):
+        return self._metadata[2]
+
+    def __setattr__(self, name, value):
+        raise AttributeError("RoutingDecision is immutable")
+
+    def __delattr__(self, name):
+        raise AttributeError("RoutingDecision is immutable")
+
+    def __reduce__(self):
+        return (
+            _rebuild_routing_decision,
+            (str(self), self.algorithm, self.decision, self.reason),
+        )
+
+
+def _rebuild_routing_decision(
+    value: str, algorithm: str, decision: str, reason: str
+) -> RoutingDecision:
+    return RoutingDecision(value, algorithm=algorithm, decision=decision, reason=reason)
 
 
 # The single tunable of the `loadaware` routing logic. beta = 1.0 reads as: an
@@ -224,7 +312,12 @@ class RoundRobinRouter(RoutingInterface):
         ):
             self._next_index.clear()
         self._next_index[endpoint_urls] = idx + 1
-        return endpoint_urls[idx % len(endpoint_urls)]
+        return RoutingDecision(
+            endpoint_urls[idx % len(endpoint_urls)],
+            algorithm=RoutingLogic.ROUND_ROBIN.value,
+            decision="primary",
+            reason="round_robin",
+        )
 
 
 class SessionRouter(RoutingInterface):
@@ -274,11 +367,20 @@ class SessionRouter(RoutingInterface):
         if session_id is None:
             # Route based on QPS if no session ID is present
             url = self._qps_routing(endpoints, request_stats)
+            decision = "fallback"
+            reason = "missing_session"
         else:
             # Use the hash ring to get the endpoint for the session ID
             url = self.hash_ring.get_node(session_id)
+            decision = "primary"
+            reason = "session_affinity"
 
-        return url
+        return RoutingDecision(
+            url,
+            algorithm=RoutingLogic.SESSION_BASED.value,
+            decision=decision,
+            reason=reason,
+        )
 
 
 class KvawareRouter(RoutingInterface):
@@ -413,7 +515,7 @@ class KvawareRouter(RoutingInterface):
         matched_tokens = math.inf
         matched_instance_id = None
         logger.debug(f"Lookup return message: {instance_id}")
-        layout_info = instance_id.layout_info
+        layout_info = getattr(instance_id, "layout_info", None) or {}
         if layout_info:
             mapped_urls = set(self.instance_id_to_ip.values())
             if any(endpoint.url not in mapped_urls for endpoint in endpoints) or any(
@@ -454,12 +556,15 @@ class KvawareRouter(RoutingInterface):
             matched_instance_id = max(live_holders, key=lambda key: layout_info[key][1])
             matched_tokens = layout_info[matched_instance_id][1]
 
-        if (
-            instance_id is None
-            or len(instance_id.layout_info) == 0
-            or matched_instance_id is None
-            or matched_tokens < max(len(token_ids) - self.threshold, 0)
-        ):
+        fallback_reason = None
+        if not layout_info:
+            fallback_reason = "no_cache_match"
+        elif matched_instance_id is None:
+            fallback_reason = "no_live_holder"
+        elif matched_tokens < max(len(token_ids) - self.threshold, 0):
+            fallback_reason = "below_threshold"
+
+        if fallback_reason is not None:
             session_id = self.extract_session_id(request, request_json)
             logger.debug(f"Fallback to using session id: {session_id}")
             # Update the hash ring with the current list of endpoints
@@ -470,9 +575,19 @@ class KvawareRouter(RoutingInterface):
             else:
                 # Use the hash ring to get the endpoint for the session ID
                 url = self.hash_ring.get_node(session_id)
-            return url
+            return RoutingDecision(
+                url,
+                algorithm=RoutingLogic.KVAWARE.value,
+                decision="fallback",
+                reason=fallback_reason,
+            )
         logger.info(f"Routing request to {matched_instance_id} found by kvaware router")
-        return self.instance_id_to_ip[matched_instance_id]
+        return RoutingDecision(
+            self.instance_id_to_ip[matched_instance_id],
+            algorithm=RoutingLogic.KVAWARE.value,
+            decision="primary",
+            reason="cache_hit",
+        )
 
 
 class LoadAwareRouter(KvawareRouter):
@@ -565,17 +680,25 @@ class LoadAwareRouter(KvawareRouter):
         benefit = min(matched_tokens, prompt_tokens) / max(prompt_tokens, 1)
         return benefit - self.beta * relative_load
 
-    def matched_tokens_by_url(self, layout_info: Dict) -> Dict[str, int]:
+    def matched_tokens_by_url(
+        self,
+        layout_info: Dict,
+        current_instance_ids: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, int]:
         """Re-key the controller's answer from instance_id to engine URL.
 
         A restarted engine registers under a fresh id while its dead id
         lingers in the controller's `kv_pool`, so `lookup()` can name the
         dead id as a holder whose match is phantom (the restart emptied the
-        cache). Inverting the bridge credits only the live id: dicts preserve
-        insertion order, so the last id `refresh_instance_map` wrote for a
-        URL wins.
+        cache). A request-local ``current_instance_ids`` snapshot is
+        authoritative when supplied. Direct callers without one use the last
+        identity written for each URL in the historical bridge.
         """
-        url_to_instance = {url: iid for iid, url in self.instance_id_to_ip.items()}
+        url_to_instance = (
+            current_instance_ids
+            if current_instance_ids is not None
+            else {url: iid for iid, url in self.instance_id_to_ip.items()}
+        )
         matched = {}
         for url, instance_id in url_to_instance.items():
             info = layout_info.get(instance_id)
@@ -589,15 +712,18 @@ class LoadAwareRouter(KvawareRouter):
         request_stats: Dict[str, RequestStats],
         layout_info: Dict,
         prompt_tokens: int,
+        current_instance_ids: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """The placement decision. Pure: no I/O, no awaits.
 
-        Requires `self.instance_id_to_ip` to be populated for every endpoint
-        (`refresh_instance_map`) since it bridges `layout_info`'s instance_id
-        keys to `request_stats`' URL keys. Ties break by lexicographic URL
-        for reproducibility; returns None if there is nothing to route to.
+        ``current_instance_ids`` bridges `layout_info`'s instance_id keys to
+        `request_stats`' URL keys. Without a snapshot, direct callers use
+        ``self.instance_id_to_ip``. Ties break by lexicographic URL for
+        reproducibility; returns None if there is nothing to route to.
         """
-        matched_by_url = self.matched_tokens_by_url(layout_info)
+        matched_by_url = self.matched_tokens_by_url(
+            layout_info, current_instance_ids=current_instance_ids
+        )
         relative = self.relative_loads(request_stats, endpoints)
         best_url = None
         best_score = -math.inf
@@ -618,12 +744,12 @@ class LoadAwareRouter(KvawareRouter):
     def instance_map_is_stale(
         self, endpoints: List[EndpointInfo], layout_info: Dict
     ) -> bool:
-        """Does the instance_id -> URL bridge still cover what we must score?
+        """Does the instance_id -> URL bridge structurally cover this lookup?
 
         Stale means an endpoint URL the bridge cannot score, or an
         instance_id in `layout_info` the bridge has never seen (an engine
-        restart). Missing the latter silently degenerates placement to
-        least-loaded for the life of the router.
+        restart). A same-URL restart is not structurally visible here;
+        ``refresh_instance_map`` separately validates known holder identities.
         """
         mapped_urls = set(self.instance_id_to_ip.values())
         if any(endpoint.url not in mapped_urls for endpoint in endpoints):
@@ -634,18 +760,34 @@ class LoadAwareRouter(KvawareRouter):
 
     async def refresh_instance_map(
         self, endpoints: List[EndpointInfo], layout_info: Dict
-    ) -> None:
-        """Populate instance_id -> URL for every endpoint, on demand.
+    ) -> Dict[str, str]:
+        """Return the live instance identity for each cache-relevant URL.
 
-        Scoring needs the whole bridge, not just the one instance
-        `KvawareRouter` translates lazily. A rebuild costs one controller
-        round-trip per endpoint, so the `instance_map_is_stale` gate keeps it
-        a once-per-fleet-change cost rather than a per-request one.
+        The cached bridge cannot reveal a restart that keeps the same URL, so
+        every known holder URL in a non-empty lookup costs one ``QueryInst``.
+        Unknown holders or unmapped endpoints require a concurrent fleet-wide
+        refresh. This is the smallest set of queries that can safely award
+        cache credit; results are returned as a request-local snapshot so
+        concurrent refreshes cannot change the identities used for scoring.
         """
-        if not self.instance_map_is_stale(endpoints, layout_info):
-            return
+        if self.instance_map_is_stale(endpoints, layout_info):
+            refresh_urls = {endpoint.url for endpoint in endpoints}
+        else:
+            endpoint_urls = {endpoint.url for endpoint in endpoints}
+            refresh_urls = {
+                url
+                for instance_id in layout_info
+                if (url := self.instance_id_to_ip.get(instance_id)) in endpoint_urls
+            }
 
-        async def query_endpoint(endpoint: EndpointInfo) -> None:
+        seen_urls = set()
+        refresh_endpoints = []
+        for endpoint in endpoints:
+            if endpoint.url in refresh_urls and endpoint.url not in seen_urls:
+                seen_urls.add(endpoint.url)
+                refresh_endpoints.append(endpoint)
+
+        async def query_endpoint(endpoint: EndpointInfo) -> tuple[str, str]:
             event_id = "QueryInst" + str(uuid.uuid4())
             url = endpoint.url if "//" in endpoint.url else "//" + endpoint.url
             query_ip = urlparse(url).hostname or ""
@@ -654,10 +796,20 @@ class LoadAwareRouter(KvawareRouter):
             logger.debug(
                 f"Query ip: {query_ip}, return instance id: {endpoint_instance_id}"
             )
-            self.instance_id_to_ip[endpoint_instance_id.instance_id] = endpoint.url
+            return endpoint.url, endpoint_instance_id.instance_id
 
-        await asyncio.gather(*(query_endpoint(e) for e in endpoints))
-        logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
+        refreshed = await asyncio.gather(
+            *(query_endpoint(endpoint) for endpoint in refresh_endpoints)
+        )
+        current_instance_ids = {}
+        for url, instance_id in refreshed:
+            # Reinsert an already-known identity so it remains the winning
+            # entry when historical and current IDs share one URL.
+            self.instance_id_to_ip.pop(instance_id, None)
+            self.instance_id_to_ip[instance_id] = url
+            current_instance_ids[url] = instance_id
+        logger.debug(f"Instance id to ip mapping: {self.instance_id_to_ip}")
+        return current_instance_ids
 
     async def tokenize_prompt(
         self, endpoints: List[EndpointInfo], request_json: Dict
@@ -746,14 +898,50 @@ class LoadAwareRouter(KvawareRouter):
 
         if not layout_info:
             # Nothing cached anywhere - no benefit term to weigh.
-            return self.fallback_url(endpoints, request_stats, request, request_json)
+            return RoutingDecision(
+                self.fallback_url(endpoints, request_stats, request, request_json),
+                algorithm=RoutingLogic.LOADAWARE.value,
+                decision="fallback",
+                reason="no_cache_match",
+            )
 
-        await self.refresh_instance_map(endpoints, layout_info)
-        url = self.select_url(endpoints, request_stats, layout_info, len(token_ids))
+        current_instance_ids = await self.refresh_instance_map(endpoints, layout_info)
+        endpoint_urls = {endpoint.url for endpoint in endpoints}
+        live_matches = {
+            url: matched_tokens
+            for url, matched_tokens in self.matched_tokens_by_url(
+                layout_info, current_instance_ids=current_instance_ids
+            ).items()
+            if url in endpoint_urls
+        }
+        if not live_matches:
+            return RoutingDecision(
+                self.fallback_url(endpoints, request_stats, request, request_json),
+                algorithm=RoutingLogic.LOADAWARE.value,
+                decision="fallback",
+                reason="no_live_holder",
+            )
+        url = self.select_url(
+            endpoints,
+            request_stats,
+            layout_info,
+            len(token_ids),
+            current_instance_ids=current_instance_ids,
+        )
         if url is None:
-            return self.fallback_url(endpoints, request_stats, request, request_json)
+            return RoutingDecision(
+                self.fallback_url(endpoints, request_stats, request, request_json),
+                algorithm=RoutingLogic.LOADAWARE.value,
+                decision="fallback",
+                reason="no_live_holder",
+            )
         logger.info(f"Routing request to {url} found by loadaware router")
-        return url
+        return RoutingDecision(
+            url,
+            algorithm=RoutingLogic.LOADAWARE.value,
+            decision="primary",
+            reason="load_aware",
+        )
 
 
 class PrefixAwareRouter(RoutingInterface):
@@ -841,13 +1029,23 @@ class PrefixAwareRouter(RoutingInterface):
             selected_endpoint = self._qps_routing(endpoints, request_stats)
             if selected_endpoint is not None:
                 await self.hashtrie.insert(prompt, selected_endpoint)
-            return selected_endpoint
+            return RoutingDecision(
+                selected_endpoint,
+                algorithm=RoutingLogic.PREFIXAWARE.value,
+                decision="fallback",
+                reason="below_threshold",
+            )
 
         selected_endpoint = random.choice(list(matched_endpoint))
 
         await self.hashtrie.insert(prompt, selected_endpoint)
 
-        return selected_endpoint
+        return RoutingDecision(
+            selected_endpoint,
+            algorithm=RoutingLogic.PREFIXAWARE.value,
+            decision="primary",
+            reason="prefix_match",
+        )
 
 
 class PriorityRouter(RoutingInterface):
@@ -954,14 +1152,24 @@ class PriorityRouter(RoutingInterface):
         endpoint_urls = tuple(sorted(endpoint.url for endpoint in endpoints))
 
         if priority < self.priority_threshold:
-            return min(
-                endpoint_urls,
-                key=lambda url: self._engine_load(url, request_stats),
+            return RoutingDecision(
+                min(
+                    endpoint_urls,
+                    key=lambda url: self._engine_load(url, request_stats),
+                ),
+                algorithm=RoutingLogic.PRIORITY.value,
+                decision="primary",
+                reason="priority",
             )
 
         idx = self._next_index.get(endpoint_urls, 0)
         self._next_index[endpoint_urls] = idx + 1
-        return endpoint_urls[idx % len(endpoint_urls)]
+        return RoutingDecision(
+            endpoint_urls[idx % len(endpoint_urls)],
+            algorithm=RoutingLogic.PRIORITY.value,
+            decision="fallback",
+            reason="round_robin",
+        )
 
 
 class DisaggregatedPrefillRouter(RoutingInterface):
@@ -1002,9 +1210,19 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             e for e in endpoints if e.model_label in self.decode_model_labels
         ]
         if is_prefill:
-            return prefiller_endpoints[0].url
+            return RoutingDecision(
+                prefiller_endpoints[0].url,
+                algorithm=RoutingLogic.DISAGGREGATED_PREFILL.value,
+                decision="primary",
+                reason="prefill",
+            )
         else:
-            return decoder_endpoints[0].url
+            return RoutingDecision(
+                decoder_endpoints[0].url,
+                algorithm=RoutingLogic.DISAGGREGATED_PREFILL.value,
+                decision="primary",
+                reason="decode",
+            )
 
 
 class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
@@ -1112,7 +1330,12 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         """
         prefiller_endpoints, _ = self._find_endpoints(endpoints)
         # Return prefill URL - actual orchestration is done in request.py
-        return prefiller_endpoints[0].url
+        return RoutingDecision(
+            prefiller_endpoints[0].url,
+            algorithm=RoutingLogic.DISAGGREGATED_PREFILL_ORCHESTRATED.value,
+            decision="primary",
+            reason="prefill",
+        )
 
 
 # Instead of managing a global _global_router, we can define the initialization functions as:

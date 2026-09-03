@@ -77,6 +77,11 @@ async def test_kvaware_routes_to_longest_reported_prefix(threshold):
     )
 
     assert selected == url_b
+    assert (selected.algorithm, selected.decision, selected.reason) == (
+        "kvaware",
+        "primary",
+        "cache_hit",
+    )
 
 
 @pytest.mark.parametrize(
@@ -163,3 +168,63 @@ async def test_kvaware_refreshes_unknown_dead_holder_and_uses_live_match():
     )
 
     assert selected == url_b
+
+
+@pytest.mark.parametrize(
+    ("layout_info", "instance_map", "threshold", "expected_reason"),
+    [
+        pytest.param({}, {}, 1000, "no_cache_match", id="no-cache-match"),
+        pytest.param(
+            {"dead-instance": ("LocalCPUBackend", 1000)},
+            {
+                "instance-a": "http://10.0.0.1:8000",
+                "instance-b": "http://10.0.0.2:8000",
+                "dead-instance": "http://10.0.0.9:8000",
+            },
+            1000,
+            "no_live_holder",
+            id="no-live-holder",
+        ),
+        pytest.param(
+            {"instance-a": ("LocalCPUBackend", 100)},
+            {
+                "instance-a": "http://10.0.0.1:8000",
+                "instance-b": "http://10.0.0.2:8000",
+            },
+            0,
+            "below_threshold",
+            id="below-threshold",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_kvaware_fallback_decision_reason(
+    layout_info, instance_map, threshold, expected_reason
+):
+    url_a = "http://10.0.0.1:8000"
+    url_b = "http://10.0.0.2:8000"
+    router = KvawareRouter.__new__(KvawareRouter)
+    router.tokenizer = Tokenizer()
+    router.threshold = threshold
+    router.session_key = "x-session-id"
+    router.hash_ring = routing_logic.HashRing()
+    router.instance_id_to_ip = instance_map
+
+    async def query_manager(_msg):
+        return SimpleNamespace(layout_info=layout_info)
+
+    router.query_manager = query_manager
+    selected = await router.route_request(
+        [EndpointInfo(url_a), EndpointInfo(url_b)],
+        {},
+        {url_a: SimpleNamespace(qps=10), url_b: SimpleNamespace(qps=1)},
+        SimpleNamespace(headers={}),
+        {"prompt": "test"},
+    )
+
+    assert selected == url_b
+    assert (selected.algorithm, selected.decision, selected.reason) == (
+        "kvaware",
+        "fallback",
+        expected_reason,
+    )

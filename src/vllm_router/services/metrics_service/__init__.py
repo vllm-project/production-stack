@@ -1,5 +1,11 @@
 from prometheus_client import Counter, Gauge, Histogram
 
+from vllm_router.routers.routing_logic import (
+    ROUTING_ALGORITHMS,
+    ROUTING_DECISION_KINDS,
+    ROUTING_DECISION_REASONS,
+)
+
 # --- Prometheus Gauges ---
 # Existing metrics
 num_requests_running = Gauge(
@@ -38,6 +44,21 @@ num_incoming_requests_total = Counter(
     "Total valid incoming requests to router (including when no backends available).",
     ["model"],
 )
+routing_decisions_total = Counter(
+    "vllm:routing_decisions_total",
+    "Total routing selections made by the router.",
+    ["algorithm", "decision", "reason"],
+)
+
+
+def record_routing_decision(*, algorithm: str, decision: str, reason: str) -> None:
+    """Increment a routing decision after normalizing bounded labels."""
+    routing_decisions_total.labels(
+        algorithm=algorithm if algorithm in ROUTING_ALGORITHMS else "unknown",
+        decision=decision if decision in ROUTING_DECISION_KINDS else "unknown",
+        reason=reason if reason in ROUTING_DECISION_REASONS else "unknown",
+    ).inc()
+
 
 # New metrics per dashboard update
 healthy_pods_total = Gauge(
