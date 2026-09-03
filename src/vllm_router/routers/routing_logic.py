@@ -928,9 +928,9 @@ class PriorityRouter(RoutingInterface):
         Args:
             endpoints (List[EndpointInfo]): The list of engine URLs
             engine_stats (Dict[str, EngineStats]): The engine stats indicating
-               the 'physical' load of each engine
+                the 'physical' load of each engine
             request_stats (Dict[str, RequestStats]): The request stats
-               indicating the request-level performance of each engine
+                indicating the request-level performance of each engine
             request (Request): The incoming request
             request_json (Dict): The request body; the resolved priority is
                 injected back into this dict so it can be forwarded to the

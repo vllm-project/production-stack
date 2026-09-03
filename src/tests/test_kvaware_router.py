@@ -100,7 +100,12 @@ async def test_kvaware_uses_tokenizer_for_each_model(monkeypatch):
         loaded_models.append(model_name)
         return tokenizers[model_name]
 
-    monkeypatch.setattr(routing_logic.AutoTokenizer, "from_pretrained", load_tokenizer)
+    monkeypatch.setattr(
+        routing_logic,
+        "AutoTokenizer",
+        SimpleNamespace(from_pretrained=load_tokenizer),
+        raising=False,
+    )
 
     router = KvawareRouter.__new__(KvawareRouter)
     router.tokenizers = {}
