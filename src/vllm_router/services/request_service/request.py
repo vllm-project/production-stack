@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import json
 import os
 import time
@@ -19,12 +20,14 @@ import uuid
 from typing import Optional
 
 import aiohttp
+import anyio
 
 # --- Request Processing & Routing ---
 from aiohttp import FormData
 from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from requests import JSONDecodeError
+from starlette.requests import ClientDisconnect
 
 from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import (
@@ -99,6 +102,9 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
     "connection",
     "server",
 }
+
+# Client went away before a response could be sent; never reaches the client.
+_CLIENT_CLOSED_REQUEST = 499
 
 
 def _is_json_media_type(content_type: str) -> bool:
@@ -227,6 +233,85 @@ def _build_backend_request_headers(
     return headers
 
 
+def _log_safe(value: str) -> str:
+    """Strip CR/LF so a crafted X-Request-Id can't forge a fake log line."""
+    if not isinstance(value, str):
+        value = str(value)
+    return value.replace("\r", "").replace("\n", "")
+
+
+async def _listen_for_disconnect(request: Request) -> None:
+    """Return once the client has disconnected."""
+    while True:
+        message = await request.receive()
+        if message["type"] == "http.disconnect":
+            return
+
+
+async def _cancel_and_wait(task: asyncio.Task) -> None:
+    """Cancel a task and wait for it to finish unwinding.
+
+    ``task.cancelled()`` can't tell our own cancel() apart from an unrelated
+    cancellation of the caller that propagated into ``task`` via its
+    ``_fut_waiter``, since both leave ``task`` cancelled either way. The
+    caller's own ``cancelling()`` count is unaffected by that propagation, so
+    it is what actually distinguishes the two.
+
+    Args:
+        task (asyncio.Task): The task to cancel.
+
+    Raises:
+        asyncio.CancelledError: If the caller itself was independently
+            cancelled while waiting, rather than only as a side effect of
+            cancelling ``task``.
+    """
+    current = asyncio.current_task()
+    pending_before = current.cancelling() if current else 0
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        if current is not None and current.cancelling() > pending_before:
+            raise
+    except Exception:
+        # A backend error that raced the disconnect is irrelevant now.
+        pass
+
+
+async def _anext_or_disconnect(stream_generator, request: Request):
+    """Wait for the backend response headers, or for the client to disconnect.
+
+    Same approach as ``vllm.entrypoints.utils.with_cancellation``.
+
+    Args:
+        stream_generator: The ``process_request`` generator for this attempt.
+        request (Request): The incoming HTTP request.
+
+    Returns:
+        The backend response headers and status code.
+
+    Raises:
+        ClientDisconnect: If the client disconnected before the backend replied.
+    """
+    headers_task = asyncio.ensure_future(anext(stream_generator))
+    disconnect_task = asyncio.ensure_future(_listen_for_disconnect(request))
+    try:
+        await asyncio.wait(
+            (headers_task, disconnect_task), return_when=asyncio.FIRST_COMPLETED
+        )
+        if headers_task.done():
+            return headers_task.result()
+        raise ClientDisconnect()
+    finally:
+        # Runs on every exit path, including our own cancellation before a winner
+        # was picked: asyncio.wait() leaves its member tasks running.
+        await _cancel_and_wait(disconnect_task)
+        if not headers_task.done():
+            await _cancel_and_wait(headers_task)
+            with anyio.CancelScope(shield=True):
+                await stream_generator.aclose()
+
+
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
@@ -337,11 +422,6 @@ async def process_request(
                     full_response.extend(chunk)
                 yield chunk
 
-        end_time = time.time()
-        request.app.state.request_stats_monitor.on_request_complete(
-            backend_url, request_id, end_time
-        )
-
         if http_status_code is not None and http_status_code >= 400:
             request_status = "error"
 
@@ -381,6 +461,10 @@ async def process_request(
         end_span(span, error=e) if tracing_active else None
         raise
     finally:
+        # Must run on every exit path or the engine stays counted as in-flight forever.
+        request.app.state.request_stats_monitor.on_request_complete(
+            backend_url, request_id, time.time()
+        )
         request_latency_seconds.labels(
             server=backend_url, model=model_name, status=request_status
         ).observe(time.time() - start_time)
@@ -661,7 +745,7 @@ async def route_general_request(
                 background_tasks,
                 parent_span_context=span_context,
             )
-            headers, status = await anext(stream_generator)
+            headers, status = await _anext_or_disconnect(stream_generator, request)
             media_type = headers.get("content-type", "text/event-stream")
             headers_dict = {
                 key: value
@@ -672,6 +756,14 @@ async def route_general_request(
             headers_dict["X-Request-Id"] = request_id
             last_error = None
             break
+        except ClientDisconnect:
+            logger.info(
+                f"Client disconnected before request {_log_safe(request_id)} was "
+                f"answered by {server_url}, aborted the backend request"
+            )
+            if tracing_active:
+                end_span(span, status_code=_CLIENT_CLOSED_REQUEST)
+            return Response(status_code=_CLIENT_CLOSED_REQUEST)
         except HTTPException:
             raise
         except Exception as e:
