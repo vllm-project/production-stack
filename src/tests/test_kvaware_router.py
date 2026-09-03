@@ -22,9 +22,9 @@ def lmcache_message_stubs(monkeypatch):
 
 
 class EndpointInfo:
-    def __init__(self, url):
+    def __init__(self, url, model_name="test-model"):
         self.url = url
-        self.model_names = ["test-model"]
+        self.model_names = [model_name]
 
 
 class Tokenizer:
@@ -44,7 +44,7 @@ async def test_kvaware_routes_to_longest_reported_prefix(threshold):
     url_a = "http://10.0.0.1:8000"
     url_b = "http://10.0.0.2:8000"
     router = KvawareRouter.__new__(KvawareRouter)
-    router.tokenizer = Tokenizer()
+    router.tokenizers = {"test-model": Tokenizer()}
     router.threshold = threshold
     router.session_key = "x-session-id"
     router.hash_ring = routing_logic.HashRing()
@@ -79,6 +79,63 @@ async def test_kvaware_routes_to_longest_reported_prefix(threshold):
     assert selected == url_b
 
 
+@pytest.mark.asyncio
+async def test_kvaware_uses_tokenizer_for_each_model(monkeypatch):
+    loaded_models = []
+    lookup_tokens = []
+
+    class ModelTokenizer:
+        def __init__(self, token_id):
+            self.token_id = token_id
+
+        def encode(self, _prompt):
+            return [self.token_id]
+
+    tokenizers = {
+        "model-a": ModelTokenizer(1),
+        "model-b": ModelTokenizer(2),
+    }
+
+    def load_tokenizer(model_name):
+        loaded_models.append(model_name)
+        return tokenizers[model_name]
+
+    monkeypatch.setattr(
+        routing_logic,
+        "AutoTokenizer",
+        SimpleNamespace(from_pretrained=load_tokenizer),
+        raising=False,
+    )
+
+    router = KvawareRouter.__new__(KvawareRouter)
+    router.tokenizers = {}
+    router.threshold = 0
+    router.session_key = "x-session-id"
+    router.hash_ring = routing_logic.HashRing()
+    router.instance_id_to_ip = {}
+
+    async def query_manager(msg):
+        lookup_tokens.append(msg.tokens)
+        return SimpleNamespace(layout_info={})
+
+    router.query_manager = query_manager
+
+    for model_name, url in (
+        ("model-a", "http://10.0.0.1:8000"),
+        ("model-b", "http://10.0.0.2:8000"),
+    ):
+        await router.route_request(
+            [EndpointInfo(url, model_name)],
+            {},
+            {},
+            SimpleNamespace(headers={}),
+            {"prompt": "test"},
+        )
+
+    assert loaded_models == ["model-a", "model-b"]
+    assert lookup_tokens == [[1], [2]]
+
+
 @pytest.mark.parametrize(
     "instance_map",
     [
@@ -105,7 +162,7 @@ async def test_kvaware_ignores_cached_dead_holder(instance_map):
     url_a = "http://10.0.0.1:8000"
     url_b = "http://10.0.0.2:8000"
     router = KvawareRouter.__new__(KvawareRouter)
-    router.tokenizer = Tokenizer()
+    router.tokenizers = {"test-model": Tokenizer()}
     router.threshold = 1000
     router.session_key = "x-session-id"
     router.hash_ring = routing_logic.HashRing()
@@ -136,7 +193,7 @@ async def test_kvaware_refreshes_unknown_dead_holder_and_uses_live_match():
     url_a = "http://10.0.0.1:8000"
     url_b = "http://10.0.0.2:8000"
     router = KvawareRouter.__new__(KvawareRouter)
-    router.tokenizer = Tokenizer()
+    router.tokenizers = {"test-model": Tokenizer()}
     router.threshold = 1000
     router.session_key = "x-session-id"
     router.hash_ring = routing_logic.HashRing()

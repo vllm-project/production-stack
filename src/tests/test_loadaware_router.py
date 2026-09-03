@@ -53,8 +53,9 @@ PROMPT_TOKENS = 2048
 
 
 class EndpointInfo:
-    def __init__(self, url: str):
+    def __init__(self, url: str, model_name: str = "test-model"):
         self.url = url
+        self.model_names = [model_name]
 
 
 class RequestStats:
@@ -309,7 +310,7 @@ async def test_route_request_scores_and_routes_to_the_argmax():
         def encode(self, _prompt):
             return list(range(PROMPT_TOKENS))
 
-    router.tokenizer = Tokenizer()
+    router.tokenizers = {"test-model": Tokenizer()}
 
     async def query_manager(_msg):
         return LookupRet({INST_A: (LOCAL, PROMPT_TOKENS)})
@@ -334,7 +335,7 @@ async def test_no_cached_prefix_anywhere_falls_back_to_qps():
         def encode(self, _prompt):
             return list(range(PROMPT_TOKENS))
 
-    router.tokenizer = Tokenizer()
+    router.tokenizers = {"test-model": Tokenizer()}
 
     async def query_manager(_msg):
         return LookupRet({})
@@ -351,6 +352,46 @@ async def test_no_cached_prefix_anywhere_falls_back_to_qps():
         endpoints(URL_A, URL_B), {}, stats, Request(), {"prompt": "x"}
     )
     assert url == URL_B
+
+
+@pytest.mark.asyncio
+async def test_tokenize_prompt_uses_tokenizer_for_each_model(monkeypatch):
+    loaded_models = []
+
+    class ModelTokenizer:
+        def __init__(self, token_id):
+            self.token_id = token_id
+
+        def encode(self, _prompt):
+            return [self.token_id]
+
+    tokenizers = {
+        "model-a": ModelTokenizer(1),
+        "model-b": ModelTokenizer(2),
+    }
+
+    class FakeAutoTokenizer:
+        @staticmethod
+        def from_pretrained(model_name):
+            loaded_models.append(model_name)
+            return tokenizers[model_name]
+
+    monkeypatch.setattr(
+        routing_logic, "AutoTokenizer", FakeAutoTokenizer, raising=False
+    )
+    router = make_router()
+    router.tokenizers = {}
+
+    token_ids = []
+    for model_name in ("model-a", "model-b", "model-a"):
+        token_ids.append(
+            await router.tokenize_prompt(
+                [EndpointInfo(URL_A, model_name)], {"prompt": "test"}
+            )
+        )
+
+    assert loaded_models == ["model-a", "model-b"]
+    assert token_ids == [[1], [2], [1]]
 
 
 @pytest.mark.asyncio
