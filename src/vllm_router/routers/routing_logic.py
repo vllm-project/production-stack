@@ -402,10 +402,14 @@ class KvawareRouter(RoutingInterface):
                 "model": endpoints[0].model_names[0],
                 "prompt": request_json.get("prompt", ""),
             }
-            body = requests.post(
+            # Use the shared aiohttp session so connections are reused and
+            # the event loop is not blocked (mirrors route_general_request).
+            client = request.app.state.aiohttp_client_wrapper()
+            async with client.post(
                 remote_url, headers=headers, json=data, timeout=10
-            ).json()
-            token_ids = body["tokens"]
+            ) as response:
+                response_json = await response.json()
+                token_ids = response_json["tokens"]
 
         event_id = "Lookup" + str(uuid.uuid4())
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
