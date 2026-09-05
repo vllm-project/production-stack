@@ -326,7 +326,7 @@ class KvawareRouter(RoutingInterface):
         self.instance_id_to_ip = {}
         self.session_key = session_key
         self.hash_ring = HashRing()
-        self.tokenizer = None
+        self.tokenizers: Dict[str, AutoTokenizer] = {}
         self.threshold = kv_aware_threshold
 
     def start_kv_manager(self):
@@ -388,24 +388,7 @@ class KvawareRouter(RoutingInterface):
         token_ids = None
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         # TODO (Yuhan): Handle chat completions
-        try:
-            if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    endpoints[0].model_names[0]
-                )
-            token_ids = self.tokenizer.encode(request_json.get("prompt", ""))
-        except Exception:
-            # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
-            remote_url = endpoints[0].url + "/tokenize"
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json.get("prompt", ""),
-            }
-            body = requests.post(
-                remote_url, headers=headers, json=data, timeout=10
-            ).json()
-            token_ids = body["tokens"]
+        token_ids = await self.tokenize_prompt(endpoints, request_json)
 
         event_id = "Lookup" + str(uuid.uuid4())
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
@@ -667,17 +650,29 @@ class LoadAwareRouter(KvawareRouter):
         The remote fallback is a blocking HTTP call, so it runs in an
         executor rather than on the event loop.
         """
+        model_name = request_json.get("model", "")
+        if not model_name:
+            raise ValueError("Missing 'model' in request body")
+        # Find the endpoint serving this model
+        model_endpoint = next(
+            (ep for ep in endpoints if model_name in ep.model_names),
+            endpoints[0] if endpoints else None,
+        )
         try:
-            if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    endpoints[0].model_names[0]
+            if model_name not in self.tokenizers:
+                self.tokenizers[model_name] = AutoTokenizer.from_pretrained(
+                    model_name
                 )
-            return self.tokenizer.encode(request_json.get("prompt", ""))
+            return self.tokenizers[model_name].encode(
+                request_json.get("prompt", "")
+            )
         except Exception:
-            remote_url = endpoints[0].url + "/tokenize"
+            if model_endpoint is None:
+                raise
+            remote_url = model_endpoint.url + "/tokenize"
             headers = {"Content-Type": "application/json"}
             data = {
-                "model": endpoints[0].model_names[0],
+                "model": model_name,
                 "prompt": request_json.get("prompt", ""),
             }
             loop = asyncio.get_running_loop()
