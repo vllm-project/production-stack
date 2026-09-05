@@ -457,6 +457,9 @@ spec:
             - name: {{ .Release.Name }}-storage
               mountPath: /data
         {{- end }}
+        {{- with $modelSpec.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
         - name: {{ $modelSpec.imagePullSecret }}

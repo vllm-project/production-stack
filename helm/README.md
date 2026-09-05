@@ -113,7 +113,10 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].pvcAnnotations` | map | `{}` | (Optional) The annotations to add to the PVC |
 | `servingEngineSpec.modelSpec[].extraVolumes` | list | `[]` | (Optional) Additional volumes to add to the pod, in Kubernetes volume format |
 | `servingEngineSpec.modelSpec[].extraVolumeMounts` | list | `[]` | (Optional) Additional volume mounts to add to the container, in Kubernetes volumeMount format |
+| `servingEngineSpec.modelSpec[].extraContainers` | list | `[]` | (Optional) Additional containers to run alongside the main vLLM container, in Kubernetes container format. Unlike the LoRA sidecar, these are added regardless of `enableLoRA` and support the full container spec (image, args, env, volumeMounts, livenessProbe, resources, etc.) |
 | `servingEngineSpec.modelSpec[].serviceAccountName` | string | `""` | (Optional) The name of the service account to use for the deployment |
+| `servingEngineSpec.modelSpec[].serviceAnnotations` | map | `{}` | (Optional) Annotations to add to the model's service |
+| `servingEngineSpec.modelSpec[].serviceLabels` | map | `{}` | (Optional) Labels to add to the model's service |
 | `servingEngineSpec.modelSpec[].priorityClassName` | string | `""` | Priority class name for the deployment |
 | `servingEngineSpec.modelSpec[].hf_token` | string/map | - | (Optional) Hugging Face token configuration |
 | `servingEngineSpec.modelSpec[].env` | list | - | (Optional) Environment variables for the container |
