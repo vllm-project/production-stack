@@ -81,22 +81,22 @@ func TestDeploymentNeedsUpdate(t *testing.T) {
 	r := &VLLMRouterReconciler{Scheme: newTestScheme()}
 
 	base := buildTestRouter("roundrobin", "", 0)
-	dep := r.deploymentForVLLMRouter(base)
+	dep := mustBuildVLLMRouterDeployment(t, r, base)
 
 	// identical spec → no update
-	if r.deploymentNeedsUpdate(dep, base) {
+	if mustVLLMRouterDeploymentNeedsUpdate(t, r, dep, base) {
 		t.Error("expected no update for identical spec")
 	}
 
 	// routing logic changed → args differ → update required
 	changed := buildTestRouter("prefixaware", "", 0)
-	if !r.deploymentNeedsUpdate(dep, changed) {
+	if !mustVLLMRouterDeploymentNeedsUpdate(t, r, dep, changed) {
 		t.Error("expected update when routingLogic changes")
 	}
 
 	// kvaware with port added → args differ → update required
 	withPort := buildTestRouter("kvaware", "", 9000)
-	if !r.deploymentNeedsUpdate(dep, withPort) {
+	if !mustVLLMRouterDeploymentNeedsUpdate(t, r, dep, withPort) {
 		t.Error("expected update when lmcacheControllerPort added")
 	}
 }
@@ -164,7 +164,7 @@ func TestDeploymentArgsRouting(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			router := buildTestRouter(tc.routingLogic, tc.sessionKey, tc.lmcachePort)
-			dep := r.deploymentForVLLMRouter(router)
+			dep := mustBuildVLLMRouterDeployment(t, r, router)
 
 			if dep == nil {
 				t.Fatal("deploymentForVLLMRouter returned nil")
