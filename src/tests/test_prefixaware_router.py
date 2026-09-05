@@ -190,3 +190,68 @@ async def test_default_threshold_zero_preserves_original_behavior():
     assert url == "http://engine1.com"
 
     fake_hashtrie.insert.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "prompt, expected_key",
+    [
+        pytest.param([1, 2, 3], "1,2,3", id="token-ids"),
+        pytest.param([[1, 2], [3]], "1,2 3", id="token-id-batch"),
+        pytest.param(["a", "b"], "a b", id="string-list"),
+        pytest.param("plain text", "plain text", id="string"),
+        pytest.param([], "", id="empty-list"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_route_accepts_token_id_prompts(prompt, expected_key):
+    """
+    /v1/completions accepts token ids as well as text, so `prompt` may be
+    list[int] or list[list[int]]. HashTrie slices the prompt by characters and
+    hashes each slice with xxhash, which raises TypeError on a list and fails
+    the request. The prompt must be normalized to a string first.
+    """
+
+    endpoints = [EndpointInfo(url="http://engine1.com")]
+    request = Request(headers={})
+    request_json = {"prompt": prompt}
+
+    router = PrefixAwareRouter()
+
+    fake_hashtrie = AsyncMock()
+    fake_hashtrie.longest_prefix_match.return_value = (0, {"http://engine1.com"})
+    router.hashtrie = fake_hashtrie
+
+    url = await router.route_request(endpoints, None, {}, request, request_json)
+
+    assert url == "http://engine1.com"
+    # The trie must see a string, and the same one on both lookup and insert.
+    fake_hashtrie.longest_prefix_match.assert_awaited_once()
+    assert fake_hashtrie.longest_prefix_match.await_args.args[0] == expected_key
+    fake_hashtrie.insert.assert_awaited_once_with(expected_key, "http://engine1.com")
+
+
+@pytest.mark.asyncio
+async def test_token_id_prompts_preserve_prefix_affinity():
+    """
+    Normalizing token ids must not flatten distinct prompts onto one key, and
+    a shared token prefix must still yield a shared character prefix so the
+    real (unmocked) HashTrie routes a continuation back to the same endpoint.
+    """
+    from vllm_router.prefix.hashtrie import HashTrie
+
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+    request = Request(headers={})
+    router = PrefixAwareRouter()
+    router.hashtrie = HashTrie(chunk_size=4)
+
+    shared = list(range(1000, 1100))
+    first = await router.route_request(endpoints, None, {}, request, {"prompt": shared})
+    # Same session, one more turn: strictly extends the token prefix.
+    second = await router.route_request(
+        endpoints, None, {}, request, {"prompt": shared + [1100, 1101]}
+    )
+
+    assert second == first
