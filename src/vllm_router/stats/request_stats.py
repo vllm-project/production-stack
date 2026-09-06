@@ -200,7 +200,13 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         ttft = timestamp - self.request_start_time[(engine_url, request_id)]
         self.ttft_monitors[engine_url].update(timestamp, ttft)
 
-    def on_request_complete(self, engine_url: str, request_id: str, timestamp: float):
+    def on_request_complete(
+        self,
+        engine_url: str,
+        request_id: str,
+        timestamp: float,
+        reached_decode: bool = True,
+    ):
         """
         Tell the monitor that a request has been completed.
 
@@ -208,18 +214,34 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             engine_url: The URL of the serving engine
             request_id: The global request ID
             timestamp: The timestamp when the request was completed
+            reached_decode: Whether the request ever received a first token
+                (i.e. on_request_response() was called for it). A request
+                that fails or disconnects before its first token is still
+                counted in in_prefill_requests, never in_decoding_requests --
+                decrementing the wrong bucket silently no-ops (clamped at 0)
+                and leaves the real bucket leaked forever.
         """
         if engine_url not in self.finished_requests:
             self.finished_requests[engine_url] = 0
-        self.in_decoding_requests[engine_url] = max(
-            0, self.in_decoding_requests.get(engine_url, 1) - 1
-        )
+        if reached_decode:
+            self.in_decoding_requests[engine_url] = max(
+                0, self.in_decoding_requests.get(engine_url, 1) - 1
+            )
+        else:
+            self.in_prefill_requests[engine_url] = max(
+                0, self.in_prefill_requests.get(engine_url, 1) - 1
+            )
         self.finished_requests[engine_url] += 1
 
         if request_start_time := self.request_start_time.get((engine_url, request_id)):
             self.latency_monitors[engine_url].update(
                 timestamp, time.time() - request_start_time
             )
+
+        # Bound these dicts -- they otherwise grow by one entry per request
+        # for the life of the process (production-stack#707).
+        self.request_start_time.pop((engine_url, request_id), None)
+        self.first_token_time.pop((engine_url, request_id), None)
 
     def on_request_swapped(self, engine_url: str, request_id: str, timestamp: float):
         # This function should be called if a request is determined to be swapped from GPU to CPU.
