@@ -1,6 +1,21 @@
 import logging
 
+import pytest
+
 from vllm_router.stats.engine_stats import EngineStats
+
+
+@pytest.fixture(autouse=True)
+def _propagate_engine_stats_logs():
+    # vllm_router.log.init_logger() sets propagate=False on this logger, so
+    # caplog (which only attaches to the root logger) would otherwise never
+    # see its records. Temporarily re-enable propagation for the test.
+    logger = logging.getLogger("vllm_router.stats.engine_stats")
+    original = logger.propagate
+    logger.propagate = True
+    yield
+    logger.propagate = original
+
 
 VLLM_SCRAPE = """
 # HELP vllm:num_requests_running Number of running requests
