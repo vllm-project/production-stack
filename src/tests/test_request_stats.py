@@ -41,6 +41,7 @@ def test_avg_latency_uses_the_supplied_completion_timestamp(monitor):
 
     stats = monitor.get_request_stats(current_time=101.5)
     assert stats[URL].avg_latency == pytest.approx(1.5)
+    assert stats[URL].avg_decoding_length == pytest.approx(1.3)
 
 
 def test_completed_request_is_dropped_from_per_request_maps(monitor):
@@ -59,3 +60,12 @@ def test_complete_without_start_does_not_raise(monitor):
     stats = monitor.get_request_stats(current_time=1.0)
     assert stats[URL].finished_requests == 1
     assert stats[URL].avg_latency == -1
+    assert stats[URL].avg_decoding_length == -1
+
+
+def test_complete_before_first_token_leaves_decoding_length_unset(monitor):
+    monitor.on_new_request(URL, "req-1", timestamp=10.0)
+    monitor.on_request_complete(URL, "req-1", timestamp=10.4)
+    stats = monitor.get_request_stats(current_time=10.4)
+    assert stats[URL].avg_latency == pytest.approx(0.4)
+    assert stats[URL].avg_decoding_length == -1
