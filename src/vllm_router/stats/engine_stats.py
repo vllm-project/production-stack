@@ -46,7 +46,7 @@ class EngineStats:
 
         Args:
             vllm_scrape (str): The vllm scrape string
-            url (str): The URL the scrape was fetched from, used only for
+            url (Optional[str]): The URL the scrape was fetched from, used only for
                 logging when no recognized metric names are found
 
         Returns:
