@@ -216,6 +216,11 @@ def initialize_all(app: FastAPI, args):
                 if args.static_model_labels
                 else None
             ),
+            healthcheck_disabled=(
+                parse_comma_separated_args(args.static_healthcheck_disabled)
+                if args.static_healthcheck_disabled
+                else None
+            ),
             static_backend_health_checks=args.static_backend_health_checks,
             static_backend_health_check_interval=args.static_backend_health_check_interval,
             static_backend_health_check_timeout_seconds=args.static_backend_health_check_timeout_seconds,

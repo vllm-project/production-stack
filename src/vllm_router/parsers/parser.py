@@ -179,6 +179,13 @@ def parse_args():
         help="The model labels of static backends, separated by commas. E.g., model1,model2",
     )
     parser.add_argument(
+        "--static-healthcheck-disabled",
+        type=str,
+        default=None,
+        help="Disable healthcheck per backend, separated by commas. E.g., true,false,true. "
+        "When set, backends with 'true' will be excluded from periodic health checks.",
+    )
+    parser.add_argument(
         "--static-backend-health-checks",
         action="store_true",
         help="Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.",
