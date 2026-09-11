@@ -234,7 +234,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
         decode_model_labels: List[str] | None = None,
     ):
         self.app = app
-        assert len(urls) == len(models), "URLs and models should have the same length"
+        self._validate_index_aligned_lists(urls, models, model_labels, model_types)
         self.urls = urls
         self.models = models
         self.aliases = aliases
@@ -251,24 +251,50 @@ class StaticServiceDiscovery(ServiceDiscovery):
         self.prefill_model_labels = prefill_model_labels
         self.decode_model_labels = decode_model_labels
 
+    @staticmethod
+    def _validate_index_aligned_lists(
+        urls: List[str],
+        models: List[str],
+        model_labels: List[str] | None,
+        model_types: List[str] | None,
+    ) -> None:
+        for list_name, values in (
+            ("models", models),
+            ("model_labels", model_labels),
+            ("model_types", model_types),
+        ):
+            if values is not None and len(urls) != len(values):
+                raise ValueError(
+                    f"urls ({len(urls)}) and {list_name} ({len(values)}) "
+                    "must have the same length"
+                )
+
     def get_unhealthy_endpoint_hashes(self) -> list[str]:
-        unhealthy_endpoints = []
         try:
-            for url, model, model_type in zip(
-                self.urls, self.models, self.model_types, strict=True
-            ):
-                if utils.is_model_healthy(
-                    url, model, model_type, self.health_check_timeout
-                ):
-                    logger.debug(f"{model} at {url} is healthy")
-                else:
-                    logger.warning(f"{model} at {url} not healthy!")
-                    unhealthy_endpoints.append(self.get_model_endpoint_hash(url, model))
-        except ValueError:
-            logger.error(
-                "To perform health check, each model has to define a static_model_type and at least one static_backend. "
-                "Skipping health checks for now."
+            self._validate_index_aligned_lists(
+                self.urls, self.models, self.model_labels, self.model_types
             )
+        except ValueError as error:
+            logger.error(f"Skipping health checks: {error}")
+            return []
+
+        if self.model_types is None:
+            logger.error(
+                "To perform health checks, each model must define a static model type."
+            )
+            return []
+
+        unhealthy_endpoints = []
+        for url, model, model_type in zip(
+            self.urls, self.models, self.model_types, strict=True
+        ):
+            if utils.is_model_healthy(
+                url, model, model_type, self.health_check_timeout
+            ):
+                logger.debug(f"{model} at {url} is healthy")
+            else:
+                logger.warning(f"{model} at {url} not healthy!")
+                unhealthy_endpoints.append(self.get_model_endpoint_hash(url, model))
         return unhealthy_endpoints
 
     async def check_model_health(self):

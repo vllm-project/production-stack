@@ -5,6 +5,51 @@ import pytest
 from vllm_router.service_discovery import StaticServiceDiscovery
 
 
+@pytest.mark.parametrize(
+    ("list_name", "models", "model_labels", "model_types"),
+    [
+        ("models", ["m-a"], ["label-a", "label-b"], ["chat", "chat"]),
+        ("model_labels", ["m-a", "m-b"], ["label-a"], ["chat", "chat"]),
+        ("model_types", ["m-a", "m-b"], ["label-a", "label-b"], ["chat"]),
+    ],
+)
+def test_init_when_index_aligned_list_lengths_differ_raises_value_error(
+    list_name: str,
+    models: list[str],
+    model_labels: list[str],
+    model_types: list[str],
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match=rf"urls \(2\) and {list_name} \(1\) must have the same length",
+    ):
+        StaticServiceDiscovery(
+            app=None,
+            urls=["http://127.0.0.1:1", "http://127.0.0.1:2"],
+            models=models,
+            model_labels=model_labels,
+            model_types=model_types,
+        )
+
+
+def test_get_unhealthy_endpoint_hashes_returns_no_partial_result_when_lengths_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    is_model_healthy_mock = MagicMock(return_value=False)
+    monkeypatch.setattr("vllm_router.utils.is_model_healthy", is_model_healthy_mock)
+    discovery_instance = StaticServiceDiscovery(
+        app=None,
+        urls=["http://127.0.0.1:1", "http://127.0.0.1:2"],
+        models=["m-a", "m-b"],
+        model_labels=["label-a", "label-b"],
+        model_types=["chat", "chat"],
+    )
+    discovery_instance.model_types.pop()
+
+    assert discovery_instance.get_unhealthy_endpoint_hashes() == []
+    is_model_healthy_mock.assert_not_called()
+
+
 def test_init_when_static_backend_health_checks_calls_start_health_checks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
