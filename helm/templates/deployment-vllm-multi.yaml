@@ -2,6 +2,7 @@
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- if ne $modelSpec.enabled false }}
 {{- if not (and (hasKey $modelSpec "raySpec") $modelSpec.raySpec.enabled) }}
+{{- $_ := include "chart.draCheck" $modelSpec -}}
 {{- $kv_role := "kv_both" }}
 {{- $kv_rank := 0 }}
 {{- $kv_parallel_size := 1 }}
@@ -58,6 +59,9 @@ spec:
     spec:
       {{- if $modelSpec.priorityClassName }}
       priorityClassName: {{ $modelSpec.priorityClassName | quote }}
+      {{- end }}
+      {{- if eq ($modelSpec.gpuAllocation | default "device-plugin") "dra" }}
+      {{- include "chart.draPodClaims" (dict "releaseName" .Release.Name "modelName" $modelSpec.name) | nindent 6 }}
       {{- end }}
       {{- if hasKey $modelSpec "initContainer" }}
       {{- $container := $modelSpec.initContainer }}
@@ -246,13 +250,14 @@ spec:
           {{- end }}
           {{- end}}
           {{- if $modelSpec.hf_token }}
-          - name: HF_TOKEN
             {{- if kindIs "string" $modelSpec.hf_token }}
+          - name: HF_TOKEN
             valueFrom:
               secretKeyRef:
                 name: {{ .Release.Name }}-secrets
                 key: hf_token_{{ $modelSpec.name }}
-            {{- else }}
+            {{- else if and $modelSpec.hf_token.secretName $modelSpec.hf_token.secretKey }}
+          - name: HF_TOKEN
             valueFrom:
               secretKeyRef:
                 name: {{ $modelSpec.hf_token.secretName }}
@@ -411,7 +416,7 @@ spec:
               containerPort: 9999
           {{- include "chart.probes" . | indent 10 }}
           {{- if $modelSpec.resources }}
-          resources: {{ toYaml $modelSpec.resources | nindent 12 }}
+          resources: {{- toYaml $modelSpec.resources | nindent 12 }}
           {{- else }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
           {{- end }}
@@ -538,6 +543,10 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       {{- end }}
+{{- if and (eq ($modelSpec.gpuAllocation | default "device-plugin") "dra") (not (and (hasKey $modelSpec "raySpec") $modelSpec.raySpec.enabled)) }}
+---
+{{ include "chart.draClaimTemplate" (dict "releaseName" .Release.Name "namespace" .Release.Namespace "modelName" $modelSpec.name "deviceClass" $modelSpec.deviceClass "gpuCount" $modelSpec.gpuCount) }}
+{{- end }}
 {{- if and $modelSpec.chatTemplate (hasKey $modelSpec "chatTemplateConfigMap") }}
 ---
 apiVersion: v1

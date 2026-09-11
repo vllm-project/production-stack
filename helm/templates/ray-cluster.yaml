@@ -2,6 +2,7 @@
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- if ne $modelSpec.enabled false }}
 {{- if and (hasKey $modelSpec "raySpec") $modelSpec.raySpec.enabled }}
+{{- $_ := include "chart.draCheck" $modelSpec -}}
 {{- with $ }}
 ---
 apiVersion: ray.io/v1
@@ -34,6 +35,13 @@ spec:
           {{- include "chart.engineLabels" . | nindent 10 }}
       spec:
         terminationGracePeriodSeconds: 0
+        {{- $headGpuCount := 0 -}}
+        {{- if and (hasKey $modelSpec "raySpec") (hasKey $modelSpec.raySpec "headNode") (hasKey $modelSpec.raySpec.headNode "gpuCount") -}}
+        {{- $headGpuCount = int $modelSpec.raySpec.headNode.gpuCount -}}
+        {{- end -}}
+        {{- if and (eq ($modelSpec.gpuAllocation | default "device-plugin") "dra") (gt $headGpuCount 0) }}
+        {{- include "chart.draPodClaims" (dict "releaseName" .Release.Name "modelName" (printf "%s-head" $modelSpec.name)) | nindent 8 }}
+        {{- end }}
         {{- if $modelSpec.serviceAccountName }}
         serviceAccountName: {{ $modelSpec.serviceAccountName }}
         {{- end }}
@@ -120,17 +128,18 @@ spec:
               {{- end}}
               {{- end}}
               {{- if $modelSpec.hf_token }}
-              - name: HF_TOKEN
                 {{- if kindIs "string" $modelSpec.hf_token }}
-                valueFrom:
-                  secretKeyRef:
-                    name: {{ .Release.Name }}-secrets
-                    key: hf_token_{{ $modelSpec.name }}
-                {{- else }}
-                valueFrom:
-                  secretKeyRef:
-                    name: {{ $modelSpec.hf_token.secretName }}
-                    key: {{ $modelSpec.hf_token.secretKey }}
+                - name: HF_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-secrets
+                      key: hf_token_{{ $modelSpec.name }}
+                {{- else if and $modelSpec.hf_token.secretName $modelSpec.hf_token.secretKey }}
+                - name: HF_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $modelSpec.hf_token.secretName }}
+                      key: {{ $modelSpec.hf_token.secretKey }}
                 {{- end }}
               {{- end }}
               {{- if and (kindIs "string" $.Values.servingEngineSpec.vllmApiKey) $.Values.servingEngineSpec.vllmApiKey }}
@@ -220,10 +229,10 @@ spec:
             livenessProbe:
               exec:
                 command: ["/bin/bash", "-c", "echo TBD"]
-            {{- if $modelSpec.raySpec.headNode.resources }}
-            resources: {{ toYaml $modelSpec.raySpec.headNode.resources | nindent 14 }}
+            {{- if and (hasKey $modelSpec.raySpec.headNode "resources") $modelSpec.raySpec.headNode.resources }}
+            resources: {{- toYaml $modelSpec.raySpec.headNode.resources | nindent 14 }}
             {{- else }}
-            resources: {{- include "chart.resources" $modelSpec.raySpec.headNode | nindent 14 }}
+            resources: {{- include "chart.resources" (include "chart.rayHeadMerged" $modelSpec | fromYaml) | nindent 14 }}
             {{- end }}
             startupProbe:
               exec:
@@ -344,6 +353,9 @@ spec:
             helm-release-name: {{ .Release.Name }}
             {{- include "chart.engineLabels" . | nindent 12 }}
         spec:
+          {{- if eq ($modelSpec.gpuAllocation | default "device-plugin") "dra" }}
+          {{- include "chart.draPodClaims" (dict "releaseName" .Release.Name "modelName" $modelSpec.name) | nindent 10 }}
+          {{- end }}
           {{- if $modelSpec.serviceAccountName }}
           serviceAccountName: {{ $modelSpec.serviceAccountName }}
           {{- end }}
@@ -421,17 +433,18 @@ spec:
                 {{- end}}
                 {{- end}}
                 {{- if $modelSpec.hf_token }}
-                - name: HF_TOKEN
                   {{- if kindIs "string" $modelSpec.hf_token }}
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ .Release.Name }}-secrets
-                      key: hf_token_{{ $modelSpec.name }}
-                  {{- else }}
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $modelSpec.hf_token.secretName }}
-                      key: {{ $modelSpec.hf_token.secretKey }}
+                  - name: HF_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: {{ .Release.Name }}-secrets
+                        key: hf_token_{{ $modelSpec.name }}
+                  {{- else if and $modelSpec.hf_token.secretName $modelSpec.hf_token.secretKey }}
+                  - name: HF_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: {{ $modelSpec.hf_token.secretName }}
+                        key: {{ $modelSpec.hf_token.secretKey }}
                   {{- end }}
                 {{- end }}
                 {{- if and (kindIs "string" $.Values.servingEngineSpec.vllmApiKey) $.Values.servingEngineSpec.vllmApiKey }}
@@ -615,6 +628,19 @@ spec:
                 {{- toYaml . | nindent 16 }}
                 {{- end }}
           {{- end }}
+{{- if eq ($modelSpec.gpuAllocation | default "device-plugin") "dra" }}
+---
+{{ include "chart.draClaimTemplate" (dict "releaseName" .Release.Name "namespace" .Release.Namespace "modelName" $modelSpec.name "deviceClass" $modelSpec.deviceClass "gpuCount" $modelSpec.gpuCount) }}
+{{- $headGpuCount := 0 -}}
+{{- if and (hasKey $modelSpec "raySpec") (hasKey $modelSpec.raySpec "headNode") (hasKey $modelSpec.raySpec.headNode "gpuCount") -}}
+{{- $headGpuCount = int $modelSpec.raySpec.headNode.gpuCount -}}
+{{- end -}}
+{{- if gt $headGpuCount 0 }}
+---
+{{- $headDeviceClass := default ($modelSpec.deviceClass | default "gpu.nvidia.com") $modelSpec.raySpec.headNode.deviceClass -}}
+{{ include "chart.draClaimTemplate" (dict "releaseName" .Release.Name "namespace" .Release.Namespace "modelName" (printf "%s-head" $modelSpec.name) "deviceClass" $headDeviceClass "gpuCount" $modelSpec.raySpec.headNode.gpuCount) }}
+{{- end }}
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
