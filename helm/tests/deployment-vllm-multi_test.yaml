@@ -451,4 +451,3 @@ tests:
       notContains:
         path: spec.template.spec.containers[0].command
         content: "serve"
-
