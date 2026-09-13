@@ -115,6 +115,39 @@ class RoutingInterface(metaclass=SingletonABCMeta):
                 ret = url
         return ret
 
+    def _least_inflight_routing(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Optional[Dict[str, EngineStats]],
+    ) -> Optional[str]:
+        """
+        Pick an endpoint by instantaneous engine saturation
+        (running + queuing requests).
+
+        Unlike windowed QPS, this reflects what each backend is doing right
+        now. Returns None when engine_stats are missing for any endpoint so
+        the caller can fall back to another signal (typically QPS).
+
+        Among backends within +1 of the minimum load, choose uniformly at
+        random. Engine stats refresh on the scrape interval, so a burst
+        inside one window would otherwise dogpile whichever URL sorts first.
+        """
+        if not endpoints or not engine_stats:
+            return None
+
+        loads: Dict[str, int] = {}
+        for info in endpoints:
+            stats = engine_stats.get(info.url)
+            if stats is None:
+                return None
+            loads[info.url] = int(stats.num_running_requests) + int(
+                stats.num_queuing_requests
+            )
+
+        min_load = min(loads.values())
+        near_tied = [url for url, load in loads.items() if load <= min_load + 1]
+        return random.choice(near_tied)
+
     def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
         """
         Update the hash ring with the current list of endpoints.
@@ -833,12 +866,16 @@ class PrefixAwareRouter(RoutingInterface):
         )
 
         if match_length < self.prefix_min_match_length:
-            # Fall back to QPS routing, but still record the prompt in the
-            # trie. Without this, a router configured with
-            # prefix_min_match_length > 0 starts with an empty trie, every
-            # request matches below the threshold, nothing is ever inserted,
-            # and prefix affinity never activates.
-            selected_endpoint = self._qps_routing(endpoints, request_stats)
+            # sub-threshold: no useful prefix affinity yet. prefer
+            # least-inflight from engine_stats (instantaneous saturation)
+            # over windowed qps. qps under-counts backends mid long-running
+            # session, and the trie insert below would latch that bad pick
+            # for the whole session (positive feedback / starvation).
+            # fall back to qps only when engine stats are unavailable.
+            # still seed the trie (#990) so later turns can pin.
+            selected_endpoint = self._least_inflight_routing(
+                endpoints, engine_stats
+            ) or self._qps_routing(endpoints, request_stats)
             if selected_endpoint is not None:
                 await self.hashtrie.insert(prompt, selected_endpoint)
             return selected_endpoint
