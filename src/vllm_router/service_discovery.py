@@ -254,12 +254,19 @@ class StaticServiceDiscovery(ServiceDiscovery):
     @staticmethod
     def _validate_index_aligned_lists(
         urls: List[str],
-        models: List[str],
+        models: List[str] | None,
         model_labels: List[str] | None,
         model_types: List[str] | None,
     ) -> None:
+        if models is None:
+            raise ValueError("models must be provided")
+        if len(urls) != len(models):
+            raise ValueError(
+                f"urls ({len(urls)}) and models ({len(models)}) "
+                "must have the same length"
+            )
+
         for list_name, values in (
-            ("models", models),
             ("model_labels", model_labels),
             ("model_types", model_types),
         ):
@@ -275,8 +282,14 @@ class StaticServiceDiscovery(ServiceDiscovery):
                 self.urls, self.models, self.model_labels, self.model_types
             )
         except ValueError as error:
-            logger.error(f"Skipping health checks: {error}")
-            return []
+            logger.error(
+                f"Skipping health checks and marking all endpoints unhealthy: {error}"
+            )
+            # Quarantine every URL/model pair that get_endpoint_info could expose.
+            return [
+                self.get_model_endpoint_hash(url, model)
+                for url, model in zip(self.urls, self.models)
+            ]
 
         if self.model_types is None:
             logger.error(

@@ -32,7 +32,16 @@ def test_init_when_index_aligned_list_lengths_differ_raises_value_error(
         )
 
 
-def test_get_unhealthy_endpoint_hashes_returns_no_partial_result_when_lengths_change(
+def test_init_when_models_are_missing_raises_value_error() -> None:
+    with pytest.raises(ValueError, match="models must be provided"):
+        StaticServiceDiscovery(
+            app=None,
+            urls=["http://127.0.0.1:1"],
+            models=None,
+        )
+
+
+def test_get_unhealthy_endpoint_hashes_marks_all_endpoints_unhealthy_when_lengths_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     is_model_healthy_mock = MagicMock(return_value=False)
@@ -46,7 +55,15 @@ def test_get_unhealthy_endpoint_hashes_returns_no_partial_result_when_lengths_ch
     )
     discovery_instance.model_types.pop()
 
-    assert discovery_instance.get_unhealthy_endpoint_hashes() == []
+    discovery_instance.unhealthy_endpoint_hashes = (
+        discovery_instance.get_unhealthy_endpoint_hashes()
+    )
+
+    assert discovery_instance.unhealthy_endpoint_hashes == [
+        discovery_instance.get_model_endpoint_hash("http://127.0.0.1:1", "m-a"),
+        discovery_instance.get_model_endpoint_hash("http://127.0.0.1:2", "m-b"),
+    ]
+    assert discovery_instance.get_endpoint_info() == []
     is_model_healthy_mock.assert_not_called()
 
 
