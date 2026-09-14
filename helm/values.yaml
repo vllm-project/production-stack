@@ -61,8 +61,14 @@ servingEngineSpec:
     requestCPU: 6
     # -- The amount of memory requested for the model
     requestMemory: "16Gi"
-    # -- The number of GPUs requested for the model
+    # -- The number of GPUs requested for the model. Must be 0 or omitted when gpuAllocation is "dra".
     requestGPU: 1 # @schema type:[integer, number, string]
+    # -- GPU allocation mechanism. "device-plugin" uses legacy nvidia.com/gpu counts. "dra" uses Kubernetes Dynamic Resource Allocation: the chart emits a pod-level resourceClaimTemplates block (v1 GA schema) and a resources.claims entry, and drops all nvidia.com/gpu counts. Requires the DRA feature gates on the cluster and an NVIDIA DRA driver publishing the gpu.nvidia.com DeviceClass (e.g. the nvidia-dra-driver-gpu chart with computeDomains.enabled=false). The legacy device plugin must be disabled; the two cannot run simultaneously.
+    gpuAllocation: "device-plugin" # @schema enum:[device-plugin,dra]
+    # -- DeviceClass name referenced by the claim when gpuAllocation is "dra"
+    deviceClass: "gpu.nvidia.com"
+    # -- Number of GPUs to claim per pod when gpuAllocation is "dra". Values above 1 render a count in the claim request so one pod holds multiple devices; with tensor parallelism this must match tensorParallelSize.
+    gpuCount: 1 # @schema type:[integer, number, string];minimum:1
     # -- The type of GPU requested. If not specified, defaults to "nvidia.com/gpu"
     requestGPUType: "nvidia.com/mig-4g.71gb"
     # -- Requires HAMi. The amount of GPU memory requested. Each unit equals to 1M. https://project-hami.io/docs/userguide/NVIDIA-device/specify-device-memory-usage
@@ -278,8 +284,12 @@ servingEngineSpec:
         requestCPU: 1
         # -- Memory request for the head node
         requestMemory: "1Gi"
-        # -- GPU request for the head node
+        # -- GPU request for the head node. Must be 0 or omitted when the model uses gpuAllocation "dra".
         requestGPU: 1
+        # -- Override the model-level deviceClass for the head node's DRA claim (gpuAllocation "dra" only)
+        # deviceClass: "gpu.nvidia.com"
+        # -- GPUs to claim for the head node when gpuAllocation is "dra". Defaults to 0 (no GPU claims). Set to 1+ if the head node requires GPUs.
+        # gpuCount: 1
         # -- Raw Kubernetes resources block for the head node container. When set, overrides the request*/limit* fields above.
         # resources:
         #   requests:
