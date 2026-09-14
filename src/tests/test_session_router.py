@@ -49,6 +49,41 @@ async def test_route_request_with_session_id():
 
 
 @pytest.mark.asyncio
+async def test_session_decision_metadata_distinguishes_affinity_and_fallback():
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+    request_stats = {
+        "http://engine1.com": RequestStats(qps=10),
+        "http://engine2.com": RequestStats(qps=5),
+    }
+    router = SessionRouter(session_key="session_id")
+
+    affinity = await router.route_request(
+        endpoints,
+        None,
+        request_stats,
+        Request(headers={"session_id": "abc123"}),
+        {},
+    )
+    fallback = await router.route_request(
+        endpoints, None, request_stats, Request(headers={}), {}
+    )
+
+    assert (affinity.algorithm, affinity.decision, affinity.reason) == (
+        "session",
+        "primary",
+        "session_affinity",
+    )
+    assert (fallback.algorithm, fallback.decision, fallback.reason) == (
+        "session",
+        "fallback",
+        "missing_session",
+    )
+
+
+@pytest.mark.asyncio
 async def test_route_request_without_session_id():
     """
     Test routing when no session ID is present in the request headers.

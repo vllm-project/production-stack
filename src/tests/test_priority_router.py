@@ -90,6 +90,11 @@ async def test_high_priority_request_selects_least_loaded_engine():
     )
 
     assert url == "http://engine2.com"
+    assert (url.algorithm, url.decision, url.reason) == (
+        "priority",
+        "primary",
+        "priority",
+    )
     # Priority must be injected back into the forwarded body.
     assert request_json["priority"] == -1
 
@@ -124,6 +129,11 @@ async def test_default_priority_is_not_treated_as_high_priority():
     )
 
     assert url == "http://engine1.com"
+    assert (url.algorithm, url.decision, url.reason) == (
+        "priority",
+        "fallback",
+        "round_robin",
+    )
 
 
 @pytest.mark.asyncio
