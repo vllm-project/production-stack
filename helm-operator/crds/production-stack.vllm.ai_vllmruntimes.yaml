@@ -1,0 +1,601 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: vllmruntimes.production-stack.vllm.ai
+spec:
+  group: production-stack.vllm.ai
+  names:
+    kind: VLLMRuntime
+    listKind: VLLMRuntimeList
+    plural: vllmruntimes
+    shortNames:
+    - vr
+    singular: vllmruntime
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: VLLMRuntime is the Schema for the vllmruntimes API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: VLLMRuntimeSpec defines the desired state of VLLMRuntime
+            properties:
+              autoscalingConfig:
+                description: Autoscaling configuration
+                properties:
+                  enabled:
+                    description: Enabled enables autoscaling
+                    type: boolean
+                  maxReplicas:
+                    description: MaxReplicas is the maximum number of replicas
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  minReplicas:
+                    default: 1
+                    description: MinReplicas is the minimum number of replicas (defaults
+                      to 1, set to 0 to enable scale-to-zero)
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  pollingInterval:
+                    default: 15
+                    description: PollingInterval is how often KEDA checks metrics
+                      (seconds)
+                    format: int32
+                    type: integer
+                  scaleDownPolicy:
+                    description: ScaleDownPolicy defines the scaling behavior when
+                      scaling down
+                    properties:
+                      periodSeconds:
+                        default: 60
+                        description: PeriodSeconds is the period for the scale down
+                          policy
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      podValue:
+                        default: 1
+                        description: PodValue is the max pods to remove per period
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      scaleToZeroDelaySeconds:
+                        default: 1800
+                        description: |-
+                          ScaleToZeroDelaySeconds is the wait time before scaling to zero (seconds).
+                          Only applicable when minReplicas is set to 0.
+                        format: int32
+                        type: integer
+                      stabilizationWindowSeconds:
+                        default: 300
+                        description: StabilizationWindowSeconds is the HPA stabilization
+                          window for scaling down
+                        format: int32
+                        type: integer
+                    type: object
+                  scaleUpPolicy:
+                    description: ScaleUpPolicy defines the scaling behavior when scaling
+                      up
+                    properties:
+                      periodSeconds:
+                        default: 60
+                        description: PeriodSeconds is the period for the scale up
+                          policy
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      podValue:
+                        default: 1
+                        description: PodValue is the max pods to add per period
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      stabilizationWindowSeconds:
+                        default: 0
+                        description: StabilizationWindowSeconds is the HPA stabilization
+                          window for scaling up
+                        format: int32
+                        type: integer
+                    type: object
+                  triggers:
+                    description: Triggers defines the metric thresholds for autoscaling
+                    properties:
+                      generationTokensThreshold:
+                        default: 100
+                        description: GenerationTokensThreshold is the per-pod generation
+                          tokens/s threshold for scaling
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      prometheusAddress:
+                        default: http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090
+                        description: PrometheusAddress is the Prometheus server address
+                          for metric queries
+                        type: string
+                      promptTokensThreshold:
+                        default: 100
+                        description: PromptTokensThreshold is the per-pod prompt tokens/s
+                          threshold for scaling
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      requestsRunningThreshold:
+                        default: 5
+                        description: RequestsRunningThreshold is the per-pod concurrent
+                          requests threshold for scaling
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    type: object
+                required:
+                - maxReplicas
+                type: object
+              deploymentConfig:
+                description: Deployment configuration
+                properties:
+                  deploymentStrategy:
+                    default: RollingUpdate
+                    description: Deploy strategy
+                    enum:
+                    - RollingUpdate
+                    - Recreate
+                    type: string
+                  image:
+                    description: Image configuration
+                    properties:
+                      name:
+                        type: string
+                      pullPolicy:
+                        type: string
+                      pullSecretName:
+                        type: string
+                      registry:
+                        type: string
+                    required:
+                    - name
+                    - registry
+                    type: object
+                  nodeSelectorTerms:
+                    description: Node selector
+                    items:
+                      description: |-
+                        A null or empty node selector term matches no objects. The requirements of
+                        them are ANDed.
+                        The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
+                      properties:
+                        matchExpressions:
+                          description: A list of node selector requirements by node's
+                            labels.
+                          items:
+                            description: |-
+                              A node selector requirement is a selector that contains values, a key, and an operator
+                              that relates the key and values.
+                            properties:
+                              key:
+                                description: The label key that the selector applies
+                                  to.
+                                type: string
+                              operator:
+                                description: |-
+                                  Represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                type: string
+                              values:
+                                description: |-
+                                  An array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. If the operator is Gt or Lt, the values
+                                  array must have a single element, which will be interpreted as an integer.
+                                  This array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchFields:
+                          description: A list of node selector requirements by node's
+                            fields.
+                          items:
+                            description: |-
+                              A node selector requirement is a selector that contains values, a key, and an operator
+                              that relates the key and values.
+                            properties:
+                              key:
+                                description: The label key that the selector applies
+                                  to.
+                                type: string
+                              operator:
+                                description: |-
+                                  Represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.
+                                type: string
+                              values:
+                                description: |-
+                                  An array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. If the operator is Gt or Lt, the values
+                                  array must have a single element, which will be interpreted as an integer.
+                                  This array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    type: array
+                  podAnnotations:
+                    additionalProperties:
+                      type: string
+                    description: Pod annotations
+                    type: object
+                  replicas:
+                    default: 1
+                    description: Replicas
+                    format: int32
+                    type: integer
+                  resources:
+                    description: Resource requirements
+                    properties:
+                      cpu:
+                        type: string
+                      gpu:
+                        type: string
+                      gpuType:
+                        type: string
+                      memory:
+                        type: string
+                    type: object
+                  runtimeClass:
+                    default: nvidia
+                    description: RuntimeClass
+                    type: string
+                  shmSize:
+                    description: |-
+                      ShmSize, when set, mounts an emptyDir with medium=Memory at /dev/shm
+                      sized to this value (e.g. "24Gi"). Tensor parallelism uses shared
+                      memory for inter-process communication and the container default
+                      /dev/shm (typically 64Mi) is too small. Accepts any Kubernetes quantity.
+                    type: string
+                  sidecarConfig:
+                    description: Sidecar configuration
+                    properties:
+                      args:
+                        description: Arguments for the sidecar container
+                        items:
+                          type: string
+                        type: array
+                      command:
+                        description: Command to run in the sidecar container
+                        items:
+                          type: string
+                        type: array
+                      enabled:
+                        default: false
+                        description: Enabled enables the sidecar container
+                        type: boolean
+                      env:
+                        description: Environment variables for the sidecar container
+                        items:
+                          description: EnvVar represents an environment variable
+                          properties:
+                            name:
+                              type: string
+                            value:
+                              type: string
+                          required:
+                          - name
+                          - value
+                          type: object
+                        type: array
+                      image:
+                        description: Image configuration for the sidecar
+                        properties:
+                          name:
+                            type: string
+                          pullPolicy:
+                            type: string
+                          pullSecretName:
+                            type: string
+                          registry:
+                            type: string
+                        required:
+                        - name
+                        - registry
+                        type: object
+                      mountPath:
+                        default: /data
+                        description: MountPath is the path where the shared volume
+                          will be mounted in the sidecar
+                        type: string
+                      name:
+                        default: sidecar
+                        description: Name is the name of the sidecar container
+                        type: string
+                      resources:
+                        description: Resource requirements for the sidecar container
+                        properties:
+                          cpu:
+                            type: string
+                          gpu:
+                            type: string
+                          gpuType:
+                            type: string
+                          memory:
+                            type: string
+                        type: object
+                    required:
+                    - image
+                    type: object
+                  toleration:
+                    description: Toleration
+                    items:
+                      description: |-
+                        The pod this Toleration is attached to tolerates any taint that matches
+                        the triple <key,value,effect> using the matching operator <operator>.
+                      properties:
+                        effect:
+                          description: |-
+                            Effect indicates the taint effect to match. Empty means match all taint effects.
+                            When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                          type: string
+                        key:
+                          description: |-
+                            Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                            If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                          type: string
+                        operator:
+                          description: |-
+                            Operator represents a key's relationship to the value.
+                            Valid operators are Exists and Equal. Defaults to Equal.
+                            Exists is equivalent to wildcard for value, so that a pod can
+                            tolerate all taints of a particular category.
+                          type: string
+                        tolerationSeconds:
+                          description: |-
+                            TolerationSeconds represents the period of time the toleration (which must be
+                            of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                            it is not set, which means tolerate the taint forever (do not evict). Zero and
+                            negative values will be treated as 0 (evict immediately) by the system.
+                          format: int64
+                          type: integer
+                        value:
+                          description: |-
+                            Value is the taint value the toleration matches to.
+                            If the operator is Exists, the value should be empty, otherwise just a regular string.
+                          type: string
+                      type: object
+                    type: array
+                required:
+                - image
+                - resources
+                type: object
+              lmCacheConfig:
+                description: LM Cache configuration
+                properties:
+                  cpuOffloadingBufferSize:
+                    default: 4Gi
+                    description: CPUOffloadingBufferSize is the size of the CPU offloading
+                      buffer
+                    type: string
+                  diskOffloadingBufferSize:
+                    default: 8Gi
+                    description: DiskOffloadingBufferSize is the size of the disk
+                      offloading buffer
+                    type: string
+                  enabled:
+                    default: false
+                    description: Enabled enables LM Cache
+                    type: boolean
+                  remoteSerde:
+                    description: RemoteSerde is the serialization format for the remote
+                      cache
+                    type: string
+                  remoteUrl:
+                    description: RemoteURL is the URL of the remote cache server
+                    type: string
+                type: object
+              model:
+                description: Model configuration
+                properties:
+                  chatTemplate:
+                    description: Chat template
+                    type: string
+                  dtype:
+                    description: Data type
+                    type: string
+                  enableLoRA:
+                    description: Enable LoRA
+                    type: boolean
+                  enableTool:
+                    description: Enable tool
+                    type: boolean
+                  hfTokenSecret:
+                    description: HuggingFace token secret
+                    properties:
+                      hfTokenKeyName:
+                        default: token
+                        description: HuggingFace token key name in the secret
+                        type: string
+                      hfTokenSecretName:
+                        description: HuggingFace token secret name
+                        type: string
+                    type: object
+                  maxModelLen:
+                    description: Maximum model length
+                    format: int32
+                    type: integer
+                  maxNumSeqs:
+                    description: Maximum number of sequences
+                    format: int32
+                    type: integer
+                  modelURL:
+                    description: Model URL
+                    type: string
+                  toolCallParser:
+                    description: Tool call parser
+                    type: string
+                required:
+                - modelURL
+                type: object
+              storageConfig:
+                description: Storage configuration
+                properties:
+                  accessMode:
+                    default: ReadWriteMany
+                    description: AccessMode is the access mode for the persistent
+                      volume claim
+                    enum:
+                    - ReadWriteOnce
+                    - ReadOnlyMany
+                    - ReadWriteMany
+                    type: string
+                  enabled:
+                    default: false
+                    description: Enabled enables persistent storage
+                    type: boolean
+                  mountPath:
+                    default: /data
+                    description: MountPath is the path where the volume will be mounted
+                      in the container
+                    type: string
+                  size:
+                    default: 10Gi
+                    description: Size is the size of the persistent volume claim
+                    type: string
+                  storageClassName:
+                    description: StorageClassName is the name of the storage class
+                      to use
+                    type: string
+                  volumeName:
+                    default: pvc-storage
+                    description: VolumeName is the name of the volume (optional, will
+                      be auto-generated if not specified)
+                    type: string
+                type: object
+              vllmConfig:
+                description: vLLM server configuration
+                properties:
+                  enableChunkedPrefill:
+                    description: Enable chunked prefill
+                    type: boolean
+                  enablePrefixCaching:
+                    description: Enable prefix caching
+                    type: boolean
+                  env:
+                    description: Environment variables
+                    items:
+                      description: EnvVar represents an environment variable
+                      properties:
+                        name:
+                          type: string
+                        value:
+                          type: string
+                      required:
+                      - name
+                      - value
+                      type: object
+                    type: array
+                  extraArgs:
+                    description: Extra arguments for vllm serve
+                    items:
+                      type: string
+                    type: array
+                  gpuMemoryUtilization:
+                    description: GPU memory utilization
+                    type: string
+                  maxLoras:
+                    description: Maximum number of LoRAs
+                    format: int32
+                    type: integer
+                  port:
+                    default: 8000
+                    description: Port for vLLM server
+                    format: int32
+                    type: integer
+                  tensorParallelSize:
+                    description: Tensor parallel size
+                    format: int32
+                    type: integer
+                  v1:
+                    description: Use V1 API
+                    type: boolean
+                type: object
+            required:
+            - deploymentConfig
+            - model
+            - vllmConfig
+            type: object
+          status:
+            description: VLLMRuntimeStatus defines the observed state of VLLMRuntime
+            properties:
+              availableReplicas:
+                description: Number of pods that are ready and serving traffic
+                format: int32
+                type: integer
+              lastUpdated:
+                description: Last updated timestamp
+                format: date-time
+                type: string
+              modelStatus:
+                description: Model status
+                type: string
+              replicas:
+                description: Current replica count (used by scale subresource)
+                format: int32
+                type: integer
+              selector:
+                description: Label selector for pods (used by scale subresource for
+                  HPA AverageValue)
+                type: string
+              unavailableReplicas:
+                description: Number of pods that are not yet available
+                format: int32
+                type: integer
+              updatedReplicas:
+                description: Number of pods running the latest pod template
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      scale:
+        labelSelectorPath: .status.selector
+        specReplicasPath: .spec.deploymentConfig.replicas
+        statusReplicasPath: .status.replicas
+      status: {}

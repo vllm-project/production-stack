@@ -1,0 +1,92 @@
+suite: test operator servicemonitor
+templates:
+  - servicemonitor-operator.yaml
+tests:
+  - it: should not render a ServiceMonitor by default
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render a ServiceMonitor when only serviceMonitor is enabled without metrics
+    release:
+      name: vllm
+      namespace: default
+    set:
+      metrics:
+        serviceMonitor:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render a ServiceMonitor when metrics and serviceMonitor are enabled
+    release:
+      name: vllm
+      namespace: default
+    set:
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+    asserts:
+      - containsDocument:
+          kind: ServiceMonitor
+          apiVersion: monitoring.coreos.com/v1
+          name: vllm-vllm-stack-operator-servicemonitor
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 30s
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: vllm
+      - equal:
+          path: metadata.labels.release
+          value: kube-prometheus-stack
+
+  - it: should allow overriding the release label and scrape settings
+    release:
+      name: vllm
+      namespace: default
+    set:
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          additionalLabels:
+            release: my-kps
+          interval: 60s
+          scrapeTimeout: 20s
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: my-kps
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 60s
+      - equal:
+          path: spec.endpoints[0].scrapeTimeout
+          value: 20s
+
+  - it: should pass through metric relabelings
+    release:
+      name: vllm
+      namespace: default
+    set:
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          metricRelabelings:
+            - action: drop
+              regex: go_.*
+              sourceLabels: [__name__]
+    asserts:
+      - equal:
+          path: spec.endpoints[0].metricRelabelings[0].action
+          value: drop

@@ -1,0 +1,346 @@
+# -- Default values for the vllm-stack-operator chart.
+# -- Installing this chart deploys the production-stack operator together with its CRDs
+# -- (VLLMRuntime, VLLMRouter, CacheServer, LoraAdapter) into the release namespace.
+
+# -- Number of operator replicas. Leader election allows more than one.
+replicaCount: 1
+
+# -- Operator image configuration
+image:
+  # -- Docker image repository
+  repository: "lmcache/production-stack-operator"
+  # -- Docker image tag. Pin it to a release tag or commit SHA for production use
+  # -- (the shipped operator images are tagged with the commit SHA and `latest`).
+  tag: "latest"
+  # -- Image pull policy. Use `Always` when tracking a floating tag such as
+  # -- `latest`; `IfNotPresent` pairs well with a pinned tag.
+  pullPolicy: "IfNotPresent"
+
+# -- Name of existing image pull secrets
+imagePullSecrets: []
+
+# -- Override the chart name
+nameOverride: ""
+# -- Override the full resource names
+fullnameOverride: ""
+
+# -- Create a dedicated service account for the operator
+serviceAccount:
+  # -- Whether to create the service account
+  create: true
+  # -- Annotations to add to the service account
+  annotations: {}
+  # -- The name of the service account to use. If not set and create is true, a name is generated.
+  name: ""
+
+# -- Create the ClusterRole, Role and their bindings required by the operator
+rbac:
+  create: true
+
+# -- Leader election configuration
+leaderElection:
+  # -- Enable leader election before acting as the controller. Required when replicaCount > 1.
+  enabled: true
+
+# -- Operator metrics configuration
+metrics:
+  # -- Expose the controller manager metrics endpoint
+  enabled: false
+  service:
+    # -- Port used by the metrics service and the --metrics-bind-address flag
+    port: 8443
+  # NOTE: the endpoint is served over plain HTTP (--metrics-secure=false) so that
+  # Prometheus can scrape it without API server authentication and authorization.
+
+  # -- ServiceMonitor for Prometheus Operator auto-discovery.
+  # -- PREREQUISITE: kube-prometheus-stack (or any chart shipping the
+  # -- prometheus-operator CRDs) must be installed in the cluster. The monitor
+  # -- carries the `release: kube-prometheus-stack` label by default so a
+  # -- kube-prometheus-stack release installed under that name picks it up
+  # -- automatically; change it if your release name differs.
+  # -- Requires metrics.enabled=true (the monitor selects the metrics Service).
+  serviceMonitor:
+    # -- Create a ServiceMonitor resource for the operator metrics service
+    enabled: false
+    # -- Labels to match the Prometheus object's serviceMonitorSelector. The
+    # -- default `release: kube-prometheus-stack` matches a kube-prometheus-stack
+    # -- release installed under that name (the usual default); change `release`
+    # -- to your release name if different.
+    additionalLabels:
+      release: kube-prometheus-stack
+    # -- Interval to scrape metrics
+    interval: 30s
+    # -- Timeout if metrics can't be retrieved in given time interval
+    scrapeTimeout: 10s
+    # -- Honor the metrics endpoints' labels
+    honorLabels: false
+    # -- Metric relabel configurations
+    metricRelabelings: []
+    # -- Relabel configurations
+    relabelings: []
+
+# @schema skipProperties:true
+# -- Operator resources. Defaults mirror operator/config/manager.
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+# -- Deployment annotations
+annotations: {}
+
+# -- Pod annotations
+podAnnotations: {}
+
+# -- Pod labels
+podLabels: {}
+
+# -- Node selector
+nodeSelector: {}
+
+# -- Affinity
+affinity: {}
+
+# -- Tolerations
+tolerations: []
+
+# -- NetworkPolicy restricting access to the operator metrics endpoint.
+# -- Mirrors operator/config/network-policy/allow-metrics-traffic.yaml: only
+# -- pods in namespaces labeled `metrics: enabled` may scrape the metrics port.
+# -- Enable together with metrics.enabled. Requires a CNI enforcing
+# -- NetworkPolicies (Calico, Cilium, ...).
+networkPolicy:
+  # -- Create the metrics NetworkPolicy
+  enabled: false
+  # -- Namespace label that grants scraping access
+  metricsNamespaceSelector:
+    matchLabels:
+      metrics: enabled
+
+# -- Extra environment variables, e.g. `{name: TZ, value: UTC}`
+extraEnv: []
+
+# -- Extra arguments passed to the manager binary,
+# -- e.g. `["--zap-log-level=debug"]`
+extraArgs: []
+
+# -- Default VLLMRuntimeSpec merged (deep, maps only — lists are replaced)
+# -- into every vllmRuntimes entry below. Define the shared configuration here
+# -- and only the per-model differences in each entry.
+vllmRuntimeDefaults:
+    model:
+      modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+      enableLoRA: true
+      enableTool: false
+      toolCallParser: ""
+      maxModelLen: 4096
+      dtype: "bfloat16"
+      maxNumSeqs: 32
+      # -- HuggingFace token secret (optional), e.g.
+      #   hfTokenSecret:
+      #     hfTokenSecretName: "huggingface-token"
+      #     hfTokenKeyName: "token"
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      tensorParallelSize: 1
+      gpuMemoryUtilization: "0.8"
+      maxLoras: 4
+      v1: true
+      port: 8000
+      env:
+        - name: HF_HOME
+          value: "/data"
+    lmCacheConfig:
+      enabled: false
+      cpuOffloadingBufferSize: "15"
+      diskOffloadingBufferSize: "0"
+      # -- Point at the CacheServer service when cacheServer.enabled is true, e.g.
+      #   remoteUrl: "lm://<fullname>-cacheserver.<namespace>.svc.cluster.local:80"
+      remoteSerde: "naive"
+    deploymentConfig:
+      resources:
+        cpu: "5"
+        memory: "32Gi"
+        gpu: "1"
+        gpuType: "nvidia.com/gpu"
+      image:
+        registry: "docker.io"
+        name: "lmcache/vllm-openai:2025-05-27-v1"
+        pullPolicy: "IfNotPresent"
+        pullSecretName: ""
+      replicas: 1
+      deploymentStrategy: "Recreate"
+      sidecarConfig:
+        enabled: true
+        name: "sidecar"
+        image:
+          registry: "docker.io"
+          name: "lmcache/lmstack-sidecar:latest"
+          pullPolicy: "Always"
+        resources:
+          cpu: "0.5"
+          memory: "128Mi"
+        mountPath: "/data"
+    # @schema skipProperties:true
+    # -- Shared storage. The operator creates ONE PVC (named after the CR) and
+    # -- mounts it at mountPath in EVERY engine pod, so replicas share model
+    # -- weights and the HF cache instead of re-downloading.
+    # -- IMPORTANT: with accessMode ReadWriteMany the StorageClass MUST support
+    # -- RWX (NFS, CephFS, JuiceFS, AWS EFS, GCP Filestore, Azure Files,
+    # -- Longhorn, ...). The cluster DEFAULT StorageClass is often RWO-only
+    # -- (local-path, gp2/gp3, pd-standard, ...) — replicas scheduled across
+    # -- nodes then fail with Multi-Attach errors. Either point
+    # -- storageClassName at an RWX-capable class, keep replicas on one node,
+    # -- or set storageConfig.enabled=false.
+    storageConfig:
+      enabled: true
+      # -- StorageClass for the shared PVC. Empty = cluster default class
+      # -- (verify it supports ReadWriteMany before scaling past one node).
+      storageClassName: ""
+      size: "10Gi"
+      accessMode: "ReadWriteMany"
+      mountPath: "/data"
+
+    # -- Autoscaling (KEDA). DISABLED BY DEFAULT.
+    # -- PREREQUISITE: KEDA must be installed in the cluster
+    # -- (https://keda.works/docs/deploy/) before enabling this — without KEDA
+    # -- the operator cannot create the ScaledObject and autoscaling stays dead.
+    # -- When enabled, the operator creates a ScaledObject targeting this
+    # -- VLLMRuntime via its scale subresource; KEDA updates the CR replicas and
+    # -- the operator reconciles the Deployment — no conflict with
+    # -- deploymentConfig.replicas. Only `enabled: true` and `maxReplicas` are
+    # -- required; everything else has the defaults below.
+    autoscalingConfig:
+      # -- Enable autoscaling (requires KEDA)
+      enabled: false
+      # -- Minimum replicas. Set 0 to enable scale-to-zero.
+      minReplicas: 1
+      # -- Maximum replicas (required when autoscaling is enabled)
+      maxReplicas: 4
+      # -- How often KEDA checks metrics (seconds)
+      pollingInterval: 15
+      # -- Scale-up behavior
+      scaleUpPolicy:
+        # -- Wait before scaling up (0 = scale up immediately)
+        stabilizationWindowSeconds: 0
+        # -- Max pods to add per period
+        podValue: 1
+        periodSeconds: 60
+      # -- Scale-down behavior
+      scaleDownPolicy:
+        # -- Wait before scaling down (default 5 min)
+        stabilizationWindowSeconds: 300
+        # -- Max pods to remove per period
+        podValue: 1
+        periodSeconds: 60
+        # -- Idle time before scaling to zero. Only applies when minReplicas=0.
+        scaleToZeroDelaySeconds: 1800
+      # -- Metric thresholds (per-pod; KEDA divides by the current replica count)
+      triggers:
+        # -- Prometheus server address for metric queries
+        prometheusAddress: "http://kube-prom-stack-kube-prome-prometheus.monitoring.svc:9090"
+        # -- Per-pod concurrent requests threshold
+        requestsRunningThreshold: 5
+        # -- Per-pod generation tokens/s threshold
+        generationTokensThreshold: 100
+        # -- Per-pod prompt tokens/s threshold
+        promptTokensThreshold: 100
+
+# -- One entry per MODEL. Same model, more throughput → raise
+# -- deploymentConfig.replicas on its entry; a different model/resource
+# -- profile → add another entry. Each entry is deep-merged over
+# -- vllmRuntimeDefaults, rendered as one VLLMRuntime CR, labelled with the
+# -- shared release label the router selects on (routes by model name).
+# -- Entry 0 defaults to "<fullname>-runtime", entry i>0 to
+# -- "<fullname>-runtime-<i>". NOTE: `--set vllmRuntimes[0]...` replaces the
+# -- whole array — define entries in a values file.
+vllmRuntimes:
+  - name: ""
+    labels: {}
+    spec: {}
+
+# -- VLLMRouter custom resource. The operator reconciles it into the router
+# -- Deployment and Service, wired to the VLLMRuntime pods above.
+vllmRouter:
+  # -- Deploy a VLLMRouter custom resource
+  enabled: true
+  # -- Name of the VLLMRouter resource. Defaults to "<fullname>-router".
+  name: ""
+  # -- Extra labels for the VLLMRouter resource
+  labels: {}
+  spec:
+    enableRouter: true
+    replicas: 1
+    # -- Service discovery method (k8s or static)
+    serviceDiscovery: k8s
+    # -- Label selector for the vLLM runtime pods. Defaults to the label the
+    # -- operator puts on the VLLMRuntime pods: "app=<vllmRuntime name>".
+    k8sLabelSelector: ""
+    # -- Routing strategy (roundrobin, session, prefixaware, or kvaware)
+    routingLogic: roundrobin
+    engineScrapeInterval: 30
+    requestStatsWindow: 60
+    port: 80
+    # -- The operator creates this service account and its RBAC.
+    serviceAccountName: "vllmrouter-sa"
+    image:
+      registry: "docker.io"
+      name: "lmcache/lmstack-router"
+      pullPolicy: "IfNotPresent"
+    resources:
+      cpu: "2"
+      memory: "8Gi"
+    env:
+      - name: LOG_LEVEL
+        value: "info"
+      - name: METRICS_ENABLED
+        value: "true"
+    nodeSelectorTerms:
+      - matchExpressions:
+          - key: kubernetes.io/os
+            operator: In
+            values:
+              - linux
+
+# -- CacheServer custom resource (LMCache server). Point
+# -- vllmRuntime.spec.lmCacheConfig.remoteUrl at it when enabled.
+cacheServer:
+  # -- Deploy a CacheServer custom resource
+  enabled: false
+  # -- Name of the CacheServer resource. Defaults to "<fullname>-cacheserver".
+  name: ""
+  # -- Extra labels for the CacheServer resource
+  labels: {}
+  spec:
+    image:
+      registry: "docker.io"
+      name: "lmcache/vllm-openai:2025-04-18"
+      pullPolicy: "IfNotPresent"
+      pullSecretName: ""
+    port: 8000
+    resources:
+      cpu: "2"
+      memory: "16Gi"
+    replicas: 1
+    deploymentStrategy: "Recreate"
+
+# -- LoraAdapter custom resources. Each entry renders one LoraAdapter, e.g.
+#   - name: loraadapter-sample
+#     spec:
+#       baseModel: "Llama-3.1-8B-Instruct"
+#       adapterSource:
+#         type: "huggingface"
+#         adapterName: "llama-3.1-nemoguard-8b-topic-control"
+#         repository: "nvidia/llama-3.1-nemoguard-8b-topic-control"
+#         credentialsSecretRef:
+#           name: "huggingface-credentials"
+#           key: "hf_token"
+#       loraAdapterDeploymentConfig:
+#         algorithm: "default"
+#         replicas: 1
+loraAdapters: []
+

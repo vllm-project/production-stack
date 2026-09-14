@@ -13,6 +13,7 @@ repos:
         exclude: |
           (?x)(
               ^helm/templates/|
+              ^helm-operator/templates/|
               .github/deployment-router.yaml
           )
       - id: end-of-file-fixer

@@ -1,0 +1,177 @@
+name: Helm Operator Chart CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/helm-operator-ci.yml'
+      - 'helm-operator/**'
+      - 'operator/api/**'
+      - 'operator/config/crd/**'
+      - 'operator/Makefile'
+  pull_request:
+    paths:
+      - '.github/workflows/helm-operator-ci.yml'
+      - 'helm-operator/**'
+      - 'operator/api/**'
+      - 'operator/config/crd/**'
+      - 'operator/Makefile'
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chart:
+    name: CRD sync, lint and render checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Verify helm is available
+        run: helm version
+
+      - name: Check CRD sync (helm chart vs operator/config/crd/bases)
+        run: make -C operator helm-crds-check
+
+      - name: Lint chart
+        run: helm lint helm-operator
+
+      - name: Render chart with helm template
+        run: |
+          set -e
+          # List overrides with --set would REPLACE the vllmRuntimes array, so
+          # anything touching the array goes through values files.
+          cat > /tmp/full-stack.yaml <<'EOT'
+          cacheServer:
+            enabled: true
+          vllmRuntimes:
+            - name: ""
+              spec:
+                autoscalingConfig:
+                  enabled: true
+          EOT
+          cat > /tmp/multi-model.yaml <<'EOT'
+          vllmRuntimes:
+            - name: ""
+              spec:
+                model:
+                  modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+            - name: ""
+              spec:
+                model:
+                  modelURL: "Qwen/Qwen2.5-7B-Instruct"
+          EOT
+          for combo in \
+            "default|" \
+            "monitoring|--set metrics.enabled=true --set metrics.serviceMonitor.enabled=true --set networkPolicy.enabled=true" \
+            "full-stack|-f /tmp/full-stack.yaml" \
+            "multi-model|-f /tmp/multi-model.yaml" \
+            "operator-only|--set vllmRuntimes=null --set vllmRouter.enabled=false"; do
+            name="${combo%%|*}"
+            args="${combo#*|}"
+            # shellcheck disable=SC2086
+            count=$(helm template vllm-stack helm-operator -n production-stack-system $args | grep -c '^kind:')
+            echo "[$name] rendered $count resources"
+          done
+
+      - name: Render and validate chart
+        run: |
+          python3 -m pip install --quiet --user pyyaml jsonschema
+          python3 - <<'EOF'
+          import glob
+          import subprocess
+          import sys
+
+          import jsonschema
+          import yaml
+
+          CHART = "helm-operator"
+          RELEASE = "vllm-stack"
+          NAMESPACE = "production-stack-system"
+
+          COMBOS = [
+              ("default", []),
+              ("monitoring", ["--set", "metrics.enabled=true",
+                              "--set", "metrics.serviceMonitor.enabled=true",
+                              "--set", "networkPolicy.enabled=true"]),
+              ("full-stack", ["-f", "/tmp/full-stack.yaml"]),
+              ("multi-model", ["-f", "/tmp/multi-model.yaml"]),
+              ("operator-only", ["--set", "vllmRuntimes=null",
+                                 "--set", "vllmRouter.enabled=false"]),
+          ]
+
+          class StrictLoader(yaml.SafeLoader):
+              pass
+
+          def no_dupes(loader, node, deep=False):
+              mapping = {}
+              for k_node, v_node in node.value:
+                  key = loader.construct_object(k_node, deep=deep)
+                  if key in mapping:
+                      raise ValueError(f"duplicate key {key!r}")
+                  mapping[key] = loader.construct_object(v_node, deep=deep)
+              return mapping
+
+          StrictLoader.add_constructor(
+              yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, no_dupes)
+
+          # CRD schemas for validating the rendered custom resources
+          schemas = {}
+          for f in glob.glob(f"{CHART}/crds/*.yaml"):
+              crd = yaml.safe_load(open(f))
+              for v in crd["spec"]["versions"]:
+                  if v["name"] == "v1alpha1":
+                      schemas[crd["spec"]["names"]["kind"]] = \
+                          v["schema"]["openAPIV3Schema"]["properties"]["spec"]
+
+          failures = []
+          for name, extra in COMBOS:
+              cmd = ["helm", "template", RELEASE, CHART, "-n", NAMESPACE] + extra
+              out = subprocess.run(cmd, capture_output=True, text=True)
+              if out.returncode != 0:
+                  failures.append(f"[{name}] helm template failed: {out.stderr[:300]}")
+                  continue
+              docs = [d for d in yaml.load_all(out.stdout, Loader=StrictLoader) if d]
+              for d in docs:
+                  md = d.get("metadata", {})
+                  n = md.get("name")
+                  if n and len(n) > 63:
+                      failures.append(f"[{name}] {d['kind']}/{n}: name exceeds 63 chars")
+                  for scope in (md.get("labels") or {}).values():
+                      if len(str(scope)) > 63:
+                          failures.append(f"[{name}] {d['kind']}/{n}: label value exceeds 63 chars")
+                  if d["kind"] in schemas:
+                      try:
+                          jsonschema.validate(d["spec"], schemas[d["kind"]])
+                      except jsonschema.ValidationError as e:
+                          failures.append(f"[{name}] {d['kind']}/{n} spec invalid: {e.message}")
+              print(f"[{name}] {len(docs)} documents rendered and validated")
+
+          # guards: optional components must not render when disabled
+          guards = [
+              ("default", "kind: ServiceMonitor", 0),
+              ("default", "kind: NetworkPolicy", 0),
+              ("operator-only", "kind: VLLMRuntime", 0),
+              ("operator-only", "kind: VLLMRouter", 0),
+              ("multi-model", "kind: VLLMRuntime", 2),
+          ]
+          for name, needle, expected in guards:
+              combo = dict(COMBOS)[name]
+              out = subprocess.run(
+                  ["helm", "template", RELEASE, CHART, "-n", NAMESPACE] + combo,
+                  capture_output=True, text=True).stdout
+              count = out.count(needle)
+              if count != expected:
+                  failures.append(f"[{name}] expected {expected} of {needle!r}, got {count}")
+
+          if failures:
+              print("\nFAILURES:")
+              for f in failures:
+                  print(" -", f)
+              sys.exit(1)
+          print("\nAll chart render checks passed")
+          EOF
