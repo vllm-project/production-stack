@@ -124,6 +124,9 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- if $modelSpec.command }}
+          command: {{ toYaml $modelSpec.command | nindent 12 }}
+          {{- else }}
           command:
           {{- if eq $modelSpec.repository "lmcache/vllm-openai" }}
           - "/opt/venv/bin/vllm"
@@ -218,6 +221,10 @@ spec:
           {{- if $modelSpec.chatTemplate }}
           - "--chat-template"
           - "/templates/{{ $modelSpec.chatTemplate }}"
+          {{- end }}
+          {{- end }}
+          {{- if $modelSpec.args }}
+          args: {{ toYaml $modelSpec.args | nindent 12 }}
           {{- end }}
           imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy }}"
           env:
