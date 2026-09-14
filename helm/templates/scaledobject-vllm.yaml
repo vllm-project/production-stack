@@ -1,7 +1,7 @@
 {{- if .Values.servingEngineSpec.enableEngine -}}
 {{- range $modelSpec := .Values.servingEngineSpec.modelSpec }}
 {{- if and (hasKey $modelSpec "keda") $modelSpec.keda.enabled }}
-{{- if not (hasKey $modelSpec "raySpec") }}
+{{- if not (or (hasKey $modelSpec "raySpec") (and (hasKey $modelSpec "lwsSpec") $modelSpec.lwsSpec.enabled)) }}
 {{- with $ -}}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
