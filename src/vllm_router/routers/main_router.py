@@ -47,8 +47,43 @@ main_router = APIRouter()
 
 logger = init_logger(__name__)
 
+# OpenAPI request body schemas for endpoints that use raw Request objects
+# (forwarded to the backend).  FastAPI cannot infer the body schema from
+# Request alone, so we add it explicitly to make the Swagger "Try it out"
+# feature work.
 
-@main_router.post("/v1/chat/completions")
+# JSON body (most LLM inference endpoints: chat, completions, embeddings, etc.)
+_REQUEST_BODY_SCHEMA: dict = {
+    "requestBody": {
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "description": "Request body forwarded to the backend model server.",
+                }
+            }
+        },
+        "required": True,
+    }
+}
+
+# Multipart form-data body (audio transcriptions, image edits, etc.)
+_FORM_BODY_SCHEMA: dict = {
+    "requestBody": {
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "description": "Multipart form-data forwarded to the backend model server.",
+                }
+            }
+        },
+        "required": True,
+    }
+}
+
+
+@main_router.post("/v1/chat/completions", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_chat_completion(request: Request, background_tasks: BackgroundTasks):
     if semantic_cache_available:
         # Check if the request can be served from the semantic cache
@@ -65,42 +100,42 @@ async def route_chat_completion(request: Request, background_tasks: BackgroundTa
     )
 
 
-@main_router.post("/v1/completions")
+@main_router.post("/v1/completions", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_completion(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/completions", background_tasks)
 
 
-@main_router.post("/v1/embeddings")
+@main_router.post("/v1/embeddings", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_embeddings(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/embeddings", background_tasks)
 
 
-@main_router.post("/tokenize")
+@main_router.post("/tokenize", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_tokenize(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/tokenize", background_tasks)
 
 
-@main_router.post("/detokenize")
+@main_router.post("/detokenize", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_detokenize(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/detokenize", background_tasks)
 
 
-@main_router.post("/v1/rerank")
+@main_router.post("/v1/rerank", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_v1_rerank(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/rerank", background_tasks)
 
 
-@main_router.post("/rerank")
+@main_router.post("/rerank", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_rerank(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/rerank", background_tasks)
 
 
-@main_router.post("/v1/score")
+@main_router.post("/v1/score", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_v1_score(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/score", background_tasks)
 
 
-@main_router.post("/score")
+@main_router.post("/score", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_score(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/score", background_tasks)
 
@@ -247,7 +282,7 @@ async def health() -> Response:
         return JSONResponse(content={"status": "healthy"}, status_code=200)
 
 
-@main_router.post("/v1/audio/transcriptions")
+@main_router.post("/v1/audio/transcriptions", openapi_extra=_FORM_BODY_SCHEMA)
 async def route_v1_audio_transcriptions(
     request: Request, background_tasks: BackgroundTasks
 ):
@@ -257,17 +292,17 @@ async def route_v1_audio_transcriptions(
     )
 
 
-@main_router.post("/v1/responses")
+@main_router.post("/v1/responses", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_v1_responses(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/responses", background_tasks)
 
 
-@main_router.post("/v1/audio/speech")
+@main_router.post("/v1/audio/speech", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_v1_audio_speech(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/audio/speech", background_tasks)
 
 
-@main_router.post("/v1/audio/translations")
+@main_router.post("/v1/audio/translations", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_v1_audio_translations(
     request: Request, background_tasks: BackgroundTasks
 ):
@@ -281,7 +316,7 @@ async def route_v1_audio_voices(request: Request, background_tasks: BackgroundTa
     return await route_general_request(request, "/v1/audio/voices", background_tasks)
 
 
-@main_router.post("/v1/images/generations")
+@main_router.post("/v1/images/generations", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_v1_images_generations(
     request: Request, background_tasks: BackgroundTasks
 ):
@@ -290,11 +325,11 @@ async def route_v1_images_generations(
     )
 
 
-@main_router.post("/v1/images/edits")
+@main_router.post("/v1/images/edits", openapi_extra=_FORM_BODY_SCHEMA)
 async def route_v1_images_edit(request: Request, background_tasks: BackgroundTasks):
     return await route_multipart_request(request, "/v1/images/edits", background_tasks)
 
 
-@main_router.post("/v1/messages")
+@main_router.post("/v1/messages", openapi_extra=_REQUEST_BODY_SCHEMA)
 async def route_anthropic_messages(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/messages", background_tasks)
