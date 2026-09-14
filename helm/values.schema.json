@@ -1130,6 +1130,10 @@
                                 "description": "Reference to an existing Kubernetes Secret from which all key/value pairs will be loaded as environment variables into the container",
                                 "type": "object"
                             },
+                            "extraContainers": {
+                                "description": "Additional containers to run alongside the main vLLM container, in Kubernetes container format. Unlike the LoRA sidecar (servingEngineSpec.sidecar), these are added regardless of enableLoRA and support the full container spec (image, args, env, volumeMounts, livenessProbe, resources, etc.).",
+                                "type": "array"
+                            },
                             "extraVolumeMounts": {
                                 "description": "Additional volume mounts to add to the container, in Kubernetes volumeMount format",
                                 "type": "array"
@@ -1522,6 +1526,10 @@
                             },
                             "serviceAnnotations": {
                                 "description": "The model's service annotations",
+                                "type": "object"
+                            },
+                            "serviceLabels": {
+                                "description": "The model's service labels",
                                 "type": "object"
                             },
                             "shmSize": {

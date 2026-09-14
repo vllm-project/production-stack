@@ -109,6 +109,27 @@ servingEngineSpec:
     extraVolumeMounts: []
       # - name: tmp-volume
       #   mountPath: /tmp
+    # -- Additional containers to run alongside the main vLLM container, in Kubernetes container format. Unlike the LoRA sidecar (servingEngineSpec.sidecar), these are added regardless of enableLoRA and support the full container spec (image, args, env, volumeMounts, livenessProbe, resources, etc.).
+    extraContainers: []
+      # - name: my-sidecar
+      #   image: my-registry/my-sidecar:latest
+      #   args: ["--flag", "value"]
+      #   env:
+      #     - name: MY_ENV_VAR
+      #       value: "my-value"
+      #   volumeMounts:
+      #     - name: tmp-volume
+      #       mountPath: /tmp
+      #   resources:
+      #     requests:
+      #       cpu: "100m"
+      #       memory: "128Mi"
+      #   livenessProbe:
+      #     httpGet:
+      #       path: /healthz
+      #       port: 8080
+      #     initialDelaySeconds: 5
+      #     periodSeconds: 10
     # -- The configuration for the init container to be run before the main container.
     initContainer:
     # -- The name of the init container
@@ -209,6 +230,8 @@ servingEngineSpec:
     shmSize: "20Gi"
     # -- The model's service annotations
     serviceAnnotations: {}
+    # -- The model's service labels
+    serviceLabels: {}
     # -- Whether to enable LoRA
     enableLoRA: true
     # -- KEDA autoscaling configuration for this model deployment. Requires KEDA to be installed in the cluster.
