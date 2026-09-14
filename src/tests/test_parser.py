@@ -92,6 +92,63 @@ def test_load_initial_config_from_config_file_if_required_when_yaml_config_file_
         assert args.static_aliases == "text-embedding-3-small:bge-m3"
 
 
+def test_load_initial_config_from_config_file_if_required_when_yaml_config_with_extended_aliases_is_provided(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with tempfile.NamedTemporaryFile() as f:
+        monkeypatch.setattr(sys, "argv", [sys.argv[0], "--dynamic-config-yaml", f.name])
+        f.write(
+            yaml.safe_dump(
+                {
+                    "static_aliases": {
+                        "text": "llama3",
+                        "reasoning": {"model": "llama3", "reasoning_effort": "high"},
+                    },
+                }
+            ).encode()
+        )
+        f.seek(0)
+        test_parser = argparse.ArgumentParser("test")
+        test_parser.add_argument("--dynamic-config-yaml", type=str)
+        test_parser.add_argument("--dynamic-config-json", type=str)
+        args = test_parser.parse_args()
+        args = parser.load_initial_config_from_config_file_if_required(
+            test_parser, args
+        )
+        assert "text:llama3" in args.static_aliases
+        assert "reasoning:llama3|reasoning_effort=high" in args.static_aliases
+
+
+def test_generate_static_aliases_rejects_unknown_key() -> None:
+    from vllm_router.parsers.yaml_utils import generate_static_aliases
+
+    with pytest.raises(ValueError, match="unknown keys"):
+        generate_static_aliases({"r1": {"model": "llama3", "reasoning_effrot": "high"}})
+
+
+def test_generate_static_aliases_rejects_missing_model() -> None:
+    from vllm_router.parsers.yaml_utils import generate_static_aliases
+
+    with pytest.raises(ValueError, match="missing required key 'model'"):
+        generate_static_aliases({"r1": {"reasoning_effort": "high"}})
+
+
+def test_generate_static_aliases_rejects_invalid_type() -> None:
+    from vllm_router.parsers.yaml_utils import generate_static_aliases
+
+    with pytest.raises(ValueError, match="expected string or dict"):
+        generate_static_aliases({"bad": 42})
+
+
+def test_generate_static_aliases_rejects_invalid_reasoning_effort() -> None:
+    from vllm_router.parsers.yaml_utils import generate_static_aliases
+
+    with pytest.raises(ValueError, match="Invalid reasoning_effort"):
+        generate_static_aliases(
+            {"r1": {"model": "llama3", "reasoning_effort": "urgent"}}
+        )
+
+
 def test_load_initial_config_from_config_file_if_required_when_json_config_file_is_provided_adds_values_to_args(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

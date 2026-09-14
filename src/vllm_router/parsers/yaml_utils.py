@@ -3,6 +3,7 @@ from typing import Any
 import yaml
 
 from vllm_router.log import init_logger
+from vllm_router.utils import AliasConfig
 
 logger = init_logger(__name__)
 
@@ -23,8 +24,41 @@ def generate_static_models(models: dict[str, Any]) -> str:
     return ",".join(static_models)
 
 
+_VALID_ALIAS_DICT_KEYS = {"model", "reasoning_effort"}
+
+
+def _parse_alias_config(alias: str, config: Any) -> AliasConfig:
+    if isinstance(config, str):
+        return AliasConfig(model=config)
+    if not isinstance(config, dict):
+        raise ValueError(
+            f"Invalid alias config for '{alias}': expected string or dict, got {type(config).__name__}"
+        )
+    if "model" not in config:
+        raise ValueError(f"Alias '{alias}' is missing required key 'model'")
+
+    unknown_keys = set(config.keys()) - _VALID_ALIAS_DICT_KEYS
+    if unknown_keys:
+        raise ValueError(
+            f"Alias '{alias}' contains unknown keys: {sorted(unknown_keys)}. "
+            f"Supported keys: {sorted(_VALID_ALIAS_DICT_KEYS)}"
+        )
+
+    return AliasConfig(
+        model=config["model"],
+        reasoning_effort=config.get("reasoning_effort"),
+    )
+
+
 def generate_static_aliases(aliases: dict[str, Any]) -> str:
-    return ",".join(f"{alias}:{model}" for alias, model in aliases.items())
+    parts = []
+    for alias, raw_config in aliases.items():
+        config = _parse_alias_config(alias, raw_config)
+        entry = f"{alias}:{config.model}"
+        if config.reasoning_effort is not None:
+            entry += f"|reasoning_effort={config.reasoning_effort}"
+        parts.append(entry)
+    return ",".join(parts)
 
 
 def generate_static_model_types(models: dict[str, Any]) -> str:
