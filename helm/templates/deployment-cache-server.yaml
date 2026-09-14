@@ -63,6 +63,10 @@ spec:
           - "/opt/venv/bin/lmcache_server"
           - "0.0.0.0"
           - "{{ .Values.cacheserverSpec.containerPort }}"
+          {{- with .Values.cacheserverSpec.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.cacheserverSpec.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

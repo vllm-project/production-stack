@@ -339,6 +339,7 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `cacheserverSpec.serviceType` | string | `"ClusterIP"` | Kubernetes service type for the cache server |
 | `cacheserverSpec.servicePort` | integer | `80` | Port the cache server service will listen on |
 | `cacheserverSpec.resources` | map | `{}` | Resource requests and limits |
+| `cacheserverSpec.env` | list | `[]` | Extra environment variables for the cache server container, e.g. to configure LMCache's eviction policy via `LMCACHE_CACHE_POLICY` and `LMCACHE_MAX_LOCAL_CPU_SIZE` |
 | `cacheserverSpec.labels` | map | `{environment: "cache", release: "cache"}` | Customized labels for the cache server deployment |
 | `cacheserverSpec.strategy` | map | `{}` | Deployment strategy for the cache server pods |
 | `cacheserverSpec.livenessProbe` | map | `{initialDelaySeconds: 15, periodSeconds: 10, failureThreshold: 3, httpGet: {path: /health, port: 8000}}` | Configuration for the liveness probe |
