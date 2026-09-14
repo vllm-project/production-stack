@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -218,16 +219,18 @@ class UserSession:
         self.generation_times = []
         self.launch_times = []
         self.finish_times = []
+        self._results_lock = threading.Lock()
 
         self.finished = False
 
-    def _update_result(self, response: Response):
-        self.prompt_lengths.append(response.prompt_tokens)
-        self.generation_lengths.append(response.generation_tokens)
-        self.ttfts.append(response.ttft)
-        self.generation_times.append(response.generation_time)
-        self.launch_times.append(response.launch_time)
-        self.finish_times.append(response.finish_time)
+    def _update_result(self, response: Response) -> None:
+        with self._results_lock:
+            self.prompt_lengths.append(response.prompt_tokens)
+            self.generation_lengths.append(response.generation_tokens)
+            self.ttfts.append(response.ttft)
+            self.generation_times.append(response.generation_time)
+            self.launch_times.append(response.launch_time)
+            self.finish_times.append(response.finish_time)
 
     def _build_system_prompt(self):
 
@@ -344,15 +347,16 @@ class UserSession:
             return
 
     def summary(self) -> pd.DataFrame:
-        df = pd.DataFrame()
-        df["prompt_tokens"] = self.prompt_lengths
-        df["generation_tokens"] = self.generation_lengths
-        df["ttft"] = self.ttfts
-        df["generation_time"] = self.generation_times
-        df["user_id"] = self.user_config.user_id
-        df["question_id"] = range(1, len(self.prompt_lengths) + 1)
-        df["launch_time"] = self.launch_times
-        df["finish_time"] = self.finish_times
+        with self._results_lock:
+            df = pd.DataFrame()
+            df["prompt_tokens"] = self.prompt_lengths
+            df["generation_tokens"] = self.generation_lengths
+            df["ttft"] = self.ttfts
+            df["generation_time"] = self.generation_times
+            df["user_id"] = self.user_config.user_id
+            df["question_id"] = range(1, len(self.prompt_lengths) + 1)
+            df["launch_time"] = self.launch_times
+            df["finish_time"] = self.finish_times
         return df
 
 
