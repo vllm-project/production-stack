@@ -18,8 +18,12 @@ spec:
 
   # Resource requirements
   resources:
-    cpu: "2"
-    memory: "16Gi"
+    requests:
+      cpu: "1"
+      memory: "8Gi"
+    limits:
+      cpu: "2"
+      memory: "16Gi"
 
   # Number of replicas
   replicas: 1
