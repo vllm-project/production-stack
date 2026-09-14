@@ -341,7 +341,7 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `cacheserverSpec.resources` | map | `{}` | Resource requests and limits |
 | `cacheserverSpec.labels` | map | `{environment: "cache", release: "cache"}` | Customized labels for the cache server deployment |
 | `cacheserverSpec.strategy` | map | `{}` | Deployment strategy for the cache server pods |
-| `cacheserverSpec.livenessProbe` | map | `{initialDelaySeconds: 15, periodSeconds: 10, failureThreshold: 3, httpGet: {path: /health, port: 8000}}` | Configuration for the liveness probe |
+| `cacheserverSpec.livenessProbe` | map | `{initialDelaySeconds: 30, periodSeconds: 10, failureThreshold: 3, timeoutSeconds: 5}` | Timing configuration for the TCP socket liveness probe on `cacheserverSpec.containerPort` |
 | `cacheserverSpec.tolerations` | list | `[]` | Tolerations configuration for the cache server pods |
 | `cacheserverSpec.runtimeClassName` | string | `""` | RuntimeClassName configuration for the cache server pods |
 | `cacheserverSpec.schedulerName` | string | `""` | SchedulerName configuration for the cache server pods |

@@ -172,12 +172,8 @@ tests:
           periodSeconds: 20
           failureThreshold: 6
           timeoutSeconds: 10
-          exec:
-            command:
-            - "/opt/venv/bin/python3"
-            - "/workspace/LMCache/examples/kubernetes/health_probe.py"
-            - "127.0.0.1"
-            - "8000"
+          tcpSocket:
+            port: 8000
     - equal:
         path: spec.template.spec.containers[0].securityContext
         value:
