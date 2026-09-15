@@ -258,7 +258,7 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `routerSpec.serviceAnnotations` | map | `{}` | Service annotations for LoadBalancer/NodePort |
 | `routerSpec.servicePort` | integer | `80` | Port the router service will listen on |
 | `routerSpec.serviceDiscovery` | string | `"k8s"` | Service discovery mode ("k8s" or "static") |
-| `routerSpec.k8sServiceDiscoveryType` | string | `"pod-ip"` | Service discovery Type ("pod-ip" or "service-name") if serviceDiscovery is "k8s" |
+| `routerSpec.k8sServiceDiscoveryType` | string | `""` | Service discovery type ("pod-ip" or "service-name") if serviceDiscovery is "k8s". Empty means use container default (pod-ip). |
 | `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static" |
 | `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
 | `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic: `"roundrobin"`, `"session"`, `"prefixaware"`, `"kvaware"`, `"disaggregated_prefill"`, or `"disaggregated_prefill_orchestrated"` |
