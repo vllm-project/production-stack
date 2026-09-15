@@ -184,16 +184,14 @@ jobs:
           uv pip install --upgrade pip
           uv pip install -e ".[semantic_cache,lmcache,test]"
 
-      - name: Start 2 vLLM serve backends
+      - name: Start mock OpenAI backends
         run: |
-          echo "🚀 Starting vLLM serve backend"
+          echo "🚀 Starting mock OpenAI backends (static-discovery e2e, #531 item 2)"
           mkdir -p "$LOG_DIR"
-          CUDA_VISIBLE_DEVICES=0 vllm serve facebook/opt-125m --port 8001 --gpu-memory-utilization 0.7 --chat-template tests/assets/template-chatml.jinja > "$LOG_DIR/backend1.log" 2>&1 &
-          backend_1_pid=$!
-          echo "STATIC_BACKEND_1_PID=$backend_1_pid" >> "$GITHUB_ENV"
-          CUDA_VISIBLE_DEVICES=1 vllm serve facebook/opt-125m --port 8002 --gpu-memory-utilization 0.7 --chat-template tests/assets/template-chatml.jinja > "$LOG_DIR/backend2.log" 2>&1 &
-          backend_2_pid=$!
-          echo "STATIC_BACKEND_2_PID=$backend_2_pid" >> "$GITHUB_ENV"
+          chmod +x tests/scripts/start-mock-backends.sh
+          eval "$(tests/scripts/start-mock-backends.sh 8001 8002 500 "$LOG_DIR")"
+          echo "STATIC_BACKEND_1_PID=$STATIC_BACKEND_1_PID" >> "$GITHUB_ENV"
+          echo "STATIC_BACKEND_2_PID=$STATIC_BACKEND_2_PID" >> "$GITHUB_ENV"
 
       - name: Wait for backends to be ready
         run: |
@@ -217,6 +215,7 @@ jobs:
             --log-dir "$LOG_DIR" \
             --num-requests 20 \
             --verbose \
+            --model fake_model_name \
             --backends-url "http://localhost:8001,http://localhost:8002"
         timeout-minutes: 5
 
@@ -232,7 +231,7 @@ jobs:
         if: always()
         run: |
           echo "🧹 Cleaning up processes"
-          pkill -f "vllm serve" || true
+          pkill -f "fake-openai-server.py" || true
           pkill -f "python3 -m src.vllm_router.app" || true
 
       - run: echo "🍏 Static discovery e2e test job status is ${{ job.status }}."

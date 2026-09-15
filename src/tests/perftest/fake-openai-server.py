@@ -13,11 +13,15 @@ import uuid
 from typing import Final
 
 from fastapi import FastAPI, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from vllm.entrypoints.openai.protocol import (
     ChatCompletionRequest,
     ChatCompletionResponseStreamChoice,
     ChatCompletionStreamResponse,
+    CompletionResponse,
+    CompletionResponseChoice,
+    CompletionResponseStreamChoice,
+    CompletionStreamResponse,
     DeltaMessage,
     UsageInfo,
 )
@@ -122,6 +126,113 @@ async def generate_fake_response(
     )
 
 
+async def generate_fake_completion_stream(
+    request_id: str,
+    model_name: str,
+    num_tokens: int,
+    tokens_per_sec: float,
+):
+    async def sleep_to_target(target: float):
+        sleep_time = target - time.time()
+        if sleep_time > 0:
+            await asyncio.sleep(sleep_time)
+
+    start = time.time()
+    global NUM_RUNNING_REQUESTS
+
+    if GLOBAL_ARGS.ttft > 0:
+        await asyncio.sleep(GLOBAL_ARGS.ttft)
+
+    NUM_RUNNING_REQUESTS += 1
+    created_time = int(time.time())
+    chunk_object_type: Final = "text_completion"
+
+    for i in range(num_tokens):
+        await sleep_to_target(start + i / tokens_per_sec)
+        text = "Hello "
+        choice = CompletionResponseStreamChoice(
+            index=0,
+            text=text,
+            logprobs=None,
+            finish_reason=None,
+        )
+        chunk = CompletionStreamResponse(
+            id=request_id,
+            object=chunk_object_type,
+            created=created_time,
+            choices=[choice],
+            model=model_name,
+        )
+        yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
+
+    await sleep_to_target(num_tokens / tokens_per_sec + start)
+    choice = CompletionResponseStreamChoice(
+        index=0,
+        text="\n",
+        logprobs=None,
+        finish_reason="length",
+    )
+    chunk = CompletionStreamResponse(
+        id=request_id,
+        object=chunk_object_type,
+        created=created_time,
+        choices=[choice],
+        model=model_name,
+    )
+    chunk.usage = UsageInfo(
+        prompt_tokens=0,
+        completion_tokens=num_tokens,
+        total_tokens=num_tokens,
+    )
+    yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
+    yield "data: [DONE]\n\n"
+
+    NUM_RUNNING_REQUESTS -= 1
+
+
+@app.post("/v1/completions")
+async def text_completions(raw_request: Request):
+    """Text completions for static-discovery e2e (router proxies /v1/completions)."""
+    global MODEL_NAME
+    body = await raw_request.json()
+    request_id = raw_request.headers.get(
+        "x-request-id", f"fake_request_id_{uuid.uuid4()}"
+    )
+    num_tokens = body.get("max_tokens") or 100
+    tokens_per_sec = GLOBAL_ARGS.speed
+    model_name = MODEL_NAME
+
+    if body.get("stream"):
+        return StreamingResponse(
+            generate_fake_completion_stream(
+                request_id, model_name, num_tokens, tokens_per_sec
+            ),
+            media_type="text/event-stream",
+        )
+
+    text = "Hello " * max(1, min(num_tokens, 10))
+    response = CompletionResponse(
+        id=request_id,
+        object="text_completion",
+        created=int(time.time()),
+        model=model_name,
+        choices=[
+            CompletionResponseChoice(
+                index=0,
+                text=text,
+                logprobs=None,
+                finish_reason="length",
+            )
+        ],
+        usage=UsageInfo(
+            prompt_tokens=0,
+            completion_tokens=num_tokens,
+            total_tokens=num_tokens,
+        ),
+    )
+    return JSONResponse(response.model_dump(exclude_unset=True))
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest, raw_request: Request):
     global MODEL_NAME
@@ -159,6 +270,12 @@ def parse_args():
     parser.add_argument("--max-tokens", type=int, default=100)
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--ttft", type=float, default=0)
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        default="fake_model_name",
+        help="Model name returned by the mock server (default: fake_model_name)",
+    )
     args = parser.parse_args()
     return args
 
@@ -167,4 +284,5 @@ if __name__ == "__main__":
     import uvicorn
 
     GLOBAL_ARGS = parse_args()
+    MODEL_NAME = GLOBAL_ARGS.model_name
     uvicorn.run(app, host=GLOBAL_ARGS.host, port=GLOBAL_ARGS.port)
