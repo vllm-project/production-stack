@@ -1,3 +1,4 @@
+import asyncio
 import json
 from unittest.mock import MagicMock, patch
 
@@ -63,6 +64,12 @@ def setup():
         return json.dumps({"model": "test-model", "stream": False}).encode()
 
     req.body = body
+
+    async def receive():
+        # The client stays connected for the duration of these tests.
+        await asyncio.Event().wait()
+
+    req.receive = receive
 
     patches = [
         patch(
