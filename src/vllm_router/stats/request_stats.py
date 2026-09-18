@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Deque, Dict, Tuple
@@ -216,9 +215,21 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         )
         self.finished_requests[engine_url] += 1
 
-        if request_start_time := self.request_start_time.get((engine_url, request_id)):
+        key = (engine_url, request_id)
+        request_start_time = self.request_start_time.pop(key, None)
+        first_token_time = self.first_token_time.pop(key, None)
+        if request_start_time is not None:
             self.latency_monitors[engine_url].update(
-                timestamp, time.time() - request_start_time
+                timestamp, timestamp - request_start_time
+            )
+        if first_token_time is not None:
+            if engine_url not in self.decoding_length_monitors:
+                self.decoding_length_monitors[engine_url] = MovingAverageMonitor(
+                    self.sliding_window_size
+                )
+            # Field comment: time from first token to completion.
+            self.decoding_length_monitors[engine_url].update(
+                timestamp, timestamp - first_token_time
             )
 
     def on_request_swapped(self, engine_url: str, request_id: str, timestamp: float):
