@@ -288,9 +288,16 @@ async def process_request(
         request_json = json.loads(body)
         is_streaming = request_json.get("stream", False)
         model_name = request_json.get("model", "unknown")
-    except (JSONDecodeError, UnicodeDecodeError, ValueError):
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
         # If we can't parse the body as JSON, assume it's not streaming
-        raise HTTPException(status=400, detail="Request body is not JSON parsable.")
+        logger.warning(
+            f"Failed to parse request body in process_request: {e}. "
+            f"Body length: {len(body)} bytes"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Request body is not JSON parsable: {e}",
+        )
 
     # Add streaming info to span after parsing
     if span is not None:
@@ -423,10 +430,21 @@ async def route_general_request(
     request_body = await request.body()
     try:
         request_json = json.loads(request_body) if request_body else {}
-    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as e:
+        content_length = len(request_body)
+        expected_length = request.headers.get("content-length")
+        logger.warning(
+            f"Failed to parse request body as JSON for request {request_id}: "
+            f"{e}. Body length: {content_length} bytes, "
+            f"Content-Length header: {expected_length}"
+        )
         return JSONResponse(
             status_code=400,
-            content={"error": "Invalid request: request body must be valid JSON."},
+            content={
+                "error": "Invalid request: request body must be valid JSON.",
+                "detail": str(e),
+                "body_length": content_length,
+            },
             headers={"X-Request-Id": request_id},
         )
 
