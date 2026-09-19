@@ -78,7 +78,6 @@ async def router_client(backend_url, model=AUDIO_MODEL):
 
         router = initialize_routing_logic(
             RoutingLogic.ROUND_ROBIN,
-            max_instance_failover_reroute_attempts=0,
         )
         stack.callback(cleanup_routing_logic)
 

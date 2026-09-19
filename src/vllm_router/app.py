@@ -45,6 +45,7 @@ from vllm_router.service_discovery import (
 from vllm_router.services.batch_service import initialize_batch_processor
 from vllm_router.services.callbacks_service.callbacks import configure_custom_callbacks
 from vllm_router.services.files_service import initialize_storage
+from vllm_router.services.request_service.retry import RetryConfig
 from vllm_router.services.request_service.rewriter import (
     get_request_rewriter,
 )
@@ -270,6 +271,8 @@ def initialize_all(app: FastAPI, args):
     if args.callbacks:
         configure_custom_callbacks(args.callbacks, app)
 
+    app.state.retry_config = RetryConfig.from_args(args)
+
     initialize_routing_logic(
         args.routing_logic,
         session_key=args.session_key,
@@ -285,7 +288,6 @@ def initialize_all(app: FastAPI, args):
         priority_field=args.priority_field,
         priority_default=args.priority_default,
         priority_threshold=args.priority_threshold,
-        max_instance_failover_reroute_attempts=args.max_instance_failover_reroute_attempts,
         lmcache_health_check_interval=args.lmcache_health_check_interval,
         lmcache_worker_timeout=args.lmcache_worker_timeout,
     )

@@ -20,6 +20,7 @@ from vllm_router.log import init_logger
 from vllm_router.parsers.yaml_utils import (
     read_and_process_yaml_config_file,
 )
+from vllm_router.services.request_service.retry import RetryConfig
 from vllm_router.version import __version__
 
 try:
@@ -120,6 +121,14 @@ def validate_args(args):
         raise ValueError(
             "Sentry profile session sample rate must be between 0.0 and 1.0."
         )
+    if args.enable_retries and args.max_retries < 2:
+        raise ValueError(
+            "--max-retries counts the initial attempt, so it must be at least 2 "
+            "when --enable-retries is set; 1 would disable retrying."
+        )
+    # Surface the remaining RetryConfig invariants at startup, not on the
+    # first request.
+    RetryConfig.from_args(args)
 
 
 def parse_args():
@@ -508,11 +517,49 @@ def parse_args():
         "Only used when --routing-logic=priority.",
     )
 
-    parser.add_argument(
-        "--max-instance-failover-reroute-attempts",
+    retry_group = parser.add_argument_group(
+        "Retry Configuration",
+        "Configure retry behavior with exponential backoff (disabled by default)",
+    )
+    retry_group.add_argument(
+        "--enable-retries",
+        action="store_true",
+        help="Retry requests that fail with a transient error, using exponential "
+        "backoff with jitter. Covers transport failures (rerouted to another engine) "
+        "and retryable statuses (408, 429, 500, 502, 503, 504). Disabled by default, "
+        "so a request is attempted exactly once.",
+    )
+    retry_group.add_argument(
+        "--max-retries",
         type=int,
-        default=0,
-        help="Number of reroute attempts per failed request",
+        default=5,
+        help="Maximum total attempts per request, counting the initial one, so 5 "
+        "means one attempt plus up to four retries (default: 5). Only used with "
+        "--enable-retries.",
+    )
+    retry_group.add_argument(
+        "--initial-backoff-ms",
+        type=int,
+        default=50,
+        help="Initial backoff duration in milliseconds (default: 50)",
+    )
+    retry_group.add_argument(
+        "--max-backoff-ms",
+        type=int,
+        default=30000,
+        help="Maximum backoff duration in milliseconds (default: 30000)",
+    )
+    retry_group.add_argument(
+        "--backoff-multiplier",
+        type=float,
+        default=1.5,
+        help="Exponential backoff multiplier (default: 1.5)",
+    )
+    retry_group.add_argument(
+        "--jitter-factor",
+        type=float,
+        default=0.2,
+        help="Random jitter factor (0.0-1.0) to prevent thundering herd (default: 0.2)",
     )
 
     parser.add_argument(

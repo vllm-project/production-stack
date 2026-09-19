@@ -1180,9 +1180,6 @@ def initialize_routing_logic(
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
-    router.max_instance_failover_reroute_attempts = kwargs.get(
-        "max_instance_failover_reroute_attempts", 0
-    )
     return router
 
 

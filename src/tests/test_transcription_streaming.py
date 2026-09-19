@@ -51,7 +51,6 @@ def setup_mocks():
 
 def _make_mock_request():
     router = RoundRobinRouter()
-    router.max_instance_failover_reroute_attempts = 0
 
     state = MagicMock()
     state.router = router
