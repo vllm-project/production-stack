@@ -63,7 +63,7 @@ spec:
       {{- $container := $modelSpec.initContainer }}
       initContainers:
         - name: {{ $container.name }}
-          image: {{ $container.image }}
+          image: {{ include "chart.image" (dict "image" $container.image "global" $.Values.global) | quote }}
           {{- if $container.command }}
           command: {{ toYaml $container.command | nindent 12 }}
           {{- end }}
@@ -119,7 +119,7 @@ spec:
       subdomain: "{{ $.Release.Name }}-{{ $modelSpec.name }}-engine-service"
       containers:
         - name: "vllm"
-          image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+          image: {{ include "chart.image" (dict "image" (printf "%s:%s" (required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository) (required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag)) "global" $.Values.global) | quote }}
           {{- with .Values.servingEngineSpec.containerSecurityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -446,7 +446,7 @@ spec:
           {{- end }}
         {{- if and $modelSpec.enableLoRA (hasKey $modelSpec "pvcStorage") }}
         - name: sidecar
-          image: {{ .Values.servingEngineSpec.sidecar.image }}
+          image: {{ include "chart.image" (dict "image" .Values.servingEngineSpec.sidecar.image "global" $.Values.global) | quote }}
           imagePullPolicy: {{ .Values.servingEngineSpec.sidecar.imagePullPolicy }}
           env:
             - name: PORT

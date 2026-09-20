@@ -44,7 +44,7 @@ spec:
       {{- if $.Values.sharedPvcStorage.enabled }}
       initContainers:
         - name: fix-perms
-          image: "{{ $.Values.sharedPvcStorage.image.repository }}:{{ $.Values.sharedPvcStorage.image.tag }}"
+          image: {{ include "chart.image" (dict "image" (printf "%s:%s" $.Values.sharedPvcStorage.image.repository $.Values.sharedPvcStorage.image.tag) "global" $.Values.global) | quote }}
           command: ["sh", "-c", "chown -R 65532:65532 /data/shared-pvc-storage"]
           securityContext:
             runAsUser: 0
@@ -56,7 +56,7 @@ spec:
       {{- end }}
       containers:
         - name: manager
-          image: "{{ .Values.loraController.image.repository }}:{{ .Values.loraController.image.tag }}"
+          image: {{ include "chart.image" (dict "image" (printf "%s:%s" .Values.loraController.image.repository .Values.loraController.image.tag) "global" $.Values.global) | quote }}
           imagePullPolicy: {{ .Values.loraController.image.pullPolicy }}
           args:
             - --leader-elect

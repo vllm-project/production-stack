@@ -52,7 +52,7 @@ spec:
       {{- end }}
       containers:
       - name: router-container
-        image: "{{ .Values.routerSpec.repository }}:{{ .Values.routerSpec.tag }}"
+        image: {{ include "chart.image" (dict "image" (printf "%s:%s" .Values.routerSpec.repository .Values.routerSpec.tag) "global" $.Values.global) | quote }}
         imagePullPolicy: "{{ .Values.routerSpec.imagePullPolicy }}"
         {{- if .Values.routerSpec.containerSecurityContext }}
         securityContext:
