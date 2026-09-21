@@ -104,7 +104,7 @@ def test_modified_ready_with_ip_adds_engine():
     )
 
     d._add_engine.assert_called_once_with(
-        "pod-b", "172.16.0.5", ["Qwen2.5-7B"], "Qwen2.5-7B"
+        "pod-b", "172.16.0.5", ["Qwen2.5-7B"], "Qwen2.5-7B", None
     )
 
 
@@ -138,11 +138,21 @@ def test_modified_not_ready_with_ip_removes_registered():
 # ---------------------------------------------------------------------------
 
 
-def _make_pod(name, ip="10.0.0.1", ready=True, terminating=False, labels=None):
+def _make_pod(
+    name,
+    ip="10.0.0.1",
+    ready=True,
+    terminating=False,
+    labels=None,
+    annotations=None,
+):
     pod = MagicMock()
     pod.metadata.name = name
     pod.metadata.labels = {} if labels is None else labels
-    pod.metadata.deletion_timestamp = None if not terminating else "2026-01-01T00:00:00Z"
+    pod.metadata.annotations = {} if annotations is None else annotations
+    pod.metadata.deletion_timestamp = (
+        None if not terminating else "2026-01-01T00:00:00Z"
+    )
     pod.status.pod_ip = ip
     pod.status.container_statuses = [MagicMock(ready=ready)]
     return pod
@@ -157,16 +167,21 @@ def _make_reconciler(pods, engines=None):
         items=pods, metadata=MagicMock(resource_version="4242")
     )
     d._get_model_names = MagicMock(return_value=["m"])
-    d._get_model_label = MagicMock(side_effect=lambda pod: (pod.metadata.labels or {}).get("model"))
+    d._get_model_label = MagicMock(
+        side_effect=lambda pod: (pod.metadata.labels or {}).get("model")
+    )
     d._add_engine = MagicMock()
     return d
 
 
-def _registered(url="http://10.0.0.1:8000", model_label=None, sleep=False):
+def _registered(
+    url="http://10.0.0.1:8000", model_label=None, sleep=False, lora_modified=None
+):
     known = MagicMock(spec=EndpointInfo)
     known.url = url
     known.model_label = model_label
     known.sleep = sleep
+    known.lora_modified = lora_modified
     return known
 
 
@@ -174,7 +189,10 @@ def test_reconcile_drops_engine_whose_pod_is_gone():
     """Core regression: the DELETED event was missed, the list must repair it."""
     d = _make_reconciler(
         pods=[_make_pod("pod-alive")],
-        engines={"pod-gone": _registered(url="http://10.0.0.9:8000"), "pod-alive": _registered()},
+        engines={
+            "pod-gone": _registered(url="http://10.0.0.9:8000"),
+            "pod-alive": _registered(),
+        },
     )
 
     d._reconcile_engines()
@@ -185,7 +203,9 @@ def test_reconcile_drops_engine_whose_pod_is_gone():
 
 def test_reconcile_discovers_pods_at_startup():
     """The watch no longer replays ADDED, so the list must populate the table."""
-    d = _make_reconciler(pods=[_make_pod("pod-a", ip="10.0.0.1"), _make_pod("pod-b", ip="10.0.0.2")])
+    d = _make_reconciler(
+        pods=[_make_pod("pod-a", ip="10.0.0.1"), _make_pod("pod-b", ip="10.0.0.2")]
+    )
 
     d._reconcile_engines()
 
@@ -215,7 +235,9 @@ def test_reconcile_drops_pod_that_became_not_ready():
 
 def test_reconcile_drops_pod_with_cleared_ip():
     """An evicted pod keeps its object but loses its IP."""
-    d = _make_reconciler(pods=[_make_pod("pod-a", ip=None)], engines={"pod-a": _registered()})
+    d = _make_reconciler(
+        pods=[_make_pod("pod-a", ip=None)], engines={"pod-a": _registered()}
+    )
 
     d._reconcile_engines()
 
@@ -234,6 +256,26 @@ def test_reconcile_rehandles_pod_whose_sleep_label_changed():
     d._add_engine.assert_called_once()
 
 
+def test_reconcile_rehandles_pod_whose_lora_annotation_changed():
+    """The LoRA operator stamps the pod when it loads or unloads an adapter.
+
+    Nothing else about the pod moves, so missing that event during a
+    disconnect would leave the router serving a stale adapter list.
+    """
+    d = _make_reconciler(
+        pods=[
+            _make_pod("pod-a", annotations={"lora-modified": "2026-01-01T00:00:01Z"})
+        ],
+        engines={"pod-a": _registered(lora_modified="2026-01-01T00:00:00Z")},
+    )
+
+    d._reconcile_engines()
+
+    d._add_engine.assert_called_once_with(
+        "pod-a", "10.0.0.1", ["m"], None, "2026-01-01T00:00:01Z"
+    )
+
+
 def test_reconcile_returns_the_list_resource_version():
     """The watch must start where the list stopped, leaving no gap."""
     d = _make_reconciler(pods=[_make_pod("pod-a")], engines={"pod-a": _registered()})
@@ -243,11 +285,15 @@ def test_reconcile_returns_the_list_resource_version():
 
 def test_reconcile_survives_one_broken_pod():
     """One unreachable pod must not abort discovery for the others."""
-    d = _make_reconciler(pods=[_make_pod("pod-bad", ip="10.0.0.1"), _make_pod("pod-ok", ip="10.0.0.2")])
+    d = _make_reconciler(
+        pods=[_make_pod("pod-bad", ip="10.0.0.1"), _make_pod("pod-ok", ip="10.0.0.2")]
+    )
     d._get_model_names = MagicMock(
-        side_effect=lambda ip: (_ for _ in ()).throw(RuntimeError("unreachable"))
-        if ip == "10.0.0.1"
-        else ["m"]
+        side_effect=lambda ip: (
+            (_ for _ in ()).throw(RuntimeError("unreachable"))
+            if ip == "10.0.0.1"
+            else ["m"]
+        )
     )
 
     d._reconcile_engines()

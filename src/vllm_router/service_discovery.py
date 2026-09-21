@@ -107,6 +107,7 @@ class EndpointInfo:
     service_name: Optional[str] = None
     namespace: Optional[str] = None
     model_info: Dict[str, ModelInfo] = None
+    lora_modified: Optional[str] = None
 
     def __str__(self):
         return f"EndpointInfo(url={self.url}, model_names={self.model_names}, added_timestamp={self.added_timestamp}, model_label={self.model_label}, service_name={self.service_name},pod_name={self.pod_name}, namespace={self.namespace})"
@@ -668,6 +669,24 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             return None
         return pod.metadata.labels.get("model")
 
+    def _get_lora_modified(self, pod) -> Optional[str]:
+        """
+        Get the timestamp the LoRA operator stamps on the pod every time it
+        loads or unloads an adapter.
+
+        It is the only pod-side signal that the pod's /v1/models answer has
+        changed, so it belongs to whatever the reconciliation compares.
+
+        Args:
+            pod: The Kubernetes pod object
+
+        Returns:
+            The annotation value if present, None otherwise
+        """
+        if not pod.metadata.annotations:
+            return None
+        return pod.metadata.annotations.get("lora-modified")
+
     def _handle_pod(self, pod, event_type: str) -> None:
         pod_name = pod.metadata.name
         pod_ip = pod.status.pod_ip
@@ -704,6 +723,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             is_pod_ready,
             model_names,
             model_label,
+            self._get_lora_modified(pod),
         )
 
     def _is_unchanged(self, pod_name: str, pod) -> bool:
@@ -713,8 +733,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
 
         Re-handling every pod on every reconnect would query /v1/models on each
         of them for no new information. The comparison stays on data carried by
-        the pod object: URL, readiness, model label, and the sleep label that
-        /sleep and /wake_up patch onto the pod.
+        the pod object: URL, readiness, model label, the sleep label that
+        /sleep and /wake_up patch onto the pod, and the lora-modified
+        annotation the LoRA operator stamps when it changes the adapters.
         """
         known = self.available_engines.get(pod_name)
         if known is None or pod.status.pod_ip is None:
@@ -731,6 +752,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             known.url == f"http://{pod.status.pod_ip}:{self.port}"
             and known.model_label == self._get_model_label(pod)
             and known.sleep == (labels.get("sleeping") == "true")
+            and known.lora_modified == self._get_lora_modified(pod)
         )
 
     def _reconcile_engines(self) -> Optional[str]:
@@ -791,7 +813,12 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 time.sleep(0.5)
 
     def _add_engine(
-        self, engine_name: str, engine_ip: str, model_names: List[str], model_label: str
+        self,
+        engine_name: str,
+        engine_ip: str,
+        model_names: List[str],
+        model_label: str,
+        lora_modified: Optional[str] = None,
     ):
         logger.info(
             f"Discovered new serving engine {engine_name} at "
@@ -818,6 +845,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 pod_name=engine_name,
                 namespace=self.namespace,
                 model_info=model_info,
+                lora_modified=lora_modified,
             )
 
             # Store model information in the endpoint info
@@ -854,6 +882,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         is_pod_ready: bool,
         model_names: List[str],
         model_label: Optional[str],
+        lora_modified: Optional[str] = None,
     ) -> None:
         if event == "ADDED":
             if engine_ip is None:
@@ -865,7 +894,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             if not model_names:
                 return
 
-            self._add_engine(engine_name, engine_ip, model_names, model_label)
+            self._add_engine(
+                engine_name, engine_ip, model_names, model_label, lora_modified
+            )
 
         elif event == "DELETED":
             if engine_name not in self.available_engines:
@@ -892,7 +923,9 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
                 return
 
             if is_pod_ready and model_names:
-                self._add_engine(engine_name, engine_ip, model_names, model_label)
+                self._add_engine(
+                    engine_name, engine_ip, model_names, model_label, lora_modified
+                )
                 return
 
             if (
@@ -1280,8 +1313,9 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
                 # new to tell us, and its URL is the service name, so it cannot
                 # change. Re-handling it would query /v1/models on every
                 # reconnect.
-                if service_name in self.available_engines and self._check_service_ready(
-                    service_name, self.namespace
+                if (
+                    service_name in self.available_engines
+                    and self._check_service_ready(service_name, self.namespace)
                 ):
                     continue
                 self._handle_service(service, "MODIFIED")

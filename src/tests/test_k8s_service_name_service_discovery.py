@@ -70,7 +70,9 @@ def test_reconcile_discovers_services_at_startup():
 
 
 def test_reconcile_skips_ready_registered_service():
-    d = _make_reconciler(services=[_make_service("svc-a")], engines={"svc-a": _registered()})
+    d = _make_reconciler(
+        services=[_make_service("svc-a")], engines={"svc-a": _registered()}
+    )
 
     d._reconcile_engines()
 
@@ -81,9 +83,9 @@ def test_reconcile_survives_one_broken_service():
     """A Service with no Endpoints object must not abort the whole pass."""
     d = _make_reconciler(services=[_make_service("svc-bad"), _make_service("svc-ok")])
     d._check_service_ready = MagicMock(
-        side_effect=lambda name, ns: (_ for _ in ()).throw(RuntimeError("404"))
-        if name == "svc-bad"
-        else True
+        side_effect=lambda name, ns: (
+            (_ for _ in ()).throw(RuntimeError("404")) if name == "svc-bad" else True
+        )
     )
 
     d._reconcile_engines()
