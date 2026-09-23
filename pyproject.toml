@@ -14,7 +14,7 @@ classifiers = [
 dependencies = [
     "aiofiles==24.1.0",
     "black>=25.1.0",
-    "fastapi==0.128.0",
+    "fastapi>=0.128.0,<1",  # allow patched starlette (e.g. GHSA-jp82-jpqv-5vv3)
     "aiohttp[speedups]==3.14.3",
     "kubernetes==36.0.3",
     "numpy==1.26.4",
