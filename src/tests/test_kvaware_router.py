@@ -1,5 +1,7 @@
 """Unit tests for the KV-cache-aware routing logic."""
 
+import asyncio
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -220,3 +222,64 @@ async def test_kvaware_refreshes_unknown_dead_holder_and_uses_live_match():
     )
 
     assert selected == url_b
+
+
+@pytest.mark.asyncio
+async def test_kvaware_remote_tokenize_fallback_does_not_block_event_loop(
+    monkeypatch,
+):
+    """The remote /tokenize fallback is a blocking HTTP call; it must run off
+    the event loop so other requests keep being served."""
+
+    def no_local_tokenizer(_model_name):
+        raise OSError("tokenizer not available locally")
+
+    def slow_post(*_args, **_kwargs):
+        time.sleep(0.3)
+        return SimpleNamespace(json=lambda: {"tokens": [1, 2, 3]})
+
+    monkeypatch.setattr(
+        routing_logic,
+        "AutoTokenizer",
+        SimpleNamespace(from_pretrained=no_local_tokenizer),
+        raising=False,
+    )
+    monkeypatch.setattr(routing_logic.requests, "post", slow_post)
+
+    url = "http://10.0.0.1:8000"
+    router = KvawareRouter.__new__(KvawareRouter)
+    router.tokenizers = {}
+    router.threshold = 0
+    router.session_key = "x-session-id"
+    router.hash_ring = routing_logic.HashRing()
+    router.instance_id_to_ip = {}
+    lookup_tokens = []
+
+    async def query_manager(msg):
+        lookup_tokens.append(msg.tokens)
+        return SimpleNamespace(layout_info={})
+
+    router.query_manager = query_manager
+
+    ticks = 0
+
+    async def ticker():
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.01)
+            ticks += 1
+
+    ticker_task = asyncio.create_task(ticker())
+    selected = await router.route_request(
+        [EndpointInfo(url)],
+        {},
+        {url: SimpleNamespace(qps=0)},
+        SimpleNamespace(headers={}),
+        {"prompt": "test"},
+    )
+    ticker_task.cancel()
+
+    assert selected == url
+    assert lookup_tokens == [[1, 2, 3]]
+    # the event loop kept running while the fallback request was in flight
+    assert ticks >= 10
