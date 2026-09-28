@@ -7,6 +7,6 @@ dependencies:
   version: 5.3.0
 - name: k8s-aibom
   repository: oci://ghcr.io/googlecloudplatform/charts
-  version: 1.5.0
-digest: sha256:e97177a32b5db9bc7cca1f886a39fcbe61089aefc8ed13abb95cad115c707453
-generated: "2026-09-22T14:34:08.909137-07:00"
+  version: 1.5.1
+digest: sha256:7b2279356bb32d61f6ace0642db7f6423cbe1fa0c279e6995b96c7196e59b8a1
+generated: "2026-09-28T08:22:16.986812-07:00"

@@ -30,6 +30,6 @@ dependencies:
     repository: oci://ghcr.io/prometheus-community/charts
     condition: prometheus-adapter.enabled
   - name: k8s-aibom
-    version: 1.5.0
+    version: 1.5.1
     repository: oci://ghcr.io/googlecloudplatform/charts
     condition: k8s-aibom.enabled
