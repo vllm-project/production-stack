@@ -435,6 +435,118 @@ async def test_instance_map_refresh_queries_endpoints_concurrently():
     }
 
 
+# --- bursts --------------------------------------------------------------------
+
+
+INST_C = "instance-c"
+BURST = 128
+BURST_PROMPT_TOKENS = 32000
+SHARED_PREFIX_TOKENS = 512
+
+
+@pytest.fixture
+def stats_monitor():
+    from vllm_router.stats.request_stats import RequestStatsMonitor, SingletonMeta
+
+    SingletonMeta._instances.pop(RequestStatsMonitor, None)
+    monitor = RequestStatsMonitor(sliding_window_size=60)
+    yield monitor
+    SingletonMeta._instances.pop(RequestStatsMonitor, None)
+
+
+async def route_burst(router, monitor):
+    """Route BURST concurrent requests the way `route_general_request` and
+    `process_request` do: snapshot `request_stats`, await `route_request`,
+    then `on_new_request` on the chosen endpoint (no await in between)."""
+    import asyncio
+    import random
+    import time
+    from collections import Counter
+    from types import SimpleNamespace
+
+    rng = random.Random(0)
+    request = SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(request_stats_monitor=monitor)),
+        headers={},
+    )
+
+    class Tokenizer:
+        def encode(self, _prompt):
+            return list(range(BURST_PROMPT_TOKENS))
+
+    router.tokenizers = {"test-model": Tokenizer()}
+
+    async def query_manager(_msg):
+        # Controller round-trip: the await during which the rest of the
+        # burst is routed.
+        await asyncio.sleep(rng.uniform(0.001, 0.02))
+        # Only a short shared prefix (e.g. a common system prompt) is cached,
+        # on one endpoint.
+        return LookupRet({INST_A: (LOCAL, SHARED_PREFIX_TOKENS)})
+
+    router.query_manager = query_manager
+    fleet = endpoints(URL_A, URL_B, URL_C)
+
+    async def one(i):
+        snapshot = monitor.get_request_stats(time.time())
+        url = await router.route_request(fleet, {}, snapshot, request, {"prompt": "x"})
+        monitor.on_new_request(url, f"req-{i}", time.time())
+        return url
+
+    return Counter(await asyncio.gather(*(one(i) for i in range(BURST))))
+
+
+def burst_router():
+    router = make_router(beta=DEFAULT_LOADAWARE_BETA)
+    router.instance_id_to_ip = {INST_A: URL_A, INST_B: URL_B, INST_C: URL_C}
+    return router
+
+
+@pytest.mark.asyncio
+async def test_a_stale_snapshot_herds_a_burst_onto_one_endpoint(
+    stats_monitor, monkeypatch
+):
+    """The failure mode: scored against the pre-burst snapshot, every request
+    sees equal load, so the small prefix match on A wins every time."""
+    monkeypatch.setattr(
+        LoadAwareRouter,
+        "live_request_stats",
+        staticmethod(lambda _request, request_stats: request_stats),
+    )
+    placement = await route_burst(burst_router(), stats_monitor)
+    assert placement == {URL_A: BURST}
+
+
+@pytest.mark.asyncio
+async def test_a_burst_is_spread_by_live_load(stats_monitor):
+    """With the live load read after the awaits, each decision sees the
+    requests placed before it, and the burst spreads over the fleet."""
+    placement = await route_burst(burst_router(), stats_monitor)
+    assert sum(placement.values()) == BURST
+    assert set(placement) == {URL_A, URL_B, URL_C}
+    assert max(placement.values()) <= BURST // 2
+
+
+def test_live_request_stats_reads_the_monitor_now(stats_monitor):
+    import time
+    from types import SimpleNamespace
+
+    request = SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(request_stats_monitor=stats_monitor))
+    )
+    stale = stats_monitor.get_request_stats(time.time())
+    stats_monitor.on_new_request(URL_A, "req-1", time.time())
+
+    live = LoadAwareRouter.live_request_stats(request, stale)
+    assert live[URL_A].in_prefill_requests == 1
+    assert URL_A not in stale
+
+
+def test_live_request_stats_keeps_the_snapshot_without_a_monitor():
+    snapshot = {URL_A: busy(in_decoding=3)}
+    assert LoadAwareRouter.live_request_stats(None, snapshot) is snapshot
+
+
 # --- configuration ------------------------------------------------------------
 
 

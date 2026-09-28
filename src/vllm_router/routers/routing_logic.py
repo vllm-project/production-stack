@@ -20,6 +20,7 @@ import math
 import os
 import random
 import threading
+import time
 import uuid
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
@@ -523,6 +524,31 @@ class LoadAwareRouter(KvawareRouter):
         logger.info(f"Initialized LoadAwareRouter with beta={self.beta}")
 
     @staticmethod
+    def live_request_stats(
+        request: Optional[Request], request_stats: Dict[str, RequestStats]
+    ) -> Dict[str, RequestStats]:
+        """`request_stats` as of now rather than as of the request's arrival.
+
+        The caller snapshots `request_stats` before awaiting `route_request`,
+        and `route_request` awaits the tokenizer and the controller lookup. A
+        request only counts as in flight once `process_request` calls
+        `on_new_request`, so without a fresh read every request of a burst
+        scores against the same pre-burst load, and a small shared-prefix
+        match wins every tie on one endpoint.
+
+        Reading the monitor after the last await is enough: nothing awaits
+        between the placement decision and `on_new_request` (the caller only
+        runs synchronous code until `process_request` starts), so each
+        decision sees every earlier one. Falls back to the snapshot when no
+        monitor is reachable (e.g. unit tests without an app).
+        """
+        state = getattr(getattr(request, "app", None), "state", None)
+        monitor = getattr(state, "request_stats_monitor", None)
+        if monitor is None:
+            return request_stats
+        return monitor.get_request_stats(time.time())
+
+    @staticmethod
     def load_penalty(request_stats: Dict[str, RequestStats], url: str) -> int:
         """In-flight requests on `url` (prefilling + decoding).
 
@@ -746,9 +772,14 @@ class LoadAwareRouter(KvawareRouter):
 
         if not layout_info:
             # Nothing cached anywhere - no benefit term to weigh.
+            request_stats = self.live_request_stats(request, request_stats)
             return self.fallback_url(endpoints, request_stats, request, request_json)
 
         await self.refresh_instance_map(endpoints, layout_info)
+        # Score against the load as of now, not as of this request's arrival:
+        # requests routed during the awaits above are missing from the
+        # caller's snapshot.
+        request_stats = self.live_request_stats(request, request_stats)
         url = self.select_url(endpoints, request_stats, layout_info, len(token_ids))
         if url is None:
             return self.fallback_url(endpoints, request_stats, request, request_json)
