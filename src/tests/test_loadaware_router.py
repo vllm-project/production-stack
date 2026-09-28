@@ -575,6 +575,42 @@ async def test_tokenize_error_body_raises_a_clear_error(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_tokenize_non_json_response_raises_a_clear_error(monkeypatch):
+    """A non-JSON reply (e.g. an HTML error page from a proxy) is reported
+    with its status code and body, not as a bare JSON decode error."""
+
+    class HtmlResponse:
+        status_code = 502
+        text = "<html>Bad Gateway</html>"
+
+        def json(self):
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    monkeypatch.setattr(
+        routing_logic.requests,
+        "post",
+        lambda url, headers=None, json=None, timeout=None: HtmlResponse(),
+    )
+    router = make_router()
+    with pytest.raises(RuntimeError, match="returned 502 \\(non-JSON\\): <html>Bad"):
+        await router.tokenize_prompt(
+            endpoints(URL_A), {"messages": [{"role": "user", "content": "x"}]}
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("messages", [None, "not a list"])
+async def test_malformed_messages_are_passed_through_to_tokenize(
+    tokenize_calls, messages
+):
+    """A `messages` that is not a list must not crash the flattening; it is
+    sent as-is for the engine's `/tokenize` to validate."""
+    router = make_router()
+    await router.tokenize_prompt(endpoints(URL_A), {"messages": messages})
+    assert tokenize_calls[0]["json"]["messages"] == messages
+
+
+@pytest.mark.asyncio
 async def test_route_request_falls_back_when_tokenize_fails(monkeypatch):
     """A failing `/tokenize` (e.g. an engine restarting) must not turn into an
     HTTP 500: the request takes the session/QPS fallback route."""

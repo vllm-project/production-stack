@@ -704,8 +704,11 @@ class LoadAwareRouter(KvawareRouter):
         "\n", the same way vLLM's chat_utils renders them before applying
         the chat template. vLLM's `/tokenize` rejects list content on a
         text-only model ("... is not a multimodal model"). Messages with any
-        non-text part are left unchanged.
+        non-text part are left unchanged. A malformed `messages` (not a list)
+        is returned as-is for the engine's `/tokenize` to reject.
         """
+        if not isinstance(messages, list):
+            return messages
         flattened = []
         for message in messages:
             content = message.get("content") if isinstance(message, dict) else None
@@ -739,7 +742,14 @@ class LoadAwareRouter(KvawareRouter):
             None,
             lambda: requests.post(remote_url, headers=headers, json=data, timeout=10),
         )
-        body = response.json()
+        try:
+            body = response.json()
+        except ValueError as e:
+            # e.g. an HTML error page from a proxy in front of the engine
+            raise RuntimeError(
+                f"{remote_url} returned {response.status_code} (non-JSON): "
+                f"{response.text[:200]}"
+            ) from e
         if not isinstance(body, dict) or "tokens" not in body:
             raise RuntimeError(
                 f"{remote_url} returned {response.status_code}: {str(body)[:200]}"
