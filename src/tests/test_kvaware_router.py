@@ -283,3 +283,18 @@ async def test_kvaware_remote_tokenize_fallback_does_not_block_event_loop(
     assert lookup_tokens == [[1, 2, 3]]
     # the event loop kept running while the fallback request was in flight
     assert ticks >= 10
+
+
+@pytest.mark.asyncio
+async def test_kvaware_without_endpoints_returns_503():
+    """With no discovered endpoints the router answers 503 instead of failing
+    on endpoints[0] in the /tokenize fallback."""
+    router = KvawareRouter.__new__(KvawareRouter)
+    router.tokenizers = {}
+
+    with pytest.raises(routing_logic.HTTPException) as exc_info:
+        await router.route_request(
+            [], {}, {}, SimpleNamespace(headers={}), {"prompt": "test"}
+        )
+
+    assert exc_info.value.status_code == 503

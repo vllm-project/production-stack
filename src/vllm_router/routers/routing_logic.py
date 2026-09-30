@@ -418,6 +418,11 @@ class KvawareRouter(RoutingInterface):
             request_json (Dict): The request body (needed for finding the
             longest prefix match)
         """
+        if not endpoints:
+            raise HTTPException(
+                status_code=503, detail="No backend endpoints available"
+            )
+
         # TODO (Yuhan): Handle chat completions
         token_ids = await self.tokenize_prompt(endpoints, request_json)
 
