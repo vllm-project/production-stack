@@ -17,7 +17,7 @@ Before running this setup, ensure you have:
 > [!CAUTION]
 > This script requires cloud resources and will incur costs. Please make sure all resources are shut down properly.
 
-To run the service, go to the [deployment_on_cloud/azure/](deployment_on_cloud/azure/) folder and run the following command:
+To run the service, go to the [deployment_on_cloud/azure/](../../deployment_on_cloud/azure/) folder and run the following command:
 
 ```bash
 cd deployment_on_cloud/azure/
