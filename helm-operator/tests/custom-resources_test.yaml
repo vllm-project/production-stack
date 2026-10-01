@@ -1,0 +1,260 @@
+suite: test custom resource rendering
+templates:
+  - vllmruntime.yaml
+  - vllmrouter.yaml
+  - cacheserver.yaml
+  - loraadapters.yaml
+tests:
+  - it: should render runtime and router CRs by default
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - containsDocument:
+          kind: VLLMRuntime
+          apiVersion: production-stack.vllm.ai/v1alpha1
+          name: vllm-vllm-stack-operator-runtime
+          template: vllmruntime.yaml
+      - containsDocument:
+          kind: VLLMRouter
+          apiVersion: production-stack.vllm.ai/v1alpha1
+          name: vllm-vllm-stack-operator-router
+          template: vllmrouter.yaml
+      - hasDocuments:
+          count: 0
+          template: cacheserver.yaml
+      - hasDocuments:
+          count: 0
+          template: loraadapters.yaml
+
+  - it: should label every runtime with the shared release label
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - equal:
+          path: metadata.labels["production-stack.vllm.ai/runtime-set"]
+          value: vllm-vllm-stack-operator
+          template: vllmruntime.yaml
+
+  - it: should default the router selector to the shared release label
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - equal:
+          path: spec.k8sLabelSelector
+          value: "production-stack.vllm.ai/runtime-set=vllm-vllm-stack-operator"
+          template: vllmrouter.yaml
+
+  - it: should keep an explicit router selector
+    release:
+      name: vllm
+      namespace: default
+    set:
+      vllmRouter:
+        spec:
+          k8sLabelSelector: "app=my-engine"
+    asserts:
+      - equal:
+          path: spec.k8sLabelSelector
+          value: "app=my-engine"
+          template: vllmrouter.yaml
+
+  - it: should render one runtime per array entry with the shared label
+    release:
+      name: vllm
+      namespace: default
+    set:
+      vllmRuntimes:
+        - name: ""
+          spec:
+            model: {modelURL: "meta-llama/Llama-3.1-8B-Instruct"}
+        - name: ""
+          spec:
+            model: {modelURL: "Qwen/Qwen2.5-7B-Instruct"}
+        - name: qwen
+          spec:
+            model: {modelURL: "Qwen/Qwen3-32B"}
+    asserts:
+      - hasDocuments:
+          count: 3
+          template: vllmruntime.yaml
+      - containsDocument:
+          kind: VLLMRuntime
+          name: vllm-vllm-stack-operator-runtime
+          template: vllmruntime.yaml
+      - containsDocument:
+          kind: VLLMRuntime
+          name: vllm-vllm-stack-operator-runtime-1
+          template: vllmruntime.yaml
+      - containsDocument:
+          kind: VLLMRuntime
+          name: qwen
+          template: vllmruntime.yaml
+      # every entry carries the shared label the router selects on
+      - equal:
+          path: metadata.labels["production-stack.vllm.ai/runtime-set"]
+          value: vllm-vllm-stack-operator
+          template: vllmruntime.yaml
+
+  - it: should render runtime spec fields verbatim
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - equal:
+          path: spec.model.modelURL
+          value: "meta-llama/Llama-3.1-8B-Instruct"
+          template: vllmruntime.yaml
+      - equal:
+          path: spec.deploymentConfig.replicas
+          value: 1
+          template: vllmruntime.yaml
+      - equal:
+          path: spec.lmCacheConfig.enabled
+          value: false
+          template: vllmruntime.yaml
+      - equal:
+          path: spec.autoscalingConfig.enabled
+          value: false
+          template: vllmruntime.yaml
+
+  - it: should deep-merge sparse entries over the shared defaults
+    release:
+      name: vllm
+      namespace: default
+    set:
+      vllmRuntimes:
+        - spec:
+            model:
+              modelURL: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+            deploymentConfig:
+              resources:
+                gpu: "8"
+        - spec:
+            model:
+              modelURL: "Qwen/Qwen2.5-7B-Instruct"
+            deploymentConfig:
+              replicas: 3
+    asserts:
+      - hasDocuments:
+          count: 2
+          template: vllmruntime.yaml
+      # per-entry values win
+      - equal:
+          path: spec.model.modelURL
+          value: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+          template: vllmruntime.yaml
+      - equal:
+          path: spec.deploymentConfig.resources.gpu
+          value: "8"
+          template: vllmruntime.yaml
+      - equal:
+          path: spec.deploymentConfig.replicas
+          value: 3
+          template: vllmruntime.yaml
+      # untouched fields fall back to vllmRuntimeDefaults
+      - equal:
+          path: spec.deploymentConfig.image.name
+          value: "lmcache/vllm-openai:2025-05-27-v1"
+          template: vllmruntime.yaml
+      - equal:
+          path: spec.storageConfig.accessMode
+          value: ReadWriteMany
+          template: vllmruntime.yaml
+
+  - it: should render autoscaling config when enabled
+    release:
+      name: vllm
+      namespace: default
+    set:
+      vllmRuntimes:
+        - spec:
+            autoscalingConfig:
+              enabled: true
+              minReplicas: 0
+              maxReplicas: 6
+              triggers:
+                prometheusAddress: "http://prometheus.monitoring.svc:9090"
+                requestsRunningThreshold: 3
+    asserts:
+      - equal:
+          path: spec.autoscalingConfig.enabled
+          value: true
+          template: vllmruntime.yaml
+      - equal:
+          path: spec.autoscalingConfig.minReplicas
+          value: 0
+          template: vllmruntime.yaml
+      - equal:
+          path: spec.autoscalingConfig.maxReplicas
+          value: 6
+          template: vllmruntime.yaml
+      - equal:
+          path: spec.autoscalingConfig.triggers.prometheusAddress
+          value: "http://prometheus.monitoring.svc:9090"
+          template: vllmruntime.yaml
+
+  - it: should render a cacheserver when enabled
+    release:
+      name: vllm
+      namespace: default
+    set:
+      cacheServer:
+        enabled: true
+        spec:
+          replicas: 2
+    asserts:
+      - containsDocument:
+          kind: CacheServer
+          apiVersion: production-stack.vllm.ai/v1alpha1
+          name: vllm-vllm-stack-operator-cacheserver
+          template: cacheserver.yaml
+      - equal:
+          path: spec.replicas
+          value: 2
+          template: cacheserver.yaml
+
+  - it: should render lora adapters from the values array
+    release:
+      name: vllm
+      namespace: default
+    set:
+      loraAdapters:
+        - name: adapter-one
+          spec:
+            baseModel: "Llama-3.1-8B-Instruct"
+        - name: adapter-two
+          spec:
+            baseModel: "Llama-3.1-8B-Instruct"
+    asserts:
+      - hasDocuments:
+          count: 2
+          template: loraadapters.yaml
+      - containsDocument:
+          kind: LoraAdapter
+          apiVersion: production-stack.vllm.ai/v1alpha1
+          name: adapter-one
+          template: loraadapters.yaml
+      - containsDocument:
+          kind: LoraAdapter
+          apiVersion: production-stack.vllm.ai/v1alpha1
+          name: adapter-two
+          template: loraadapters.yaml
+
+  - it: should render nothing when runtimes and router are disabled
+    release:
+      name: vllm
+      namespace: default
+    set:
+      vllmRuntimes: null
+      vllmRouter:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+          template: vllmruntime.yaml
+      - hasDocuments:
+          count: 0
+          template: vllmrouter.yaml

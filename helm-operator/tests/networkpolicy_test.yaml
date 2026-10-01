@@ -1,0 +1,37 @@
+suite: test metrics network policy
+templates:
+  - networkpolicy-metrics.yaml
+tests:
+  - it: should not render a NetworkPolicy by default
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should restrict metrics ingress to labeled namespaces
+    release:
+      name: vllm
+      namespace: default
+    set:
+      metrics:
+        enabled: true
+        service:
+          port: 9090
+      networkPolicy:
+        enabled: true
+    asserts:
+      - containsDocument:
+          kind: NetworkPolicy
+          apiVersion: networking.k8s.io/v1
+          name: vllm-vllm-stack-operator-allow-metrics-traffic
+      - equal:
+          path: spec.ingress[0].from[0].namespaceSelector.matchLabels.metrics
+          value: enabled
+      - equal:
+          path: spec.ingress[0].ports[0].port
+          value: 9090
+      - equal:
+          path: spec.podSelector.matchLabels["app.kubernetes.io/component"]
+          value: operator

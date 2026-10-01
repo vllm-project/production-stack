@@ -1,0 +1,15 @@
+{{- if .Values.cacheServer.enabled -}}
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: CacheServer
+metadata:
+  name: {{ include "vllm-stack-operator.cacheServerName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: cache-server
+    {{- with .Values.cacheServer.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- toYaml .Values.cacheServer.spec | nindent 2 }}
+{{- end }}
