@@ -1,0 +1,30 @@
+servingEngineSpec:
+  modelSpec:
+    name: bonsai-ternary-8b
+    enabled: true
+    repository: your-registry/llama.cpp-server
+    tag: prism-b8846-d104cf1
+    modelURL: /model/Ternary-Bonsai-8B-Q2_0.gguf
+    replicaCount: 4
+    requestCPU: 4
+    requestMemory: 8Gi
+    requestGPU: 1
+    pvcStorage: ""
+    trustRemoteCode: true
+    vllmConfig:
+      enablePrefixCaching: true
+      maxModelLen: 2048
+      gpuMemoryUtilization: 0.9
+      tensorParallelSize: 1
+    command:
+      - "/opt/prism-release/llama-server"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "-m"
+      - "/model/Ternary-Bonsai-8B-Q2_0.gguf"
+      - "--ctx-size"
+      - "2048"
+      - "--threads"
+      - "8"
