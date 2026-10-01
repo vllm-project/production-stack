@@ -75,6 +75,11 @@ async def route_embeddings(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/embeddings", background_tasks)
 
 
+@main_router.post("/pooling")
+async def route_pooling(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/pooling", background_tasks)
+
+
 @main_router.post("/tokenize")
 async def route_tokenize(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/tokenize", background_tasks)
