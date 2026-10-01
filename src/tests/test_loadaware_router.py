@@ -454,7 +454,7 @@ def stats_monitor():
     SingletonMeta._instances.pop(RequestStatsMonitor, None)
 
 
-async def route_burst(router, monitor):
+async def route_burst(router, monitor, layout_info=None):
     """Route BURST concurrent requests the way `route_general_request` and
     `process_request` do: snapshot `request_stats`, await `route_request`,
     then `on_new_request` on the chosen endpoint (no await in between)."""
@@ -480,6 +480,8 @@ async def route_burst(router, monitor):
         # Controller round-trip: the await during which the rest of the
         # burst is routed.
         await asyncio.sleep(rng.uniform(0.001, 0.02))
+        if layout_info is not None:
+            return LookupRet(layout_info)
         # Only a short shared prefix (e.g. a common system prompt) is cached,
         # on one endpoint.
         return LookupRet({INST_A: (LOCAL, SHARED_PREFIX_TOKENS)})
@@ -524,6 +526,19 @@ async def test_a_burst_is_spread_by_live_load(stats_monitor):
     placement = await route_burst(burst_router(), stats_monitor)
     assert sum(placement.values()) == BURST
     assert set(placement) == {URL_A, URL_B, URL_C}
+    assert max(placement.values()) <= BURST // 2
+
+
+@pytest.mark.asyncio
+async def test_a_cold_burst_is_spread_by_live_load(stats_monitor):
+    """Nothing cached anywhere: the fallback must also see live load."""
+    from uhashring import HashRing
+
+    router = burst_router()
+    router.session_key = "x-user-id"
+    router.hash_ring = HashRing()
+    placement = await route_burst(router, stats_monitor, layout_info={})
+    assert sum(placement.values()) == BURST
     assert max(placement.values()) <= BURST // 2
 
 

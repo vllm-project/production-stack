@@ -723,7 +723,8 @@ class LoadAwareRouter(KvawareRouter):
         request_json: Dict,
     ) -> str:
         """Upstream's no-cache-info route: session hash if any, else lowest
-        QPS."""
+        QPS, scored against the live load (see `live_request_stats`)."""
+        request_stats = self.live_request_stats(request, request_stats)
         session_id = self.extract_session_id(request, request_json)
         logger.debug(f"Fallback to using session id: {session_id}")
         self._update_hash_ring(endpoints)
@@ -772,7 +773,6 @@ class LoadAwareRouter(KvawareRouter):
 
         if not layout_info:
             # Nothing cached anywhere - no benefit term to weigh.
-            request_stats = self.live_request_stats(request, request_stats)
             return self.fallback_url(endpoints, request_stats, request, request_json)
 
         await self.refresh_instance_map(endpoints, layout_info)
