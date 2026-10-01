@@ -23,64 +23,21 @@ class EndpointInfo:
 
 
 class RequestStats:
-    def __init__(self, qps: float):
+    def __init__(
+        self,
+        qps: float = 0.0,
+        in_prefill_requests: int = 0,
+        in_decoding_requests: int = 0,
+    ):
         self.qps = qps
-
-
-class EngineStats:
-    def __init__(self, num_running_requests: int = 0, num_queuing_requests: int = 0):
-        self.num_running_requests = num_running_requests
-        self.num_queuing_requests = num_queuing_requests
+        self.in_prefill_requests = in_prefill_requests
+        self.in_decoding_requests = in_decoding_requests
 
 
 class Request:
     def __init__(self, headers: Dict[str, str], body: Dict[str, Any] = None):
         self.headers = headers
         self.body = body
-
-
-@pytest.mark.asyncio
-async def test_route_falls_back_to_qps_when_match_below_threshold():
-    """
-    When the longest prefix match is shorter than prefix_min_match_length
-    and engine_stats are unavailable, the request falls back to QPS-based
-    routing and picks the engine with the lowest QPS.
-
-    The prompt must still be inserted into the trie, attributed to the
-    selected endpoint. otherwise a router that starts with an empty trie
-    never seeds it (every request matches below the threshold), and prefix
-    affinity never activates.
-    """
-
-    endpoints = [
-        EndpointInfo(url="http://engine1.com"),
-        EndpointInfo(url="http://engine2.com"),
-    ]
-    request_stats = {
-        "http://engine1.com": RequestStats(qps=10),
-        "http://engine2.com": RequestStats(qps=5),
-    }
-    request = Request(headers={})
-    request_json = {"prompt": "some prompt text"}
-
-    router = PrefixAwareRouter(prefix_min_match_length=4096)
-
-    fake_hashtrie = AsyncMock()
-    fake_hashtrie.longest_prefix_match.return_value = (
-        0,
-        {"http://engine1.com"},
-    )
-    router.hashtrie = fake_hashtrie
-
-    url = await router.route_request(
-        endpoints, None, request_stats, request, request_json
-    )
-
-    assert url == "http://engine2.com"
-
-    fake_hashtrie.insert.assert_awaited_once_with(
-        "some prompt text", "http://engine2.com"
-    )
 
 
 @pytest.mark.asyncio
@@ -92,25 +49,21 @@ async def test_below_threshold_prefers_least_inflight_over_stale_qps():
     completions) while instantaneous in-flight is high. a new session's
     first request matches below the threshold. using QPS would pick B and
     the trie insert would latch that bad pick for the session. least-
-    inflight must prefer the idle backend A instead.
+    inflight via request_stats must prefer the idle backend A instead.
     """
 
     endpoints = [
         EndpointInfo(url="http://engine-a.com"),
         EndpointInfo(url="http://engine-b.com"),
     ]
-    # stale qps: b looks "least busy" because long requests rarely complete
+    # stale qps: b looks "least busy" because long requests rarely complete;
+    # request_stats in-flight: b is saturated, a is idle
     request_stats = {
-        "http://engine-a.com": RequestStats(qps=8.0),
-        "http://engine-b.com": RequestStats(qps=1.0),
-    }
-    # instantaneous load: b is saturated, a is idle
-    engine_stats = {
-        "http://engine-a.com": EngineStats(
-            num_running_requests=0, num_queuing_requests=0
+        "http://engine-a.com": RequestStats(
+            qps=8.0, in_prefill_requests=0, in_decoding_requests=0
         ),
-        "http://engine-b.com": EngineStats(
-            num_running_requests=4, num_queuing_requests=4
+        "http://engine-b.com": RequestStats(
+            qps=1.0, in_prefill_requests=4, in_decoding_requests=4
         ),
     }
     request = Request(headers={})
@@ -123,7 +76,7 @@ async def test_below_threshold_prefers_least_inflight_over_stale_qps():
     router.hashtrie = fake_hashtrie
 
     url = await router.route_request(
-        endpoints, engine_stats, request_stats, request, request_json
+        endpoints, None, request_stats, request, request_json
     )
 
     assert url == "http://engine-a.com"
@@ -133,24 +86,20 @@ async def test_below_threshold_prefers_least_inflight_over_stale_qps():
 
 
 @pytest.mark.asyncio
-async def test_below_threshold_falls_back_to_qps_when_engine_stats_incomplete():
+async def test_below_threshold_missing_request_stats_entry_is_load_zero():
     """
-    If any endpoint is missing from engine_stats (cold scrape / scrape
-    failure), least-inflight returns None and the branch falls back to QPS.
+    A URL absent from request_stats has load 0 (idle / never served), so it
+    wins over a known busy backend. does not fall back to QPS.
     """
 
     endpoints = [
         EndpointInfo(url="http://engine1.com"),
         EndpointInfo(url="http://engine2.com"),
     ]
+    # engine2 missing => load 0. stale qps would prefer engine1 if we mixed.
     request_stats = {
-        "http://engine1.com": RequestStats(qps=10),
-        "http://engine2.com": RequestStats(qps=5),
-    }
-    # engine2 missing from scrape
-    engine_stats = {
-        "http://engine1.com": EngineStats(
-            num_running_requests=9, num_queuing_requests=0
+        "http://engine1.com": RequestStats(
+            qps=1.0, in_prefill_requests=9, in_decoding_requests=0
         ),
     }
     request = Request(headers={})
@@ -163,7 +112,7 @@ async def test_below_threshold_falls_back_to_qps_when_engine_stats_incomplete():
     router.hashtrie = fake_hashtrie
 
     url = await router.route_request(
-        endpoints, engine_stats, request_stats, request, request_json
+        endpoints, None, request_stats, request, request_json
     )
 
     assert url == "http://engine2.com"
@@ -173,11 +122,10 @@ async def test_below_threshold_falls_back_to_qps_when_engine_stats_incomplete():
 
 
 @pytest.mark.asyncio
-async def test_below_threshold_near_tied_inflight_spreads_burst():
+async def test_below_threshold_exact_min_ties_spread_and_exclude_near_min():
     """
-    When several backends are within +1 of the minimum in-flight load,
-    selection is random among them so a burst inside one scrape window
-    does not dogpile a single url.
+    Random among endpoints at the exact minimum load only. a backend at
+    min+1 is not in the candidate set (no +1 near-tie band).
     """
 
     endpoints = [
@@ -185,20 +133,16 @@ async def test_below_threshold_near_tied_inflight_spreads_burst():
         EndpointInfo(url="http://engine2.com"),
         EndpointInfo(url="http://engine3.com"),
     ]
+    # loads: 2, 2, 3. exact-min candidates are engine1 and engine2 only.
     request_stats = {
-        "http://engine1.com": RequestStats(qps=1),
-        "http://engine2.com": RequestStats(qps=1),
-        "http://engine3.com": RequestStats(qps=1),
-    }
-    engine_stats = {
-        "http://engine1.com": EngineStats(
-            num_running_requests=2, num_queuing_requests=0
+        "http://engine1.com": RequestStats(
+            qps=1, in_prefill_requests=2, in_decoding_requests=0
         ),
-        "http://engine2.com": EngineStats(
-            num_running_requests=2, num_queuing_requests=1
+        "http://engine2.com": RequestStats(
+            qps=1, in_prefill_requests=1, in_decoding_requests=1
         ),
-        "http://engine3.com": EngineStats(
-            num_running_requests=5, num_queuing_requests=0
+        "http://engine3.com": RequestStats(
+            qps=1, in_prefill_requests=3, in_decoding_requests=0
         ),
     }
     request = Request(headers={})
@@ -209,13 +153,12 @@ async def test_below_threshold_near_tied_inflight_spreads_burst():
     router.hashtrie = fake_hashtrie
 
     counts: Counter = Counter()
-    # deterministic but covers both near-tied urls across many draws
     with patch(
         "vllm_router.routers.routing_logic.random.choice", side_effect=lambda xs: xs[0]
     ):
         url = await router.route_request(
             endpoints,
-            engine_stats,
+            None,
             request_stats,
             request,
             {"prompt": "burst-0"},
@@ -226,7 +169,7 @@ async def test_below_threshold_near_tied_inflight_spreads_burst():
     ):
         url = await router.route_request(
             endpoints,
-            engine_stats,
+            None,
             request_stats,
             request,
             {"prompt": "burst-1"},
@@ -239,17 +182,55 @@ async def test_below_threshold_near_tied_inflight_spreads_burst():
 
 
 @pytest.mark.asyncio
+async def test_below_threshold_cold_all_zero_seeds_trie():
+    """
+    Empty / all-zero request_stats: every endpoint has load 0, so selection
+    is random among all, and the chosen url is still inserted into the trie
+    (#990 seeding).
+    """
+
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+    request_stats: Dict[str, RequestStats] = {}
+    request = Request(headers={})
+    request_json = {"prompt": "some prompt text"}
+
+    router = PrefixAwareRouter(prefix_min_match_length=4096)
+
+    fake_hashtrie = AsyncMock()
+    fake_hashtrie.longest_prefix_match.return_value = (
+        0,
+        {"http://engine1.com"},
+    )
+    router.hashtrie = fake_hashtrie
+
+    with patch(
+        "vllm_router.routers.routing_logic.random.choice",
+        side_effect=lambda xs: "http://engine2.com",
+    ):
+        url = await router.route_request(
+            endpoints, None, request_stats, request, request_json
+        )
+
+    assert url == "http://engine2.com"
+    fake_hashtrie.insert.assert_awaited_once_with(
+        "some prompt text", "http://engine2.com"
+    )
+
+
+@pytest.mark.asyncio
 async def test_below_threshold_seeding_enables_later_pinning():
     """
     Regression test for the trie never seeding when
     prefix_min_match_length > 0.
 
     Uses the real HashTrie. the first request has no prefix match, so it is
-    routed by the below-threshold fallback (qps here, no engine_stats) - but
-    it must seed the trie. a follow-up request extending the same prompt
-    then matches above the threshold and must pin to the endpoint that
-    served the first request, even when qps stats would prefer the other
-    endpoint.
+    routed by least-inflight via request_stats - but it must seed the trie.
+    a follow-up request extending the same prompt then matches above the
+    threshold and must pin to the endpoint that served the first request,
+    even when request_stats would prefer the other endpoint.
     """
 
     endpoints = [
@@ -264,10 +245,15 @@ async def test_below_threshold_seeding_enables_later_pinning():
     first_prompt = "x" * 128 + "y" * 72
     followup_prompt = first_prompt + "z" * 40
 
-    # First request: cold trie, match below threshold -> QPS picks engine1.
+    # First request: cold trie, match below threshold -> least-inflight
+    # picks engine1 (unique min load).
     request_stats = {
-        "http://engine1.com": RequestStats(qps=5),
-        "http://engine2.com": RequestStats(qps=10),
+        "http://engine1.com": RequestStats(
+            qps=5, in_prefill_requests=0, in_decoding_requests=0
+        ),
+        "http://engine2.com": RequestStats(
+            qps=10, in_prefill_requests=3, in_decoding_requests=0
+        ),
     }
     url = await router.route_request(
         endpoints, None, request_stats, request, {"prompt": first_prompt}
@@ -276,10 +262,14 @@ async def test_below_threshold_seeding_enables_later_pinning():
 
     # Follow-up: shares the first 128-char chunk, so it matches at the
     # threshold and must pin to engine1 even though engine2 now has the
-    # lower QPS.
+    # lower in-flight load.
     request_stats = {
-        "http://engine1.com": RequestStats(qps=10),
-        "http://engine2.com": RequestStats(qps=5),
+        "http://engine1.com": RequestStats(
+            qps=10, in_prefill_requests=5, in_decoding_requests=0
+        ),
+        "http://engine2.com": RequestStats(
+            qps=5, in_prefill_requests=0, in_decoding_requests=0
+        ),
     }
     url = await router.route_request(
         endpoints, None, request_stats, request, {"prompt": followup_prompt}
@@ -306,25 +296,21 @@ async def test_least_inflight_seeding_pins_followup_away_from_busy_backend():
     followup_prompt = first_prompt + "c" * 40
 
     request_stats = {
-        "http://engine-a.com": RequestStats(qps=9.0),
-        "http://engine-b.com": RequestStats(qps=0.5),
-    }
-    engine_stats = {
-        "http://engine-a.com": EngineStats(
-            num_running_requests=0, num_queuing_requests=0
+        "http://engine-a.com": RequestStats(
+            qps=9.0, in_prefill_requests=0, in_decoding_requests=0
         ),
-        "http://engine-b.com": EngineStats(
-            num_running_requests=6, num_queuing_requests=2
+        "http://engine-b.com": RequestStats(
+            qps=0.5, in_prefill_requests=6, in_decoding_requests=2
         ),
     }
 
     url = await router.route_request(
-        endpoints, engine_stats, request_stats, request, {"prompt": first_prompt}
+        endpoints, None, request_stats, request, {"prompt": first_prompt}
     )
     assert url == "http://engine-a.com"
 
     url = await router.route_request(
-        endpoints, engine_stats, request_stats, request, {"prompt": followup_prompt}
+        endpoints, None, request_stats, request, {"prompt": followup_prompt}
     )
     assert url == "http://engine-a.com"
 
