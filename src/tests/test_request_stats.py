@@ -149,3 +149,26 @@ async def test_process_request_balances_counters_on_success(monitor):
     assert stats[URL].in_decoding_requests == 0
     assert stats[URL].finished_requests == 1
     assert monitor.request_start_time == {}
+
+
+@pytest.mark.asyncio
+async def test_process_request_counts_overlapping_requests_sharing_an_id(monitor):
+    # Clients can reuse an X-Request-Id; two overlapping requests that share it
+    # must each release their own slot.
+    request = _fake_request(monitor, _OkRequestCM)
+    body = json.dumps({"model": "test-model", "stream": False}).encode()
+    gens = [
+        process_request(request, body, URL, "req-1", "/v1/chat/completions", None)
+        for _ in range(2)
+    ]
+    for _ in range(2):  # both dispatched, then both past their first chunk
+        for gen in gens:
+            await anext(gen)
+    for gen in gens:
+        async for _ in gen:
+            pass
+
+    stats = monitor.get_request_stats(time.time())
+    assert stats[URL].in_prefill_requests == 0
+    assert stats[URL].in_decoding_requests == 0
+    assert stats[URL].finished_requests == 2
