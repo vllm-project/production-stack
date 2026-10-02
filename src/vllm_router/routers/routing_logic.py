@@ -367,6 +367,33 @@ class KvawareRouter(RoutingInterface):
                 pass
             self.lmcache_cluster_monitor_task = None
 
+    async def tokenize_prompt(
+        self, endpoints: List[EndpointInfo], request_json: Dict
+    ) -> List[int]:
+        """Local-first tokenization with the remote `/tokenize` fallback.
+
+        The remote fallback is a blocking HTTP call, so it runs in an
+        executor rather than on the event loop.
+        """
+        try:
+            tokenizer = self._get_tokenizer(endpoints)
+            return tokenizer.encode(request_json.get("prompt", ""))
+        except Exception:
+            remote_url = endpoints[0].url + "/tokenize"
+            headers = {"Content-Type": "application/json"}
+            data = {
+                "model": endpoints[0].model_names[0],
+                "prompt": request_json.get("prompt", ""),
+            }
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    remote_url, headers=headers, json=data, timeout=10
+                ),
+            )
+            return response.json()["tokens"]
+
     async def route_request(
         self,
         endpoints: List[EndpointInfo],
@@ -391,24 +418,13 @@ class KvawareRouter(RoutingInterface):
             request_json (Dict): The request body (needed for finding the
             longest prefix match)
         """
-        token_ids = None
-        # Local-first tokenization, fall back to remote "/tokenize" API on failure
+        if not endpoints:
+            raise HTTPException(
+                status_code=503, detail="No backend endpoints available"
+            )
+
         # TODO (Yuhan): Handle chat completions
-        try:
-            tokenizer = self._get_tokenizer(endpoints)
-            token_ids = tokenizer.encode(request_json.get("prompt", ""))
-        except Exception:
-            # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
-            remote_url = endpoints[0].url + "/tokenize"
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json.get("prompt", ""),
-            }
-            body = requests.post(
-                remote_url, headers=headers, json=data, timeout=10
-            ).json()
-            token_ids = body["tokens"]
+        token_ids = await self.tokenize_prompt(endpoints, request_json)
 
         event_id = "Lookup" + str(uuid.uuid4())
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
@@ -661,33 +677,6 @@ class LoadAwareRouter(KvawareRouter):
 
         await asyncio.gather(*(query_endpoint(e) for e in endpoints))
         logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
-
-    async def tokenize_prompt(
-        self, endpoints: List[EndpointInfo], request_json: Dict
-    ) -> List[int]:
-        """Local-first tokenization with the remote `/tokenize` fallback.
-
-        The remote fallback is a blocking HTTP call, so it runs in an
-        executor rather than on the event loop.
-        """
-        try:
-            tokenizer = self._get_tokenizer(endpoints)
-            return tokenizer.encode(request_json.get("prompt", ""))
-        except Exception:
-            remote_url = endpoints[0].url + "/tokenize"
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "model": endpoints[0].model_names[0],
-                "prompt": request_json.get("prompt", ""),
-            }
-            loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: requests.post(
-                    remote_url, headers=headers, json=data, timeout=10
-                ),
-            )
-            return response.json()["tokens"]
 
     def fallback_url(
         self,
