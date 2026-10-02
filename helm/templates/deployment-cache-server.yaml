@@ -82,7 +82,7 @@ spec:
             # invoke does not ship in the LMCache image. A TCP socket check is the
             # only probe kind compatible with the actual protocol on this port.
             tcpSocket:
-              port: {{ .Values.cacheserverSpec.containerPort }}
+              port: caserver-cport
           {{- end }}
           {{- with .Values.cacheserverSpec.containerSecurityContext }}
           securityContext:
