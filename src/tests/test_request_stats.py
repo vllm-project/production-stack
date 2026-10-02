@@ -55,6 +55,19 @@ def test_completed_request_releases_per_request_bookkeeping(monitor):
     assert monitor.first_token_time == {}
 
 
+def test_avg_latency_drops_requests_outside_the_window(monitor):
+    # Like QPS and TTFT, latency only covers the sliding window (10 s here).
+    now = time.time()
+    monitor.on_new_request(URL, "req-1", now)
+    monitor.on_request_response(URL, "req-1", now + 0.5)
+    monitor.on_request_complete(URL, "req-1", now + 2)
+
+    assert monitor.get_request_stats(now + 3)[URL].avg_latency == 2
+    stats = monitor.get_request_stats(now + 100)
+    assert stats[URL].ttft == -1
+    assert stats[URL].avg_latency == -1
+
+
 class _RaisingRequestCM:
     async def __aenter__(self):
         raise ConnectionError("backend down")
