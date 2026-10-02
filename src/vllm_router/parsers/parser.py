@@ -131,6 +131,14 @@ def parse_args():
         "--port", type=int, default=8001, help="The port to run the server on."
     )
     parser.add_argument(
+        "--timeout-keep-alive",
+        type=int,
+        default=5,
+        help="Seconds to keep an idle HTTP keep-alive connection open before "
+        "closing it (uvicorn default: 5). Raise it when clients reuse "
+        "connections across requests spaced more than a few seconds apart.",
+    )
+    parser.add_argument(
         "--root-path",
         type=str,
         default="",
