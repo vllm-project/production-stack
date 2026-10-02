@@ -36,6 +36,11 @@ tests:
           requests:
             cpu: "0.5"
             memory: "512Mi"
+        env:
+          - name: LMCACHE_CACHE_POLICY
+            value: "LRU"
+          - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+            value: "16"
         annotations:
           annotation-key: annotation-value
         labels:
@@ -164,6 +169,14 @@ tests:
     - equal:
         path: spec.template.spec.containers[0].imagePullPolicy
         value: "Always"
+
+    - equal:
+        path: spec.template.spec.containers[0].env
+        value:
+          - name: LMCACHE_CACHE_POLICY
+            value: "LRU"
+          - name: LMCACHE_MAX_LOCAL_CPU_SIZE
+            value: "16"
 
     - equal:
         path: spec.template.spec.containers[0].livenessProbe
