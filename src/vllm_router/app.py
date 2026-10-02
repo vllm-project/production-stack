@@ -243,7 +243,9 @@ def initialize_all(app: FastAPI, args):
         raise ValueError(f"Invalid service discovery type: {args.service_discovery}")
 
     # Initialize singletons via custom functions.
-    initialize_engine_stats_scraper(args.engine_stats_interval)
+    initialize_engine_stats_scraper(
+        args.engine_stats_interval, args.engine_stats_scrape_timeout
+    )
     initialize_request_stats_monitor(args.request_stats_window)
 
     if args.enable_batch_api:

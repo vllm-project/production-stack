@@ -41,6 +41,7 @@ The router can be configured using command-line arguments. Below are the availab
 ### Monitoring Options
 
 - `--engine-stats-interval`: The interval in seconds to scrape engine statistics. Default is `30`.
+- `--engine-stats-scrape-timeout`: The read timeout in seconds for a single engine `/metrics` scrape. Defaults to `--engine-stats-interval`.
 - `--request-stats-window`: The sliding window seconds to compute request statistics. Default is `60`.
 
 ### Logging Options
