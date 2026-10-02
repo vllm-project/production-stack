@@ -234,6 +234,7 @@ def initialize_all(app: FastAPI, args):
             decode_model_labels=args.decode_model_labels,
             watcher_timeout_seconds=args.k8s_watcher_timeout_seconds,
             health_check_timeout_seconds=args.backend_health_check_timeout_seconds,
+            static_known_models=args.k8s_known_models,
         )
 
     elif args.service_discovery == "external-only":
