@@ -87,9 +87,17 @@ wait_for_vllm_pvcs_deleted() {
     pvcs=$(kubectl get pvc -o name 2>/dev/null | grep '^persistentvolumeclaim/vllm-' || true)
     if [ -n "$pvcs" ]; then
         print_status "⏳ Waiting for PVCs to be deleted: $(echo "$pvcs" | tr '\n' ' ')"
-        # shellcheck disable=SC2086
-        kubectl wait --for=delete --timeout=120s $pvcs >/dev/null 2>&1 ||
-            print_warning "Timed out waiting for PVCs to be deleted: $(echo "$pvcs" | tr '\n' ' ')"
+        # Wait per PVC: a single multi-resource wait aborts as soon as one of
+        # them is already gone, leaving the rest unwaited.
+        local pvc
+        for pvc in $pvcs; do
+            kubectl wait --for=delete --timeout=120s "$pvc" >/dev/null 2>&1 || {
+                # Only a PVC that still exists is a real timeout
+                if kubectl get "$pvc" >/dev/null 2>&1; then
+                    print_warning "Timed out waiting for PVC to be deleted: $pvc"
+                fi
+            }
+        done
     fi
 }
 
