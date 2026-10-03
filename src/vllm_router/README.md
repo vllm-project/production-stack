@@ -101,6 +101,8 @@ vllm-router --port 8000 \
 By enabling the `--static-backend-health-checks` flag, **vllm-router** will send a simple request to
 your LLM nodes every minute to verify that they still work.
 If a node is down, it will output a warning and exclude the node from being routed to.
+When `VLLM_API_KEY` is set, health-check requests send it as a Bearer token in the
+`Authorization` header.
 
 If you enable this flag, its also required that you specify `--static-model-types` as we have to use
 different endpoints for each model type.
