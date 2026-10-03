@@ -77,12 +77,12 @@ spec:
             periodSeconds: {{ .Values.cacheserverSpec.livenessProbe.periodSeconds | default 10 }}
             failureThreshold: {{ .Values.cacheserverSpec.livenessProbe.failureThreshold | default 3 }}
             timeoutSeconds: {{ .Values.cacheserverSpec.livenessProbe.timeoutSeconds | default 5 }}
-            exec:
-              command:
-              - "/opt/venv/bin/python3"
-              - "/workspace/LMCache/examples/kubernetes/health_probe.py"
-              - "127.0.0.1"
-              - "{{ .Values.cacheserverSpec.containerPort }}"
+            # The cache server is a raw TCP socket server (lmcache_server), not an
+            # HTTP server, and the exec-based health_probe.py script this used to
+            # invoke does not ship in the LMCache image. A TCP socket check is the
+            # only probe kind compatible with the actual protocol on this port.
+            tcpSocket:
+              port: caserver-cport
           {{- end }}
           {{- with .Values.cacheserverSpec.containerSecurityContext }}
           securityContext:
