@@ -120,6 +120,13 @@ async def route_is_sleeping(request: Request, background_tasks: BackgroundTasks)
     return await route_sleep_wakeup_request(request, "/is_sleeping", background_tasks)
 
 
+@main_router.post("/reset_prefix_cache")
+async def route_reset_prefix_cache(request: Request, background_tasks: BackgroundTasks):
+    return await route_sleep_wakeup_request(
+        request, "/reset_prefix_cache", background_tasks
+    )
+
+
 @main_router.get("/version")
 async def show_version():
     ver = {"version": __version__}
