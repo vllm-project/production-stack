@@ -1299,6 +1299,7 @@ async def proxy_multipart_request(
             KvawareRouter,
             PrefixAwareRouter,
             SessionRouter,
+            PriorityRouter,
             DisaggregatedPrefillOrchestratedRouter,
         ),
     ):

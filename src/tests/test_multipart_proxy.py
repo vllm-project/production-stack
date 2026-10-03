@@ -51,7 +51,9 @@ async def multipart_backend(endpoint, handler):
 
 
 @asynccontextmanager
-async def router_client(backend_url, model=AUDIO_MODEL):
+async def router_client(
+    backend_url, model=AUDIO_MODEL, routing_logic=RoutingLogic.ROUND_ROBIN
+):
     app = FastAPI()
     app.include_router(main_router)
 
@@ -77,7 +79,7 @@ async def router_client(backend_url, model=AUDIO_MODEL):
         )
 
         router = initialize_routing_logic(
-            RoutingLogic.ROUND_ROBIN,
+            routing_logic,
             max_instance_failover_reroute_attempts=0,
         )
         stack.callback(cleanup_routing_logic)
@@ -227,3 +229,28 @@ async def test_image_edit_accepts_standard_multipart_request():
         "content_type": "image/png",
         "content": b"fake-image",
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "routing_logic", [RoutingLogic.ROUND_ROBIN, RoutingLogic.PRIORITY]
+)
+async def test_audio_translation_routes_under_every_routing_logic(routing_logic):
+    """proxy_multipart_request dispatches on isinstance, so a router added to
+    route_general_request and not to this call site falls through to the
+    synchronous branch and is called with the wrong arity."""
+
+    async def translate(request):
+        await request.post()
+        return web.json_response({"text": "translated"})
+
+    async with multipart_backend("/v1/audio/translations", translate) as backend_url:
+        async with router_client(backend_url, routing_logic=routing_logic) as client:
+            response = await client.post(
+                "/v1/audio/translations",
+                data={"model": AUDIO_MODEL},
+                files={"file": ("speech.wav", b"fake-audio", "audio/wav")},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"text": "translated"}
