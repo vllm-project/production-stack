@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
+from vllm_router.routers.routing_logic import PriorityRouter, RoutingDecision
 from vllm_router.services.request_service.request import (
     process_request,
     proxy_multipart_request,
@@ -12,10 +13,11 @@ from vllm_router.utils import SingletonABCMeta
 
 
 class EndpointInfo:
-    def __init__(self, url, model_names=None, sleep=False):
+    def __init__(self, url, model_names=None, sleep=False, Id=None):
         self.url = url
         self.model_names = model_names or ["whisper-model"]
         self.sleep = sleep
+        self.Id = Id
 
 
 @pytest.fixture(autouse=True)
@@ -109,6 +111,12 @@ async def test_proxy_multipart_request_preserves_client_auth_without_stale_bound
             "x-custom-header": "keep-me",
         }
     )
+    request.app.state.router.route_request.return_value = RoutingDecision(
+        "http://engine",
+        algorithm="roundrobin",
+        decision="primary",
+        reason="round_robin",
+    )
     backend_response = MagicMock()
     backend_response.status = 200
     backend_response.headers.items.return_value = [("content-type", "application/json")]
@@ -119,15 +127,22 @@ async def test_proxy_multipart_request_preserves_client_auth_without_stale_bound
     request.app.state.aiohttp_client_wrapper = MagicMock(return_value=mock_client)
 
     service_discovery = MagicMock()
-    service_discovery.get_endpoint_info.return_value = [EndpointInfo("http://engine")]
+    service_discovery.get_endpoint_info.return_value = [
+        EndpointInfo("http://engine", Id="multipart-engine-id")
+    ]
 
     form_data = aiohttp.FormData()
     form_data.add_field("file", b"audio-bytes", filename="sample.wav")
     form_data.add_field("model", "whisper-model")
 
-    with patch(
-        "vllm_router.services.request_service.request.get_service_discovery",
-        return_value=service_discovery,
+    with (
+        patch(
+            "vllm_router.services.request_service.request.get_service_discovery",
+            return_value=service_discovery,
+        ),
+        patch(
+            "vllm_router.services.request_service.request.record_routing_decision"
+        ) as metric_mock,
     ):
         response = await proxy_multipart_request(
             form_data,
@@ -145,3 +160,48 @@ async def test_proxy_multipart_request_preserves_client_auth_without_stale_bound
     assert "x-request-id" not in forwarded_headers
     assert forwarded_headers["x-custom-header"] == "keep-me"
     assert "content-type" not in lowered_headers
+    metric_mock.assert_called_once_with(
+        algorithm="roundrobin",
+        decision="primary",
+        reason="round_robin",
+    )
+
+
+@pytest.mark.asyncio
+async def test_proxy_multipart_request_awaits_priority_router_with_request_body():
+    request = _build_request()
+    request.app.state.router = PriorityRouter(priority_default=0, priority_threshold=0)
+
+    backend_response = MagicMock()
+    backend_response.status = 200
+    backend_response.headers.items.return_value = [("content-type", "application/json")]
+    backend_response.json = AsyncMock(return_value={"ok": True})
+
+    mock_client = MagicMock()
+    mock_client.post = AsyncMock(return_value=backend_response)
+    request.app.state.aiohttp_client_wrapper = MagicMock(return_value=mock_client)
+
+    service_discovery = MagicMock()
+    service_discovery.get_endpoint_info.return_value = [
+        EndpointInfo("http://engine", Id="priority-engine-id")
+    ]
+
+    form_data = aiohttp.FormData()
+    form_data.add_field("file", b"audio-bytes", filename="sample.wav")
+    form_data.add_field("model", "whisper-model")
+
+    with patch(
+        "vllm_router.services.request_service.request.get_service_discovery",
+        return_value=service_discovery,
+    ):
+        response = await proxy_multipart_request(
+            form_data,
+            "whisper-model",
+            "/v1/audio/transcriptions",
+            request,
+        )
+
+    assert response.status_code == 200
+    assert mock_client.post.await_args.args[0] == (
+        "http://engine/v1/audio/transcriptions"
+    )
