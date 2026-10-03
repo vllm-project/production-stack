@@ -613,7 +613,10 @@ async def route_general_request(
         f"Debug session extraction - Router type: {type(request.app.state.router).__name__}"
     )
     logger.debug(f"Debug session extraction - Session key config: {session_key}")
-    logger.debug(f"Debug session extraction - Request headers: {dict(request.headers)}")
+    # Pass the Headers object as a lazy argument rather than a formatted dict,
+    # so TokenRedactionFilter can find it in record.args and redact
+    # Authorization and Cookie before this line is emitted.
+    logger.debug("Debug session extraction - Request headers: %s", request.headers)
     logger.debug(f"Debug session extraction - Extracted session ID: {session_id}")
 
     logger.info(
