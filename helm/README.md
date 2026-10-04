@@ -551,3 +551,31 @@ The output should look like the following:
   ]
 }
 ```
+
+## Optional: runtime AI inventory (k8s-aibom)
+
+The stack can optionally install [k8s-aibom](https://github.com/GoogleCloudPlatform/k8s-aibom),
+an unprivileged controller that generates a [CycloneDX 1.6 ML-BOM](https://cyclonedx.org/capabilities/mlbom/)
+for each AI workload actually serving — model identity, runtime, and
+container digests, each with evidence and a confidence tier. vLLM is a
+natively detected runtime.
+
+Enable it at install time, then opt in the namespace you deploy the
+stack into (inventory is namespace-opt-in by design — nothing is
+recorded without this label):
+
+```bash
+helm install llmstack . --set k8s-aibom.enabled=true
+kubectl label namespace <your-namespace> aibom.k8saibom.dev/enabled=true
+```
+
+Each vLLM deployment then gets an `AIBOM` resource:
+
+```bash
+kubectl get aiboms -n <your-namespace>
+```
+
+The BOM records the served model (from `--model` args or `HF_MODEL_ID`,
+confidence `declared`) and the vLLM runtime (confidence `inferred`),
+and can be shipped to external sinks (GCS, webhook) for audit retention.
+See the [k8s-aibom documentation](https://github.com/GoogleCloudPlatform/k8s-aibom#readme).

@@ -130,6 +130,10 @@ servingEngineSpec:
       #       port: 8080
       #     initialDelaySeconds: 5
       #     periodSeconds: 10
+    # -- Optional container command for the main vLLM container. Replaces the default vllm serve invocation.
+    command: [] # @schema item: string
+    # -- Optional container args for the main vLLM container. Used with command to override the default vllm serve invocation.
+    args: [] # @schema item: string
     # -- The configuration for the init container to be run before the main container.
     initContainer:
     # -- The name of the init container
@@ -1103,3 +1107,12 @@ prometheus-adapter:
   #       matches: ""
   #       as: "vllm_num_incoming_requests_total"
   #     metricsQuery: sum by(namespace, model) (vllm:num_incoming_requests_total)
+
+# -- Optional runtime AI inventory (k8s-aibom). When enabled, a
+# lightweight, unprivileged controller generates a CycloneDX 1.6 ML-BOM
+# for AI workloads in namespaces labeled aibom.k8saibom.dev/enabled=true
+# — including the vLLM deployments this chart manages. Disabled by
+# default; nothing is inventoried without both this flag and the
+# namespace opt-in label.
+k8s-aibom:
+  enabled: false

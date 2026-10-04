@@ -191,6 +191,15 @@
                 }
             }
         },
+        "k8s-aibom": {
+            "description": "Optional runtime AI inventory (k8s-aibom). When enabled, a lightweight, unprivileged controller generates a CycloneDX 1.6 ML-BOM for AI workloads in namespaces labeled aibom.k8saibom.dev/enabled=true — including the vLLM deployments this chart manages. Disabled by default; nothing is inventoried without both this flag and the namespace opt-in label.",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
         "kube-prometheus-stack": {
             "description": "Kube Prometheus Stack dependency chart configuration. More values can be found [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml).",
             "type": "object"
@@ -1113,6 +1122,20 @@
                             "annotations": {
                                 "description": "The annotations to add to the deployment",
                                 "type": "object"
+                            },
+                            "args": {
+                                "description": "Optional container args for the main vLLM container. Used with command to override the default vllm serve invocation.",
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "command": {
+                                "description": "Optional container command for the main vLLM container. Replaces the default vllm serve invocation.",
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
                             },
                             "enableLoRA": {
                                 "description": "Whether to enable LoRA",

@@ -52,8 +52,8 @@ Explanation of Key Items in ``values-15-a-minimal-pipeline-parallel-example-rayc
   - **requestGPU**: Defines the number of GPUs to allocate for the KubeRay head pod. Currently, the Ray head node must also participate in both tensor parallelism and pipeline parallelism. This requirement exists because the ``vllm serve ...`` command is executed on the Ray head node, and vLLM mandates that the pod where this command is run must have at least one visible GPU.
 
 - **name**: The unique identifier for your model deployment.
-- **repository**: The Docker repository containing the model's serving engine image. RayCluster images must include both the Ray Python package and the ``ray`` CLI because KubeRay uses them to start the head and worker nodes. The example uses ``lmcache/vllm-openai``, which includes the Ray runtime.
-- **tag**: Specifies the version of the model image to use.
+- **repository**: The Docker repository containing the model's serving engine image. RayCluster images must include both the Ray Python package and the ``ray`` CLI because KubeRay starts the head and worker containers with a generated ``ray start`` command. The example uses ``vllm/vllm-openai``.
+- **tag**: Specifies the version of the model image to use. This must stay pinned to ``v0.17.1``, the last ``vllm/vllm-openai`` tag that ships Ray: vLLM removed Ray from the image's CUDA dependencies in v0.18.0, so newer tags (including ``latest``) do not contain the ``ray`` executable. Current ``lmcache/vllm-openai`` tags do not contain it either. If you substitute your own image, verify it first with ``docker run --rm --entrypoint /bin/bash <image> -c "command -v ray"``.
 - **modelURL**: The URL pointing to the model on Hugging Face or another hosting service.
 - **replicaCount**: The number of total Kuberay worker pods.
 - **requestCPU**: The amount of CPU resources requested per Kuberay worker pod.
@@ -89,8 +89,8 @@ In the following example, we configure a total of two Ray nodes each equipped wi
      runtimeClassName: ""
      modelSpec:
      - name: "distilgpt2"
-       repository: "lmcache/vllm-openai"
-       tag: "latest"
+       repository: "vllm/vllm-openai"
+       tag: "v0.17.1"
        modelURL: "distilbert/distilgpt2"
 
        replicaCount: 1
