@@ -1,0 +1,20 @@
+apiVersion: v2
+name: vllm-stack-operator
+description: Kubernetes operator for the vLLM production stack. Manages VLLMRuntime, VLLMRouter, CacheServer and LoraAdapter custom resources.
+
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semantic.org/)
+version: 0.1.0
+
+# The version of the operator image shipped by default. Override with `image.tag`.
+appVersion: "latest"
+
+# Minimum Kubernetes version: the CRDs use apiextensions.k8s.io/v1 (1.16+) and
+# the operator targets controller-runtime bases tested against modern clusters.
+kubeVersion: ">=1.23.0-0"
+
+maintainers:
+  - name: apostac

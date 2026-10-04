@@ -1,0 +1,84 @@
+suite: test operator rbac and service account
+templates:
+  - serviceaccount.yaml
+  - role.yaml
+  - rolebinding.yaml
+tests:
+  - it: should render service account, roles and bindings by default
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - containsDocument:
+          kind: ServiceAccount
+          apiVersion: v1
+          name: vllm-vllm-stack-operator
+          template: serviceaccount.yaml
+      - containsDocument:
+          kind: ClusterRole
+          apiVersion: rbac.authorization.k8s.io/v1
+          name: vllm-vllm-stack-operator
+          template: role.yaml
+      - containsDocument:
+          kind: Role
+          apiVersion: rbac.authorization.k8s.io/v1
+          name: vllm-vllm-stack-operator-leader-election
+          template: role.yaml
+      - containsDocument:
+          kind: ClusterRoleBinding
+          apiVersion: rbac.authorization.k8s.io/v1
+          name: vllm-vllm-stack-operator
+          template: rolebinding.yaml
+      - containsDocument:
+          kind: RoleBinding
+          apiVersion: rbac.authorization.k8s.io/v1
+          name: vllm-vllm-stack-operator-leader-election
+          template: rolebinding.yaml
+
+  - it: should bind the cluster role to the created service account
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: vllm-vllm-stack-operator
+          template: rolebinding.yaml
+      - equal:
+          path: subjects[0].namespace
+          value: default
+          template: rolebinding.yaml
+
+  - it: should render nothing when rbac and service account creation are disabled
+    release:
+      name: vllm
+      namespace: default
+    set:
+      rbac:
+        create: false
+      serviceAccount:
+        create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+          template: role.yaml
+      - hasDocuments:
+          count: 0
+          template: rolebinding.yaml
+      - hasDocuments:
+          count: 0
+          template: serviceaccount.yaml
+
+  - it: should use an existing service account name when provided
+    release:
+      name: vllm
+      namespace: default
+    set:
+      serviceAccount:
+        create: false
+        name: my-existing-sa
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: my-existing-sa
+          template: rolebinding.yaml
