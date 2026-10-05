@@ -329,6 +329,14 @@ class KvawareRouter(RoutingInterface):
         self.tokenizers: Dict[str, AutoTokenizer] = {}
         self.threshold = kv_aware_threshold
 
+    def _get_tokenizer(
+        self, endpoints: List[EndpointInfo], model_name: Optional[str] = None
+    ):
+        model_name = model_name or endpoints[0].model_names[0]
+        if model_name not in self.tokenizers:
+            self.tokenizers[model_name] = AutoTokenizer.from_pretrained(model_name)
+        return self.tokenizers[model_name]
+
     def start_kv_manager(self):
         """
         Start the kv manager
@@ -388,22 +396,74 @@ class KvawareRouter(RoutingInterface):
         token_ids = None
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         # TODO (Yuhan): Handle chat completions
-        token_ids = await self.tokenize_prompt(endpoints, request_json)
+        try:
+            model_name = request_json.get("model") or None
+            tokenizer = self._get_tokenizer(endpoints, model_name)
+            token_ids = tokenizer.encode(request_json.get("prompt", ""))
+        except Exception:
+            # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
+            remote_url = endpoints[0].url + "/tokenize"
+            headers = {"Content-Type": "application/json"}
+            data = {
+                "model": request_json.get("model") or endpoints[0].model_names[0],
+                "prompt": request_json.get("prompt", ""),
+            }
+            body = requests.post(
+                remote_url, headers=headers, json=data, timeout=10
+            ).json()
+            token_ids = body["tokens"]
 
         event_id = "Lookup" + str(uuid.uuid4())
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
         instance_id = await self.query_manager(msg)
         matched_tokens = math.inf
+        matched_instance_id = None
         logger.debug(f"Lookup return message: {instance_id}")
-        if len(list(instance_id.layout_info.keys())) > 0:
-            matched_instance_id = list(instance_id.layout_info.keys())[
-                0
-            ]  # Get the first key
-            matched_tokens = instance_id.layout_info[matched_instance_id][1]
+        layout_info = instance_id.layout_info
+        if layout_info:
+            mapped_urls = set(self.instance_id_to_ip.values())
+            if any(endpoint.url not in mapped_urls for endpoint in endpoints) or any(
+                holder not in self.instance_id_to_ip for holder in layout_info
+            ):
+                for endpoint in endpoints:
+                    event_id = "QueryInst" + str(uuid.uuid4())
+                    query_ip = endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
+                        0
+                    ].split("//")[1]
+                    query_message = QueryInstMsg(
+                        ip=query_ip,
+                        event_id=event_id,
+                    )
+                    endpoint_instance_id = await self.query_manager(query_message)
+                    logger.debug(
+                        f"Query ip: {query_ip}, return instance id: "
+                        f"{endpoint_instance_id}"
+                    )
+                    self.instance_id_to_ip[endpoint_instance_id.instance_id] = (
+                        endpoint.url
+                    )
+                logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
+
+            live_urls = {endpoint.url for endpoint in endpoints}
+            url_to_instance = {
+                url: holder
+                for holder, url in self.instance_id_to_ip.items()
+                if url in live_urls
+            }
+            live_holders = [
+                holder for holder in layout_info if holder in url_to_instance.values()
+            ]
+        else:
+            live_holders = []
+
+        if live_holders:
+            matched_instance_id = max(live_holders, key=lambda key: layout_info[key][1])
+            matched_tokens = layout_info[matched_instance_id][1]
 
         if (
             instance_id is None
             or len(instance_id.layout_info) == 0
+            or matched_instance_id is None
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
             session_id = self.extract_session_id(request, request_json)
@@ -417,30 +477,8 @@ class KvawareRouter(RoutingInterface):
                 # Use the hash ring to get the endpoint for the session ID
                 url = self.hash_ring.get_node(session_id)
             return url
-        else:
-            queried_instance_ids = [info for info in instance_id.layout_info]
-            if queried_instance_ids[0] not in self.instance_id_to_ip:
-                for endpoint in endpoints:
-                    event_id = "QueryInst" + str(uuid.uuid4())
-                    query_ip = endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
-                        0
-                    ].split("//")[1]
-                    query_message = QueryInstMsg(
-                        ip=query_ip,
-                        event_id=event_id,
-                    )
-                    endpoint_instance_id = await self.query_manager(query_message)
-                    logger.debug(
-                        f"Query ip: {query_ip}, return instance id: {endpoint_instance_id}"
-                    )
-                    self.instance_id_to_ip[endpoint_instance_id.instance_id] = (
-                        endpoint.url
-                    )
-                logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
-            logger.info(
-                f"Routing request to {queried_instance_ids[0]} found by kvaware router"
-            )
-            return self.instance_id_to_ip[queried_instance_ids[0]]
+        logger.info(f"Routing request to {matched_instance_id} found by kvaware router")
+        return self.instance_id_to_ip[matched_instance_id]
 
 
 class LoadAwareRouter(KvawareRouter):
@@ -635,20 +673,17 @@ class LoadAwareRouter(KvawareRouter):
         The remote fallback is a blocking HTTP call, so it runs in an
         executor rather than on the event loop.
         """
-        model_name = request_json.get("model", "")
-        if not model_name:
-            raise ValueError("Missing 'model' in request body")
+        model_name = request_json.get("model") or None
+        if model_name is None:
+            names = getattr(endpoints[0], "model_names", None) if endpoints else None
+            model_name = names[0] if names else None
         # Find the endpoint serving this model
         model_endpoint = next(
-            (ep for ep in endpoints if model_name in ep.model_names),
+            (ep for ep in endpoints if model_name in getattr(ep, "model_names", [])),
             endpoints[0] if endpoints else None,
         )
         try:
-            if model_name not in self.tokenizers:
-                self.tokenizers[model_name] = AutoTokenizer.from_pretrained(
-                    model_name
-                )
-            return self.tokenizers[model_name].encode(
+            return self._get_tokenizer(endpoints, model_name).encode(
                 request_json.get("prompt", "")
             )
         except Exception:

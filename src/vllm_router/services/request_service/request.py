@@ -23,7 +23,7 @@ import aiohttp
 # --- Request Processing & Routing ---
 from aiohttp import FormData
 from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from requests import JSONDecodeError
 
 from vllm_router.log import init_logger
@@ -99,6 +99,11 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
     "connection",
     "server",
 }
+
+
+def _is_json_media_type(content_type: str) -> bool:
+    media_type = content_type.partition(";")[0].strip().lower()
+    return media_type == "application/json" or media_type.endswith("+json")
 
 
 async def process_external_provider_request(
@@ -278,33 +283,39 @@ async def process_request(
     request.app.state.request_stats_monitor.on_new_request(
         backend_url, request_id, start_time
     )
-    # Check if this is a streaming request and extract model name
-    try:
-        request_json = json.loads(body)
-        is_streaming = request_json.get("stream", False)
-        model_name = request_json.get("model", "unknown")
-    except (JSONDecodeError, UnicodeDecodeError, ValueError):
-        # If we can't parse the body as JSON, assume it's not streaming
-        raise HTTPException(status=400, detail="Request body is not JSON parsable.")
 
-    # Add streaming info to span after parsing
-    if span is not None:
-        span.set_attribute("vllm.is_streaming", is_streaming)
-
-    # Sanitize the request headers
-    headers = _build_backend_request_headers(request, request_id)
-
-    # Inject trace context into outgoing headers
-    if tracing_active:
-        inject_context(headers, span_context)
-
-    # For non-streaming requests, collect the full response to cache it properly
-    full_response = bytearray()
-
-    request_status = "success"
+    model_name = "unknown"
+    request_status = "error"
     http_status_code = None
 
     try:
+        # Check if this is a streaming request and extract model name
+        try:
+            request_json = json.loads(body)
+            is_streaming = request_json.get("stream", False)
+            model_name = request_json.get("model", "unknown")
+        except (JSONDecodeError, UnicodeDecodeError, ValueError):
+            # If we can't parse the body as JSON, assume it's not streaming
+            raise HTTPException(
+                status_code=400, detail="Request body is not JSON parsable."
+            )
+
+        # Add streaming info to span after parsing
+        if span is not None:
+            span.set_attribute("vllm.is_streaming", is_streaming)
+
+        # Sanitize the request headers
+        headers = _build_backend_request_headers(request, request_id)
+
+        # Inject trace context into outgoing headers
+        if tracing_active:
+            inject_context(headers, span_context)
+
+        # For non-streaming requests, collect the full response to cache it properly
+        full_response = bytearray()
+
+        request_status = "success"
+
         async with request.app.state.aiohttp_client_wrapper().request(
             method=request.method,
             url=backend_url + endpoint,
@@ -331,11 +342,6 @@ async def process_request(
                 if full_response is not None:
                     full_response.extend(chunk)
                 yield chunk
-
-        end_time = time.time()
-        request.app.state.request_stats_monitor.on_request_complete(
-            backend_url, request_id, end_time
-        )
 
         if http_status_code is not None and http_status_code >= 400:
             request_status = "error"
@@ -376,6 +382,11 @@ async def process_request(
         end_span(span, error=e) if tracing_active else None
         raise
     finally:
+        # In finally so backend-error and client-disconnect paths also release
+        # the in-flight slot; on_request_complete is idempotent.
+        request.app.state.request_stats_monitor.on_request_complete(
+            backend_url, request_id, time.time()
+        )
         request_latency_seconds.labels(
             server=backend_url, model=model_name, status=request_status
         ).observe(time.time() - start_time)
@@ -1156,7 +1167,7 @@ async def route_general_transcriptions(
         temperature: Optional[float] = (
             float(temperature_str) if temperature_str is not None else None
         )
-        language: Optional[str] = form.get("language", "en")
+        language: Optional[str] = form.get("language")
         stream: bool = form.get("stream", "false").lower() == "true"
     except KeyError as e:
         return JSONResponse(
@@ -1186,7 +1197,16 @@ async def route_general_transcriptions(
     payload_bytes = await file.read()
     files = {"file": (file.filename, payload_bytes, file.content_type)}
 
-    data = {"model": model, "language": language}
+    data = {"model": model}
+
+    if isinstance(language, str):
+        language_stripped = language.strip()
+        if language_stripped and language_stripped.lower() not in (
+            "none",
+            "null",
+            "undefined",
+        ):
+            data["language"] = language_stripped
 
     if prompt:
         data["prompt"] = prompt
@@ -1213,12 +1233,12 @@ async def route_general_transcriptions(
     )
 
 
-async def route_image_edit_request(
+async def route_multipart_request(
     request: Request,
     endpoint: str,
     background_tasks: BackgroundTasks,
 ):
-    """Route OpenAI-compatible image edit requests (multipart/form-data)."""
+    """Route OpenAI-compatible multipart/form-data requests."""
 
     body = await request.body()
     try:
@@ -1230,7 +1250,7 @@ async def route_image_edit_request(
             content={"error": "Invalid multipart/form-data request"},
         )
 
-    logger.debug("Routing image edit request with model %s", model)
+    logger.debug("Routing multipart request with model %s", model)
 
     return await proxy_multipart_request(body, model, endpoint, request)
 
@@ -1370,6 +1390,15 @@ async def proxy_multipart_request(
             request_stats_monitor.on_request_response(
                 chosen_url, request_id, time.time()
             )
+            if not _is_json_media_type(
+                backend_response.headers.get("content-type", "")
+            ):
+                return Response(
+                    content=await backend_response.read(),
+                    status_code=backend_response.status,
+                    headers=resp_headers,
+                )
+
             response_content = await backend_response.json()
             return JSONResponse(
                 content=response_content,
