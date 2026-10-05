@@ -318,7 +318,7 @@ async def test_route_request_scores_and_routes_to_the_argmax():
     router.query_manager = query_manager
     stats = {URL_A: busy(in_prefill=4, in_decoding=8), URL_B: busy()}
     url = await router.route_request(
-        endpoints(URL_A, URL_B), {}, stats, None, {"prompt": "x"}
+        endpoints(URL_A, URL_B), {}, stats, None, {"prompt": "x", "model": "test-model"}
     )
     assert url == URL_B
 
