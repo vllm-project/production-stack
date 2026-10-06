@@ -974,8 +974,8 @@ def _parse_model_labels(labels: Optional[Union[str, List[str]]]) -> List[str]:
     if not labels:
         return []
     if isinstance(labels, str):
-        return [label.strip() for label in labels.split(",") if label.strip()]
-    return list(labels)
+        labels = labels.split(",")
+    return [label.strip() for label in labels if label and label.strip()]
 
 
 class DisaggregatedPrefillRouter(RoutingInterface):
@@ -984,7 +984,11 @@ class DisaggregatedPrefillRouter(RoutingInterface):
     First request goes to prefill endpoint, then second request goes to decode endpoint.
     """
 
-    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
+    def __init__(
+        self,
+        prefill_model_labels: Optional[Union[str, List[str]]],
+        decode_model_labels: Optional[Union[str, List[str]]],
+    ):
         self.prefill_model_labels = _parse_model_labels(prefill_model_labels)
         self.decode_model_labels = _parse_model_labels(decode_model_labels)
         self.request_cache = {}  # Cache to store prefill results
@@ -1036,7 +1040,11 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
     Load balancing: Uses round-robin across available prefill and decode pods.
     """
 
-    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
+    def __init__(
+        self,
+        prefill_model_labels: Optional[Union[str, List[str]]],
+        decode_model_labels: Optional[Union[str, List[str]]],
+    ):
         if hasattr(self, "_initialized"):
             return
         self.prefill_model_labels = _parse_model_labels(prefill_model_labels)

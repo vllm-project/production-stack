@@ -24,6 +24,7 @@ def endpoint(url, label):
 def test_parse_model_labels():
     assert _parse_model_labels("a, b,,c ") == ["a", "b", "c"]
     assert _parse_model_labels(["a", "b"]) == ["a", "b"]
+    assert _parse_model_labels(["a ", " b", ""]) == ["a", "b"]
     assert _parse_model_labels(None) == []
     assert _parse_model_labels("") == []
 
@@ -64,5 +65,11 @@ def test_disaggregated_prefill_router_labels_match_exactly():
         endpoint("http://p-short:8000", "prefill-short"),
         endpoint("http://d:8000", "decode"),
     ]
-    assert router.route_request(endpoints, {}, {}, None, {"max_tokens": 1}) == "http://p-short:8000"
-    assert router.route_request(endpoints, {}, {}, None, {"max_tokens": 64}) == "http://d:8000"
+    assert (
+        router.route_request(endpoints, {}, {}, None, {"max_tokens": 1})
+        == "http://p-short:8000"
+    )
+    assert (
+        router.route_request(endpoints, {}, {}, None, {"max_tokens": 64})
+        == "http://d:8000"
+    )
