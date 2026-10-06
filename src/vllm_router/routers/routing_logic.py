@@ -326,8 +326,14 @@ class KvawareRouter(RoutingInterface):
         self.instance_id_to_ip = {}
         self.session_key = session_key
         self.hash_ring = HashRing()
-        self.tokenizer = None
+        self.tokenizers = {}
         self.threshold = kv_aware_threshold
+
+    def _get_tokenizer(self, endpoints: List[EndpointInfo]):
+        model_name = endpoints[0].model_names[0]
+        if model_name not in self.tokenizers:
+            self.tokenizers[model_name] = AutoTokenizer.from_pretrained(model_name)
+        return self.tokenizers[model_name]
 
     def start_kv_manager(self):
         """
@@ -389,11 +395,8 @@ class KvawareRouter(RoutingInterface):
         # Local-first tokenization, fall back to remote "/tokenize" API on failure
         # TODO (Yuhan): Handle chat completions
         try:
-            if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    endpoints[0].model_names[0]
-                )
-            token_ids = self.tokenizer.encode(request_json.get("prompt", ""))
+            tokenizer = self._get_tokenizer(endpoints)
+            token_ids = tokenizer.encode(request_json.get("prompt", ""))
         except Exception:
             # Remote /tokenize fallback (let errors bubble up to keep behavior simple)
             remote_url = endpoints[0].url + "/tokenize"
@@ -411,16 +414,53 @@ class KvawareRouter(RoutingInterface):
         msg = LookupMsg(tokens=token_ids, event_id=event_id)
         instance_id = await self.query_manager(msg)
         matched_tokens = math.inf
+        matched_instance_id = None
         logger.debug(f"Lookup return message: {instance_id}")
-        if len(list(instance_id.layout_info.keys())) > 0:
-            matched_instance_id = list(instance_id.layout_info.keys())[
-                0
-            ]  # Get the first key
-            matched_tokens = instance_id.layout_info[matched_instance_id][1]
+        layout_info = instance_id.layout_info
+        if layout_info:
+            mapped_urls = set(self.instance_id_to_ip.values())
+            if any(endpoint.url not in mapped_urls for endpoint in endpoints) or any(
+                holder not in self.instance_id_to_ip for holder in layout_info
+            ):
+                for endpoint in endpoints:
+                    event_id = "QueryInst" + str(uuid.uuid4())
+                    query_ip = endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
+                        0
+                    ].split("//")[1]
+                    query_message = QueryInstMsg(
+                        ip=query_ip,
+                        event_id=event_id,
+                    )
+                    endpoint_instance_id = await self.query_manager(query_message)
+                    logger.debug(
+                        f"Query ip: {query_ip}, return instance id: "
+                        f"{endpoint_instance_id}"
+                    )
+                    self.instance_id_to_ip[endpoint_instance_id.instance_id] = (
+                        endpoint.url
+                    )
+                logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
+
+            live_urls = {endpoint.url for endpoint in endpoints}
+            url_to_instance = {
+                url: holder
+                for holder, url in self.instance_id_to_ip.items()
+                if url in live_urls
+            }
+            live_holders = [
+                holder for holder in layout_info if holder in url_to_instance.values()
+            ]
+        else:
+            live_holders = []
+
+        if live_holders:
+            matched_instance_id = max(live_holders, key=lambda key: layout_info[key][1])
+            matched_tokens = layout_info[matched_instance_id][1]
 
         if (
             instance_id is None
             or len(instance_id.layout_info) == 0
+            or matched_instance_id is None
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
             session_id = self.extract_session_id(request, request_json)
@@ -434,30 +474,8 @@ class KvawareRouter(RoutingInterface):
                 # Use the hash ring to get the endpoint for the session ID
                 url = self.hash_ring.get_node(session_id)
             return url
-        else:
-            queried_instance_ids = [info for info in instance_id.layout_info]
-            if queried_instance_ids[0] not in self.instance_id_to_ip:
-                for endpoint in endpoints:
-                    event_id = "QueryInst" + str(uuid.uuid4())
-                    query_ip = endpoint.url.split(f":{endpoint.url.split(':')[-1]}")[
-                        0
-                    ].split("//")[1]
-                    query_message = QueryInstMsg(
-                        ip=query_ip,
-                        event_id=event_id,
-                    )
-                    endpoint_instance_id = await self.query_manager(query_message)
-                    logger.debug(
-                        f"Query ip: {query_ip}, return instance id: {endpoint_instance_id}"
-                    )
-                    self.instance_id_to_ip[endpoint_instance_id.instance_id] = (
-                        endpoint.url
-                    )
-                logger.info(f"Instance id to ip mapping: {self.instance_id_to_ip}")
-            logger.info(
-                f"Routing request to {queried_instance_ids[0]} found by kvaware router"
-            )
-            return self.instance_id_to_ip[queried_instance_ids[0]]
+        logger.info(f"Routing request to {matched_instance_id} found by kvaware router")
+        return self.instance_id_to_ip[matched_instance_id]
 
 
 class LoadAwareRouter(KvawareRouter):
@@ -651,13 +669,17 @@ class LoadAwareRouter(KvawareRouter):
 
         The remote fallback is a blocking HTTP call, so it runs in an
         executor rather than on the event loop.
+
+        Chat completions (`messages`) are tokenized by the engine's
+        `/tokenize` with the model's own chat template, so the token ids match
+        what the engine prefills and caches. Reading only `prompt` would look
+        every chat request up as an empty prompt and never find a match.
         """
+        if "messages" in request_json:
+            return await self._tokenize_chat(endpoints, request_json)
         try:
-            if self.tokenizer is None:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    endpoints[0].model_names[0]
-                )
-            return self.tokenizer.encode(request_json.get("prompt", ""))
+            tokenizer = self._get_tokenizer(endpoints)
+            return tokenizer.encode(request_json.get("prompt", ""))
         except Exception:
             remote_url = endpoints[0].url + "/tokenize"
             headers = {"Content-Type": "application/json"}
@@ -673,6 +695,66 @@ class LoadAwareRouter(KvawareRouter):
                 ),
             )
             return response.json()["tokens"]
+
+    @staticmethod
+    def _flatten_text_content(messages: List[Dict]) -> List[Dict]:
+        """Join text-only list content into one string.
+
+        `[{"type": "text", "text": ...}, ...]` becomes the parts joined with
+        "\n", the same way vLLM's chat_utils renders them before applying
+        the chat template. vLLM's `/tokenize` rejects list content on a
+        text-only model ("... is not a multimodal model"). Messages with any
+        non-text part are left unchanged. A malformed `messages` (not a list)
+        is returned as-is for the engine's `/tokenize` to reject.
+        """
+        if not isinstance(messages, list):
+            return messages
+        flattened = []
+        for message in messages:
+            content = message.get("content") if isinstance(message, dict) else None
+            if isinstance(content, list) and all(
+                isinstance(part, dict) and part.get("type") == "text"
+                for part in content
+            ):
+                message = {
+                    **message,
+                    "content": "\n".join(part.get("text", "") for part in content),
+                }
+            flattened.append(message)
+        return flattened
+
+    async def _tokenize_chat(
+        self, endpoints: List[EndpointInfo], request_json: Dict
+    ) -> List[int]:
+        """Tokenize a chat request through the engine's `/tokenize`."""
+        remote_url = endpoints[0].url + "/tokenize"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "model": endpoints[0].model_names[0],
+            "messages": self._flatten_text_content(request_json["messages"]),
+            "add_generation_prompt": request_json.get("add_generation_prompt", True),
+        }
+        for key in ("tools", "chat_template_kwargs"):
+            if key in request_json:
+                data[key] = request_json[key]
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.post(remote_url, headers=headers, json=data, timeout=10),
+        )
+        try:
+            body = response.json()
+        except ValueError as e:
+            # e.g. an HTML error page from a proxy in front of the engine
+            raise RuntimeError(
+                f"{remote_url} returned {response.status_code} (non-JSON): "
+                f"{response.text[:200]}"
+            ) from e
+        if not isinstance(body, dict) or "tokens" not in body:
+            raise RuntimeError(
+                f"{remote_url} returned {response.status_code}: {str(body)[:200]}"
+            )
+        return body["tokens"]
 
     def fallback_url(
         self,
@@ -721,11 +803,18 @@ class LoadAwareRouter(KvawareRouter):
                 status_code=503, detail="No backend endpoints available"
             )
 
-        token_ids = await self.tokenize_prompt(endpoints, request_json)
+        try:
+            token_ids = await self.tokenize_prompt(endpoints, request_json)
 
-        event_id = "Lookup" + str(uuid.uuid4())
-        msg = LookupMsg(tokens=token_ids, event_id=event_id)
-        lookup_ret = await self.query_manager(msg)
+            event_id = "Lookup" + str(uuid.uuid4())
+            msg = LookupMsg(tokens=token_ids, event_id=event_id)
+            lookup_ret = await self.query_manager(msg)
+        except Exception as e:
+            # Tokenization (e.g. an engine `/tokenize` error while it restarts)
+            # or the controller lookup failed: route without cache information
+            # instead of failing the request with an HTTP 500.
+            logger.warning(f"loadaware lookup failed, using fallback route: {e!r}")
+            return self.fallback_url(endpoints, request_stats, request, request_json)
         logger.debug(f"Lookup return message: {lookup_ret}")
         layout_info = getattr(lookup_ret, "layout_info", None) or {}
 
