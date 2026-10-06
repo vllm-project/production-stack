@@ -973,9 +973,12 @@ def _parse_model_labels(labels: Optional[Union[str, List[str]]]) -> List[str]:
     """
     if not labels:
         return []
-    if isinstance(labels, str):
-        labels = labels.split(",")
-    return [label.strip() for label in labels if label and label.strip()]
+    raw_labels = labels.split(",") if isinstance(labels, str) else labels
+    return [
+        label.strip()
+        for label in raw_labels
+        if isinstance(label, str) and label.strip()
+    ]
 
 
 class DisaggregatedPrefillRouter(RoutingInterface):

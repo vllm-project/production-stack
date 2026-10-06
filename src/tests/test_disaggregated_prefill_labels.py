@@ -25,6 +25,7 @@ def test_parse_model_labels():
     assert _parse_model_labels("a, b,,c ") == ["a", "b", "c"]
     assert _parse_model_labels(["a", "b"]) == ["a", "b"]
     assert _parse_model_labels(["a ", " b", ""]) == ["a", "b"]
+    assert _parse_model_labels(["a", None, 3, " "]) == ["a"]
     assert _parse_model_labels(None) == []
     assert _parse_model_labels("") == []
 
