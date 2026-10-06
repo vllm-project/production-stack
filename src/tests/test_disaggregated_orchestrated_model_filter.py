@@ -21,7 +21,7 @@ ENDPOINTS = [
 ]
 
 
-def _run(model):
+def _run(model, body=None):
     seen = []
     router = DisaggregatedPrefillOrchestratedRouter.__new__(
         DisaggregatedPrefillOrchestratedRouter
@@ -37,7 +37,7 @@ def _run(model):
     )
 
     async def req_json():
-        return {"model": model, "prompt": "hi"}
+        return body if body is not None else {"model": model, "prompt": "hi"}
 
     request.json = req_json
     discovery = SimpleNamespace(get_endpoint_info=lambda: ENDPOINTS)
@@ -59,3 +59,10 @@ def test_only_endpoints_of_the_requested_model():
 def test_sleeping_endpoints_skipped():
     seen, _ = _run("model-a")
     assert seen == ["http://a-prefill:8000", "http://a-decode:8000"]
+
+
+def test_non_object_body_does_not_raise_in_the_filter():
+    # A JSON body that is not an object: no model filter, the flow answers.
+    seen, response = _run(None, body=["not", "an", "object"])
+    assert seen == [e.url for e in ENDPOINTS]
+    assert response.status_code == 503
