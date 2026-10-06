@@ -51,29 +51,44 @@ class EngineStats:
             EngineStats: The EngineStats object
 
         Note:
-            Assume vllm only runs a single model
+            Assume vllm only runs a single model. A data-parallel engine
+            (--data-parallel-size N) exports each metric once per engine
+            (engine="0".."N-1"): request and prefix-cache counters are summed
+            over engines, and the per-engine ratios (prefix cache hit rate,
+            KV cache usage) are averaged.
         """
         num_running_reqs = 0
         num_queuing_reqs = 0
-        gpu_prefix_cache_hit_rate = 0.0
         gpu_prefix_cache_hits_total = 0
         gpu_prefix_cache_queries_total = 0
-        gpu_cache_usage_perc = 0.0
+        hit_rate_per_engine = []
+        cache_usage_per_engine = []
 
         for family in text_string_to_metric_families(vllm_scrape):
             for sample in family.samples:
                 if sample.name == "vllm:num_requests_running":
-                    num_running_reqs = sample.value
+                    num_running_reqs += sample.value
                 elif sample.name == "vllm:num_requests_waiting":
-                    num_queuing_reqs = sample.value
+                    num_queuing_reqs += sample.value
                 elif sample.name == "vllm:gpu_prefix_cache_hit_rate":
-                    gpu_prefix_cache_hit_rate = sample.value
+                    hit_rate_per_engine.append(sample.value)
                 elif sample.name == "vllm:gpu_prefix_cache_hits_total":
-                    gpu_prefix_cache_hits_total = sample.value
+                    gpu_prefix_cache_hits_total += sample.value
                 elif sample.name == "vllm:gpu_prefix_cache_queries_total":
-                    gpu_prefix_cache_queries_total = sample.value
+                    gpu_prefix_cache_queries_total += sample.value
                 elif sample.name == "vllm:gpu_cache_usage_perc":
-                    gpu_cache_usage_perc = sample.value
+                    cache_usage_per_engine.append(sample.value)
+
+        gpu_prefix_cache_hit_rate = (
+            sum(hit_rate_per_engine) / len(hit_rate_per_engine)
+            if hit_rate_per_engine
+            else 0.0
+        )
+        gpu_cache_usage_perc = (
+            sum(cache_usage_per_engine) / len(cache_usage_per_engine)
+            if cache_usage_per_engine
+            else 0.0
+        )
 
         return EngineStats(
             num_running_requests=num_running_reqs,
