@@ -30,6 +30,7 @@ def test_single_engine_unchanged():
     assert abs(stats.gpu_cache_usage_perc - 0.42) < 1e-9
     assert stats.gpu_prefix_cache_hits_total == 10
     assert stats.gpu_prefix_cache_queries_total == 20
+    assert abs(stats.gpu_prefix_cache_hit_rate - 0.5) < 1e-9
 
 
 def test_data_parallel_engines_aggregated():
@@ -41,6 +42,15 @@ def test_data_parallel_engines_aggregated():
     assert abs(stats.gpu_cache_usage_perc - 0.05) < 1e-9
     assert stats.gpu_prefix_cache_hits_total == 80
     assert stats.gpu_prefix_cache_queries_total == 160
+    assert abs(stats.gpu_prefix_cache_hit_rate - 0.5) < 1e-9
+
+
+def test_hit_rate_from_totals_not_mean_of_engine_rates():
+    # Engine 0: 1 query, 0 hits; engine 1: 1000 queries, 1000 hits.
+    stats = EngineStats.from_vllm_scrape(
+        _scrape([(0, 0, 0.0, 0, 1), (0, 0, 0.0, 1000, 1000)])
+    )
+    assert abs(stats.gpu_prefix_cache_hit_rate - 1000 / 1001) < 1e-9
 
 
 def test_empty_scrape():

@@ -54,8 +54,9 @@ class EngineStats:
             Assume vllm only runs a single model. A data-parallel engine
             (--data-parallel-size N) exports each metric once per engine
             (engine="0".."N-1"): request and prefix-cache counters are summed
-            over engines, and the per-engine ratios (prefix cache hit rate,
-            KV cache usage) are averaged.
+            over engines; the prefix cache hit rate is total hits / total
+            queries (the mean of the per-engine gauges if the counters are
+            absent) and the KV cache usage is the mean over engines.
         """
         num_running_reqs = 0
         num_queuing_reqs = 0
@@ -79,11 +80,16 @@ class EngineStats:
                 elif sample.name == "vllm:gpu_cache_usage_perc":
                     cache_usage_per_engine.append(sample.value)
 
-        gpu_prefix_cache_hit_rate = (
-            sum(hit_rate_per_engine) / len(hit_rate_per_engine)
-            if hit_rate_per_engine
-            else 0.0
-        )
+        if gpu_prefix_cache_queries_total > 0:
+            gpu_prefix_cache_hit_rate = (
+                gpu_prefix_cache_hits_total / gpu_prefix_cache_queries_total
+            )
+        elif hit_rate_per_engine:
+            gpu_prefix_cache_hit_rate = sum(hit_rate_per_engine) / len(
+                hit_rate_per_engine
+            )
+        else:
+            gpu_prefix_cache_hit_rate = 0.0
         gpu_cache_usage_perc = (
             sum(cache_usage_per_engine) / len(cache_usage_per_engine)
             if cache_usage_per_engine
