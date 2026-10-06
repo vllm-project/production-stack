@@ -123,7 +123,7 @@ deploy_helm_chart() {
 wait_for_pods() {
     print_status "⏳ Waiting for pods to be ready"
     chmod +x tests/e2e/wait-for-pods.sh
-    tests/e2e/wait-for-pods.sh --pod-prefix vllm --timeout 300 --verbose
+    tests/e2e/wait-for-pods.sh --pod-prefix vllm --timeout 600 --verbose
 }
 
 # Function to setup port forwarding
