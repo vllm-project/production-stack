@@ -527,21 +527,8 @@ class LoadAwareRouter(KvawareRouter):
     def live_request_stats(
         request: Optional[Request], request_stats: Dict[str, RequestStats]
     ) -> Dict[str, RequestStats]:
-        """`request_stats` as of now rather than as of the request's arrival.
-
-        The caller snapshots `request_stats` before awaiting `route_request`,
-        and `route_request` awaits the tokenizer and the controller lookup. A
-        request only counts as in flight once `process_request` calls
-        `on_new_request`, so without a fresh read every request of a burst
-        scores against the same pre-burst load, and a small shared-prefix
-        match wins every tie on one endpoint.
-
-        Reading the monitor after the last await is enough: nothing awaits
-        between the placement decision and `on_new_request` (the caller only
-        runs synchronous code until `process_request` starts), so each
-        decision sees every earlier one. Falls back to the snapshot when no
-        monitor is reachable (e.g. unit tests without an app).
-        """
+        """Current `request_stats`, so a burst does not score against the
+        pre-burst snapshot. Falls back to `request_stats` without a monitor."""
         state = getattr(getattr(request, "app", None), "state", None)
         monitor = getattr(state, "request_stats_monitor", None)
         if monitor is None:
