@@ -562,6 +562,253 @@ def test_live_request_stats_keeps_the_snapshot_without_a_monitor():
     assert LoadAwareRouter.live_request_stats(None, snapshot) is snapshot
 
 
+# --- chat completions lookup ---------------------------------------------------
+
+
+class FakeResponse:
+    def __init__(self, body, status_code=200):
+        self._body = body
+        self.status_code = status_code
+
+    def json(self):
+        return self._body
+
+
+@pytest.fixture
+def tokenize_calls(monkeypatch):
+    """Capture `/tokenize` POSTs and answer with fixed token ids."""
+    calls = []
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        calls.append({"url": url, "json": json})
+        return FakeResponse({"tokens": [1, 2, 3], "count": 3})
+
+    monkeypatch.setattr(routing_logic.requests, "post", fake_post)
+    return calls
+
+
+class QpsFallbackRequest:
+    headers: Dict[str, str] = {}
+
+
+def make_fallback_router(beta: float = DEFAULT_LOADAWARE_BETA):
+    """A router that can also take the session/QPS fallback route."""
+    from uhashring import HashRing
+
+    router = make_router(beta=beta)
+    router.session_key = "x-user-id"
+    router.hash_ring = HashRing()
+    return router
+
+
+@pytest.mark.asyncio
+async def test_chat_request_is_tokenized_with_the_engine_chat_template(
+    tokenize_calls,
+):
+    """`messages` go to the engine's `/tokenize` (chat template applied), not
+    through `prompt`, which a chat request does not have."""
+    router = make_router()
+    request_json = {
+        "model": "test-model",
+        "messages": [{"role": "user", "content": "hello"}],
+        "tools": [{"type": "function", "function": {"name": "f"}}],
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+    tokens = await router.tokenize_prompt(endpoints(URL_A), request_json)
+
+    assert tokens == [1, 2, 3]
+    assert len(tokenize_calls) == 1
+    call = tokenize_calls[0]
+    assert call["url"] == URL_A + "/tokenize"
+    assert call["json"] == {
+        "model": "test-model",
+        "messages": [{"role": "user", "content": "hello"}],
+        "add_generation_prompt": True,
+        "tools": [{"type": "function", "function": {"name": "f"}}],
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+
+
+@pytest.mark.asyncio
+async def test_text_only_list_content_is_flattened_before_tokenize(tokenize_calls):
+    """vLLM's `/tokenize` rejects list content on a text-only model; text parts
+    are joined with a newline, as vLLM's chat_utils renders them."""
+    router = make_router()
+    request_json = {
+        "messages": [
+            {"role": "system", "content": "sys"},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "part one"},
+                    {"type": "text", "text": "part two"},
+                ],
+            },
+        ],
+        "add_generation_prompt": False,
+    }
+    await router.tokenize_prompt(endpoints(URL_A), request_json)
+
+    sent = tokenize_calls[0]["json"]
+    assert sent["messages"][1]["content"] == "part one\npart two"
+    assert sent["messages"][0] == {"role": "system", "content": "sys"}
+    assert sent["add_generation_prompt"] is False
+    # The client's request body is not mutated.
+    assert isinstance(request_json["messages"][1]["content"], list)
+
+
+@pytest.mark.asyncio
+async def test_list_content_with_non_text_parts_is_left_unchanged(tokenize_calls):
+    router = make_router()
+    content = [
+        {"type": "text", "text": "what is this?"},
+        {"type": "image_url", "image_url": {"url": "http://x/y.png"}},
+    ]
+    await router.tokenize_prompt(
+        endpoints(URL_A), {"messages": [{"role": "user", "content": content}]}
+    )
+    assert tokenize_calls[0]["json"]["messages"][0]["content"] == content
+
+
+@pytest.mark.asyncio
+async def test_completions_prompt_still_uses_the_local_tokenizer(tokenize_calls):
+    router = make_router()
+
+    class Tokenizer:
+        def encode(self, prompt):
+            return [len(prompt)]
+
+    router.tokenizers = {"test-model": Tokenizer()}
+    tokens = await router.tokenize_prompt(endpoints(URL_A), {"prompt": "abcd"})
+
+    assert tokens == [4]
+    assert tokenize_calls == []
+
+
+@pytest.mark.asyncio
+async def test_tokenize_error_body_raises_a_clear_error(monkeypatch):
+    """An engine error body has no `tokens`; say so instead of a bare
+    `KeyError: 'tokens'`."""
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        return FakeResponse({"error": {"message": "boom"}}, status_code=400)
+
+    monkeypatch.setattr(routing_logic.requests, "post", fake_post)
+    router = make_router()
+    with pytest.raises(RuntimeError, match="returned 400"):
+        await router.tokenize_prompt(
+            endpoints(URL_A), {"messages": [{"role": "user", "content": "x"}]}
+        )
+
+
+@pytest.mark.asyncio
+async def test_tokenize_non_json_response_raises_a_clear_error(monkeypatch):
+    """A non-JSON reply (e.g. an HTML error page from a proxy) is reported
+    with its status code and body, not as a bare JSON decode error."""
+
+    class HtmlResponse:
+        status_code = 502
+        text = "<html>Bad Gateway</html>"
+
+        def json(self):
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    monkeypatch.setattr(
+        routing_logic.requests,
+        "post",
+        lambda url, headers=None, json=None, timeout=None: HtmlResponse(),
+    )
+    router = make_router()
+    with pytest.raises(RuntimeError, match="returned 502 \\(non-JSON\\): <html>Bad"):
+        await router.tokenize_prompt(
+            endpoints(URL_A), {"messages": [{"role": "user", "content": "x"}]}
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("messages", [None, "not a list"])
+async def test_malformed_messages_are_passed_through_to_tokenize(
+    tokenize_calls, messages
+):
+    """A `messages` that is not a list must not crash the flattening; it is
+    sent as-is for the engine's `/tokenize` to validate."""
+    router = make_router()
+    await router.tokenize_prompt(endpoints(URL_A), {"messages": messages})
+    assert tokenize_calls[0]["json"]["messages"] == messages
+
+
+@pytest.mark.asyncio
+async def test_route_request_falls_back_when_tokenize_fails(monkeypatch):
+    """A failing `/tokenize` (e.g. an engine restarting) must not turn into an
+    HTTP 500: the request takes the session/QPS fallback route."""
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        raise ConnectionError("engine restarting")
+
+    monkeypatch.setattr(routing_logic.requests, "post", fake_post)
+    router = make_fallback_router()
+
+    async def query_manager(_msg):
+        raise AssertionError("lookup must not run without token ids")
+
+    router.query_manager = query_manager
+    stats = {URL_A: busy(qps=5.0), URL_B: busy(qps=1.0)}
+    url = await router.route_request(
+        endpoints(URL_A, URL_B),
+        {},
+        stats,
+        QpsFallbackRequest(),
+        {"messages": [{"role": "user", "content": "x"}]},
+    )
+    assert url == URL_B
+
+
+@pytest.mark.asyncio
+async def test_route_request_falls_back_when_the_lookup_fails(tokenize_calls):
+    router = make_fallback_router()
+
+    async def query_manager(_msg):
+        raise TimeoutError("controller unavailable")
+
+    router.query_manager = query_manager
+    stats = {URL_A: busy(qps=1.0), URL_B: busy(qps=5.0)}
+    url = await router.route_request(
+        endpoints(URL_A, URL_B),
+        {},
+        stats,
+        QpsFallbackRequest(),
+        {"messages": [{"role": "user", "content": "x"}]},
+    )
+    assert url == URL_A
+
+
+@pytest.mark.asyncio
+async def test_chat_request_routes_to_the_replica_holding_its_prefix(
+    tokenize_calls,
+):
+    """End to end: a chat request is looked up by its chat-template tokens
+    and lands on the replica reported to hold them."""
+    router = make_router(beta=0.5)
+    looked_up = []
+
+    async def query_manager(msg):
+        looked_up.append(msg.tokens)
+        return LookupRet({INST_B: (LOCAL, 3)})
+
+    router.query_manager = query_manager
+    url = await router.route_request(
+        endpoints(URL_A, URL_B),
+        {},
+        {},
+        None,
+        {"messages": [{"role": "user", "content": "x"}]},
+    )
+    assert tokenize_calls[0]["json"]["messages"] == [{"role": "user", "content": "x"}]
+    assert "prompt" not in tokenize_calls[0]["json"]
+    assert looked_up == [[1, 2, 3]]
+    assert url == URL_B
+
+
 # --- configuration ------------------------------------------------------------
 
 
