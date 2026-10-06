@@ -46,11 +46,11 @@ def _router(labels_as_string=False):
     return router
 
 
-def _is_pd_model(body, endpoints, labels_as_string=False):
+def _is_pd_model(body, endpoints, labels_as_string=False, aliases=None):
     async def req_json():
         return body
 
-    discovery = SimpleNamespace(get_endpoint_info=lambda: endpoints)
+    discovery = SimpleNamespace(get_endpoint_info=lambda: endpoints, aliases=aliases)
     with mock.patch.object(request_module, "get_service_discovery", lambda: discovery):
         return asyncio.run(
             request_module.is_pd_model(
@@ -69,6 +69,25 @@ def test_is_pd_model():
     assert _is_pd_model({}, endpoints)
 
 
+def test_is_pd_model_resolves_aliases():
+    aliases = {"plain-alias": "plain-model"}
+    assert not _is_pd_model({"model": "plain-alias"}, PLAIN + PD, aliases=aliases)
+
+
+def test_is_pd_model_discovery_error_keeps_orchestrated_flow():
+    def boom():
+        raise RuntimeError("discovery down")
+
+    async def req_json():
+        return {"model": "plain-model"}
+
+    discovery = SimpleNamespace(get_endpoint_info=boom)
+    with mock.patch.object(request_module, "get_service_discovery", lambda: discovery):
+        assert asyncio.run(
+            request_module.is_pd_model(SimpleNamespace(json=req_json), _router())
+        )
+
+
 def test_route_request_plain_model_least_busy_pod():
     stats = {
         PLAIN[0].url: SimpleNamespace(in_prefill_requests=2, in_decoding_requests=1),
@@ -76,6 +95,11 @@ def test_route_request_plain_model_least_busy_pod():
     }
     url = asyncio.run(_router().route_request(PLAIN, {}, stats, None, {}))
     assert url == PLAIN[1].url
+
+
+def test_route_request_plain_model_without_request_stats():
+    url = asyncio.run(_router().route_request(PLAIN, {}, None, None, {}))
+    assert url == PLAIN[0].url
 
 
 def test_route_request_pd_model_unchanged():

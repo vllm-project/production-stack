@@ -396,26 +396,31 @@ async def process_request(
 async def is_pd_model(request: Request, router) -> bool:
     """Does the requested model have prefill/decode pods behind this router?
 
-    False only when the model has pods and none of them carries a P/D role
-    label. An unparsable body or an unknown model keeps the orchestrated flow
+    False only when the model (after alias resolution, as in the general
+    path) has pods and none of them carries a P/D role label. An unparsable
+    body, an unknown model or a discovery error keeps the orchestrated flow
     (and its error responses).
     """
     try:
         request_json = await request.json()
+        model = request_json.get("model") if isinstance(request_json, dict) else None
+        if not model:
+            return True
+        service_discovery = get_service_discovery()
+        aliases = getattr(service_discovery, "aliases", None)
+        if aliases and model in aliases.keys():
+            model = aliases[model]
+        endpoints = [
+            e
+            for e in service_discovery.get_endpoint_info()
+            if model in (getattr(e, "model_names", None) or [])
+        ]
+        if not endpoints:
+            return True
+        labels = router.pd_role_labels()
+        return any(e.model_label in labels for e in endpoints)
     except Exception:
         return True
-    model = request_json.get("model") if isinstance(request_json, dict) else None
-    if not model:
-        return True
-    endpoints = [
-        e
-        for e in get_service_discovery().get_endpoint_info()
-        if model in (getattr(e, "model_names", None) or [])
-    ]
-    if not endpoints:
-        return True
-    labels = router.pd_role_labels()
-    return any(e.model_label in labels for e in endpoints)
 
 
 async def route_general_request(

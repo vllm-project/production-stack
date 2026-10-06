@@ -1191,7 +1191,7 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         ):
 
             def in_flight(e: EndpointInfo) -> int:
-                stats = request_stats.get(e.url)
+                stats = (request_stats or {}).get(e.url)
                 if stats is None:
                     return 0
                 return stats.in_prefill_requests + stats.in_decoding_requests
