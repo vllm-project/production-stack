@@ -393,6 +393,31 @@ async def process_request(
         end_span(span) if tracing_active else None
 
 
+async def is_pd_model(request: Request, router) -> bool:
+    """Does the requested model have prefill/decode pods behind this router?
+
+    False only when the model has pods and none of them carries a P/D role
+    label. An unparsable body or an unknown model keeps the orchestrated flow
+    (and its error responses).
+    """
+    try:
+        request_json = await request.json()
+    except Exception:
+        return True
+    model = request_json.get("model") if isinstance(request_json, dict) else None
+    if not model:
+        return True
+    endpoints = [
+        e
+        for e in get_service_discovery().get_endpoint_info()
+        if model in (getattr(e, "model_names", None) or [])
+    ]
+    if not endpoints:
+        return True
+    labels = router.pd_role_labels()
+    return any(e.model_label in labels for e in endpoints)
+
+
 async def route_general_request(
     request: Request, endpoint: str, background_tasks: BackgroundTasks
 ):
@@ -417,8 +442,11 @@ async def route_general_request(
         )
         return response
 
-    # Handle orchestrated disaggregated inference (NxDI pattern)
-    if isinstance(request.app.state.router, DisaggregatedPrefillOrchestratedRouter):
+    # Handle orchestrated disaggregated inference (NxDI pattern). Models
+    # without P/D pods behind this router take the general path below.
+    if isinstance(
+        request.app.state.router, DisaggregatedPrefillOrchestratedRouter
+    ) and await is_pd_model(request, request.app.state.router):
         response = await route_orchestrated_disaggregated_request(
             request, endpoint, background_tasks
         )
@@ -586,7 +614,13 @@ async def route_general_request(
 
     elif isinstance(
         request.app.state.router,
-        (KvawareRouter, PrefixAwareRouter, SessionRouter, PriorityRouter),
+        (
+            KvawareRouter,
+            PrefixAwareRouter,
+            SessionRouter,
+            PriorityRouter,
+            DisaggregatedPrefillOrchestratedRouter,
+        ),
     ):
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
@@ -640,7 +674,13 @@ async def route_general_request(
                 server_url = remaining[0].url
             elif isinstance(
                 request.app.state.router,
-                (KvawareRouter, PrefixAwareRouter, SessionRouter, PriorityRouter),
+                (
+                    KvawareRouter,
+                    PrefixAwareRouter,
+                    SessionRouter,
+                    PriorityRouter,
+                    DisaggregatedPrefillOrchestratedRouter,
+                ),
             ):
                 server_url = await request.app.state.router.route_request(
                     remaining, engine_stats, request_stats, request, request_json

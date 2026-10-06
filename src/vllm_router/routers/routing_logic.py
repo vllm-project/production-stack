@@ -1184,9 +1184,32 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         we need to handle the full flow differently. This returns the prefill URL
         as a placeholder - the actual orchestration happens in route_orchestrated_disaggregated_request.
         """
+        # A model without P/D pods behind this router (a plain engine): its
+        # least busy pod, as the general path would route it.
+        if endpoints and not any(
+            e.model_label in self.pd_role_labels() for e in endpoints
+        ):
+
+            def in_flight(e: EndpointInfo) -> int:
+                stats = request_stats.get(e.url)
+                if stats is None:
+                    return 0
+                return stats.in_prefill_requests + stats.in_decoding_requests
+
+            return min(endpoints, key=lambda e: (in_flight(e), e.url)).url
         prefiller_endpoints, _ = self._find_endpoints(endpoints)
         # Return prefill URL - actual orchestration is done in request.py
         return prefiller_endpoints[0].url
+
+    def pd_role_labels(self) -> set:
+        """Prefill and decode model labels (a list, or the comma-separated
+        command-line value)."""
+        labels = set()
+        for value in (self.prefill_model_labels, self.decode_model_labels):
+            if isinstance(value, str):
+                value = value.split(",")
+            labels.update(label.strip() for label in value or [] if label.strip())
+        return labels
 
 
 # Instead of managing a global _global_router, we can define the initialization functions as:
