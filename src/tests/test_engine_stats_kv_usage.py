@@ -16,5 +16,7 @@ def test_kv_cache_usage_perc_is_read():
 
 
 def test_legacy_gpu_cache_usage_perc_is_still_read():
-    stats = EngineStats.from_vllm_scrape(SCRAPE.format(name="vllm:gpu_cache_usage_perc"))
+    stats = EngineStats.from_vllm_scrape(
+        SCRAPE.format(name="vllm:gpu_cache_usage_perc")
+    )
     assert stats.gpu_cache_usage_perc == 0.42
