@@ -22,7 +22,7 @@ import random
 import threading
 import time
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 import requests
@@ -1056,15 +1056,36 @@ class PriorityRouter(RoutingInterface):
         return endpoint_urls[idx % len(endpoint_urls)]
 
 
+def _parse_model_labels(labels: Optional[Union[str, List[str]]]) -> List[str]:
+    """Normalize --prefill-model-labels / --decode-model-labels to a list.
+
+    The CLI passes a comma-separated string. Matching a pod label with ``in``
+    against that string is a substring test, so "model1" would also match
+    "model1-short"; compare against the split list instead.
+    """
+    if not labels:
+        return []
+    raw_labels = labels.split(",") if isinstance(labels, str) else labels
+    return [
+        label.strip()
+        for label in raw_labels
+        if isinstance(label, str) and label.strip()
+    ]
+
+
 class DisaggregatedPrefillRouter(RoutingInterface):
     """
     Route the request to the appropriate engine URL by handling prefill and decode operations sequentially.
     First request goes to prefill endpoint, then second request goes to decode endpoint.
     """
 
-    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
-        self.prefill_model_labels = prefill_model_labels
-        self.decode_model_labels = decode_model_labels
+    def __init__(
+        self,
+        prefill_model_labels: Optional[Union[str, List[str]]],
+        decode_model_labels: Optional[Union[str, List[str]]],
+    ):
+        self.prefill_model_labels = _parse_model_labels(prefill_model_labels)
+        self.decode_model_labels = _parse_model_labels(decode_model_labels)
         self.request_cache = {}  # Cache to store prefill results
 
     def route_request(
@@ -1114,11 +1135,15 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
     Load balancing: Uses round-robin across available prefill and decode pods.
     """
 
-    def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
+    def __init__(
+        self,
+        prefill_model_labels: Optional[Union[str, List[str]]],
+        decode_model_labels: Optional[Union[str, List[str]]],
+    ):
         if hasattr(self, "_initialized"):
             return
-        self.prefill_model_labels = prefill_model_labels or []
-        self.decode_model_labels = decode_model_labels or []
+        self.prefill_model_labels = _parse_model_labels(prefill_model_labels)
+        self.decode_model_labels = _parse_model_labels(decode_model_labels)
         # Round-robin counters for load balancing across xPyD pods
         self.prefill_idx = 0
         self.decode_idx = 0
