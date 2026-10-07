@@ -280,8 +280,11 @@ async def process_request(
     first_token = False
     total_len = 0
     start_time = time.time()
+    # Key the stats by this dispatch, not by request_id: clients can reuse an
+    # X-Request-Id for concurrent requests, which would then share one slot.
+    stats_id = str(uuid.uuid4())
     request.app.state.request_stats_monitor.on_new_request(
-        backend_url, request_id, start_time
+        backend_url, stats_id, start_time
     )
 
     model_name = "unknown"
@@ -343,7 +346,7 @@ async def process_request(
                 if not first_token:
                     first_token = True
                     request.app.state.request_stats_monitor.on_request_response(
-                        backend_url, request_id, time.time()
+                        backend_url, stats_id, time.time()
                     )
                 # Collect the body only when a consumer needs it
                 if full_response is not None:
@@ -392,7 +395,7 @@ async def process_request(
         # In finally so backend-error and client-disconnect paths also release
         # the in-flight slot; on_request_complete is idempotent.
         request.app.state.request_stats_monitor.on_request_complete(
-            backend_url, request_id, time.time()
+            backend_url, stats_id, time.time()
         )
         request_latency_seconds.labels(
             server=backend_url, model=model_name, status=request_status
@@ -1343,7 +1346,8 @@ async def proxy_multipart_request(
             include_content_type=isinstance(form_data, bytes),
         )
 
-        request_stats_monitor.on_new_request(chosen_url, request_id, time.time())
+        stats_id = str(uuid.uuid4())  # see process_request
+        request_stats_monitor.on_new_request(chosen_url, stats_id, time.time())
 
         try:
             backend_response = await client.post(
@@ -1353,9 +1357,7 @@ async def proxy_multipart_request(
                 timeout=aiohttp.ClientTimeout(total=300),
             )
         except Exception:
-            request_stats_monitor.on_request_complete(
-                chosen_url, request_id, time.time()
-            )
+            request_stats_monitor.on_request_complete(chosen_url, stats_id, time.time())
             raise
 
         resp_headers = {
@@ -1374,14 +1376,14 @@ async def proxy_multipart_request(
                         if not first_token:
                             first_token = True
                             request_stats_monitor.on_request_response(
-                                chosen_url, request_id, time.time()
+                                chosen_url, stats_id, time.time()
                             )
                         if chunk:
                             yield chunk
                 finally:
                     backend_response.close()
                     request_stats_monitor.on_request_complete(
-                        chosen_url, request_id, time.time()
+                        chosen_url, stats_id, time.time()
                     )
 
             return StreamingResponse(
@@ -1394,9 +1396,7 @@ async def proxy_multipart_request(
             )
 
         try:
-            request_stats_monitor.on_request_response(
-                chosen_url, request_id, time.time()
-            )
+            request_stats_monitor.on_request_response(chosen_url, stats_id, time.time())
             if not _is_json_media_type(
                 backend_response.headers.get("content-type", "")
             ):
@@ -1426,9 +1426,7 @@ async def proxy_multipart_request(
             )
         finally:
             backend_response.close()
-            request_stats_monitor.on_request_complete(
-                chosen_url, request_id, time.time()
-            )
+            request_stats_monitor.on_request_complete(chosen_url, stats_id, time.time())
     except aiohttp.ClientResponseError as response_error:
         if response_error.response is not None:
             try:
