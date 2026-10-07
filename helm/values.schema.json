@@ -26,6 +26,10 @@
                     "description": "Whether to enable the cache server",
                     "type": "boolean"
                 },
+                "env": {
+                    "description": "Extra environment variables for the cache server container, e.g. to configure LMCache's eviction policy via `LMCACHE_CACHE_POLICY` and `LMCACHE_MAX_LOCAL_CPU_SIZE` (https://docs.lmcache.ai/api_reference/configurations.html)",
+                    "type": "array"
+                },
                 "image": {
                     "description": "Image configuration for the cache Server",
                     "type": "object",
