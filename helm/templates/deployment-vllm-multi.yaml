@@ -179,7 +179,7 @@ spec:
           - {{ .maxNumSeqs | quote }}
           {{-   end }}
           {{-   if hasKey . "gpuMemoryUtilization" }}
-          - "--gpu_memory_utilization"
+          - "--gpu-memory-utilization"
           - {{ .gpuMemoryUtilization | quote }}
           {{-   end }}
           {{-   if hasKey . "maxLoras" }}
