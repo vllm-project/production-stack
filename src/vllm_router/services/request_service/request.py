@@ -153,15 +153,15 @@ async def process_external_provider_request(
             endpoint=endpoint, payload=request_json, stream=is_streaming
         )
 
-        # Build response headers
-        response_headers = {"X-Request-Id": request_id}
-        response_headers.update(
-            {
-                k: v
-                for k, v in provider_response.headers.items()
-                if k.lower() != "content-type"
-            }
-        )
+        # aiohttp decompresses the body and JSONResponse serializes it again,
+        # so upstream framing and encoding headers no longer describe it.
+        response_headers = {
+            k: v
+            for k, v in provider_response.headers.items()
+            if k.lower() not in ("content-type", "x-request-id")
+            and k.lower() not in _HEADERS_TO_STRIP_FROM_RESPONSE
+        }
+        response_headers["X-Request-Id"] = request_id
 
         # Handle streaming response
         if provider_response.is_stream and provider_response.stream_iterator:
