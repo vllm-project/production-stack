@@ -782,6 +782,18 @@ async def route_orchestrated_disaggregated_request(
     # Get endpoints from service discovery
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
+    # Only pods that serve the requested model: several P/D models can share
+    # this router with the same prefill/decode role labels.
+    requested_model = (
+        request_json.get("model") if isinstance(request_json, dict) else None
+    )
+    if requested_model:
+        endpoints = [
+            e
+            for e in endpoints
+            if requested_model in (getattr(e, "model_names", None) or [])
+            and not getattr(e, "sleep", False)
+        ]
 
     # Use router's _find_endpoints method to get prefill and decode endpoints
     router = request.app.state.router
