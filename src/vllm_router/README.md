@@ -27,7 +27,7 @@ The router can be configured using command-line arguments. Below are the availab
 - `--service-discovery`: The service discovery type. Options are `static` or `k8s`. This option is required.
 - `--static-backends`: The URLs of static serving engines, separated by commas (e.g., `http://localhost:8000,http://localhost:8001`).
 - `--static-models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
-- `--static-aliases`: The aliases of the models running in the static serving engines, separated by commas and associated using colons (e.g., `model_alias1:model,mode_alias2:model`).
+- `--static-aliases`: The aliases of the models running in the static serving engines, separated by commas and associated using colons (e.g., `model_alias1:model,mode_alias2:model`). Aliases can optionally include parameter overrides using a pipe separator (e.g., `reasoning-alias:deepseek-r1|reasoning_effort=high`).
 - `--static-backend-health-checks`: Enable this flag to make vllm-router check periodically if the models work by sending dummy requests to their endpoints.
 - `--k8s-port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
 - `--k8s-namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
@@ -88,7 +88,7 @@ vllm-router --port 8000 \
     --service-discovery static \
     --static-backends "http://localhost:9001,http://localhost:9002,http://localhost:9003" \
     --static-models "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m" \
-    --static-aliases "gpt4:meta-llama/Llama-3.1-8B-Instruct" \
+    --static-aliases "gpt4:meta-llama/Llama-3.1-8B-Instruct,reasoning:deepseek-r1|reasoning_effort=high" \
     --static-model-types "chat,chat,chat" \
     --static-backend-health-checks \
     --engine-stats-interval 10 \
@@ -126,7 +126,7 @@ Currently, the dynamic config supports the following fields:
 - `callbacks`: The path to the callback instance extending CustomCallbackHandler.
 - (When using `static` service discovery) `static_backends`: The URLs of static serving engines, separated by commas (e.g., `http://localhost:9001,http://localhost:9002,http://localhost:9003`).
 - (When using `static` service discovery) `static_models`: The models running in the static serving engines, separated by commas (e.g., `model1,model2`).
-- (When using `static` service discovery) `static_aliases`: The aliases of the models running in the static serving engines, separated by commas and associated using colons (e.g., `model_alias1:model,mode_alias2:model`).
+- (When using `static` service discovery) `static_aliases`: The aliases of the models running in the static serving engines. In CLI/JSON format: comma-separated `alias:model` pairs with optional pipe-separated parameters (e.g., `my-alias:model,reasoning:model|reasoning_effort=high`). In YAML format: a mapping where values are either a plain model name string or a dict with `model` and optional `reasoning_effort` keys.
 - (When using `static` service discovery and if you enable the `--static-backend-health-checks` flag) `static_model_types`: The model types running in the static serving engines, separated by commas (e.g., `chat,chat`).
 - (When using `k8s` service discovery) `k8s_port`: The port of vLLM processes when using K8s service discovery. Default is `8000`.
 - (When using `k8s` service discovery) `k8s_namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
@@ -152,6 +152,9 @@ static_models:
 static_aliases:
     "my-alias": "facebook/opt-125m"
     "my-other-alias": "meta-llama/Llama-3.1-8B-Instruct"
+    "reasoning":
+        model: "meta-llama/Llama-3.1-8B-Instruct"
+        reasoning_effort: "high"
 ```
 
 Here is an example of a dynamic JSON config file:
@@ -164,7 +167,7 @@ Here is an example of a dynamic JSON config file:
     "static_backends": "http://localhost:9001,http://localhost:9002,http://localhost:9003",
     "static_models": "facebook/opt-125m,meta-llama/Llama-3.1-8B-Instruct,facebook/opt-125m",
     "static_model_types": "completion,chat,completion",
-    "static_aliases": "my-alias:meta-llama/Llama-3.1-8B-Instruct,my-other-alias:meta-llama/Llama-3.1-8B-Instruct"
+    "static_aliases": "my-alias:meta-llama/Llama-3.1-8B-Instruct,reasoning:meta-llama/Llama-3.1-8B-Instruct|reasoning_effort=high"
 }
 ```
 
