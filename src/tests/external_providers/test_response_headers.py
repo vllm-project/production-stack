@@ -19,8 +19,11 @@ from vllm_router.services.request_service.request import (
 @pytest.mark.asyncio
 @pytest.mark.parametrize("stream", [False, True])
 @pytest.mark.parametrize("compressed", [False, True])
+@pytest.mark.parametrize(
+    "provider_request_id_header", [None, "X-Request-Id", "x-request-id", "X-ReQuEsT-Id"]
+)
 async def test_external_provider_response_headers_match_forwarded_body(
-    monkeypatch, stream, compressed
+    monkeypatch, stream, compressed, provider_request_id_header
 ):
     """Forward decoded provider bodies with valid downstream response headers."""
     payload = {"choices": [{"message": {"content": "hello from the provider"}}]}
@@ -32,10 +35,13 @@ async def test_external_provider_response_headers_match_forwarded_body(
 
     async def upstream_handler(request):
         assert (await request.json())["stream"] is stream
+        headers = {"X-Provider-Trace": "provider-trace"}
+        if provider_request_id_header:
+            headers[provider_request_id_header] = "provider-request"
         response = web.Response(
             body=body,
             content_type="text/event-stream" if stream else "application/json",
-            headers={"X-Provider-Trace": "provider-trace"},
+            headers=headers,
         )
         if compressed:
             response.enable_compression(force=web.ContentCoding.gzip)
@@ -76,7 +82,7 @@ async def test_external_provider_response_headers_match_forwarded_body(
         )
 
         assert response.headers["x-provider-trace"] == "provider-trace"
-        assert response.headers["x-request-id"] == "router-request"
+        assert response.headers.getlist("x-request-id") == ["router-request"]
         if stream:
             assert "content-length" not in response.headers
             assert response.headers["content-type"].startswith("text/event-stream")
@@ -93,6 +99,10 @@ async def test_external_provider_response_headers_match_forwarded_body(
             assert header not in response.headers
 
     finally:
-        await registry.close()
-        await runner.cleanup()
-        upstream_socket.close()
+        try:
+            await registry.close()
+        finally:
+            try:
+                await runner.cleanup()
+            finally:
+                upstream_socket.close()
