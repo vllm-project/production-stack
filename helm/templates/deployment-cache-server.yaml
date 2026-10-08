@@ -58,7 +58,7 @@ spec:
       {{- end }}
       containers:
         - name: "lmcache-server"
-          image: "{{ .Values.cacheserverSpec.image.repository }}:{{ .Values.cacheserverSpec.image.tag }}"
+          image: {{ include "chart.image" (dict "image" (printf "%s:%s" .Values.cacheserverSpec.image.repository .Values.cacheserverSpec.image.tag) "global" $.Values.global) | quote }}
           command:
           - "/opt/venv/bin/lmcache_server"
           - "0.0.0.0"
