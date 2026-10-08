@@ -11,5 +11,9 @@ spec:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: standard
+  # For the offline example, populate the backing directory before deployment:
+  # /data/llama3/Llama-3.1-8B-Instruct/config.json
+  # The PV root is mounted at /data in the serving container, so modelURL is
+  # /data/Llama-3.1-8B-Instruct.
   hostPath:
     path: /data/llama3
