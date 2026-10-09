@@ -321,7 +321,7 @@ tests:
           - "--enable-prefix-caching"
           - "--max-model-len"
           - "1024"
-          - "--gpu_memory_utilization"
+          - "--gpu-memory-utilization"
           - "0.8"
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'

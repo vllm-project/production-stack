@@ -20,6 +20,7 @@ import math
 import os
 import random
 import threading
+import time
 import uuid
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
@@ -523,6 +524,18 @@ class LoadAwareRouter(KvawareRouter):
         logger.info(f"Initialized LoadAwareRouter with beta={self.beta}")
 
     @staticmethod
+    def live_request_stats(
+        request: Optional[Request], request_stats: Dict[str, RequestStats]
+    ) -> Dict[str, RequestStats]:
+        """Current `request_stats`, so a burst does not score against the
+        pre-burst snapshot. Falls back to `request_stats` without a monitor."""
+        state = getattr(getattr(request, "app", None), "state", None)
+        monitor = getattr(state, "request_stats_monitor", None)
+        if monitor is None:
+            return request_stats
+        return monitor.get_request_stats(time.time())
+
+    @staticmethod
     def load_penalty(request_stats: Dict[str, RequestStats], url: str) -> int:
         """In-flight requests on `url` (prefilling + decoding).
 
@@ -669,7 +682,14 @@ class LoadAwareRouter(KvawareRouter):
 
         The remote fallback is a blocking HTTP call, so it runs in an
         executor rather than on the event loop.
+
+        Chat completions (`messages`) are tokenized by the engine's
+        `/tokenize` with the model's own chat template, so the token ids match
+        what the engine prefills and caches. Reading only `prompt` would look
+        every chat request up as an empty prompt and never find a match.
         """
+        if "messages" in request_json:
+            return await self._tokenize_chat(endpoints, request_json)
         try:
             tokenizer = self._get_tokenizer(endpoints)
             return tokenizer.encode(request_json.get("prompt", ""))
@@ -689,6 +709,66 @@ class LoadAwareRouter(KvawareRouter):
             )
             return response.json()["tokens"]
 
+    @staticmethod
+    def _flatten_text_content(messages: List[Dict]) -> List[Dict]:
+        """Join text-only list content into one string.
+
+        `[{"type": "text", "text": ...}, ...]` becomes the parts joined with
+        "\n", the same way vLLM's chat_utils renders them before applying
+        the chat template. vLLM's `/tokenize` rejects list content on a
+        text-only model ("... is not a multimodal model"). Messages with any
+        non-text part are left unchanged. A malformed `messages` (not a list)
+        is returned as-is for the engine's `/tokenize` to reject.
+        """
+        if not isinstance(messages, list):
+            return messages
+        flattened = []
+        for message in messages:
+            content = message.get("content") if isinstance(message, dict) else None
+            if isinstance(content, list) and all(
+                isinstance(part, dict) and part.get("type") == "text"
+                for part in content
+            ):
+                message = {
+                    **message,
+                    "content": "\n".join(part.get("text", "") for part in content),
+                }
+            flattened.append(message)
+        return flattened
+
+    async def _tokenize_chat(
+        self, endpoints: List[EndpointInfo], request_json: Dict
+    ) -> List[int]:
+        """Tokenize a chat request through the engine's `/tokenize`."""
+        remote_url = endpoints[0].url + "/tokenize"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "model": endpoints[0].model_names[0],
+            "messages": self._flatten_text_content(request_json["messages"]),
+            "add_generation_prompt": request_json.get("add_generation_prompt", True),
+        }
+        for key in ("tools", "chat_template_kwargs"):
+            if key in request_json:
+                data[key] = request_json[key]
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: requests.post(remote_url, headers=headers, json=data, timeout=10),
+        )
+        try:
+            body = response.json()
+        except ValueError as e:
+            # e.g. an HTML error page from a proxy in front of the engine
+            raise RuntimeError(
+                f"{remote_url} returned {response.status_code} (non-JSON): "
+                f"{response.text[:200]}"
+            ) from e
+        if not isinstance(body, dict) or "tokens" not in body:
+            raise RuntimeError(
+                f"{remote_url} returned {response.status_code}: {str(body)[:200]}"
+            )
+        return body["tokens"]
+
     def fallback_url(
         self,
         endpoints: List[EndpointInfo],
@@ -697,7 +777,8 @@ class LoadAwareRouter(KvawareRouter):
         request_json: Dict,
     ) -> str:
         """Upstream's no-cache-info route: session hash if any, else lowest
-        QPS."""
+        QPS, scored against the live load (see `live_request_stats`)."""
+        request_stats = self.live_request_stats(request, request_stats)
         session_id = self.extract_session_id(request, request_json)
         logger.debug(f"Fallback to using session id: {session_id}")
         self._update_hash_ring(endpoints)
@@ -736,11 +817,18 @@ class LoadAwareRouter(KvawareRouter):
                 status_code=503, detail="No backend endpoints available"
             )
 
-        token_ids = await self.tokenize_prompt(endpoints, request_json)
+        try:
+            token_ids = await self.tokenize_prompt(endpoints, request_json)
 
-        event_id = "Lookup" + str(uuid.uuid4())
-        msg = LookupMsg(tokens=token_ids, event_id=event_id)
-        lookup_ret = await self.query_manager(msg)
+            event_id = "Lookup" + str(uuid.uuid4())
+            msg = LookupMsg(tokens=token_ids, event_id=event_id)
+            lookup_ret = await self.query_manager(msg)
+        except Exception as e:
+            # Tokenization (e.g. an engine `/tokenize` error while it restarts)
+            # or the controller lookup failed: route without cache information
+            # instead of failing the request with an HTTP 500.
+            logger.warning(f"loadaware lookup failed, using fallback route: {e!r}")
+            return self.fallback_url(endpoints, request_stats, request, request_json)
         logger.debug(f"Lookup return message: {lookup_ret}")
         layout_info = getattr(lookup_ret, "layout_info", None) or {}
 
@@ -749,6 +837,10 @@ class LoadAwareRouter(KvawareRouter):
             return self.fallback_url(endpoints, request_stats, request, request_json)
 
         await self.refresh_instance_map(endpoints, layout_info)
+        # Score against the load as of now, not as of this request's arrival:
+        # requests routed during the awaits above are missing from the
+        # caller's snapshot.
+        request_stats = self.live_request_stats(request, request_stats)
         url = self.select_url(endpoints, request_stats, layout_info, len(token_ids))
         if url is None:
             return self.fallback_url(endpoints, request_stats, request, request_json)
