@@ -756,6 +756,28 @@ async def send_request_to_decode(
             yield chunk
 
 
+# A streaming decode response is cut only when no data arrives for this long.
+# A total limit (upstream used total=600) cut every stream still generating
+# after ten minutes mid-body, e.g. long reasoning answers (60k+ tokens).
+DECODE_STREAM_IDLE_TIMEOUT_S = 600
+# Opening the TCP connection to the decode engine (aiohttp's default value).
+DECODE_SOCK_CONNECT_TIMEOUT_S = 30
+
+
+def _decode_client_timeout(is_streaming: bool) -> aiohttp.ClientTimeout:
+    """Timeout for the orchestrated decode request: no total limit; a
+    streaming response fails after DECODE_STREAM_IDLE_TIMEOUT_S seconds without
+    data. A non-streaming response only arrives after generation, so it gets no
+    read limit either. An unreachable engine still fails fast: the TCP connect
+    is limited to DECODE_SOCK_CONNECT_TIMEOUT_S. (`connect` is not set: it also
+    covers waiting for a free connection in the client's pool.)"""
+    return aiohttp.ClientTimeout(
+        total=None,
+        sock_connect=DECODE_SOCK_CONNECT_TIMEOUT_S,
+        sock_read=DECODE_STREAM_IDLE_TIMEOUT_S if is_streaming else None,
+    )
+
+
 async def route_orchestrated_disaggregated_request(
     request: Request,
     endpoint: str,
@@ -890,7 +912,7 @@ async def route_orchestrated_disaggregated_request(
                 "Content-Type": "application/json",
                 "X-Request-Id": request_id,
             },
-            timeout=aiohttp.ClientTimeout(total=600),
+            timeout=_decode_client_timeout(is_streaming),
         )
         try:
             if decode_resp.status != 200:
