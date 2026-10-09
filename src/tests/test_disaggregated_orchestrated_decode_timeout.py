@@ -131,3 +131,5 @@ def test_decode_has_no_total_limit(stream, idle):
     assert prefill_timeout.total == 300  # prefill unchanged
     assert decode_timeout.total is None
     assert decode_timeout.sock_read == idle
+    # An unreachable decode engine still fails fast.
+    assert decode_timeout.sock_connect == 30
