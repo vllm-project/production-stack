@@ -815,6 +815,18 @@ async def route_orchestrated_disaggregated_request(
     prefill_request_json["max_tokens"] = 1
     if "max_completion_tokens" in prefill_request_json:
         prefill_request_json["max_completion_tokens"] = 1
+    # Avoid min_tokens > max_tokens=1 conflict in vLLM SamplingParams (400);
+    # the decode request keeps the client's min_tokens.
+    prefill_request_json.pop("min_tokens", None)
+    # The Responses API ignores max_tokens and caps output with
+    # max_output_tokens (default: the rest of the context). Without this the
+    # prefill generates a whole answer and returns kv_transfer_params for
+    # prompt + output, which do not match the decode request's prompt.
+    if (
+        endpoint.rstrip("/").endswith("/responses")
+        or "max_output_tokens" in prefill_request_json
+    ):
+        prefill_request_json["max_output_tokens"] = 1
     # Enable disaggregated inference mode - prefill will return kv_transfer_params
     prefill_request_json["kv_transfer_params"] = {
         "do_remote_decode": True,
