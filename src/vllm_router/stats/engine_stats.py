@@ -14,7 +14,7 @@
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Optional
 
 import requests
 from prometheus_client.parser import text_string_to_metric_families
@@ -22,6 +22,8 @@ from prometheus_client.parser import text_string_to_metric_families
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import get_service_discovery
 from vllm_router.utils import SingletonMeta
+
+_CONNECT_TIMEOUT_SECONDS = 3.05
 
 logger = init_logger(__name__)
 
@@ -86,13 +88,15 @@ class EngineStats:
 
 
 class EngineStatsScraper(metaclass=SingletonMeta):
-    def __init__(self, scrape_interval: float):
+    def __init__(self, scrape_interval: float, scrape_timeout: Optional[float] = None):
         """
         Initialize the scraper to periodically fetch metrics from all serving engines.
 
         Args:
             scrape_interval (float): The interval in seconds
                 to scrape the metrics.
+            scrape_timeout (Optional[float]): The read timeout in seconds for a
+                single /metrics request. Defaults to scrape_interval.
 
         Raises:
             ValueError: if the service discover module is have
@@ -109,6 +113,9 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         self.engine_stats: Dict[str, EngineStats] = {}
         self.engine_stats_lock = threading.Lock()
         self.scrape_interval = scrape_interval
+        self.scrape_timeout = (
+            scrape_timeout if scrape_timeout is not None else scrape_interval
+        )
 
         # scrape thread
         self.running = True
@@ -124,7 +131,14 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             url (str): The URL of the serving engine (does not contain endpoint)
         """
         try:
-            response = requests.get(url + "/metrics", timeout=self.scrape_interval)
+            # (connect, read): the read budget may legitimately be large to ride
+            # out a long chunked prefill, but a dead or unreachable backend must
+            # not hold the sequential scrape loop for that long. 3.05 s is the
+            # connect timeout the requests docs recommend.
+            response = requests.get(
+                url + "/metrics",
+                timeout=(_CONNECT_TIMEOUT_SECONDS, self.scrape_timeout),
+            )
             response.raise_for_status()
             engine_stats = EngineStats.from_vllm_scrape(response.text)
         except Exception as e:
@@ -209,8 +223,10 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         self.scrape_thread.join()
 
 
-def initialize_engine_stats_scraper(scrape_interval: float) -> EngineStatsScraper:
-    return EngineStatsScraper(scrape_interval)
+def initialize_engine_stats_scraper(
+    scrape_interval: float, scrape_timeout: Optional[float] = None
+) -> EngineStatsScraper:
+    return EngineStatsScraper(scrape_interval, scrape_timeout)
 
 
 def get_engine_stats_scraper() -> EngineStatsScraper:
