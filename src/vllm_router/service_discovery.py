@@ -487,7 +487,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
         # Init kubernetes watcher
         try:
             config.load_incluster_config()
-        except config.ConfigException:
+        except Exception:
             config.load_kube_config()
 
         self.k8s_api = client.CoreV1Api()
@@ -996,7 +996,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
         # Init kubernetes watcher
         try:
             config.load_incluster_config()
-        except config.ConfigException:
+        except Exception:
             config.load_kube_config()
 
         self.k8s_api = client.CoreV1Api()
