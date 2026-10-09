@@ -1,4 +1,9 @@
-FROM lmcache/vllm-openai:2025-05-27-v1
+# The base image supplies the lmcache + vllm pair the router runs with.
+# It MUST match the engines' image versions: lmcache's controller<->worker
+# ZMQ messages are version-locked, and kv-aware chunk hashes are rooted in
+# vLLM's NONE_HASH - a mismatch on either side makes every KV lookup miss
+# silently (routing degrades to session/QPS with no error).
+FROM lmcache/vllm-openai:v0.5.4
 
 WORKDIR /app
 
