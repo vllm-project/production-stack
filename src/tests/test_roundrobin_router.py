@@ -128,6 +128,18 @@ def test_roundrobin_keeps_state_when_endpoint_order_changes():
     )
 
 
+def test_roundrobin_decision_metadata_preserves_string_behavior():
+    router = RoundRobinRouter()
+    selected = router.route_request(
+        [EndpointInfo(url="http://engine1.com")], {}, {}, generate_request()
+    )
+
+    assert selected == "http://engine1.com"
+    assert selected.algorithm == "roundrobin"
+    assert selected.decision == "primary"
+    assert selected.reason == "round_robin"
+
+
 def test_roundrobin_rejects_empty_endpoint_list():
     router = RoundRobinRouter()
 
