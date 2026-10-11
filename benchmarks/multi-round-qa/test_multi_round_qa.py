@@ -53,6 +53,8 @@ def test_summary_during_streamed_response(session: benchmark.UserSession) -> Non
     release_response = threading.Event()
     update_finished = threading.Event()
     histories: list[list[dict[str, str]]] = []
+    # Simulate a loop left running by an earlier test before installing the trace.
+    benchmark.AsyncLoopWrapper.StartLoop()
 
     class Backend(BaseHTTPRequestHandler):
         def do_POST(self) -> None:
@@ -120,6 +122,11 @@ def test_summary_during_streamed_response(session: benchmark.UserSession) -> Non
     )
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
+    if benchmark.AsyncLoopWrapper._loop is not None:
+        benchmark.AsyncLoopWrapper.StopLoop()
+        benchmark.AsyncLoopWrapper._loop.close()
+        benchmark.AsyncLoopWrapper._loop = None
+        benchmark.AsyncLoopWrapper._thread = None
     previous_trace = sys.gettrace()
     previous_thread_trace = threading.gettrace()
     sys.settrace(trace)
