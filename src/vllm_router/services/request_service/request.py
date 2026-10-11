@@ -717,6 +717,34 @@ async def route_general_request(
     )
 
 
+async def _read_json_object_body(request: Request, request_id: str):
+    """
+    Read the request body as a JSON object.
+
+    Returns:
+        A tuple (request_json, error_response). Exactly one of them is None: a
+        malformed, undecodable or non-object body gives a 400 response instead
+        of an unhandled parsing error.
+    """
+    try:
+        request_json = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+        return None, JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: request body must be valid JSON."},
+            headers={"X-Request-Id": request_id},
+        )
+
+    if not isinstance(request_json, dict):
+        return None, JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: request body must be a JSON object."},
+            headers={"X-Request-Id": request_id},
+        )
+
+    return request_json, None
+
+
 async def send_request_to_prefiller(
     client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
 ):
@@ -775,7 +803,9 @@ async def route_orchestrated_disaggregated_request(
     """
     in_router_time = time.time()
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
-    request_json = await request.json()
+    request_json, error_response = await _read_json_object_body(request, request_id)
+    if error_response is not None:
+        return error_response
 
     logger.info(f"[{request_id}] Starting orchestrated disaggregated inference")
 
@@ -969,7 +999,9 @@ async def route_disaggregated_prefill_request(
     in_router_time = time.time()
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
-    request_json = await request.json()
+    request_json, error_response = await _read_json_object_body(request, request_id)
+    if error_response is not None:
+        return error_response
 
     # Save original request for decode phase
     orig_request_json = request_json.copy()
