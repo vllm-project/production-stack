@@ -489,6 +489,14 @@ async def route_general_request(
             headers={"X-Request-Id": request_id},
         )
 
+    if not isinstance(requested_model, str):
+        end_span(span, status_code=400) if tracing_active else None
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid request: 'model' must be a string."},
+            headers={"X-Request-Id": request_id},
+        )
+
     # Add model info to parent span
     if span is not None:
         span.set_attribute("vllm.model", requested_model)
