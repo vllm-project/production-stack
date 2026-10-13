@@ -9,7 +9,7 @@
 ## 最新动态
 
 - 📄 Production-Stack [官方文档](https://docs.vllm.ai/projects/production-stack)正式发布！
-- ✨ 面向 Lambda Labs、AWS EKS 和 Google GCP 的[云端部署教程](https://github.com/vllm-project/production-stack/blob/main/tutorials)现已推出！
+- ✨ 面向 Lambda Labs、AWS EKS 和 Google GCP 的[云端部署教程](https://github.com/vllm-project/production-stack/tree/main/tutorials)现已推出！
 - 🛤️ 2026 年度路线图已发布！[立即参与讨论](https://github.com/vllm-project/production-stack/issues/855)！
 - 🔥 vLLM Production Stack 正式发布！欢迎阅读我们于 2025 年 1 月 22 日发布的[发布博客](https://blog.lmcache.ai/2025-01-21-stack-release)。
 
@@ -32,7 +32,7 @@
 ## 分步实战教程
 
 0. 如何[*安装 Kubernetes 环境（kubectl、helm、minikube 等）*](https://github.com/vllm-project/production-stack/blob/main/tutorials/00-install-kubernetes-env.md)？
-1. 如何[*在主流云平台上部署 Production Stack（AWS、GCP、Lambda Labs、Azure）*](https://github.com/vllm-project/production-stack/blob/main/tutorials/cloud_deployments)？
+1. 如何[*在主流云平台上部署 Production Stack（AWS、GCP、Lambda Labs、Azure）*](https://github.com/vllm-project/production-stack/tree/main/tutorials/cloud_deployments)？
 2. 如何[*搭建最小化 vLLM Production Stack*](https://github.com/vllm-project/production-stack/blob/main/tutorials/01-minimal-helm-installation.md)？
 3. 如何[*自定义 vLLM 配置（可选）*](https://github.com/vllm-project/production-stack/blob/main/tutorials/02-basic-vllm-config.md)？
 4. 如何[*加载您的 LLM 模型权重*](https://github.com/vllm-project/production-stack/blob/main/tutorials/03-load-model-from-pv.md)？
