@@ -121,3 +121,28 @@ def test_is_model_healthy_when_requests_status_with_status_code_not_200_returns_
     monkeypatch.setattr("requests.post", request_mock)
 
     assert utils.is_model_healthy("http://localhost", "test", "chat") is False
+
+
+def test_parse_static_model_max_lens_when_pairs_supplied_returns_dict() -> None:
+    assert utils.parse_static_model_max_lens("llama3:131072, org/model:v1:32768") == {
+        "llama3": 131072,
+        "org/model:v1": 32768,
+    }
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["llama3", ":131072", "llama3:", "llama3:abc", "llama3:0", "llama3:-1"],
+)
+def test_parse_static_model_max_lens_when_entry_is_malformed_raises_value_error(
+    value: str,
+) -> None:
+    with pytest.raises(ValueError):
+        utils.parse_static_model_max_lens(value)
+
+
+def test_parse_static_model_max_lens_when_model_repeats_with_another_value_raises_value_error() -> (
+    None
+):
+    with pytest.raises(ValueError, match="Conflicting max_model_len"):
+        utils.parse_static_model_max_lens("llama3:131072,llama3:32768")

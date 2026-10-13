@@ -224,6 +224,36 @@ def parse_static_aliases(static_aliases: str):
     return aliases
 
 
+def parse_static_model_max_lens(static_model_max_lens: str) -> dict[str, int]:
+    """Parse ``model:max_model_len`` pairs separated by commas.
+
+    The split is on the last colon, so model names may contain colons.
+    """
+    max_lens: dict[str, int] = {}
+    for entry in static_model_max_lens.split(","):
+        model, sep, value = entry.strip().rpartition(":")
+        if not sep or not model:
+            raise ValueError(
+                f"Invalid static model max length '{entry}': expected model:max_model_len"
+            )
+        try:
+            max_len = int(value)
+        except ValueError:
+            raise ValueError(
+                f"Invalid max_model_len '{value}' for model '{model}': expected a positive integer"
+            ) from None
+        if max_len <= 0:
+            raise ValueError(
+                f"Invalid max_model_len '{value}' for model '{model}': expected a positive integer"
+            )
+        if max_lens.get(model, max_len) != max_len:
+            raise ValueError(
+                f"Conflicting max_model_len values for model '{model}': {max_lens[model]} and {max_len}"
+            )
+        max_lens[model] = max_len
+    return max_lens
+
+
 def replace_model_in_request_body(request_json: dict, model: str):
     request_json["model"] = model
     request_body = json.dumps(request_json)
