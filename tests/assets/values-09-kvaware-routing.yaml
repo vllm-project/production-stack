@@ -18,7 +18,7 @@ servingEngineSpec:
         gpuMemoryUtilization: 0.8
       lmcacheConfig:
         enabled: true
-        cpuOffloadingBufferSize: "10"
+        cpuOffloadingBufferSize: "2"
         enableController: true
         controllerPort: 9000
         controllerReplyPort: 9001

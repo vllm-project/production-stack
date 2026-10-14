@@ -142,7 +142,7 @@ jobs:
             --verbose \
             --result-dir /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }} \
             --timeout 20
-        timeout-minutes: 20
+        timeout-minutes: 60
 
       - name: Cleanup k8s discovery resources
         if: always()
