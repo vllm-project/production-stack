@@ -21,9 +21,21 @@ spec:
       nodePort: {{ .Values.routerSpec.nodePort }}
       {{- end }}
     - name: "lmcache-port"
-      port: 9000
+      port: {{ .Values.routerSpec.lmcacheControllerPort | default 9000 }}
       targetPort: lmcache-port
       protocol: TCP
+    {{- if .Values.routerSpec.lmcacheControllerReplyPort }}
+    - name: "lmcache-reply"
+      port: {{ .Values.routerSpec.lmcacheControllerReplyPort }}
+      targetPort: lmcache-reply
+      protocol: TCP
+    {{- end }}
+    {{- if .Values.routerSpec.lmcacheControllerHeartbeatPort }}
+    - name: "lmcache-hbeat"
+      port: {{ .Values.routerSpec.lmcacheControllerHeartbeatPort }}
+      targetPort: lmcache-hbeat
+      protocol: TCP
+    {{- end }}
   {{- include "chart.routerExtraPorts" $ | nindent 4 }}
   selector:
   {{- include "chart.routerStandardLabels" (dict "releaseName" .Release.Name "chartName" .Chart.Name) | nindent 4 }}
