@@ -179,7 +179,7 @@ spec:
           - {{ .maxNumSeqs | quote }}
           {{-   end }}
           {{-   if hasKey . "gpuMemoryUtilization" }}
-          - "--gpu_memory_utilization"
+          - "--gpu-memory-utilization"
           - {{ .gpuMemoryUtilization | quote }}
           {{-   end }}
           {{-   if hasKey . "maxLoras" }}
@@ -463,6 +463,9 @@ spec:
           volumeMounts:
             - name: {{ .Release.Name }}-storage
               mountPath: /data
+        {{- end }}
+        {{- with $modelSpec.extraContainers }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:
