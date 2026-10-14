@@ -210,6 +210,10 @@ def init_logger(name: str, log_level=None) -> Logger:
     error_stream = logging.StreamHandler()
     error_stream.setLevel(logging.WARNING)
     error_stream.setFormatter(formatter)
+    # Each handler owns its filter chain, so the stdout handler's
+    # TokenRedactionFilter never runs for a WARNING or above. Without this,
+    # a warning that logs headers would print them in cleartext.
+    error_stream.addFilter(TokenRedactionFilter())
     logger.addHandler(error_stream)
     logger.propagate = False
 
