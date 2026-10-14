@@ -15,7 +15,7 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.1.12
+version: 0.1.13
 
 maintainers:
   - name: apostac
@@ -29,3 +29,7 @@ dependencies:
     version: 5.3.0
     repository: oci://ghcr.io/prometheus-community/charts
     condition: prometheus-adapter.enabled
+  - name: k8s-aibom
+    version: 1.5.1
+    repository: oci://ghcr.io/googlecloudplatform/charts
+    condition: k8s-aibom.enabled

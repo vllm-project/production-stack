@@ -124,6 +124,9 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- if $modelSpec.command }}
+          command: {{ toYaml $modelSpec.command | nindent 12 }}
+          {{- else }}
           command:
           {{- if eq $modelSpec.repository "lmcache/vllm-openai" }}
           - "/opt/venv/bin/vllm"
@@ -176,7 +179,7 @@ spec:
           - {{ .maxNumSeqs | quote }}
           {{-   end }}
           {{-   if hasKey . "gpuMemoryUtilization" }}
-          - "--gpu_memory_utilization"
+          - "--gpu-memory-utilization"
           - {{ .gpuMemoryUtilization | quote }}
           {{-   end }}
           {{-   if hasKey . "maxLoras" }}
@@ -218,6 +221,10 @@ spec:
           {{- if $modelSpec.chatTemplate }}
           - "--chat-template"
           - "/templates/{{ $modelSpec.chatTemplate }}"
+          {{- end }}
+          {{- end }}
+          {{- if $modelSpec.args }}
+          args: {{ toYaml $modelSpec.args | nindent 12 }}
           {{- end }}
           imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy }}"
           env:
@@ -456,6 +463,9 @@ spec:
           volumeMounts:
             - name: {{ .Release.Name }}-storage
               mountPath: /data
+        {{- end }}
+        {{- with $modelSpec.extraContainers }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
       {{- if $modelSpec.imagePullSecret }}
       imagePullSecrets:

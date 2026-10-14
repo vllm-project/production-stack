@@ -75,6 +75,32 @@ Examples:
 EOF
 }
 
+# Function to wait until every vllm-* PVC is really gone
+#
+# Every values file deploys the same claim (vllm-opt125m-storage-claim). A PVC
+# stays in Terminating while the pvc-protection finalizer is held by the pods
+# still shutting down. If the next "helm install" starts in that window, Helm
+# adopts the dying PVC instead of creating a new one, and the new pods sit in
+# Pending forever once it finally disappears.
+wait_for_vllm_pvcs_deleted() {
+    local pvcs
+    pvcs=$(kubectl get pvc -o name 2>/dev/null | grep '^persistentvolumeclaim/vllm-' || true)
+    if [ -n "$pvcs" ]; then
+        print_status "⏳ Waiting for PVCs to be deleted: $(echo "$pvcs" | tr '\n' ' ')"
+        # Wait per PVC: a single multi-resource wait aborts as soon as one of
+        # them is already gone, leaving the rest unwaited.
+        local pvc
+        for pvc in $pvcs; do
+            kubectl wait --for=delete --timeout=120s "$pvc" >/dev/null 2>&1 || {
+                # Only a PVC that still exists is a real timeout
+                if kubectl get "$pvc" >/dev/null 2>&1; then
+                    print_warning "Timed out waiting for PVC to be deleted: $pvc"
+                fi
+            }
+        done
+    fi
+}
+
 # Function to deploy helm chart
 deploy_helm_chart() {
     local values_file=$1
@@ -85,6 +111,9 @@ deploy_helm_chart() {
         helm upgrade vllm ./helm -f "$values_file"
     else
         print_status "🚀 Installing new vllm deployment"
+        # Guard against a leftover PVC from a previous release that is still
+        # terminating; installing on top of it would adopt it.
+        wait_for_vllm_pvcs_deleted
         helm dependency build helm/
         helm install vllm ./helm -f "$values_file"
     fi
@@ -94,7 +123,7 @@ deploy_helm_chart() {
 wait_for_pods() {
     print_status "⏳ Waiting for pods to be ready"
     chmod +x tests/e2e/wait-for-pods.sh
-    tests/e2e/wait-for-pods.sh --pod-prefix vllm --timeout 300 --verbose
+    tests/e2e/wait-for-pods.sh --pod-prefix vllm --timeout 600 --verbose
 }
 
 # Function to setup port forwarding
@@ -169,6 +198,29 @@ run_test() {
     timeout "${TIMEOUT_MINUTES}m" bash -c "$test_cmd"
 }
 
+# Function to dump full logs of every pod matching a selector
+#
+# Logs are collected per pod rather than with "kubectl logs -l": a selector
+# read truncates each pod to 10 lines by default, caps the number of pods it
+# reads, and rejects --previous on some kubectl versions. Engine startup
+# failures scroll off the end of a short tail, and a crashed container has
+# restarted by the time logs are collected, so the trace only survives in the
+# previous container.
+collect_pod_logs() {
+    local selector=$1
+    local out_dir=$2
+    local prefix=$3
+
+    local pod
+    for pod in $(kubectl get pods -l "$selector" -o name 2>/dev/null); do
+        pod=${pod#pod/}
+        kubectl logs "$pod" --all-containers --tail=-1 > "$out_dir/$prefix-$pod.log" 2>/dev/null || true
+        kubectl logs "$pod" --all-containers --tail=-1 --previous > "$out_dir/$prefix-$pod-previous.log" 2>/dev/null || true
+        # Keep only non-empty previous-container logs
+        [ -s "$out_dir/$prefix-$pod-previous.log" ] || rm -f "$out_dir/$prefix-$pod-previous.log"
+    done
+}
+
 # Function to collect debug logs
 collect_debug_logs() {
     local test_type=$1
@@ -186,16 +238,20 @@ collect_debug_logs() {
     for selector in "${router_selectors[@]}"; do
         if kubectl get pods -l "$selector" >/dev/null 2>&1; then
             print_status "Found router pods with selector: $selector"
-            kubectl logs -l "$selector" --tail=100 > "$RESULT_DIR/debug-logs/test-type-$test_type/router-${selector//\//-}.log" 2>/dev/null || true
+            collect_pod_logs "$selector" "$RESULT_DIR/debug-logs/test-type-$test_type" "router"
             break
         fi
     done
 
     # Get serving engine logs
-    kubectl logs -l app.kubernetes.io/component=serving-engine --tail=100 > "$RESULT_DIR/debug-logs/test-type-$test_type/serving-engines.log" 2>/dev/null || true
+    collect_pod_logs "app.kubernetes.io/component=serving-engine" "$RESULT_DIR/debug-logs/test-type-$test_type" "serving-engine"
 
     # Get pod status
     kubectl get pods -o wide > "$RESULT_DIR/debug-logs/test-type-$test_type/pod-status.txt" 2>/dev/null || true
+
+    # Describe pods for last state / exit codes / OOMKilled, which the status
+    # table and events do not show
+    kubectl describe pods > "$RESULT_DIR/debug-logs/test-type-$test_type/pod-describe.txt" 2>/dev/null || true
 
     # Get services
     kubectl get svc > "$RESULT_DIR/debug-logs/test-type-$test_type/services.txt" 2>/dev/null || true
@@ -211,8 +267,16 @@ cleanup_resources() {
     # Kill any port forwarding processes
     pkill -f "kubectl port-forward" 2>/dev/null || true
 
-    # Uninstall helm chart
-    helm uninstall vllm 2>/dev/null || true
+    # Uninstall helm chart. --wait blocks until every resource of the release
+    # is gone, so the next test cannot install on top of a terminating PVC.
+    if helm status vllm >/dev/null 2>&1; then
+        helm uninstall vllm --wait --timeout 3m ||
+            print_warning "helm uninstall did not complete cleanly"
+    fi
+
+    # Backstop in case the uninstall above timed out or the release was already
+    # gone while its PVCs were not.
+    wait_for_vllm_pvcs_deleted
 
     # Clean up docker images
     sudo docker image prune -f 2>/dev/null || true

@@ -5,5 +5,8 @@ dependencies:
 - name: prometheus-adapter
   repository: oci://ghcr.io/prometheus-community/charts
   version: 5.3.0
-digest: sha256:8d1c619d53bcf3aee4f7d512f1cdff45af4cfe366816dbe4abb000b77bf0fa53
-generated: "2026-03-04T22:45:14.968546603+01:00"
+- name: k8s-aibom
+  repository: oci://ghcr.io/googlecloudplatform/charts
+  version: 1.5.1
+digest: sha256:7b2279356bb32d61f6ace0642db7f6423cbe1fa0c279e6995b96c7196e59b8a1
+generated: "2026-09-28T08:22:16.986812-07:00"
