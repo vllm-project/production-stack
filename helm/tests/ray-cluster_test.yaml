@@ -208,15 +208,15 @@ tests:
         value: RayCluster
     - documentIndex: 0
       equal:
-        path: metadata.annotations.["example.com/owner"]
+        path: metadata.annotations["example.com/owner"]
         value: team-a
     - documentIndex: 0
       equal:
-        path: spec.headGroupSpec.template.metadata.annotations.["k8s.v1.cni.cncf.io/networks"]
+        path: spec.headGroupSpec.template.metadata.annotations["k8s.v1.cni.cncf.io/networks"]
         value: macvlan-conf
     - documentIndex: 0
       equal:
-        path: spec.workerGroupSpecs[0].template.metadata.annotations.["k8s.v1.cni.cncf.io/networks"]
+        path: spec.workerGroupSpecs[0].template.metadata.annotations["k8s.v1.cni.cncf.io/networks"]
         value: macvlan-conf
 
   - it: should not render VLLM_API_KEY
