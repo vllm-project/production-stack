@@ -1,10 +1,12 @@
-"""Unit tests for route_sleep_wakeup_request's /reset_prefix_cache support.
+"""Unit tests for route_sleep_wakeup_request's response-relay behavior.
 
-route_sleep_wakeup_request already backs /sleep, /wake_up, /is_sleeping.
-These tests cover two things: the new /reset_prefix_cache endpoint relays
-vLLM's real response body (unlike /sleep and /wake_up, whose upstream body
-is always empty and safe to ignore), and that existing /sleep behavior is
-provably unchanged by that change.
+route_sleep_wakeup_request backs /sleep, /wake_up, /is_sleeping, and
+/reset_prefix_cache. After every POST it now always tries to parse and
+relay the real upstream JSON body, falling back to the old canned
+{"status": "success"} only when parsing fails (an empty body, as /sleep
+and /wake_up send). These tests cover that generic behavior relaying
+/reset_prefix_cache's real body, and that /sleep's existing behavior is
+provably unchanged.
 """
 
 import json
@@ -38,15 +40,23 @@ def _build_request(query_params, body=b""):
     return request
 
 
-def _mock_aiohttp_session(response_status, response_json=None):
+def _mock_aiohttp_session(response_status, response_json=None, json_raises=False):
     """Build a mock aiohttp.ClientSession usable both as
     `async with aiohttp.ClientSession() as client:` and, on the returned
     client, `async with client.post(...) as response:`.
+
+    json_raises=True simulates a real empty-body response, where aiohttp's
+    response.json() raises rather than returning None.
     """
     mock_response = MagicMock()
     mock_response.status = response_status
     mock_response.raise_for_status = MagicMock()
-    mock_response.json = AsyncMock(return_value=response_json)
+    if json_raises:
+        mock_response.json = AsyncMock(
+            side_effect=json.JSONDecodeError("Expecting value", "", 0)
+        )
+    else:
+        mock_response.json = AsyncMock(return_value=response_json)
 
     mock_post_cm = MagicMock()
     mock_post_cm.__aenter__ = AsyncMock(return_value=mock_response)
@@ -113,9 +123,10 @@ async def test_reset_prefix_cache_relays_real_response_body(request_body):
 
 @pytest.mark.asyncio
 async def test_sleep_still_returns_canned_status_unaffected():
-    """Regression: /sleep's existing behavior (canned {"status": "success"},
-    ignoring the empty upstream body) must be unchanged by the
-    /reset_prefix_cache relay logic added alongside it.
+    """Regression: /sleep's existing behavior (canned {"status": "success"})
+    must be unchanged by the generic relay logic. /sleep's real upstream
+    response body is empty, so response.json() raises (simulated here) and
+    the code must fall back to the canned status, not propagate the error.
     """
     endpoint_info = EndpointInfo("X", "http://engine-x:8000", "pod-x")
     service_discovery = MagicMock()
@@ -123,7 +134,7 @@ async def test_sleep_still_returns_canned_status_unaffected():
     service_discovery.add_sleep_label = MagicMock()
 
     mock_session_cm, mock_client, mock_response = _mock_aiohttp_session(
-        response_status=200, response_json=None
+        response_status=200, json_raises=True
     )
 
     request = _build_request({"id": "X", "level": "2"})
@@ -141,6 +152,7 @@ async def test_sleep_still_returns_canned_status_unaffected():
         response = await route_sleep_wakeup_request(request, "/sleep", MagicMock())
 
     assert json.loads(response.body) == {"status": "success"}
-    # The relay logic must never even attempt to parse /sleep's body.
-    mock_response.json.assert_not_called()
+    # The relay logic does attempt to parse /sleep's body now (generic,
+    # unconditional) -- it must just fail gracefully and fall back.
+    mock_response.json.assert_awaited_once()
     service_discovery.add_sleep_label.assert_called_once_with("pod-x")
