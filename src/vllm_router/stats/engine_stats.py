@@ -72,7 +72,12 @@ class EngineStats:
                     gpu_prefix_cache_hits_total = sample.value
                 elif sample.name == "vllm:gpu_prefix_cache_queries_total":
                     gpu_prefix_cache_queries_total = sample.value
-                elif sample.name == "vllm:gpu_cache_usage_perc":
+                elif sample.name in (
+                    "vllm:gpu_cache_usage_perc",
+                    "vllm:kv_cache_usage_perc",
+                ):
+                    # vLLM renamed gpu_cache_usage_perc to kv_cache_usage_perc;
+                    # newer releases only export the new name.
                     gpu_cache_usage_perc = sample.value
 
         return EngineStats(
