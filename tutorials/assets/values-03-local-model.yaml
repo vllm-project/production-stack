@@ -1,0 +1,30 @@
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+    - name: "llama3-local"
+      repository: "vllm/vllm-openai"
+      tag: "latest"
+      # The PV root is mounted at /data inside the serving container.
+      modelURL: "/data/Llama-3.1-8B-Instruct"
+      replicaCount: 1
+
+      requestCPU: 10
+      requestMemory: "16Gi"
+      requestGPU: 1
+
+      # Reuse the PV labeled model=llama3-pv from pv-03.yaml.
+      pvcStorage: "50Gi"
+      pvcAccessMode:
+        - ReadWriteOnce
+      pvcMatchLabels:
+        model: "llama3-pv"
+
+      vllmConfig:
+        maxModelLen: 4096
+
+      # Fail instead of attempting a network download if local files are missing.
+      env:
+        - name: HF_HUB_OFFLINE
+          value: "1"
+        - name: TRANSFORMERS_OFFLINE
+          value: "1"
