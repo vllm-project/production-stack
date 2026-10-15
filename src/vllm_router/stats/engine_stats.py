@@ -55,10 +55,12 @@ class EngineStats:
         """
         num_running_reqs = 0
         num_queuing_reqs = 0
-        gpu_prefix_cache_hit_rate = 0.0
+        gpu_prefix_cache_hit_rate = None
         gpu_prefix_cache_hits_total = 0
         gpu_prefix_cache_queries_total = 0
         gpu_cache_usage_perc = 0.0
+        prefix_cache_hits_total = None
+        prefix_cache_queries_total = None
 
         for family in text_string_to_metric_families(vllm_scrape):
             for sample in family.samples:
@@ -72,6 +74,10 @@ class EngineStats:
                     gpu_prefix_cache_hits_total = sample.value
                 elif sample.name == "vllm:gpu_prefix_cache_queries_total":
                     gpu_prefix_cache_queries_total = sample.value
+                elif sample.name == "vllm:prefix_cache_hits_total":
+                    prefix_cache_hits_total = sample.value
+                elif sample.name == "vllm:prefix_cache_queries_total":
+                    prefix_cache_queries_total = sample.value
                 elif sample.name in (
                     "vllm:gpu_cache_usage_perc",
                     "vllm:kv_cache_usage_perc",
@@ -79,6 +85,20 @@ class EngineStats:
                     # vLLM renamed gpu_cache_usage_perc to kv_cache_usage_perc;
                     # newer releases only export the new name.
                     gpu_cache_usage_perc = sample.value
+
+        # Prefer current counters when both naming schemes are exposed.
+        if prefix_cache_hits_total is not None:
+            gpu_prefix_cache_hits_total = prefix_cache_hits_total
+        if prefix_cache_queries_total is not None:
+            gpu_prefix_cache_queries_total = prefix_cache_queries_total
+        # V1 engines do not export the legacy hit-rate gauge. Derive the
+        # cumulative token hit ratio while preserving an explicit gauge value.
+        if gpu_prefix_cache_hit_rate is None:
+            gpu_prefix_cache_hit_rate = (
+                gpu_prefix_cache_hits_total / gpu_prefix_cache_queries_total
+                if gpu_prefix_cache_queries_total > 0
+                else 0.0
+            )
 
         return EngineStats(
             num_running_requests=num_running_reqs,
