@@ -51,7 +51,7 @@ async def multipart_backend(endpoint, handler):
 
 
 @asynccontextmanager
-async def router_client(backend_url, model=AUDIO_MODEL):
+async def router_client(backend_url, model=AUDIO_MODEL, aliases=None):
     app = FastAPI()
     app.include_router(main_router)
 
@@ -61,6 +61,7 @@ async def router_client(backend_url, model=AUDIO_MODEL):
             app=app,
             urls=[backend_url],
             models=[model],
+            aliases=aliases,
         )
         stack.callback(
             setattr, service_discovery_module, "_global_service_discovery", None
@@ -226,4 +227,111 @@ async def test_image_edit_accepts_standard_multipart_request():
         "filename": "input.png",
         "content_type": "image/png",
         "content": b"fake-image",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("use_alias", [False, True])
+@pytest.mark.parametrize(
+    "endpoint,model,upload_key,stream,filename",
+    [
+        ("/v1/audio/transcriptions", AUDIO_MODEL, "file", False, "input.bin"),
+        ("/v1/audio/transcriptions", AUDIO_MODEL, "file", True, "input.bin"),
+        ("/v1/audio/translations", AUDIO_MODEL, "file", False, "input.bin"),
+        ("/v1/audio/translations", AUDIO_MODEL, "file", False, "speech sample.wav"),
+        ("/v1/audio/translations", AUDIO_MODEL, "file", False, "语音.wav"),
+        ("/v1/images/edits", IMAGE_MODEL, "image", False, "input.bin"),
+        ("/v1/images/edits", IMAGE_MODEL, "image", False, "input image.png"),
+        ("/v1/images/edits", IMAGE_MODEL, "image", False, "图像.png"),
+    ],
+)
+async def test_multipart_model_aliases(
+    endpoint, model, upload_key, stream, filename, use_alias
+):
+    received = {}
+    alias = "model-alias"
+    content = b"\x00\xffmodel-alias\x80"
+
+    async def capture(request):
+        form = await request.post()
+        upload = form[upload_key]
+        received.update(
+            model=form["model"],
+            prompt=form["prompt"],
+            filename=upload.filename,
+            content_type=upload.content_type,
+            content=upload.file.read(),
+            stream=form.get("stream"),
+        )
+        if stream:
+            return web.Response(
+                text='data: {"text": "transcribed"}\n\n',
+                content_type="text/event-stream",
+            )
+        return web.json_response({"text": "processed"})
+
+    async with multipart_backend(endpoint, capture) as backend_url:
+        async with router_client(
+            backend_url, model=model, aliases={alias: model}
+        ) as client:
+            data = {"model": alias if use_alias else model, "prompt": alias}
+            if stream:
+                data["stream"] = "true"
+            response = await client.post(
+                endpoint,
+                data=data,
+                files={upload_key: (filename, content, "application/octet-stream")},
+            )
+
+    assert response.status_code == 200
+    if stream:
+        assert response.headers["content-type"].startswith("text/event-stream")
+        assert response.text == 'data: {"text": "transcribed"}\n\n'
+    else:
+        assert response.json() == {"text": "processed"}
+    assert received == {
+        "model": model,
+        "prompt": alias,
+        "filename": filename,
+        "content_type": "application/octet-stream",
+        "content": content,
+        "stream": "true" if stream else None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_image_edit_alias_preserves_repeated_fields_and_uploads():
+    received = {}
+
+    async def capture(request):
+        form = await request.post()
+        received["model"] = form["model"]
+        received["images"] = [
+            (upload.filename, upload.content_type, upload.file.read())
+            for upload in form.getall("image")
+        ]
+        received["extra"] = form.getall("extra")
+        return web.json_response({"data": []})
+
+    async with multipart_backend("/v1/images/edits", capture) as backend_url:
+        async with router_client(
+            backend_url, model=IMAGE_MODEL, aliases={"image-alias": IMAGE_MODEL}
+        ) as client:
+            response = await client.post(
+                "/v1/images/edits",
+                data={"model": "image-alias", "extra": ["first", "second"]},
+                files=[
+                    ("image", ("first.png", b"first-image", "image/png")),
+                    ("image", ("second.png", b"second-image", "image/png")),
+                ],
+            )
+
+    assert response.status_code == 200
+    assert received == {
+        "model": IMAGE_MODEL,
+        "images": [
+            ("first.png", "image/png", b"first-image"),
+            ("second.png", "image/png", b"second-image"),
+        ],
+        "extra": ["first", "second"],
     }
