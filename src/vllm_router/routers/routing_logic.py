@@ -358,12 +358,8 @@ class KvawareRouter(RoutingInterface):
         )
         try:
             if model_name not in self.tokenizers:
-                self.tokenizers[model_name] = AutoTokenizer.from_pretrained(
-                    model_name
-                )
-            return self.tokenizers[model_name].encode(
-                request_json.get("prompt", "")
-            )
+                self.tokenizers[model_name] = AutoTokenizer.from_pretrained(model_name)
+            return self.tokenizers[model_name].encode(request_json.get("prompt", ""))
         except Exception:
             if model_endpoint is None:
                 raise
