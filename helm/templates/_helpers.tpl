@@ -149,12 +149,121 @@ readinessProbe:
 
 {{- end }}
 
+{{/*
+  Validate DRA configuration for a model spec. Fails the render with an
+  actionable message on conflicting or incomplete DRA settings.
+  Call with: include "chart.draCheck" $modelSpec
+*/}}
+{{- define "chart.draCheck" -}}
+{{- if eq (.gpuAllocation | default "device-plugin") "dra" -}}
+{{- if and (hasKey . "requestGPU") (ne (toString .requestGPU) "") -}}
+{{- if gt (int .requestGPU) 0 -}}
+{{- fail (printf "modelSpec '%s': gpuAllocation 'dra' cannot be combined with requestGPU. Remove requestGPU; GPUs are allocated via DRA claims (ResourceClaimTemplate)" .name) -}}
+{{- end -}}
+{{- end -}}
+{{- if or (hasKey . "requestGPUMem") (hasKey . "requestGPUMemPercentage") (hasKey . "requestGPUCores") -}}
+{{- fail (printf "modelSpec '%s': gpuAllocation 'dra' cannot be combined with HAMi GPU requests (requestGPUMem, requestGPUMemPercentage, requestGPUCores)" .name) -}}
+{{- end -}}
+{{- if .resources -}}
+{{- $hasClaim := false -}}
+{{- if hasKey .resources "claims" -}}
+{{- range .resources.claims -}}
+{{- if eq .name "gpu" -}}
+{{- $hasClaim = true -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- if not $hasClaim -}}
+{{- fail (printf "modelSpec '%s': gpuAllocation 'dra' with a custom 'resources' block requires a 'claims' entry with name 'gpu'" .name) -}}
+{{- end -}}
+{{- end -}}
+{{- if and (hasKey . "raySpec") (hasKey .raySpec "enabled") .raySpec.enabled -}}
+{{- $hn := default dict .raySpec.headNode -}}
+{{- if and (hasKey $hn "requestGPU") (ne (toString $hn.requestGPU) "") -}}
+{{- if gt (int $hn.requestGPU) 0 -}}
+{{- fail (printf "modelSpec '%s': gpuAllocation 'dra' cannot be combined with raySpec.headNode.requestGPU. Set raySpec.headNode.requestGPU to 0; GPUs are allocated via DRA claims (ResourceClaimTemplate)" .name) -}}
+{{- end -}}
+{{- end -}}
+{{- if or (hasKey $hn "requestGPUMem") (hasKey $hn "requestGPUMemPercentage") (hasKey $hn "requestGPUCores") -}}
+{{- fail (printf "modelSpec '%s': gpuAllocation 'dra' cannot be combined with HAMi GPU requests in raySpec.headNode" .name) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+  Name of the standalone ResourceClaimTemplate object for a model.
+  Call with: include "chart.draClaimName" (dict "releaseName" .Release.Name "modelName" $modelSpec.name)
+*/}}
+{{- define "chart.draClaimName" -}}
+{{- printf "%s-%s-dra-gpu" .releaseName .modelName -}}
+{{- end -}}
+
+{{/*
+  Render the standalone ResourceClaimTemplate object (v1 GA schema).
+  Inline pod-level resourceClaimTemplates is NOT used: the field is feature-gated
+  and rejected by strict decoding on GA-enabled clusters (verified on k3s 1.36.4).
+  Call with: include "chart.draClaimTemplate" (dict "releaseName" ... "namespace" ... "modelName" ... "deviceClass" ... "gpuCount" ...)
+*/}}
+{{- define "chart.draClaimTemplate" -}}
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: {{ include "chart.draClaimName" . }}
+  namespace: {{ .namespace }}
+spec:
+  spec:
+    devices:
+      requests:
+        - name: gpu
+          exactly:
+            deviceClassName: {{ .deviceClass | default "gpu.nvidia.com" }}
+            {{- if and (hasKey . "gpuCount") (ne (toString .gpuCount) "") }}
+            {{- if gt (int .gpuCount) 1 }}
+            count: {{ .gpuCount }}
+            {{- end }}
+            {{- end }}
+{{- end -}}
+
+{{/*
+  Render the pod-level resourceClaims reference for DRA.
+  Call with: include "chart.draPodClaims" (dict "releaseName" ... "modelName" ...)
+*/}}
+{{- define "chart.draPodClaims" -}}
+resourceClaims:
+  - name: gpu
+    resourceClaimTemplateName: {{ include "chart.draClaimName" . }}
+{{- end -}}
+
+{{/*
+  Merge ray head-node resource fields with the model's DRA settings so the
+  head container can share chart.resources' DRA handling (claims emission).
+  headNode.deviceClass / headNode.gpuCount override the model-level values.
+  Call with: include "chart.rayHeadMerged" $modelSpec
+*/}}
+{{- define "chart.rayHeadMerged" -}}
+{{- $head := default dict .raySpec.headNode -}}
+{{- $merged := deepCopy $head -}}
+{{- $_ := set $merged "gpuAllocation" (.gpuAllocation | default "device-plugin") -}}
+{{- if eq (.gpuAllocation | default "device-plugin") "dra" -}}
+{{- $_ := set $merged "deviceClass" (get $head "deviceClass" | default (.deviceClass | default "gpu.nvidia.com")) -}}
+{{- $_ := set $merged "gpuCount" (get $head "gpuCount" | default 0) -}}
+{{- end -}}
+{{- toYaml $merged -}}
+{{- end -}}
+
 {{- define "chart.hasLimits" -}}
 {{- $modelSpec := . -}}
+{{- $gpuRequested := false -}}
+{{- if and (hasKey $modelSpec "requestGPU") (ne (toString $modelSpec.requestGPU) "") -}}
+{{- if gt (int $modelSpec.requestGPU) 0 -}}
+{{- $gpuRequested = true -}}
+{{- end -}}
+{{- end -}}
 {{- or
     (hasKey $modelSpec "limitMemory")
     (hasKey $modelSpec "limitCPU")
-    (gt (int $modelSpec.requestGPU) 0)
+    $gpuRequested
     (hasKey $modelSpec "limitGPUMem")
     (hasKey $modelSpec "limitGPUMemPercentage")
     (hasKey $modelSpec "limitGPUCores")
@@ -166,23 +275,38 @@ Define resources with a variable model spec
 */}}
 {{- define "chart.resources" -}}
 {{- $modelSpec := . -}}
+{{- $dra := eq ($modelSpec.gpuAllocation | default "device-plugin") "dra" -}}
 requests:
   memory: {{ required "Value 'modelSpec.requestMemory' must be defined !" ($modelSpec.requestMemory | quote) }}
   cpu: {{ required "Value 'modelSpec.requestCPU' must be defined !" ($modelSpec.requestCPU | quote) }}
-  {{- if (gt (int $modelSpec.requestGPU) 0) }}
+  {{- if and (not $dra) (hasKey $modelSpec "requestGPU") (ne (toString $modelSpec.requestGPU) "") (gt (int $modelSpec.requestGPU) 0) }}
   {{- $gpuType := default "nvidia.com/gpu" $modelSpec.requestGPUType }}
-  {{ $gpuType }}: {{ required "Value 'modelSpec.requestGPU' must be defined !" (index $modelSpec.requestGPU | quote) }}
+  {{ $gpuType }}: {{ required "Value 'modelSpec.requestGPU' must be defined !" ($modelSpec.requestGPU | quote) }}
   {{- end }}
-  {{- if (hasKey $modelSpec "requestGPUMem") }}
+  {{- if and (not $dra) (hasKey $modelSpec "requestGPUMem") }}
   nvidia.com/gpumem: {{ $modelSpec.requestGPUMem | quote }}
   {{- end }}
-  {{- if (hasKey $modelSpec "requestGPUMemPercentage") }}
+  {{- if and (not $dra) (hasKey $modelSpec "requestGPUMemPercentage") }}
   nvidia.com/gpumem-percentage: {{ $modelSpec.requestGPUMemPercentage | quote }}
   {{- end }}
-  {{- if (hasKey $modelSpec "requestGPUCores") }}
+  {{- if and (not $dra) (hasKey $modelSpec "requestGPUCores") }}
   nvidia.com/gpucores: {{ $modelSpec.requestGPUCores | quote }}
   {{- end }}
-{{- if (include "chart.hasLimits" $modelSpec | fromYaml) }}
+{{- $hasDraClaim := false -}}
+{{- if $dra -}}
+  {{- $count := 1 -}}
+  {{- if hasKey $modelSpec "gpuCount" -}}
+    {{- $count = int $modelSpec.gpuCount -}}
+  {{- end -}}
+  {{- if gt $count 0 -}}
+    {{- $hasDraClaim = true -}}
+  {{- end -}}
+{{- end -}}
+{{- if $hasDraClaim }}
+claims:
+  - name: gpu
+{{- end }}
+{{- if and (not $dra) (eq (include "chart.hasLimits" $modelSpec) "true") }}
 limits:
   {{- if (hasKey $modelSpec "limitMemory") }}
   memory: {{ $modelSpec.limitMemory | quote }}
@@ -190,9 +314,9 @@ limits:
   {{- if (hasKey $modelSpec "limitCPU") }}
   cpu: {{ $modelSpec.limitCPU | quote }}
   {{- end }}
-  {{- if (gt (int $modelSpec.requestGPU) 0) }}
+  {{- if (and (hasKey $modelSpec "requestGPU") (ne (toString $modelSpec.requestGPU) "") (gt (int $modelSpec.requestGPU) 0)) }}
   {{- $gpuType := default "nvidia.com/gpu" $modelSpec.requestGPUType }}
-  {{ $gpuType }}: {{ required "Value 'modelSpec.requestGPU' must be defined !" (index $modelSpec.requestGPU | quote) }}
+  {{ $gpuType }}: {{ required "Value 'modelSpec.requestGPU' must be defined !" ($modelSpec.requestGPU | quote) }}
   {{- end }}
   {{- if (hasKey $modelSpec "limitGPUMem") }}
   nvidia.com/gpumem: {{ $modelSpec.limitGPUMem | quote }}
