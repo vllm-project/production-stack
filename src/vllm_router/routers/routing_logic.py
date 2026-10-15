@@ -336,6 +336,52 @@ class KvawareRouter(RoutingInterface):
             self.tokenizers[model_name] = AutoTokenizer.from_pretrained(model_name)
         return self.tokenizers[model_name]
 
+    async def tokenize_prompt(
+        self, endpoints: List[EndpointInfo], request_json: Dict
+    ) -> List[int]:
+        """Local-first tokenization with the remote `/tokenize` fallback.
+
+        Uses per-model tokenizers for multi-model setups. Falls back to the
+        first endpoint's model name when the request body doesn't specify one.
+        The remote fallback runs in an executor to avoid blocking the event loop.
+        """
+        # Prefer model from request body; fall back to endpoints' model
+        model_name = request_json.get("model", "")
+        if not model_name and endpoints:
+            model_name = endpoints[0].model_names[0]
+        if not model_name:
+            raise ValueError("Missing 'model' in request body and no endpoints")
+        # Find the endpoint serving this model
+        model_endpoint = next(
+            (ep for ep in endpoints if model_name in ep.model_names),
+            endpoints[0] if endpoints else None,
+        )
+        try:
+            if model_name not in self.tokenizers:
+                self.tokenizers[model_name] = AutoTokenizer.from_pretrained(
+                    model_name
+                )
+            return self.tokenizers[model_name].encode(
+                request_json.get("prompt", "")
+            )
+        except Exception:
+            if model_endpoint is None:
+                raise
+            remote_url = model_endpoint.url + "/tokenize"
+            headers = {"Content-Type": "application/json"}
+            data = {
+                "model": model_name,
+                "prompt": request_json.get("prompt", ""),
+            }
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    remote_url, headers=headers, json=data, timeout=10
+                ),
+            )
+            return response.json()["tokens"]
+
     def start_kv_manager(self):
         """
         Start the kv manager
@@ -666,47 +712,14 @@ class LoadAwareRouter(KvawareRouter):
     ) -> List[int]:
         """Local-first tokenization with the remote `/tokenize` fallback.
 
-        The remote fallback is a blocking HTTP call, so it runs in an
-        executor rather than on the event loop.
-
         Chat completions (`messages`) are tokenized by the engine's
         `/tokenize` with the model's own chat template, so the token ids match
-        what the engine prefills and caches. Reading only `prompt` would look
-        every chat request up as an empty prompt and never find a match.
+        what the engine prefills and caches. Prompt-only requests use the
+        parent class's local-first tokenization logic with per-model caches.
         """
-        model_name = request_json.get("model", "")
-        if not model_name:
-            raise ValueError("Missing 'model' in request body")
-        # Find the endpoint serving this model
-        model_endpoint = next(
-            (ep for ep in endpoints if model_name in ep.model_names),
-            endpoints[0] if endpoints else None,
-        )
-        try:
-            if model_name not in self.tokenizers:
-                self.tokenizers[model_name] = AutoTokenizer.from_pretrained(
-                    model_name
-                )
-            return self.tokenizers[model_name].encode(
-                request_json.get("prompt", "")
-            )
-        except Exception:
-            if model_endpoint is None:
-                raise
-            remote_url = model_endpoint.url + "/tokenize"
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "model": model_name,
-                "prompt": request_json.get("prompt", ""),
-            }
-            loop = asyncio.get_running_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: requests.post(
-                    remote_url, headers=headers, json=data, timeout=10
-                ),
-            )
-            return response.json()["tokens"]
+        if "messages" in request_json:
+            return await self._tokenize_chat(endpoints, request_json)
+        return await super().tokenize_prompt(endpoints, request_json)
 
     @staticmethod
     def _flatten_text_content(messages: List[Dict]) -> List[Dict]:
