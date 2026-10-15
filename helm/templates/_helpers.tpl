@@ -1,4 +1,24 @@
 {{/*
+Override an image's registry while preserving its repository path, tag and digest.
+Usage: include "chart.image" (dict "image" $image "global" $.Values.global)
+*/}}
+{{- define "chart.image" -}}
+{{- $global := .global | default dict -}}
+{{- $registry := $global.imageRegistry | default "" | trimSuffix "/" -}}
+{{- $image := .image | default "" -}}
+{{- if and $registry $image -}}
+  {{- $parts := splitList "/" $image -}}
+  {{- $first := first $parts -}}
+  {{- if and (gt (len $parts) 1) (or (contains "." $first) (contains ":" $first) (eq $first "localhost")) -}}
+    {{- $image = join "/" (rest $parts) -}}
+  {{- end -}}
+  {{- printf "%s/%s" $registry $image -}}
+{{- else -}}
+  {{- $image -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Define ports for the pods
 */}}
 {{- define "chart.container-port" -}}
