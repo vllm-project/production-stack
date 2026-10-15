@@ -3,9 +3,11 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 import httpx
 import pytest
+import starlette.formparsers
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 from fastapi import FastAPI
+from starlette.datastructures import UploadFile
 
 import vllm_router.service_discovery as service_discovery_module
 from vllm_router.aiohttp_client import AiohttpClientWrapper
@@ -34,6 +36,27 @@ from vllm_router.utils import SingletonMeta
 
 AUDIO_MODEL = "openai/whisper-tiny"
 IMAGE_MODEL = "image-edit-model"
+
+
+@pytest.fixture
+def multipart_upload_files(monkeypatch):
+    # Keep handles observable after the request instead of relying on GC.
+    files = []
+    spooled_temporary_file = starlette.formparsers.SpooledTemporaryFile
+
+    def record_file(*args, **kwargs):
+        file = spooled_temporary_file(*args, **kwargs)
+        files.append(file)
+        return file
+
+    monkeypatch.setattr(starlette.formparsers, "SpooledTemporaryFile", record_file)
+    # Exercise real disk-backed uploads without sending large request bodies.
+    monkeypatch.setattr(starlette.formparsers.MultiPartParser, "spool_max_size", 1)
+    try:
+        yield files
+    finally:
+        for file in files:
+            file.close()
 
 
 @asynccontextmanager
@@ -335,3 +358,88 @@ async def test_image_edit_alias_preserves_repeated_fields_and_uploads():
         ],
         "extra": ["first", "second"],
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint,model,upload_key",
+    [
+        ("/v1/audio/translations", AUDIO_MODEL, "file"),
+        ("/v1/images/edits", IMAGE_MODEL, "image"),
+    ],
+)
+@pytest.mark.parametrize(
+    "requested_model,expected_status",
+    [("canonical", 200), ("alias", 200), (None, 400), ("unknown", 404)],
+)
+async def test_multipart_request_closes_uploads(
+    endpoint,
+    model,
+    upload_key,
+    requested_model,
+    expected_status,
+    multipart_upload_files,
+):
+    async def capture(request):
+        form = await request.post()
+        assert form["model"] == model
+        assert len(form.getall(upload_key)) == 2
+        return web.json_response({"text": "processed"})
+
+    async with multipart_backend(endpoint, capture) as backend_url:
+        async with router_client(
+            backend_url, model=model, aliases={"model-alias": model}
+        ) as client:
+            models = {"canonical": model, "alias": "model-alias", "unknown": "unknown"}
+            data = {"model": models[requested_model]} if requested_model else {}
+            response = await client.post(
+                endpoint,
+                data=data,
+                files=[
+                    (upload_key, ("first.bin", b"first-upload")),
+                    (upload_key, ("second.bin", b"second-upload")),
+                ],
+            )
+
+    assert response.status_code == expected_status
+    assert len(multipart_upload_files) == 2
+    assert all(file._rolled for file in multipart_upload_files)
+    assert all(file.closed for file in multipart_upload_files)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint,model,upload_key",
+    [
+        ("/v1/audio/translations", AUDIO_MODEL, "file"),
+        ("/v1/images/edits", IMAGE_MODEL, "image"),
+    ],
+)
+async def test_multipart_request_closes_uploads_when_read_fails(
+    endpoint, model, upload_key, multipart_upload_files, monkeypatch
+):
+    async def fail_read(self, size=-1):
+        raise OSError("upload read failed")
+
+    monkeypatch.setattr(UploadFile, "read", fail_read)
+
+    async def unexpected_request(request):
+        pytest.fail("An upload read failure must not reach the backend")
+
+    async with multipart_backend(endpoint, unexpected_request) as backend_url:
+        async with router_client(
+            backend_url, model=model, aliases={"model-alias": model}
+        ) as client:
+            with pytest.raises(OSError, match="upload read failed"):
+                await client.post(
+                    endpoint,
+                    data={"model": "model-alias"},
+                    files=[
+                        (upload_key, ("first.bin", b"first-upload")),
+                        (upload_key, ("second.bin", b"second-upload")),
+                    ],
+                )
+
+    assert len(multipart_upload_files) == 2
+    assert all(file._rolled for file in multipart_upload_files)
+    assert all(file.closed for file in multipart_upload_files)

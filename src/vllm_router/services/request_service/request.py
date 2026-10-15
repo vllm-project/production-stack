@@ -1265,27 +1265,30 @@ async def route_multipart_request(
             content={"error": "Invalid multipart/form-data request"},
         )
 
-    aliases = getattr(get_service_discovery(), "aliases", None)
-    if aliases and model in aliases:
-        model = aliases[model]
-        # Rebuild only aliased forms, preserving repeated fields and file uploads.
-        body = FormData(quote_fields=False)
-        for key, value in form.multi_items():
-            if key == "model":
-                body.add_field(key, model)
-            elif isinstance(value, StarletteUploadFile):
-                body.add_field(
-                    key,
-                    await value.read(),
-                    filename=value.filename,
-                    content_type=value.content_type,
-                )
-            else:
-                body.add_field(key, value)
+    try:
+        aliases = getattr(get_service_discovery(), "aliases", None)
+        if aliases and model in aliases:
+            model = aliases[model]
+            # Rebuild only aliased forms, preserving repeated fields and file uploads.
+            body = FormData(quote_fields=False)
+            for key, value in form.multi_items():
+                if key == "model":
+                    body.add_field(key, model)
+                elif isinstance(value, StarletteUploadFile):
+                    body.add_field(
+                        key,
+                        await value.read(),
+                        filename=value.filename,
+                        content_type=value.content_type,
+                    )
+                else:
+                    body.add_field(key, value)
 
-    logger.debug("Routing multipart request with model %s", model)
+        logger.debug("Routing multipart request with model %s", model)
 
-    return await proxy_multipart_request(body, model, endpoint, request)
+        return await proxy_multipart_request(body, model, endpoint, request)
+    finally:
+        await form.close()
 
 
 async def proxy_multipart_request(
