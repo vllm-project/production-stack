@@ -124,10 +124,9 @@ def test_is_model_healthy_when_requests_status_with_status_code_not_200_returns_
 
 
 def test_parse_static_model_max_lens_when_pairs_supplied_returns_dict() -> None:
-    assert utils.parse_static_model_max_lens("llama3:131072, org/model:v1:32768") == {
-        "llama3": 131072,
-        "org/model:v1": 32768,
-    }
+    assert utils.parse_static_model_max_lens(
+        "llama3:131072, org/model:v1:32768, qwen : 4096"
+    ) == {"llama3": 131072, "org/model:v1": 32768, "qwen": 4096}
 
 
 @pytest.mark.parametrize(

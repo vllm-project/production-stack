@@ -361,7 +361,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
                 extra_fields=(
                     {"max_model_len": self.model_max_lens[model]}
                     if model in self.model_max_lens
-                    else None
+                    else {}
                 ),
             )
         }

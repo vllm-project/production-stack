@@ -232,6 +232,7 @@ def parse_static_model_max_lens(static_model_max_lens: str) -> dict[str, int]:
     max_lens: dict[str, int] = {}
     for entry in static_model_max_lens.split(","):
         model, sep, value = entry.strip().rpartition(":")
+        model = model.strip()
         if not sep or not model:
             raise ValueError(
                 f"Invalid static model max length '{entry}': expected model:max_model_len"
