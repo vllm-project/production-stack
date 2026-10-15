@@ -43,12 +43,33 @@ def test_absent_or_zero_query_count_has_zero_hit_ratio(scrape):
 
 
 @pytest.mark.parametrize("reverse", [False, True])
-def test_current_counter_names_take_precedence_without_double_counting(reverse):
-    parts = [counters("prefix_cache", 8, 10), counters("gpu_prefix_cache", 1, 10)]
+@pytest.mark.parametrize("hits,queries", [(8, 10), (0, 0)])
+def test_current_counter_names_take_precedence_without_double_counting(
+    reverse, hits, queries
+):
+    parts = [
+        counters("prefix_cache", hits, queries),
+        counters("gpu_prefix_cache", 1, 20),
+    ]
     stats = EngineStats.from_vllm_scrape("".join(reversed(parts) if reverse else parts))
-    assert stats.gpu_prefix_cache_hits_total == 8
-    assert stats.gpu_prefix_cache_queries_total == 10
-    assert stats.gpu_prefix_cache_hit_rate == pytest.approx(0.8)
+    assert stats.gpu_prefix_cache_hits_total == hits
+    assert stats.gpu_prefix_cache_queries_total == queries
+    assert stats.gpu_prefix_cache_hit_rate == pytest.approx(
+        hits / queries if queries else 0
+    )
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("counter", ["hits", "queries"])
+def test_incomplete_current_pair_preserves_legacy_pair(reverse, counter):
+    parts = [
+        f"vllm:prefix_cache_{counter}_total 8\n",
+        counters("gpu_prefix_cache", 1, 20),
+    ]
+    stats = EngineStats.from_vllm_scrape("".join(reversed(parts) if reverse else parts))
+    assert stats.gpu_prefix_cache_hits_total == 1
+    assert stats.gpu_prefix_cache_queries_total == 20
+    assert stats.gpu_prefix_cache_hit_rate == pytest.approx(1 / 20)
 
 
 def test_counter_reset_uses_current_scrape():

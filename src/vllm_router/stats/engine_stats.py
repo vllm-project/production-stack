@@ -86,10 +86,13 @@ class EngineStats:
                     # newer releases only export the new name.
                     gpu_cache_usage_perc = sample.value
 
-        # Prefer current counters when both naming schemes are exposed.
-        if prefix_cache_hits_total is not None:
+        # Prefer a complete current pair; never mix naming schemes when
+        # a partial scrape exposes only one of the current counters.
+        if (
+            prefix_cache_hits_total is not None
+            and prefix_cache_queries_total is not None
+        ):
             gpu_prefix_cache_hits_total = prefix_cache_hits_total
-        if prefix_cache_queries_total is not None:
             gpu_prefix_cache_queries_total = prefix_cache_queries_total
         # V1 engines do not export the legacy hit-rate gauge. Derive the
         # cumulative token hit ratio while preserving an explicit gauge value.
