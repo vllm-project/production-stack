@@ -60,6 +60,7 @@ from vllm_router.stats.request_stats import (
 from vllm_router.utils import (
     parse_comma_separated_args,
     parse_static_aliases,
+    parse_static_model_max_lens,
     parse_static_urls,
     set_ulimit,
 )
@@ -221,6 +222,11 @@ def initialize_all(app: FastAPI, args):
             static_backend_health_check_timeout_seconds=args.static_backend_health_check_timeout_seconds,
             prefill_model_labels=args.prefill_model_labels,
             decode_model_labels=args.decode_model_labels,
+            model_max_lens=(
+                parse_static_model_max_lens(args.static_model_max_lens)
+                if getattr(args, "static_model_max_lens", None)
+                else None
+            ),
         )
     elif args.service_discovery == "k8s":
         initialize_service_discovery(
