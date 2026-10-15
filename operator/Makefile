@@ -45,6 +45,21 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+.PHONY: helm-crds
+helm-crds: manifests ## Sync generated CRDs into the helm-operator chart's crds/ directory.
+	mkdir -p ../helm-operator/crds/
+	cp config/crd/bases/*.yaml ../helm-operator/crds/
+
+.PHONY: helm-crds-check
+helm-crds-check: ## Fail if the helm-operator chart CRDs drifted from config/crd/bases (for CI).
+	@for f in config/crd/bases/*.yaml; do \
+		cmp -s "$$f" "../helm-operator/crds/$$(basename $$f)" || { echo "DRIFT: $$f differs from ../helm-operator/crds/ — run 'make helm-crds' to sync"; exit 1; }; \
+	done
+	@for f in ../helm-operator/crds/*.yaml; do \
+		[ -f "config/crd/bases/$$(basename $$f)" ] || { echo "DRIFT: $$f has no source in config/crd/bases"; exit 1; }; \
+	done
+	@echo "helm-operator chart CRDs are in sync with config/crd/bases"
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."

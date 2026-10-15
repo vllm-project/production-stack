@@ -1,0 +1,18 @@
+{{- if .Values.metrics.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  # Service names are limited to 63 chars; budget for the "-metrics" suffix.
+  name: {{ include "vllm-stack-operator.fullname" . | trunc 54 | trimSuffix "-" }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vllm-stack-operator.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "vllm-stack-operator.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: metrics
+      port: {{ .Values.metrics.service.port }}
+      targetPort: metrics
+      protocol: TCP
+{{- end }}
