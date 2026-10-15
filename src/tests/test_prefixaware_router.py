@@ -215,6 +215,11 @@ async def test_below_threshold_cold_all_zero_seeds_trie():
         )
 
     assert url == "http://engine2.com"
+    assert (url.algorithm, url.decision, url.reason) == (
+        "prefixaware",
+        "fallback",
+        "below_threshold",
+    )
     fake_hashtrie.insert.assert_awaited_once_with(
         "some prompt text", "http://engine2.com"
     )
@@ -344,7 +349,11 @@ async def test_route_uses_matched_endpoint_when_match_above_threshold():
     )
 
     assert url == "http://engine1.com"
-
+    assert (url.algorithm, url.decision, url.reason) == (
+        "prefixaware",
+        "primary",
+        "prefix_match",
+    )
     fake_hashtrie.insert.assert_awaited_once()
 
 

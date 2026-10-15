@@ -43,6 +43,29 @@ The router can be configured using command-line arguments. Below are the availab
 - `--engine-stats-interval`: The interval in seconds to scrape engine statistics. Default is `30`.
 - `--request-stats-window`: The sliding window seconds to compute request statistics. Default is `60`.
 
+### Routing decision metric
+
+`vllm:routing_decisions_total` counts each backend selection at the point where the
+request is dispatched. Its labels are:
+
+- `algorithm`: `roundrobin`, `session`, `kvaware`, `loadaware`, `prefixaware`,
+  `priority`, `disaggregated_prefill`, `disaggregated_prefill_orchestrated`, or
+  `unknown`.
+- `decision`: `primary`, `fallback`, `retry`, or `unknown`.
+- `reason`: `round_robin`, `session_affinity`, `missing_session`, `cache_hit`,
+  `no_cache_match`, `no_live_holder`, `below_threshold`, `load_aware`,
+  `prefix_match`, `priority`, `prefill`, `decode`, `requested_endpoint`,
+  `backend_error`, or `unknown`.
+
+All three labels use closed allowlists; unexpected values are normalized to
+`unknown`. The metric deliberately excludes backend IDs, models, request IDs,
+prompts, URLs, and error details. `EndpointInfo.Id` is discovery-provided and may
+be arbitrary, so it is not a label. The current per-process cardinality contract
+is at most 9 algorithms x 4 decisions x 15 reasons = 540 time series, independent
+of the number or churn of discovered backends and independent of request volume.
+Adding an allowlisted label value increases that bound and requires an explicit
+cardinality review.
+
 ### Logging Options
 
 - `--log-stats`: Log statistics periodically.
