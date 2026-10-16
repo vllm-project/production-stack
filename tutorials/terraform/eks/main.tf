@@ -107,7 +107,7 @@ module "eks" {
 
   vpc_id = local.vpc_id
   # control_plane_subnet_ids = module.vpc.private_subnets  # will fall back to subnets_ids if attribute is skipped
-  subnet_ids = slice(local.private_subnet_ids_per_az, 0, 2) # Use only first two private subnets (in different AZs) for control plane. You can also use all private subnets for more IPs.
+  subnet_ids = slice(local.private_subnet_ids_per_az, 0, min(2, length(local.private_subnet_ids_per_az))) # Use only first two private subnets (in different AZs) for control plane. You can also use all private subnets for more IPs.
   enable_irsa = true
 
   ## Public access endpoint is provided through AWS's managed service layer (proxy), not through your VPC's public subnets

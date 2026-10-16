@@ -103,13 +103,13 @@ locals {
 
   # var.vpc_cidr only describes a new VPC; an existing VPC may also have secondary CIDRs.
   vpc_cidr_blocks = local.create_new_vpc ? [var.vpc_cidr] : [
-    for a in data.aws_vpc.existing[0].cidr_block_associations : a.cidr_block
+    for a in data.aws_vpc.existing[0].cidr_block_associations : a.cidr_block if a.state == "associated"
   ]
 
   # An existing VPC can have several private subnets per AZ. EFS allows only one
   # mount target per AZ and EKS needs control plane subnets in two different AZs,
   # so keep one subnet per AZ. A new VPC already has exactly one per AZ.
-  existing_private_subnets_by_az = {
+  existing_private_subnets_by_az = local.create_new_vpc ? {} : {
     for s in data.aws_subnet.cluster_subnets : s.availability_zone => s.id...
   }
   private_subnet_ids_per_az = local.create_new_vpc ? local.private_subnet_ids : [

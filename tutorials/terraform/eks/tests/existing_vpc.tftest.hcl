@@ -73,6 +73,7 @@ override_data {
     cidr_block_associations = [
       { association_id = "vpc-cidr-assoc-1", cidr_block = "172.31.0.0/16", state = "associated" },
       { association_id = "vpc-cidr-assoc-2", cidr_block = "100.64.0.0/16", state = "associated" },
+      { association_id = "vpc-cidr-assoc-3", cidr_block = "100.65.0.0/16", state = "disassociated" },
     ]
   }
 }
@@ -139,6 +140,13 @@ run "efs_sg_allows_existing_vpc_cidrs" {
       anytrue([for r in aws_security_group.efs-sg[0].ingress : contains(r.cidr_blocks, c)])
     ])
     error_message = "EFS SG must allow NFS from every CIDR associated with the existing VPC."
+  }
+
+  assert {
+    condition = alltrue([
+      for r in aws_security_group.efs-sg[0].ingress : !contains(r.cidr_blocks, "100.65.0.0/16")
+    ])
+    error_message = "EFS SG must skip CIDRs that are no longer associated with the VPC."
   }
 }
 
