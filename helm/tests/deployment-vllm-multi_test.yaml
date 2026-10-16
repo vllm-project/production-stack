@@ -482,3 +482,25 @@ tests:
           name: vllm-shared-pvc-storage
           persistentVolumeClaim:
             claimName: vllm-shared-pvc-storage-claim
+
+  - it: should render lmcache without vllmConfig
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+        - name: "test-model"
+          repository: "lmcache/vllm-openai"
+          tag: "latest"
+          modelURL: "facebook/opt-125m"
+          replicaCount: 1
+          requestCPU: 1
+          requestMemory: "1Gi"
+          requestGPU: 1
+          lmcacheConfig:
+            enabled: true
+            cpuOffloadingBufferSize: "10"
+    asserts:
+    - documentIndex: 0
+      contains:
+        path: spec.template.spec.containers[0].command
+        content: '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'
