@@ -235,3 +235,30 @@ tests:
       - template: deployment-vllm-multi.yaml
         hasDocuments:
           count: 0
+
+  - it: should create the scaler when raySpec is null
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: test-model
+            repository: vllm/vllm-openai
+            tag: latest
+            modelURL: facebook/opt-125m
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: 1Gi
+            requestGPU: 1
+            keda:
+              enabled: true
+            raySpec: null
+    asserts:
+      - template: scaledobject-vllm.yaml
+        hasDocuments:
+          count: 1
+      - template: deployment-vllm-multi.yaml
+        hasDocuments:
+          count: 1
+      - template: deployment-vllm-multi.yaml
+        notExists:
+          path: spec.replicas
