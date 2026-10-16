@@ -72,6 +72,15 @@ def test_incomplete_current_pair_preserves_legacy_pair(reverse, counter):
     assert stats.gpu_prefix_cache_hit_rate == pytest.approx(1 / 20)
 
 
+def test_external_connector_counters_are_not_counted_as_local_hits():
+    stats = EngineStats.from_vllm_scrape(
+        counters("prefix_cache", 8, 10) + counters("external_prefix_cache", 90, 100)
+    )
+    assert stats.gpu_prefix_cache_hits_total == 8
+    assert stats.gpu_prefix_cache_queries_total == 10
+    assert stats.gpu_prefix_cache_hit_rate == pytest.approx(0.8)
+
+
 def test_counter_reset_uses_current_scrape():
     before = EngineStats.from_vllm_scrape(counters("prefix_cache", 80, 100))
     after = EngineStats.from_vllm_scrape(counters("prefix_cache", 1, 10))

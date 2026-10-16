@@ -86,6 +86,9 @@ class EngineStats:
                     # newer releases only export the new name.
                     gpu_cache_usage_perc = sample.value
 
+        # These counters cover the engine's local prefix cache only. Hits
+        # served through a KV connector (e.g. LMCache) are exported
+        # separately as vllm:external_prefix_cache_* and are not included.
         # Prefer a complete current pair; never mix naming schemes when
         # a partial scrape exposes only one of the current counters.
         if (
