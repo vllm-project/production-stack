@@ -68,6 +68,10 @@ data "aws_vpc" "existing" {
 data "aws_subnets" "existing_private" {
   count = local.create_new_vpc ? 0 : 1
   filter {
+    name   = "vpc-id"
+    values = [var.vpc_id]
+  }
+  filter {
     name   = "tag:kubernetes.io/role/internal-elb"
     values = ["1"]
   }
@@ -94,6 +98,22 @@ locals {
   vpc_id             = local.create_new_vpc ? module.vpc.vpc_id : data.aws_vpc.existing[0].id
   private_subnet_ids = local.create_new_vpc ? module.vpc.private_subnets : data.aws_subnets.existing_private[0].ids
   public_subnet_ids  = local.create_new_vpc ? module.vpc.public_subnets : data.aws_subnets.existing_public[0].ids
+
+  # var.vpc_cidr only describes a new VPC; an existing VPC may also have secondary CIDRs.
+  vpc_cidr_blocks = local.create_new_vpc ? [var.vpc_cidr] : [
+    for a in data.aws_vpc.existing[0].cidr_block_associations : a.cidr_block
+  ]
+
+  # An existing VPC can have several private subnets per AZ. EFS allows only one
+  # mount target per AZ and EKS needs control plane subnets in two different AZs,
+  # so keep one subnet per AZ. A new VPC already has exactly one per AZ.
+  existing_private_subnets_by_az = {
+    for s in data.aws_subnet.cluster_subnets : s.availability_zone => s.id...
+  }
+  private_subnet_ids_per_az = local.create_new_vpc ? local.private_subnet_ids : [
+    for az in sort(keys(local.existing_private_subnets_by_az)) :
+    sort(local.existing_private_subnets_by_az[az])[0]
+  ]
 }
 
 
