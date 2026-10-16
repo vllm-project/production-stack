@@ -66,7 +66,7 @@ data "aws_vpc" "existing" {
 }
 
 data "aws_subnets" "existing_private" {
-  count = local.create_new_vpc ? 0 : 1
+  count = local.create_new_vpc || length(var.private_subnet_ids) > 0 ? 0 : 1
   filter {
     name   = "vpc-id"
     values = [var.vpc_id]
@@ -96,7 +96,9 @@ data "aws_subnets" "existing_public" {
 ############################
 locals {
   vpc_id             = local.create_new_vpc ? module.vpc.vpc_id : data.aws_vpc.existing[0].id
-  private_subnet_ids = local.create_new_vpc ? module.vpc.private_subnets : data.aws_subnets.existing_private[0].ids
+  private_subnet_ids = local.create_new_vpc ? module.vpc.private_subnets : (
+    length(var.private_subnet_ids) > 0 ? var.private_subnet_ids : data.aws_subnets.existing_private[0].ids
+  )
   public_subnet_ids  = local.create_new_vpc ? module.vpc.public_subnets : data.aws_subnets.existing_public[0].ids
 
   # var.vpc_cidr only describes a new VPC; an existing VPC may also have secondary CIDRs.

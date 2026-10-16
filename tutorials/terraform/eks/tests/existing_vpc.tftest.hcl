@@ -187,3 +187,36 @@ run "new_vpc_path_unchanged" {
     error_message = "New-VPC path must keep one mount target per private subnet."
   }
 }
+
+run "explicit_private_subnet_ids_skip_tag_lookup" {
+  command = plan
+
+  variables {
+    private_subnet_ids = ["subnet-0a1", "subnet-0a2", "subnet-0b1", "subnet-0c1"]
+  }
+
+  assert {
+    condition     = length(data.aws_subnets.existing_private) == 0
+    error_message = "Tag lookup must be skipped when private_subnet_ids is set."
+  }
+
+  assert {
+    condition     = length(aws_efs_mount_target.eks-efs-mounts) == 3
+    error_message = "Explicit subnets must still get one EFS mount target per AZ."
+  }
+}
+
+run "subnet_outside_vpc_is_rejected" {
+  command = plan
+
+  variables {
+    private_subnet_ids = ["subnet-0a1", "subnet-0a2", "subnet-0b1", "subnet-0c1"]
+  }
+
+  override_data {
+    target = data.aws_subnet.cluster_subnets[3]
+    values = { id = "subnet-0c1", vpc_id = "vpc-0other", availability_zone = "us-east-1c", cidr_block = "10.9.0.0/20" }
+  }
+
+  expect_failures = [data.aws_subnet.cluster_subnets]
+}
