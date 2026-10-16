@@ -52,6 +52,12 @@ variable "vpc_id" {
   default     = ""
 }
 
+variable "private_subnet_ids" {
+  description = "Existing private subnet IDs in vpc_id (create_vpc = false only). If empty, subnets tagged kubernetes.io/role/internal-elb=1 are used."
+  type        = list(string)
+  default     = []
+}
+
 # New‑VPC parameters (ignored when create_vpc = false)
 variable "vpc_name" {
   description = "Name for the VPC."
