@@ -13,8 +13,9 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- with .Values.loraController.pdb.maxUnavailable }}
-  maxUnavailable: {{ . }}
+  {{- $maxUnavailable := .Values.loraController.pdb.maxUnavailable }}
+  {{- if and (not (kindIs "invalid" $maxUnavailable)) (ne (toString $maxUnavailable) "") }}
+  maxUnavailable: {{ $maxUnavailable }}
   {{- else }}
   minAvailable: {{ .Values.loraController.pdb.minAvailable | default 0 }}
   {{- end }}

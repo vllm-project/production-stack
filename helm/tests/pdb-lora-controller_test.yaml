@@ -95,3 +95,17 @@ tests:
         value: 1
     - notExists:
         path: spec.minAvailable
+
+  - it: should render maxUnavailable when it is set to 0
+    set:
+      loraController:
+        enableLoraController: true
+        pdb:
+          enabled: true
+          maxUnavailable: 0
+    asserts:
+    - equal:
+        path: spec.maxUnavailable
+        value: 0
+    - notExists:
+        path: spec.minAvailable
