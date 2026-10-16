@@ -122,6 +122,17 @@ export AWS_PROFILE=myprofile        # ← If null Terraform exec auth will use t
 * **Calico overlay CNI** with VXLAN encapsulation (110+ pods/node vs 17 with VPC CNI)
 * AWS Load Balancer Controller for ingress exposure
 * Kubernetes-friendly subnet tagging and IAM roles
+* Or reuse an existing VPC with `create_vpc = false` (see below)
+
+#### Reusing an existing VPC
+
+Set `create_vpc = false` and `vpc_id`. Private subnets are taken from `private_subnet_ids`, or, if that is empty, from the subnets in `vpc_id` tagged `kubernetes.io/role/internal-elb=1`. The stack uses one subnet per AZ for the control plane and EFS mount targets, and allows NFS from all CIDRs of the VPC. `vpc_cidr` and the subnet CIDR variables are ignored.
+
+```hcl
+create_vpc         = false
+vpc_id             = "vpc-0123456789abcdef0"
+private_subnet_ids = ["subnet-0aaa...", "subnet-0bbb...", "subnet-0ccc..."] # optional
+```
 
 ### 2. ☸️ EKS Cluster
 
@@ -372,6 +383,7 @@ This stack provides extensive customization options to tailor your deployment:
 | <a name="input_nvidia_setup"></a> [nvidia\_setup](#input\_nvidia\_setup) | GPU enablement strategy:<br/>  • "plugin"           → installs only the nvidia-device-plugin DaemonSet<br/>  • "operator\_custom"  → GPU Operator with your YAML values file<br/>  • "operator\_no\_driver" → GPU Operator, driver & toolkit pods disabled (map-style set) | `string` | `"plugin"` | no |
 | <a name="input_one_nat_gateway_per_az"></a> [one\_nat\_gateway\_per\_az](#input\_one\_nat\_gateway\_per\_az) | n/a | `bool` | `false` | no |
 | <a name="input_pod_cidr"></a> [pod\_cidr](#input\_pod\_cidr) | Pod network CIDR. | `string` | `"10.244.0.0/16"` | no |
+| <a name="input_private_subnet_ids"></a> [private\_subnet\_ids](#input\_private\_subnet\_ids) | Existing private subnet IDs in vpc\_id (create\_vpc = false only). If empty, subnets tagged kubernetes.io/role/internal-elb=1 are used. | `list(string)` | `[]` | no |
 | <a name="input_private_subnet_cidrs"></a> [private\_subnet\_cidrs](#input\_private\_subnet\_cidrs) | CIDRs for private subnets. | `list(string)` | <pre>[<br/>  "10.20.1.0/24",<br/>  "10.20.2.0/24",<br/>  "10.20.3.0/24"<br/>]</pre> | no |
 | <a name="input_public_subnet_cidrs"></a> [public\_subnet\_cidrs](#input\_public\_subnet\_cidrs) | CIDRs for public subnets. | `list(string)` | <pre>[<br/>  "10.20.101.0/24",<br/>  "10.20.102.0/24",<br/>  "10.20.103.0/24"<br/>]</pre> | no |
 | <a name="input_region"></a> [region](#input\_region) | AWS region where all resources are deployed. | `string` | `"us-east-2"` | no |
@@ -508,6 +520,13 @@ source env-vars
 terraform init
 terraform plan
 terraform apply
+```
+
+To check the configuration without AWS credentials, run the plan-only tests in [`tests/`](./tests), which mock all providers:
+
+```bash
+terraform init -backend=false
+terraform test
 ```
 
 ---
