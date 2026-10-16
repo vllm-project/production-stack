@@ -422,7 +422,7 @@ spec:
           {{- else }}
           resources: {{- include "chart.resources" $modelSpec | nindent 12 }}
           {{- end }}
-          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") }}
+          {{- if or (hasKey $modelSpec "pvcStorage") (and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "tensorParallelSize")) (hasKey $modelSpec "chatTemplate") (hasKey $modelSpec "extraVolumeMounts") $.Values.sharedPvcStorage.enabled }}
           volumeMounts:
           {{- end }}
           {{- if hasKey $modelSpec "pvcStorage" }}
