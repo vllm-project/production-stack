@@ -55,16 +55,24 @@ spec:
     {{- end }}
   {{- end }}
   {{- if hasKey $modelSpec.keda "triggers" }}
+  {{- if not (kindIs "slice" $modelSpec.keda.triggers) }}
+  {{- fail (printf "servingEngineSpec.modelSpec[%s].keda.triggers must be a list" $modelSpec.name) }}
+  {{- end }}
   triggers:
     {{- toYaml $modelSpec.keda.triggers | nindent 4 }}
   {{- else }}
-  # Default trigger configuration - monitors vllm queue length
+  {{- $defaultPrometheusNamespace := "monitoring" }}
+  {{- if (index .Values "kube-prometheus-stack" | default dict).enabled }}
+  {{- $defaultPrometheusNamespace = .Release.Namespace }}
+  {{- end }}
+  # Default trigger configuration - monitors the queue length of this model's engines.
+  # vLLM labels its metrics with model_name, not the modelSpec name, so select by the engine service.
   triggers:
     - type: prometheus
       metadata:
-        serverAddress: http://prometheus-operated.monitoring.svc:9090
+        serverAddress: {{ $modelSpec.keda.serverAddress | default (printf "http://prometheus-operated.%s.svc:9090" $defaultPrometheusNamespace) }}
         metricName: vllm:num_requests_waiting
-        query: vllm:num_requests_waiting{model="{{ $modelSpec.name }}"}
+        query: sum(vllm:num_requests_waiting{namespace="{{ .Release.Namespace }}",service="{{ .Release.Name }}-{{ $modelSpec.name }}-engine-service"})
         threshold: '5'
   {{- end }}
 ---
