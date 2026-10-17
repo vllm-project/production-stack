@@ -152,6 +152,28 @@ tests:
           path: spec.triggers[0].metadata.serverAddress
           value: http://prometheus.example:9090
 
+  - it: should use the default trigger when triggers is empty
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            keda:
+              enabled: true
+              triggers: []
+    asserts:
+      - template: scaledobject-vllm.yaml
+        equal:
+          path: spec.triggers[0].metadata.query
+          value: sum(vllm:num_requests_waiting{namespace="NAMESPACE",service="RELEASE-NAME-test-model-engine-service"})
+
   - it: should fail when triggers is not a list
     set:
       servingEngineSpec:
