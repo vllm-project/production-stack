@@ -9,6 +9,40 @@ from vllm_router import utils
 
 
 @pytest.mark.parametrize(
+    "url,expected_result",
+    (
+        ("http://oss-20b:8000", True),
+        ("http://oss-20b/v1", True),
+        ("http://oss_20b:8000", True),
+        ("https://x:8000", True),
+        ("http://-host:8000", False),
+        ("http://host-:8000/v1", False),
+        ("https://example.com:8000/v1", True),
+        ("http://oss_20b.example.com:8000", True),
+        ("http://oss-20b.example.com:8000", True),
+        # Preserve existing multi-label acceptance.
+        ("http://-host.example.com:8000", True),
+        ("http://host-.example.com:8000", True),
+        ("http://localhost:8000", True),
+        ("http://127.0.0.1:8000", True),
+        ("", False),
+        ("ftp://localhost:8000", False),
+        ("http://host..example.com:8000", False),
+        ("http://host:", False),
+        ("http://[::1]:8000", False),
+    ),
+)
+def test_validate_url(url: str, expected_result: bool) -> None:
+    assert utils.validate_url(url) is expected_result
+
+
+def test_parse_static_urls_keeps_single_label_backends() -> None:
+    assert utils.parse_static_urls(
+        "http://oss-20b:8000,http://-host:8000,http://oss_20b/v1,http://localhost:8000"
+    ) == ["http://oss-20b:8000", "http://oss_20b/v1", "http://localhost:8000"]
+
+
+@pytest.mark.parametrize(
     "aliases,expected_result",
     (
         ("gpt-4:mistral-nemo-instruct-2407", {"gpt-4": "mistral-nemo-instruct-2407"}),
