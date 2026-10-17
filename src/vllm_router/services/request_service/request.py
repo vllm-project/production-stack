@@ -1238,6 +1238,15 @@ async def route_general_transcriptions(
     for key, value in data.items():
         form_data.add_field(key, value)
 
+    # Forward the remaining text fields unchanged (timestamp_granularities[],
+    # seed, top_p, to_language, ...); only the fields normalized above are
+    # rebuilt.
+    rebuilt = ("file", "model", "language", "prompt", "response_format")
+    rebuilt += ("temperature", "stream")
+    for key, value in form.multi_items():
+        if key not in rebuilt and isinstance(value, str):
+            form_data.add_field(key, value)
+
     return await proxy_multipart_request(
         form_data, model, endpoint, request, stream=stream
     )
