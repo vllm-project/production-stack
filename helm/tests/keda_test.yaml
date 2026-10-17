@@ -92,7 +92,90 @@ tests:
       - template: scaledobject-vllm.yaml
         equal:
           path: spec.triggers[0].metadata.query
-          value: vllm:num_requests_waiting{model="test-model-default"}
+          value: sum(vllm:num_requests_waiting{namespace="NAMESPACE",service="RELEASE-NAME-test-model-default-engine-service"})
+      - template: scaledobject-vllm.yaml
+        equal:
+          path: spec.triggers[0].metadata.serverAddress
+          value: http://prometheus-operated.monitoring.svc:9090
+
+  - it: should point the default trigger at the bundled Prometheus when kube-prometheus-stack is enabled
+    release:
+      name: vllm
+      namespace: llm
+    set:
+      kube-prometheus-stack:
+        enabled: true
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "llama"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            keda:
+              enabled: true
+    asserts:
+      - template: scaledobject-vllm.yaml
+        equal:
+          path: spec.triggers[0].metadata.serverAddress
+          value: http://prometheus-operated.llm.svc:9090
+      - template: scaledobject-vllm.yaml
+        equal:
+          path: spec.triggers[0].metadata.query
+          value: sum(vllm:num_requests_waiting{namespace="llm",service="vllm-llama-engine-service"})
+
+  - it: should use keda.serverAddress for the default trigger when set
+    set:
+      kube-prometheus-stack:
+        enabled: true
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            keda:
+              enabled: true
+              serverAddress: http://prometheus.example:9090
+    asserts:
+      - template: scaledobject-vllm.yaml
+        equal:
+          path: spec.triggers[0].metadata.serverAddress
+          value: http://prometheus.example:9090
+
+  - it: should fail when triggers is not a list
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            keda:
+              enabled: true
+              triggers:
+                type: prometheus
+                metadata:
+                  query: sum(vllm:num_requests_waiting)
+                  threshold: '5'
+    asserts:
+      - template: scaledobject-vllm.yaml
+        failedTemplate:
+          errorMessage: servingEngineSpec.modelSpec[test-model].keda.triggers must be a list
 
   - it: should support advanced KEDA configuration
     set:
