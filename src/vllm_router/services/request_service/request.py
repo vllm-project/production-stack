@@ -721,7 +721,7 @@ async def route_general_request(
 
 
 async def send_request_to_prefiller(
-    client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
+    client: aiohttp.ClientSession, endpoint: str, req_data: dict, headers: dict
 ):
     """Send a request to a prefiller service."""
     req_data = req_data.copy()
@@ -734,24 +734,15 @@ async def send_request_to_prefiller(
     req_data["stream"] = False
     req_data.pop("stream_options", None)
 
-    headers = {
-        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
-        "X-Request-Id": request_id,
-    }
-
     async with client.post(endpoint, json=req_data, headers=headers) as response:
         response.raise_for_status()
         return await response.json()
 
 
 async def send_request_to_decode(
-    client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
+    client: aiohttp.ClientSession, endpoint: str, req_data: dict, headers: dict
 ):
     """Asynchronously stream the response from a service using a persistent client."""
-    headers = {
-        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",
-        "X-Request-Id": request_id,
-    }
 
     async with client.post(endpoint, json=req_data, headers=headers) as response:
         response.raise_for_status()
@@ -843,10 +834,7 @@ async def route_orchestrated_disaggregated_request(
         async with client.post(
             prefill_api_url,
             json=prefill_request_json,
-            headers={
-                "Content-Type": "application/json",
-                "X-Request-Id": request_id,
-            },
+            headers=_build_backend_request_headers(request, request_id),
             timeout=aiohttp.ClientTimeout(total=300),
         ) as prefill_resp:
             if prefill_resp.status != 200:
@@ -889,10 +877,7 @@ async def route_orchestrated_disaggregated_request(
         decode_resp = await client.post(
             decode_api_url,
             json=decode_request,
-            headers={
-                "Content-Type": "application/json",
-                "X-Request-Id": request_id,
-            },
+            headers=_build_backend_request_headers(request, request_id),
             timeout=aiohttp.ClientTimeout(total=600),
         )
         try:
@@ -973,6 +958,15 @@ async def route_disaggregated_prefill_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
+    # Forward the client's headers (Authorization included) like every other
+    # proxy path; the engines may be running with --api-key. A router-side
+    # OPENAI_API_KEY still applies when the client sends no key.
+    backend_headers = _build_backend_request_headers(request, request_id)
+    router_api_key = os.environ.get("OPENAI_API_KEY")
+    if router_api_key and not any(
+        key.lower() == "authorization" for key in backend_headers
+    ):
+        backend_headers["Authorization"] = f"Bearer {router_api_key}"
 
     # Save original request for decode phase
     orig_request_json = request_json.copy()
@@ -986,7 +980,7 @@ async def route_disaggregated_prefill_request(
     st = time.time()
     try:
         await send_request_to_prefiller(
-            request.app.state.prefill_client, endpoint, request_json, request_id
+            request.app.state.prefill_client, endpoint, request_json, backend_headers
         )
         et = time.time()
         logger.info(f"{request_id} prefill time (TTFT): {et - st:.4f}")
@@ -1025,7 +1019,7 @@ async def route_disaggregated_prefill_request(
     async def generate_stream():
         try:
             async for chunk in send_request_to_decode(
-                request.app.state.decode_client, endpoint, request_json, request_id
+                request.app.state.decode_client, endpoint, request_json, backend_headers
             ):
                 yield chunk
         except aiohttp.ClientResponseError as e:
