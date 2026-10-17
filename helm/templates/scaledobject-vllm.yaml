@@ -54,7 +54,7 @@ spec:
       {{- toYaml $modelSpec.keda.advanced.scalingModifiers | nindent 6 }}
     {{- end }}
   {{- end }}
-  {{- if hasKey $modelSpec.keda "triggers" }}
+  {{- if $modelSpec.keda.triggers }}
   {{- if not (kindIs "slice" $modelSpec.keda.triggers) }}
   {{- fail (printf "servingEngineSpec.modelSpec[%s].keda.triggers must be a list" $modelSpec.name) }}
   {{- end }}

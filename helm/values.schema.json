@@ -1298,33 +1298,8 @@
                                         "type": "string"
                                     },
                                     "triggers": {
-                                        "description": "List of KEDA trigger configurations. If not set, the default trigger scales on the average queue length of this model's engines.",
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "metadata": {
-                                                    "type": "object",
-                                                    "properties": {
-                                                        "metricName": {
-                                                            "type": "string"
-                                                        },
-                                                        "query": {
-                                                            "type": "string"
-                                                        },
-                                                        "serverAddress": {
-                                                            "type": "string"
-                                                        },
-                                                        "threshold": {
-                                                            "type": "string"
-                                                        }
-                                                    }
-                                                },
-                                                "type": {
-                                                    "type": "string"
-                                                }
-                                            }
-                                        }
+                                        "description": "List of KEDA trigger configurations. If empty, the default trigger scales on the average queue length of this model's engines.",
+                                        "type": "array"
                                     }
                                 }
                             },

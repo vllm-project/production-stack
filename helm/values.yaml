@@ -263,15 +263,16 @@ servingEngineSpec:
         replicas: 2
       # -- Prometheus address used by the default trigger. Defaults to prometheus-operated in the release namespace when kube-prometheus-stack is enabled, otherwise in the monitoring namespace.
       serverAddress: ""
-      # -- List of KEDA trigger configurations. If not set, the default trigger scales on the average queue length of this model's engines.
-      triggers:
-        - type: "prometheus"
-          metadata:
-            serverAddress: "http://prometheus-operated.monitoring.svc:9090"
-            metricName: "vllm:num_requests_waiting"
-            # The query must return a single value, so aggregate it. Replace "vllm" with your release name.
-            query: 'sum(vllm:num_requests_waiting{service="vllm-mistral-engine-service"})'
-            threshold: "5"
+      # -- List of KEDA trigger configurations. If empty, the default trigger scales on the average queue length of this model's engines.
+      triggers: []
+      # Example of a custom trigger. The query must return a single value, so aggregate it:
+      # triggers:
+      #   - type: "prometheus"
+      #     metadata:
+      #       serverAddress: "http://prometheus-operated.monitoring.svc:9090"
+      #       metricName: "vllm:num_requests_running"
+      #       query: 'sum(vllm:num_requests_running{service="<release>-<model>-engine-service"})'
+      #       threshold: "4"
       # -- Advanced KEDA configuration
       advanced:
         # --  Restore original replica count when ScaledObject is deleted
