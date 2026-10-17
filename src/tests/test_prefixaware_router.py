@@ -381,3 +381,28 @@ async def test_default_threshold_zero_preserves_original_behavior():
     assert url == "http://engine1.com"
 
     fake_hashtrie.insert.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prompt_length,threshold", [(127, 128), (255, 256)])
+async def test_partial_chunk_below_threshold_prefers_least_inflight(
+    prompt_length, threshold
+):
+    endpoints = [
+        EndpointInfo(url="http://engine-a.com"),
+        EndpointInfo(url="http://engine-b.com"),
+    ]
+    request_stats = {
+        "http://engine-a.com": RequestStats(in_prefill_requests=1),
+        "http://engine-b.com": RequestStats(),
+    }
+    # The trie uses 128-character chunks; the final chunk is one character short.
+    prompt = "x" * prompt_length
+    router = PrefixAwareRouter(prefix_min_match_length=threshold)
+    await router.hashtrie.insert(prompt, "http://engine-a.com")
+
+    url = await router.route_request(
+        endpoints, None, request_stats, Request(headers={}), {"prompt": prompt}
+    )
+
+    assert url == "http://engine-b.com"
