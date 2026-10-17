@@ -1,4 +1,4 @@
-"""The disaggregated-prefill route forwards the client's headers, Authorization
+"""The P/D routes forward the client's headers, Authorization
 included, to the prefill and decode engines, like the other proxy paths."""
 
 from types import SimpleNamespace
@@ -59,3 +59,11 @@ async def test_no_key_anywhere_sends_no_authorization(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     seen = await _route(monkeypatch, {})
     assert seen == [("prefill", None), ("decode", None)]
+
+
+def test_pd_headers_leave_content_type_to_the_json_body(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "router-key")
+    headers = request_module._build_pd_backend_headers(
+        _Request({"Content-Type": "text/plain", "X-Request-Id": "client"}), "rid"
+    )
+    assert headers == {"X-Request-Id": "rid", "Authorization": "Bearer router-key"}

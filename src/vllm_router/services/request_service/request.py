@@ -227,6 +227,23 @@ def _build_backend_request_headers(
     return headers
 
 
+def _build_pd_backend_headers(request: Request, request_id: str) -> dict[str, str]:
+    """Headers for the P/D engine requests.
+
+    Forwards the client's headers (Authorization included) like every other
+    proxy path, since the engines may be running with --api-key. A router-side
+    OPENAI_API_KEY still applies when the client sends no key. Content-Type is
+    left to aiohttp, because the body is re-serialized as JSON.
+    """
+    headers = _build_backend_request_headers(
+        request, request_id, include_content_type=False
+    )
+    router_api_key = os.environ.get("OPENAI_API_KEY")
+    if router_api_key and not any(key.lower() == "authorization" for key in headers):
+        headers["Authorization"] = f"Bearer {router_api_key}"
+    return headers
+
+
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
@@ -770,6 +787,7 @@ async def route_orchestrated_disaggregated_request(
     in_router_time = time.time()
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
+    backend_headers = _build_pd_backend_headers(request, request_id)
 
     logger.info(f"[{request_id}] Starting orchestrated disaggregated inference")
 
@@ -834,7 +852,7 @@ async def route_orchestrated_disaggregated_request(
         async with client.post(
             prefill_api_url,
             json=prefill_request_json,
-            headers=_build_backend_request_headers(request, request_id),
+            headers=backend_headers,
             timeout=aiohttp.ClientTimeout(total=300),
         ) as prefill_resp:
             if prefill_resp.status != 200:
@@ -877,7 +895,7 @@ async def route_orchestrated_disaggregated_request(
         decode_resp = await client.post(
             decode_api_url,
             json=decode_request,
-            headers=_build_backend_request_headers(request, request_id),
+            headers=backend_headers,
             timeout=aiohttp.ClientTimeout(total=600),
         )
         try:
@@ -958,15 +976,7 @@ async def route_disaggregated_prefill_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
-    # Forward the client's headers (Authorization included) like every other
-    # proxy path; the engines may be running with --api-key. A router-side
-    # OPENAI_API_KEY still applies when the client sends no key.
-    backend_headers = _build_backend_request_headers(request, request_id)
-    router_api_key = os.environ.get("OPENAI_API_KEY")
-    if router_api_key and not any(
-        key.lower() == "authorization" for key in backend_headers
-    ):
-        backend_headers["Authorization"] = f"Bearer {router_api_key}"
+    backend_headers = _build_pd_backend_headers(request, request_id)
 
     # Save original request for decode phase
     orig_request_json = request_json.copy()
