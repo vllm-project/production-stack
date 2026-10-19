@@ -84,7 +84,7 @@ Define additional router ports
 Define startup, liveness and readiness probes
 */}}
 {{- define "chart.templateProbe"}}
-  initialDelaySeconds: {{ .initialDelaySeconds | default 15 }}
+  initialDelaySeconds: {{ ternary .initialDelaySeconds 15 (hasKey . "initialDelaySeconds") }}
   periodSeconds: {{ .periodSeconds | default 10 }}
   failureThreshold: {{ .failureThreshold | default 3 }}
   {{- if .timeoutSeconds }}

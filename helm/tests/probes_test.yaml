@@ -1,0 +1,78 @@
+suite: test serving engine probe initial delays
+templates:
+  - deployment-vllm-multi.yaml
+tests:
+  - it: should preserve zero initial delays for all engine probes
+    set:
+      servingEngineSpec.modelSpec:
+        - name: test-model
+          repository: vllm/vllm-openai
+          tag: latest
+          modelURL: facebook/opt-125m
+          replicaCount: 1
+          requestCPU: 1
+          requestMemory: 1Gi
+          requestGPU: 0
+      servingEngineSpec.startupProbe.initialDelaySeconds: 0
+      servingEngineSpec.livenessProbe.initialDelaySeconds: 0
+      servingEngineSpec.readinessProbe.initialDelaySeconds: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.initialDelaySeconds
+          value: 0
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+          value: 0
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+          value: 0
+
+  - it: should preserve positive initial delays for all engine probes
+    set:
+      servingEngineSpec.modelSpec:
+        - name: test-model
+          repository: vllm/vllm-openai
+          tag: latest
+          modelURL: facebook/opt-125m
+          replicaCount: 1
+          requestCPU: 1
+          requestMemory: 1Gi
+          requestGPU: 0
+      servingEngineSpec.startupProbe.initialDelaySeconds: 20
+      servingEngineSpec.livenessProbe.initialDelaySeconds: 10
+      servingEngineSpec.readinessProbe.initialDelaySeconds: 5
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.initialDelaySeconds
+          value: 20
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+          value: 10
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+          value: 5
+
+  - it: should use default initial delays when the fields are omitted
+    set:
+      servingEngineSpec.modelSpec:
+        - name: test-model
+          repository: vllm/vllm-openai
+          tag: latest
+          modelURL: facebook/opt-125m
+          replicaCount: 1
+          requestCPU: 1
+          requestMemory: 1Gi
+          requestGPU: 0
+      servingEngineSpec.startupProbe.initialDelaySeconds: null
+      servingEngineSpec.livenessProbe.initialDelaySeconds: null
+      servingEngineSpec.readinessProbe.initialDelaySeconds: null
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.initialDelaySeconds
+          value: 15
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+          value: 15
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+          value: 15
