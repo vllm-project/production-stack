@@ -1,5 +1,6 @@
 """Unit tests for the KV-cache-aware routing logic."""
 
+import socket
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -224,12 +225,30 @@ async def test_kvaware_refreshes_unknown_dead_holder_and_uses_live_match():
     assert selected == url_b
 
 
+def free_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 def test_dynamic_config_reload_keeps_kvaware_settings(monkeypatch):
+    zmq = pytest.importorskip("zmq")
+    zmq_asyncio = pytest.importorskip("zmq.asyncio")
     manager_args = {}
 
     class ControllerManager:
+        """Binds the controller sockets like lmcache 0.3.11, which has no close()."""
+
         def __init__(self, urls, **kwargs):
             manager_args.update(urls=urls, **kwargs)
+            context = zmq_asyncio.Context.instance()
+            self.controller_pull_socket = context.socket(zmq.PULL)
+            self.controller_pull_socket.bind(f"tcp://{urls['pull']}")
+            self.controller_reply_socket = context.socket(zmq.REP)
+            self.controller_reply_socket.bind(f"tcp://{urls['reply']}")
+
+        async def start_all(self):
+            await self.controller_pull_socket.recv_multipart()
 
     monkeypatch.setattr(
         routing_logic,
@@ -237,29 +256,35 @@ def test_dynamic_config_reload_keeps_kvaware_settings(monkeypatch):
         SimpleNamespace(LMCacheControllerManager=ControllerManager),
         raising=False,
     )
-    monkeypatch.setattr(KvawareRouter, "start_kv_manager", lambda self: None)
+    pull_port, reply_port, heartbeat_port = free_port(), free_port(), free_port()
     config = DynamicRouterConfig(
         service_discovery="static",
         routing_logic="kvaware",
         kv_aware_threshold=500,
-        lmcache_controller_port=9100,
-        lmcache_controller_reply_port=9101,
-        lmcache_controller_heartbeat_port=9102,
+        lmcache_controller_port=pull_port,
+        lmcache_controller_reply_port=reply_port,
+        lmcache_controller_heartbeat_port=heartbeat_port,
         lmcache_health_check_interval=7,
         lmcache_worker_timeout=11,
     )
     watcher = SimpleNamespace(app=MagicMock())
 
     try:
+        running = routing_logic.initialize_routing_logic(
+            routing_logic.RoutingLogic.KVAWARE,
+            lmcache_controller_port=pull_port,
+            lmcache_controller_reply_port=reply_port,
+        )
         DynamicConfigWatcher.reconfigure_routing_logic(watcher, config)
+        assert watcher.app.state.router is not running
         assert watcher.app.state.router.threshold == 500
     finally:
         routing_logic.cleanup_routing_logic()
     assert manager_args == {
         "urls": {
-            "pull": "0.0.0.0:9100",
-            "reply": "0.0.0.0:9101",
-            "heartbeat": "0.0.0.0:9102",
+            "pull": f"0.0.0.0:{pull_port}",
+            "reply": f"0.0.0.0:{reply_port}",
+            "heartbeat": f"0.0.0.0:{heartbeat_port}",
         },
         "health_check_interval": 7,
         "lmcache_worker_timeout": 11,

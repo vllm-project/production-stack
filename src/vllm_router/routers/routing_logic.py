@@ -367,6 +367,26 @@ class KvawareRouter(RoutingInterface):
             except concurrent.futures.CancelledError:
                 pass
             self.lmcache_cluster_monitor_task = None
+        # Release the controller ports so that a router rebuilt by a dynamic
+        # config reload can bind them again. The sockets belong to the kv
+        # manager loop, so close them there.
+        if hasattr(self, "loop") and self.loop.is_running():
+
+            async def close_kv_manager():
+                self._close_kv_manager()
+
+            asyncio.run_coroutine_threadsafe(close_kv_manager(), self.loop).result()
+        elif hasattr(self, "kv_manager"):
+            self._close_kv_manager()
+
+    def _close_kv_manager(self):
+        if hasattr(self.kv_manager, "close"):
+            self.kv_manager.close()
+            return
+        # lmcache 0.3.11's LMCacheControllerManager has no close()
+        for name in ("controller_pull_socket", "controller_reply_socket"):
+            if hasattr(self.kv_manager, name):
+                getattr(self.kv_manager, name).close(linger=0)
 
     async def route_request(
         self,
