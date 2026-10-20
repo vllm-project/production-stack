@@ -74,7 +74,10 @@ _LABEL_GAUGES = [
 
 
 # Start the measurement window so the first scrape reports a real value.
-psutil.cpu_percent(interval=None)
+try:
+    psutil.cpu_percent(interval=None)
+except Exception as e:
+    logger.warning("Failed to start the CPU usage measurement window: %s", e)
 
 
 def _clear_label_gauges() -> None:
