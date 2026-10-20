@@ -73,6 +73,10 @@ _LABEL_GAUGES = [
 ]
 
 
+# Start the measurement window so the first scrape reports a real value.
+psutil.cpu_percent(interval=None)
+
+
 def _clear_label_gauges() -> None:
     for gauge in _LABEL_GAUGES:
         gauge.clear()
@@ -97,7 +101,8 @@ async def metrics():
     """
     _clear_label_gauges()
 
-    cpu_percent = psutil.cpu_percent(interval=0.1)
+    # interval=None does not block: it reports usage since the previous call.
+    cpu_percent = psutil.cpu_percent(interval=None)
     router_cpu_usage_percent.set(cpu_percent)
 
     memory_percent = psutil.virtual_memory().percent
