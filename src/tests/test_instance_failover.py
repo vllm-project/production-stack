@@ -221,3 +221,33 @@ async def test_http_exception_not_retried(setup):
             await route_general_request(req, "/v1/chat/completions", MagicMock())
 
     assert call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_backend_date_and_request_id_headers_are_not_duplicated(setup):
+    req, router = setup
+    req.headers = {"content-type": "application/json", "X-Request-Id": "req-abc"}
+    backend_headers = MagicMock()
+    backend_headers.items.return_value = [
+        ("content-type", "application/json"),
+        ("date", "Tue, 20 Oct 2026 21:00:37 GMT"),
+        ("server", "uvicorn"),
+        ("x-request-id", "req-abc"),
+    ]
+
+    async def ok(*a, **kw):
+        yield backend_headers, 200
+        yield b"done"
+
+    with patch(
+        "vllm_router.services.request_service.request.process_request", side_effect=ok
+    ):
+        from vllm_router.services.request_service.request import route_general_request
+
+        resp = await route_general_request(req, "/v1/chat/completions", MagicMock())
+
+    names = [name.decode().lower() for name, _ in resp.raw_headers]
+    assert names.count("x-request-id") == 1
+    assert resp.headers["x-request-id"] == "req-abc"
+    # The router's own server adds Date when it sends the response.
+    assert "date" not in names
