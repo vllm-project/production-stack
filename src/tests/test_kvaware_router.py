@@ -1,10 +1,12 @@
 """Unit tests for the KV-cache-aware routing logic."""
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
 import vllm_router.routers.routing_logic as routing_logic
+from vllm_router.dynamic_config import DynamicConfigWatcher, DynamicRouterConfig
 from vllm_router.routers.routing_logic import KvawareRouter
 
 
@@ -220,3 +222,45 @@ async def test_kvaware_refreshes_unknown_dead_holder_and_uses_live_match():
     )
 
     assert selected == url_b
+
+
+def test_dynamic_config_reload_keeps_kvaware_settings(monkeypatch):
+    manager_args = {}
+
+    class ControllerManager:
+        def __init__(self, urls, **kwargs):
+            manager_args.update(urls=urls, **kwargs)
+
+    monkeypatch.setattr(
+        routing_logic,
+        "controller_manager",
+        SimpleNamespace(LMCacheControllerManager=ControllerManager),
+        raising=False,
+    )
+    monkeypatch.setattr(KvawareRouter, "start_kv_manager", lambda self: None)
+    config = DynamicRouterConfig(
+        service_discovery="static",
+        routing_logic="kvaware",
+        kv_aware_threshold=500,
+        lmcache_controller_port=9100,
+        lmcache_controller_reply_port=9101,
+        lmcache_controller_heartbeat_port=9102,
+        lmcache_health_check_interval=7,
+        lmcache_worker_timeout=11,
+    )
+    watcher = SimpleNamespace(app=MagicMock())
+
+    try:
+        DynamicConfigWatcher.reconfigure_routing_logic(watcher, config)
+        assert watcher.app.state.router.threshold == 500
+    finally:
+        routing_logic.cleanup_routing_logic()
+    assert manager_args == {
+        "urls": {
+            "pull": "0.0.0.0:9100",
+            "reply": "0.0.0.0:9101",
+            "heartbeat": "0.0.0.0:9102",
+        },
+        "health_check_interval": 7,
+        "lmcache_worker_timeout": 11,
+    }
