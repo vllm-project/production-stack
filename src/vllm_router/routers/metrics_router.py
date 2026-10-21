@@ -29,6 +29,7 @@ from vllm_router.services.metrics_service import (
     gpu_prefix_cache_hits_total,
     gpu_prefix_cache_queries_total,
     healthy_pods_total,
+    kv_cache_usage_perc,
     num_decoding_requests,
     num_prefill_requests,
     num_requests_running,
@@ -63,6 +64,7 @@ _LABEL_GAUGES = [
     num_decoding_requests,
     num_requests_running,
     num_requests_waiting,
+    kv_cache_usage_perc,
     avg_latency,
     avg_itl,
     num_requests_swapped,
@@ -121,6 +123,8 @@ async def metrics():
 
     engine_stats = get_engine_stats_scraper().get_engine_stats()
     for server, engine_stat in engine_stats.items():
+        num_requests_waiting.labels(server=server).set(engine_stat.num_queuing_requests)
+        kv_cache_usage_perc.labels(server=server).set(engine_stat.gpu_cache_usage_perc)
         gpu_prefix_cache_hit_rate.labels(server=server).set(
             engine_stat.gpu_prefix_cache_hit_rate
         )

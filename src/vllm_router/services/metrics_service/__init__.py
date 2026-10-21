@@ -8,6 +8,9 @@ num_requests_running = Gauge(
 num_requests_waiting = Gauge(
     "vllm:num_requests_waiting", "Number of waiting requests", ["server"]
 )
+kv_cache_usage_perc = Gauge(
+    "vllm:kv_cache_usage_perc", "GPU KV-cache usage", ["server"]
+)
 gpu_prefix_cache_hit_rate = Gauge(
     "vllm:gpu_prefix_cache_hit_rate",
     "GPU Prefix Cache Hit Rate",
