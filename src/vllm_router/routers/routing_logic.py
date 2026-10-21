@@ -16,6 +16,7 @@ import abc
 import asyncio
 import concurrent.futures
 import enum
+import json
 import math
 import os
 import random
@@ -916,8 +917,14 @@ class PrefixAwareRouter(RoutingInterface):
             else:
                 prompt = ""
         else:
-            # Handle regular completions
-            prompt = request_json["prompt"]
+            # completions use prompt; /v1/systemone uses state, /v1/decisions
+            # and /v1/embeddings use input. none of them (e.g. /v1/score) -> ""
+            prompt = request_json.get(
+                "prompt", request_json.get("state", request_json.get("input", ""))
+            )
+            if not isinstance(prompt, str):
+                # state/input/batched prompt can be JSON; trie hashes strings
+                prompt = json.dumps(prompt, sort_keys=True)
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
         match_length, matched_endpoint = await self.hashtrie.longest_prefix_match(
