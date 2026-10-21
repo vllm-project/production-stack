@@ -45,11 +45,16 @@ async def test_metrics_exports_scraped_waiting_requests_and_kv_cache_usage(
     monkeypatch.setattr(
         metrics_router,
         "get_service_discovery",
-        lambda: SimpleNamespace(get_endpoint_info=lambda: []),
+        lambda: SimpleNamespace(
+            get_endpoint_info=lambda: [
+                SimpleNamespace(url=server, model_names=["test-model"], healthy=True)
+            ]
+        ),
     )
 
     response = await metrics_router.metrics()
     output = response.body.decode()
 
-    assert f'vllm:num_requests_waiting{{server="{server}"}} 7.0' in output
-    assert f'vllm:kv_cache_usage_perc{{server="{server}"}} 0.42' in output
+    labels = f'model_name="test-model",server="{server}"'
+    assert f"vllm:num_requests_waiting{{{labels}}} 7.0" in output
+    assert f"vllm:kv_cache_usage_perc{{{labels}}} 0.42" in output
