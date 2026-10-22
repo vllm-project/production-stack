@@ -92,6 +92,10 @@ def _loadaware_beta(override: Optional[float]) -> float:
 
 
 class RoutingInterface(metaclass=SingletonABCMeta):
+    # Upper bound on cached endpoint-set entries to prevent unbounded memory
+    # growth when endpoints change dynamically (add / remove / update).
+    _MAX_CACHE_SIZE = 1024
+
     def _qps_routing(
         self, endpoints: List[EndpointInfo], request_stats: Dict[str, RequestStats]
     ) -> str:
@@ -116,26 +120,21 @@ class RoutingInterface(metaclass=SingletonABCMeta):
                 ret = url
         return ret
 
-    def _update_hash_ring(self, endpoints: List["EndpointInfo"]):
+    def _get_hash_ring(self, endpoints: List["EndpointInfo"]) -> HashRing:
         """
-        Update the hash ring with the current list of endpoints.
+        Return the hash ring for this endpoint set, building it on first use.
+        Rebuilding one shared ring per request is costly when requests for
+        different models (different endpoint sets) interleave.
         """
-        # Extract endpoint URLs
-        endpoint_urls = [endpoint.url for endpoint in endpoints]
-
-        # Get the current nodes in the hash ring
-        current_nodes = set(self.hash_ring.get_nodes())
-
-        # Convert the new endpoint URLs to a set for easy comparison
-        new_nodes = set(endpoint_urls)
-
-        # Remove nodes that are no longer in the list
-        for node in current_nodes - new_nodes:
-            self.hash_ring.remove_node(node)
-
-        # Add new nodes that are not already in the hash ring
-        for node in new_nodes - current_nodes:
-            self.hash_ring.add_node(node)
+        urls = frozenset(endpoint.url for endpoint in endpoints)
+        ring = self._hash_rings.get(urls)
+        if ring is None:
+            # Clearing is safe: a rebuilt ring places every node identically.
+            if len(self._hash_rings) >= self._MAX_CACHE_SIZE:
+                self._hash_rings.clear()
+            ring = HashRing(list(urls))
+            self._hash_rings[urls] = ring
+        return ring
 
     def extract_session_id(self, request: Request, request_json: Dict) -> Optional[str]:
         """
@@ -172,10 +171,6 @@ class RoutingInterface(metaclass=SingletonABCMeta):
 class RoundRobinRouter(RoutingInterface):
     # TODO (ApostaC): when available engines in the endpoints changes, the
     # algorithm may not be "perfectly" round-robin.
-
-    # Upper bound on cached endpoint-set entries to prevent unbounded memory
-    # growth when endpoints change dynamically (add / remove / update).
-    _MAX_CACHE_SIZE = 1024
 
     def __init__(self):
         if hasattr(self, "_initialized"):
@@ -240,7 +235,7 @@ class SessionRouter(RoutingInterface):
         if session_key is None:
             raise ValueError("SessionRouter must be initialized with a session_key")
         self.session_key = session_key
-        self.hash_ring = HashRing()
+        self._hash_rings: dict[frozenset[str], HashRing] = {}
         self._initialized = True
 
     async def route_request(
@@ -269,15 +264,12 @@ class SessionRouter(RoutingInterface):
         session_id = self.extract_session_id(request, request_json)
         logger.debug(f"Got session id: {session_id}")
 
-        # Update the hash ring with the current list of endpoints
-        self._update_hash_ring(endpoints)
-
         if session_id is None:
             # Route based on QPS if no session ID is present
             url = self._qps_routing(endpoints, request_stats)
         else:
             # Use the hash ring to get the endpoint for the session ID
-            url = self.hash_ring.get_node(session_id)
+            url = self._get_hash_ring(endpoints).get_node(session_id)
 
         return url
 
@@ -326,7 +318,7 @@ class KvawareRouter(RoutingInterface):
         self.req_id = 0
         self.instance_id_to_ip = {}
         self.session_key = session_key
-        self.hash_ring = HashRing()
+        self._hash_rings: dict[frozenset[str], HashRing] = {}
         self.tokenizers = {}
         self.threshold = kv_aware_threshold
 
@@ -466,14 +458,12 @@ class KvawareRouter(RoutingInterface):
         ):
             session_id = self.extract_session_id(request, request_json)
             logger.debug(f"Fallback to using session id: {session_id}")
-            # Update the hash ring with the current list of endpoints
-            self._update_hash_ring(endpoints)
             if session_id is None:
                 # Route based on QPS if no session ID is present
                 url = self._qps_routing(endpoints, request_stats)
             else:
                 # Use the hash ring to get the endpoint for the session ID
-                url = self.hash_ring.get_node(session_id)
+                url = self._get_hash_ring(endpoints).get_node(session_id)
             return url
         logger.info(f"Routing request to {matched_instance_id} found by kvaware router")
         return self.instance_id_to_ip[matched_instance_id]
@@ -781,10 +771,9 @@ class LoadAwareRouter(KvawareRouter):
         request_stats = self.live_request_stats(request, request_stats)
         session_id = self.extract_session_id(request, request_json)
         logger.debug(f"Fallback to using session id: {session_id}")
-        self._update_hash_ring(endpoints)
         if session_id is None:
             return self._qps_routing(endpoints, request_stats)
-        return self.hash_ring.get_node(session_id)
+        return self._get_hash_ring(endpoints).get_node(session_id)
 
     async def route_request(
         self,

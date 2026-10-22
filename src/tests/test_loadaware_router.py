@@ -327,8 +327,6 @@ async def test_route_request_scores_and_routes_to_the_argmax():
 async def test_no_cached_prefix_anywhere_falls_back_to_qps():
     """An empty `layout_info` means there is no benefit term to weigh: the
     request takes the upstream session/QPS fallback, not a crash."""
-    from uhashring import HashRing
-
     router = make_router()
 
     class Tokenizer:
@@ -342,7 +340,7 @@ async def test_no_cached_prefix_anywhere_falls_back_to_qps():
 
     router.query_manager = query_manager
     router.session_key = "x-user-id"
-    router.hash_ring = HashRing()
+    router._hash_rings = {}
 
     class Request:
         headers: Dict[str, str] = {}
@@ -532,11 +530,9 @@ async def test_a_burst_is_spread_by_live_load(stats_monitor):
 @pytest.mark.asyncio
 async def test_a_cold_burst_is_spread_by_live_load(stats_monitor):
     """Nothing cached anywhere: the fallback must also see live load."""
-    from uhashring import HashRing
-
     router = burst_router()
     router.session_key = "x-user-id"
-    router.hash_ring = HashRing()
+    router._hash_rings = {}
     placement = await route_burst(router, stats_monitor, layout_info={})
     assert sum(placement.values()) == BURST
     assert max(placement.values()) <= BURST // 2
@@ -593,11 +589,9 @@ class QpsFallbackRequest:
 
 def make_fallback_router(beta: float = DEFAULT_LOADAWARE_BETA):
     """A router that can also take the session/QPS fallback route."""
-    from uhashring import HashRing
-
     router = make_router(beta=beta)
     router.session_key = "x-user-id"
-    router.hash_ring = HashRing()
+    router._hash_rings = {}
     return router
 
 
