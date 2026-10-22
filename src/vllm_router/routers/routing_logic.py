@@ -916,8 +916,10 @@ class PrefixAwareRouter(RoutingInterface):
             else:
                 prompt = ""
         else:
-            # Handle regular completions
-            prompt = request_json["prompt"]
+            # Handle regular completions. Bodies without a prompt (embeddings,
+            # responses, rerank, score, speech, multipart) route with no
+            # prefix affinity instead of failing.
+            prompt = request_json.get("prompt", "")
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
         match_length, matched_endpoint = await self.hashtrie.longest_prefix_match(

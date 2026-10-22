@@ -381,3 +381,25 @@ async def test_default_threshold_zero_preserves_original_behavior():
     assert url == "http://engine1.com"
 
     fake_hashtrie.insert.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "request_json",
+    [
+        {"model": "m", "input": "embed me"},  # /v1/embeddings, /v1/responses
+        {"model": "m", "query": "q", "documents": ["d"]},  # /v1/rerank
+        {},  # multipart routes (audio)
+    ],
+)
+async def test_request_without_prompt_or_messages_is_routed(request_json):
+    """Bodies with neither "prompt" nor "messages" are routed, not a KeyError."""
+
+    endpoints = [EndpointInfo(url="http://engine1.com")]
+    router = PrefixAwareRouter()
+
+    url = await router.route_request(
+        endpoints, None, {}, Request(headers={}), request_json
+    )
+
+    assert url == "http://engine1.com"
