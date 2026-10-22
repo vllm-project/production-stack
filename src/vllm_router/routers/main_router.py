@@ -105,6 +105,16 @@ async def route_score(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/score", background_tasks)
 
 
+@main_router.post("/v1/systemone")
+async def route_v1_systemone(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/systemone", background_tasks)
+
+
+@main_router.post("/v1/decisions")
+async def route_v1_decisions(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/decisions", background_tasks)
+
+
 @main_router.post("/sleep")
 async def route_sleep(request: Request, background_tasks: BackgroundTasks):
     return await route_sleep_wakeup_request(request, "/sleep", background_tasks)
