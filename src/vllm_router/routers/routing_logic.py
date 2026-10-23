@@ -19,6 +19,7 @@ import enum
 import math
 import os
 import random
+import socket
 import threading
 import time
 import uuid
@@ -378,6 +379,29 @@ class KvawareRouter(RoutingInterface):
             asyncio.run_coroutine_threadsafe(close_kv_manager(), self.loop).result()
         elif hasattr(self, "kv_manager"):
             self._close_kv_manager()
+        self._wait_for_controller_ports()
+
+    def _wait_for_controller_ports(self, timeout: float = 1.0):
+        # Closing a ZMQ socket returns before libzmq's I/O thread unbinds the
+        # port, so wait until the ports can be bound again. SO_REUSEADDR
+        # matches libzmq, so worker connections left in TIME_WAIT don't count.
+        deadline = time.monotonic() + timeout
+        for port in (
+            self.lmcache_controller_port,
+            self.lmcache_controller_reply_port,
+            self.lmcache_controller_heartbeat_port,
+        ):
+            if port is None:
+                continue
+            while time.monotonic() < deadline:
+                with socket.socket() as probe:
+                    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    try:
+                        probe.bind(("0.0.0.0", port))
+                        break
+                    except OSError:
+                        pass
+                time.sleep(0.01)
 
     def _close_kv_manager(self):
         if hasattr(self.kv_manager, "close"):
