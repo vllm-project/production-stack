@@ -45,6 +45,7 @@ from uhashring import HashRing
 
 from vllm_router.log import init_logger
 from vllm_router.service_discovery import EndpointInfo
+from vllm_router.services.metrics_service import routing_fallbacks_total
 from vllm_router.stats.engine_stats import EngineStats
 from vllm_router.stats.request_stats import RequestStats
 from vllm_router.utils import SingletonABCMeta
@@ -273,6 +274,9 @@ class SessionRouter(RoutingInterface):
         self._update_hash_ring(endpoints)
 
         if session_id is None:
+            routing_fallbacks_total.labels(
+                routing_logic="session", reason="no_session_id"
+            ).inc()
             # Route based on QPS if no session ID is present
             url = self._qps_routing(endpoints, request_stats)
         else:
@@ -464,6 +468,13 @@ class KvawareRouter(RoutingInterface):
             or matched_instance_id is None
             or matched_tokens < max(len(token_ids) - self.threshold, 0)
         ):
+            if not layout_info:
+                reason = "no_cache_hit"
+            elif matched_instance_id is None:
+                reason = "no_live_holder"
+            else:
+                reason = "below_threshold"
+            routing_fallbacks_total.labels(routing_logic="kvaware", reason=reason).inc()
             session_id = self.extract_session_id(request, request_json)
             logger.debug(f"Fallback to using session id: {session_id}")
             # Update the hash ring with the current list of endpoints
@@ -828,12 +839,18 @@ class LoadAwareRouter(KvawareRouter):
             # or the controller lookup failed: route without cache information
             # instead of failing the request with an HTTP 500.
             logger.warning(f"loadaware lookup failed, using fallback route: {e!r}")
+            routing_fallbacks_total.labels(
+                routing_logic="loadaware", reason="lookup_failed"
+            ).inc()
             return self.fallback_url(endpoints, request_stats, request, request_json)
         logger.debug(f"Lookup return message: {lookup_ret}")
         layout_info = getattr(lookup_ret, "layout_info", None) or {}
 
         if not layout_info:
             # Nothing cached anywhere - no benefit term to weigh.
+            routing_fallbacks_total.labels(
+                routing_logic="loadaware", reason="no_cache_hit"
+            ).inc()
             return self.fallback_url(endpoints, request_stats, request, request_json)
 
         await self.refresh_instance_map(endpoints, layout_info)
@@ -925,6 +942,9 @@ class PrefixAwareRouter(RoutingInterface):
         )
 
         if match_length < self.prefix_min_match_length:
+            routing_fallbacks_total.labels(
+                routing_logic="prefixaware", reason="below_threshold"
+            ).inc()
             # sub-threshold: no useful prefix affinity yet. least-inflight
             # via request_stats (same signal as LoadAwareRouter.load_penalty).
             # missing url => load 0. random among exact min. no engine_stats

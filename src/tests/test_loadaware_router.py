@@ -14,8 +14,10 @@ needed.
 """
 
 from typing import Any, Dict
+from unittest.mock import AsyncMock
 
 import pytest
+from prometheus_client import REGISTRY
 
 import vllm_router.routers.routing_logic as routing_logic
 from vllm_router.routers.routing_logic import (
@@ -807,6 +809,57 @@ async def test_chat_request_routes_to_the_replica_holding_its_prefix(
     assert "prompt" not in tokenize_calls[0]["json"]
     assert looked_up == [[1, 2, 3]]
     assert url == URL_B
+
+
+# --- routing fallback metric --------------------------------------------------
+
+
+def fallback_count(reason):
+    labels = {"routing_logic": "loadaware", "reason": reason}
+    return REGISTRY.get_sample_value("vllm:routing_fallbacks_total", labels) or 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "query_manager, reason",
+    [
+        pytest.param(
+            AsyncMock(return_value=LookupRet({INST_B: (LOCAL, 3)})),
+            None,
+            id="cache-hit",
+        ),
+        pytest.param(
+            AsyncMock(return_value=LookupRet({})),
+            "no_cache_hit",
+            id="nothing-cached",
+        ),
+        pytest.param(
+            AsyncMock(side_effect=TimeoutError("controller unavailable")),
+            "lookup_failed",
+            id="lookup-failed",
+        ),
+    ],
+)
+async def test_route_request_counts_fallbacks_by_reason(
+    tokenize_calls, query_manager, reason
+):
+    """Each fallback is counted once, under its reason; a request scored
+    against a cache hit is not a fallback."""
+    router = make_fallback_router()
+    router.query_manager = query_manager
+    reasons = ("no_cache_hit", "lookup_failed")
+    before = {r: fallback_count(r) for r in reasons}
+
+    await router.route_request(
+        endpoints(URL_A, URL_B),
+        {},
+        {},
+        QpsFallbackRequest(),
+        {"messages": [{"role": "user", "content": "x"}]},
+    )
+
+    counted = {r: fallback_count(r) - before[r] for r in reasons}
+    assert counted == {r: 1 if r == reason else 0 for r in reasons}
 
 
 # --- configuration ------------------------------------------------------------
