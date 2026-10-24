@@ -28,6 +28,13 @@ data "aws_vpc" "selected" {
 data "aws_subnet" "cluster_subnets" {
   count = length(local.private_subnet_ids)
   id    = local.private_subnet_ids[count.index]
+
+  lifecycle {
+    postcondition {
+      condition     = self.vpc_id == local.vpc_id
+      error_message = "Subnet ${self.id} is not in VPC ${local.vpc_id}."
+    }
+  }
 }
 
 # Data sources for cluster subnets (public)
