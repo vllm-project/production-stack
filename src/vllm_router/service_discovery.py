@@ -314,12 +314,14 @@ class StaticServiceDiscovery(ServiceDiscovery):
         while self._running:
             try:
                 self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
+            except Exception as e:
+                logger.error(e)
+            # Wait after a failed check too, or the loop retries at once.
+            try:
                 await asyncio.sleep(self.health_check_interval)
             except asyncio.CancelledError:
                 logger.debug("Health check task cancelled")
                 break
-            except Exception as e:
-                logger.error(e)
 
     def start_health_check_task(self) -> None:
         self.loop = asyncio.new_event_loop()
