@@ -157,6 +157,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         self.watch_interval = watch_interval
         self.current_config = init_config
         self.app = app
+        self._reconfigure_pending = False
 
         # Watcher thread
         self.running = True
@@ -262,6 +263,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         Reconfigures the router with the given config.
         """
         self.reconfigure_service_discovery(config)
+        self._reconfigure_pending = True
         self.reconfigure_routing_logic(config)
         self.reconfigure_batch_api(config)
         self.reconfigure_stats(config)
@@ -291,13 +293,14 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                     config = DynamicRouterConfig.from_json(self.config_path)
                 else:
                     raise ValueError("Unsupported config file type.")
-                if config != self.current_config:
+                if config != self.current_config or self._reconfigure_pending:
                     logger.info(
                         "DynamicConfigWatcher: Config changed, reconfiguring..."
                     )
                     self.reconfigure_all(config)
                     logger.info("DynamicConfigWatcher: Config reconfiguration complete")
                     self.current_config = config
+                    self._reconfigure_pending = False
             except Exception as e:
                 logger.warning(f"DynamicConfigWatcher: Error loading config file: {e}")
 
