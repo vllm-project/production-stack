@@ -177,11 +177,13 @@ func (r *CacheServerReconciler) deploymentForCacheServer(cacheServer *production
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: cacheServer.Spec.PodSecurityContext,
 					Containers: []corev1.Container{
 						{
 							Name:            "cache-server",
 							Image:           image,
 							ImagePullPolicy: imagePullPolicy,
+							SecurityContext: cacheServer.Spec.SecurityContext,
 							Command: []string{
 								"/opt/venv/bin/lmcache_server",
 								"0.0.0.0",
@@ -224,6 +226,14 @@ func (r *CacheServerReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, cs
 	expectedResources := expectedDep.Spec.Template.Spec.Containers[0].Resources
 	actualResources := dep.Spec.Template.Spec.Containers[0].Resources
 	if !reflect.DeepEqual(expectedResources, actualResources) {
+		return true
+	}
+
+	// Compare security contexts so changes roll out to existing deployments.
+	if !reflect.DeepEqual(expectedDep.Spec.Template.Spec.SecurityContext, dep.Spec.Template.Spec.SecurityContext) {
+		return true
+	}
+	if !reflect.DeepEqual(expectedDep.Spec.Template.Spec.Containers[0].SecurityContext, dep.Spec.Template.Spec.Containers[0].SecurityContext) {
 		return true
 	}
 

@@ -94,6 +94,14 @@ type VLLMRouterSpec struct {
 	// Environment variables
 	Env []EnvVar `json:"env,omitempty"`
 
+	// PodSecurityContext for the router pod
+	// +optional
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// SecurityContext for the router container
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
 	// VLLM API Key configuration
 	VLLMApiKeySecret corev1.LocalObjectReference `json:"vllmApiKeySecret,omitempty"`
 	VLLMApiKeyName   string                      `json:"vllmApiKeyName,omitempty"`

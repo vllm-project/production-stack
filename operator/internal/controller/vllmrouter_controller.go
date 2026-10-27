@@ -317,6 +317,7 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 				Spec: corev1.PodSpec{
 					ServiceAccountName: router.Spec.ServiceAccountName,
 					ImagePullSecrets:   imagePullSecrets,
+					SecurityContext:    router.Spec.PodSecurityContext,
 					Containers: []corev1.Container{
 						{
 							Name:            "router",
@@ -324,6 +325,7 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 							ImagePullPolicy: imagePullPolicy,
 							Args:            args,
 							Env:             env,
+							SecurityContext: router.Spec.SecurityContext,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",
@@ -393,6 +395,14 @@ func (r *VLLMRouterReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, rou
 
 	// Compare container args
 	if !reflect.DeepEqual(expectedDep.Spec.Template.Spec.Containers[0].Args, dep.Spec.Template.Spec.Containers[0].Args) {
+		return true
+	}
+
+	// Compare security contexts so changes roll out to existing deployments.
+	if !reflect.DeepEqual(expectedDep.Spec.Template.Spec.SecurityContext, dep.Spec.Template.Spec.SecurityContext) {
+		return true
+	}
+	if !reflect.DeepEqual(expectedDep.Spec.Template.Spec.Containers[0].SecurityContext, dep.Spec.Template.Spec.Containers[0].SecurityContext) {
 		return true
 	}
 
