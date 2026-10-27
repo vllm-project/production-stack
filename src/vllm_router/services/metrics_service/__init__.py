@@ -38,6 +38,11 @@ num_incoming_requests_total = Counter(
     "Total valid incoming requests to router (including when no backends available).",
     ["model"],
 )
+routing_fallbacks_total = Counter(
+    "vllm:routing_fallbacks_total",
+    "Requests routed by a fallback path instead of the routing logic's primary policy",
+    ["routing_logic", "reason"],
+)
 
 # New metrics per dashboard update
 healthy_pods_total = Gauge(

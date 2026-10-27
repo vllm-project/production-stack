@@ -3,6 +3,7 @@ from typing import Any, Dict
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from prometheus_client import REGISTRY
 
 from vllm_router.routers.routing_logic import (
     PrefixAwareRouter,
@@ -346,6 +347,44 @@ async def test_route_uses_matched_endpoint_when_match_above_threshold():
     assert url == "http://engine1.com"
 
     fake_hashtrie.insert.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "match_length, fallbacks",
+    [
+        pytest.param(0, 1, id="below-threshold"),
+        pytest.param(4096, 0, id="above-threshold"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_below_threshold_match_is_counted_as_fallback(match_length, fallbacks):
+    """
+    Only a match shorter than prefix_min_match_length leaves prefix affinity,
+    so only that request is counted as a routing fallback.
+    """
+
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+    request = Request(headers={})
+    request_json = {"prompt": "some prompt text"}
+    labels = {"routing_logic": "prefixaware", "reason": "below_threshold"}
+
+    router = PrefixAwareRouter(prefix_min_match_length=128)
+
+    fake_hashtrie = AsyncMock()
+    fake_hashtrie.longest_prefix_match.return_value = (
+        match_length,
+        {"http://engine1.com"},
+    )
+    router.hashtrie = fake_hashtrie
+
+    before = REGISTRY.get_sample_value("vllm:routing_fallbacks_total", labels) or 0
+    await router.route_request(endpoints, None, {}, request, request_json)
+    after = REGISTRY.get_sample_value("vllm:routing_fallbacks_total", labels) or 0
+
+    assert after - before == fallbacks
 
 
 @pytest.mark.asyncio
