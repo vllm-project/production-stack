@@ -268,6 +268,8 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `routerSpec.prefixMinMatchLength` | integer | `0` | Minimum prefix match length for `prefixaware` routing to reuse a matched endpoint; below this, requests fall back to QPS routing. Quantized to the prefix chunk size (default 128). `0` disables it |
 | `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic |
 | `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router |
+| `routerSpec.securityContext` | map | `{"seccompProfile":{"type":"RuntimeDefault"}}` | Pod-level security context configuration |
+| `routerSpec.containerSecurityContext` | map | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | Container-level security context configuration |
 | `routerSpec.extraVolumes` | list | `[]` | Additional volumes to add to the router pod, in Kubernetes volume format |
 | `routerSpec.extraVolumeMounts` | list | `[]` | Additional volume mounts to add to the router container, in Kubernetes volumeMount format |
 | `routerSpec.engineScrapeInterval` | integer | `15` | Interval in seconds to scrape metrics from the serving engine |
@@ -349,7 +351,7 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `cacheserverSpec.runtimeClassName` | string | `""` | RuntimeClassName configuration for the cache server pods |
 | `cacheserverSpec.schedulerName` | string | `""` | SchedulerName configuration for the cache server pods |
 | `cacheserverSpec.securityContext` | map | `{"seccompProfile":{"type":"RuntimeDefault"}}` | Pod-level security context configuration |
-| `cacheserverSpec.containerSecurityContext` | map | `{}` | Container-level security context configuration |
+| `cacheserverSpec.containerSecurityContext` | map | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | Container-level security context configuration |
 | `cacheserverSpec.priorityClassName` | string | - | Priority class for cache server |
 | `cacheserverSpec.affinity` | map | - | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
 | `cacheserverSpec.nodeSelector` | map | - | (Optional) nodeSelector for the cache pods. |
