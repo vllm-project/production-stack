@@ -381,3 +381,62 @@ async def test_default_threshold_zero_preserves_original_behavior():
     assert url == "http://engine1.com"
 
     fake_hashtrie.insert.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "request_json",
+    [
+        {"prompt": "hello"},
+        {"prompt": ["batched", "prompts"]},
+        {"state": "ticket text", "questions": {}},
+        {"state": {"ticket": "charged twice"}, "questions": {}},
+        {"input": "package arrived broken", "questions": []},
+        {"text_1": "a", "text_2": "b"},
+    ],
+)
+async def test_route_handles_non_chat_body_shapes(request_json):
+    """Bodies without messages/prompt (/v1/systemone, /v1/decisions,
+    /v1/score) must route instead of raising KeyError."""
+
+    endpoints = [EndpointInfo(url="http://engine1.com")]
+    router = PrefixAwareRouter()
+
+    url = await router.route_request(
+        endpoints, None, {}, Request(headers={}), request_json
+    )
+
+    assert url == "http://engine1.com"
+
+
+@pytest.mark.asyncio
+async def test_systemone_same_state_pins_to_same_backend():
+    """Repeat questions over one systemone state reuse the backend whose
+    prefix cache already holds that state."""
+
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+    request = Request(headers={})
+    router = PrefixAwareRouter(prefix_min_match_length=128)
+    state = {"ticket": "x" * 200}
+
+    url = await router.route_request(
+        endpoints,
+        None,
+        {"http://engine2.com": RequestStats(in_prefill_requests=3)},
+        request,
+        {"state": state, "questions": {"q1": {"type": "noul"}}},
+    )
+    assert url == "http://engine1.com"
+
+    # engine1 is now busier, but the shared state must keep it pinned
+    url = await router.route_request(
+        endpoints,
+        None,
+        {"http://engine1.com": RequestStats(in_prefill_requests=5)},
+        request,
+        {"state": state, "questions": {"q2": {"type": "noul"}}},
+    )
+    assert url == "http://engine1.com"
