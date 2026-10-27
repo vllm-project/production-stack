@@ -124,6 +124,11 @@ while true; do
         kubectl get pods | grep "$POD_PREFIX" || true
         print_error "Pod descriptions:"
         kubectl describe pods | grep -A 20 -B 5 "$POD_PREFIX" || true
+        # Show why the pods are not ready
+        for pod in $(kubectl get pods --no-headers | grep "$POD_PREFIX" | awk '{split($2, r, "/"); if (r[1] != r[2]) print $1}'); do
+            print_error "Last 40 log lines of $pod:"
+            kubectl logs "$pod" --all-containers --tail=40 || true
+        done
         exit 1
     fi
 done

@@ -135,6 +135,8 @@ jobs:
           source /usr/local/bin/conda-init
           conda activate llmstack
           echo "🧪 Running all k8s discovery routing tests"
+          # Drop results left over from earlier runs
+          rm -rf /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }}
           ./tests/e2e/run-k8s-routing-test.sh all \
             --model "facebook/opt-125m" \
             --num-requests 25 \
