@@ -497,10 +497,16 @@ routerSpec:
   hf_token: ""
 
   # -- Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core
-  securityContext: {}
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
 
   # -- Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core
-  containerSecurityContext: {}
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
 
   # -- Additional volumes to add to the router pod, in Kubernetes volume format
   extraVolumes: []
@@ -871,9 +877,15 @@ cacheserverSpec:
   # -- SchedulerName configuration for the cache server pods
   schedulerName: ""
   # -- Pod-level security context configuration
-  securityContext: {}
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
   # -- Container-level security context configuration
-  containerSecurityContext: {}
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
   # -- Priority class for the cache server pods
   priorityClassName: ""
   # -- Node selector for the cache server pods

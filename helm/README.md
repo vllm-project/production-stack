@@ -348,7 +348,7 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `cacheserverSpec.tolerations` | list | `[]` | Tolerations configuration for the cache server pods |
 | `cacheserverSpec.runtimeClassName` | string | `""` | RuntimeClassName configuration for the cache server pods |
 | `cacheserverSpec.schedulerName` | string | `""` | SchedulerName configuration for the cache server pods |
-| `cacheserverSpec.securityContext` | map | `{}` | Pod-level security context configuration |
+| `cacheserverSpec.securityContext` | map | `{"seccompProfile":{"type":"RuntimeDefault"}}` | Pod-level security context configuration |
 | `cacheserverSpec.containerSecurityContext` | map | `{}` | Container-level security context configuration |
 | `cacheserverSpec.priorityClassName` | string | - | Priority class for cache server |
 | `cacheserverSpec.affinity` | map | - | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
