@@ -35,6 +35,7 @@ This table documents all available configuration values for the Production Stack
 
 ### Table of Contents
 
+- [Global Configuration](#global-configuration)
 - [Serving Engine Configuration](#serving-engine-configuration)
 - [Router Configuration](#router-configuration)
 - [Cache Server Configuration](#cache-server-configuration)
@@ -42,6 +43,35 @@ This table documents all available configuration values for the Production Stack
 - [LoRA Controller Configuration](#lora-controller-configuration)
 - [Shared Storage Configuration](#shared-storage-configuration)
 - [Other Configuration](#other-configuration)
+
+### Global Configuration
+
+Set `global.imageRegistry` to pull images from a shared registry:
+
+```yaml
+global:
+  imageRegistry: "registry.example.com:5000"
+```
+
+The override replaces an explicit registry (such as `ghcr.io`) or prefixes an
+unqualified image. Repository paths, tags and digests are preserved. For example,
+`lmcache/lmstack-router:latest` becomes
+`registry.example.com:5000/lmcache/lmstack-router:latest`.
+Mirror images at their corresponding repository paths before enabling this option.
+
+This applies to the router, serving engines, cache server, LoRA controller and
+sidecar, Ray head and worker containers, and their init containers. An empty
+value (the default) leaves configured images unchanged. Continue to configure
+`imagePullSecrets` per component when authentication is required.
+
+Helm also passes global values to dependencies. The bundled
+`kube-prometheus-stack` supports this setting. The bundled `prometheus-adapter`
+requires its own `prometheus-adapter.image.repository` override. Images in
+user-supplied `extraObjects` are not rewritten.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `global.imageRegistry` | string | `""` | Registry override for images managed by this chart |
 
 ### Serving Engine Configuration
 

@@ -45,7 +45,7 @@ spec:
         {{- $container := $modelSpec.raySpec.headNode.initContainer }}
         initContainers:
           - name: {{ $container.name }}
-            image: {{ $container.image }}
+            image: {{ include "chart.image" (dict "image" $container.image "global" $.Values.global) | quote }}
             {{- if $container.command }}
             command: {{ toYaml $container.command | nindent 14 }}
             {{- end }}
@@ -88,7 +88,7 @@ spec:
         {{- end }}
         containers:
           - name: vllm-ray-head
-            image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+            image: {{ include "chart.image" (dict "image" (printf "%s:%s" (required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository) (required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag)) "global" $.Values.global) | quote }}
             imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
             command:
               - >-
@@ -355,7 +355,7 @@ spec:
           {{- $container := $modelSpec.initContainer }}
           initContainers:
             - name: {{ $container.name }}
-              image: {{ $container.image }}
+              image: {{ include "chart.image" (dict "image" $container.image "global" $.Values.global) | quote }}
               {{- if $container.command }}
               command: {{ toYaml $container.command | nindent 16 }}
               {{- end }}
@@ -398,7 +398,7 @@ spec:
           {{- end }}
           containers:
             - name: vllm-ray-worker
-              image: "{{ required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository }}:{{ required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag }}"
+              image: {{ include "chart.image" (dict "image" (printf "%s:%s" (required "Required value 'modelSpec.repository' must be defined !" $modelSpec.repository) (required "Required value 'modelSpec.tag' must be defined !" $modelSpec.tag)) "global" $.Values.global) | quote }}
               imagePullPolicy: "{{ .Values.servingEngineSpec.imagePullPolicy | default "Always" }}"
               env:
                 - name: VLLM_HOST_IP
