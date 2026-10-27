@@ -98,6 +98,10 @@ _HEADERS_TO_STRIP_FROM_RESPONSE = {
     "transfer-encoding",
     "connection",
     "server",
+    # The router's server adds its own Date header.
+    "date",
+    # The router sets X-Request-Id itself after copying the backend headers.
+    "x-request-id",
 }
 
 
