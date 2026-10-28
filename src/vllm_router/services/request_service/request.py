@@ -25,6 +25,7 @@ from aiohttp import FormData
 from fastapi import BackgroundTasks, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from requests import JSONDecodeError
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from vllm_router.log import init_logger
 from vllm_router.routers.routing_logic import (
@@ -1207,6 +1208,10 @@ async def route_general_transcriptions(
     payload_bytes = await file.read()
     files = {"file": (file.filename, payload_bytes, file.content_type)}
 
+    aliases = getattr(get_service_discovery(), "aliases", None)
+    if aliases and model in aliases:
+        model = aliases[model]
+
     data = {"model": model}
 
     if isinstance(language, str):
@@ -1250,7 +1255,7 @@ async def route_multipart_request(
 ):
     """Route OpenAI-compatible multipart/form-data requests."""
 
-    body = await request.body()
+    body: bytes | FormData = await request.body()
     try:
         form = await request.form()
         model: str = form.get("model")
@@ -1260,9 +1265,30 @@ async def route_multipart_request(
             content={"error": "Invalid multipart/form-data request"},
         )
 
-    logger.debug("Routing multipart request with model %s", model)
+    try:
+        aliases = getattr(get_service_discovery(), "aliases", None)
+        if aliases and model in aliases:
+            model = aliases[model]
+            # Rebuild only aliased forms, preserving repeated fields and file uploads.
+            body = FormData(quote_fields=False)
+            for key, value in form.multi_items():
+                if key == "model":
+                    body.add_field(key, model)
+                elif isinstance(value, StarletteUploadFile):
+                    body.add_field(
+                        key,
+                        await value.read(),
+                        filename=value.filename,
+                        content_type=value.content_type,
+                    )
+                else:
+                    body.add_field(key, value)
 
-    return await proxy_multipart_request(body, model, endpoint, request)
+        logger.debug("Routing multipart request with model %s", model)
+
+        return await proxy_multipart_request(body, model, endpoint, request)
+    finally:
+        await form.close()
 
 
 async def proxy_multipart_request(
