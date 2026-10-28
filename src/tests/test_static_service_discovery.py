@@ -267,8 +267,13 @@ def test_check_model_health_waits_the_interval_after_a_failed_check(
         discovery_instance, "get_unhealthy_endpoint_hashes", counting_check
     )
     monkeypatch.setattr("vllm_router.service_discovery.asyncio.sleep", fake_sleep)
+    errors = []
+    monkeypatch.setattr(
+        "vllm_router.service_discovery.logger.error", lambda msg: errors.append(msg)
+    )
 
     asyncio.run(discovery_instance.check_model_health())
 
     assert len(checks) == 3
     assert sleeps == [60, 60, 60]
+    assert errors == ["Static health check failed: KeyError('chta')"] * 3

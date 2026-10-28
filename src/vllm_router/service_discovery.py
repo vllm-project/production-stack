@@ -315,7 +315,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
             try:
                 self.unhealthy_endpoint_hashes = self.get_unhealthy_endpoint_hashes()
             except Exception as e:
-                logger.error(e)
+                logger.error(f"Static health check failed: {e!r}")
             # Wait after a failed check too, or the loop retries at once.
             try:
                 await asyncio.sleep(self.health_check_interval)
