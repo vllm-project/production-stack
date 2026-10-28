@@ -72,6 +72,14 @@ class DynamicRouterConfig:
     priority_field: Optional[str] = "priority"
     priority_default: Optional[int] = 0
     priority_threshold: Optional[int] = None
+    kv_aware_threshold: Optional[int] = 2000
+    loadaware_beta: Optional[float] = None
+    prefix_min_match_length: Optional[int] = 0
+    lmcache_controller_port: Optional[int] = 9000
+    lmcache_controller_reply_port: Optional[int] = None
+    lmcache_controller_heartbeat_port: Optional[int] = None
+    lmcache_health_check_interval: Optional[int] = 5
+    lmcache_worker_timeout: Optional[int] = 30
 
     # Logging Options
     callbacks: Optional[str] = None
@@ -111,6 +119,14 @@ class DynamicRouterConfig:
             priority_field=args.priority_field,
             priority_default=args.priority_default,
             priority_threshold=args.priority_threshold,
+            kv_aware_threshold=args.kv_aware_threshold,
+            loadaware_beta=args.loadaware_beta,
+            prefix_min_match_length=args.prefix_min_match_length,
+            lmcache_controller_port=args.lmcache_controller_port,
+            lmcache_controller_reply_port=args.lmcache_controller_reply_port,
+            lmcache_controller_heartbeat_port=args.lmcache_controller_heartbeat_port,
+            lmcache_health_check_interval=args.lmcache_health_check_interval,
+            lmcache_worker_timeout=args.lmcache_worker_timeout,
             # Logging Options
             callbacks=args.callbacks,
         )
@@ -230,6 +246,14 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 config.prefill_model_labels
             ),
             decode_model_labels=parse_comma_separated_args(config.decode_model_labels),
+            kv_aware_threshold=config.kv_aware_threshold,
+            loadaware_beta=config.loadaware_beta,
+            prefix_min_match_length=config.prefix_min_match_length,
+            lmcache_controller_port=config.lmcache_controller_port,
+            lmcache_controller_reply_port=config.lmcache_controller_reply_port,
+            lmcache_controller_heartbeat_port=config.lmcache_controller_heartbeat_port,
+            lmcache_health_check_interval=config.lmcache_health_check_interval,
+            lmcache_worker_timeout=config.lmcache_worker_timeout,
         )
         self.app.state.router = routing_logic
         logger.info("DynamicConfigWatcher: Routing logic reconfiguration complete")
