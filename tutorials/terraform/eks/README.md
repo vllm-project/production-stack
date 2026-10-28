@@ -152,7 +152,7 @@ Core EKS add-ons via [terraform-aws-eks-**blueprints-addons**](https://github.co
 * **Load balancing**: Round-robin router service
 * **Hugging Face token**: stored as Kubernetes Secret
 * **LLM Storage**: Init container Persistent model caching under `/data/models/`
-* **Default Helm charts**: [cpu-tinyllama-light-ingress](./modules/llm-stack/helm/cpu/cpu-tinyllama-light-ingress-tpl) | [gpu-tinyllama-light-ingress](./modules/llm-stack/helm/gpu/gpu-tinyllama-light-ingress-tpl)
+* **Default Helm charts**: [cpu-tinyllama-light-ingress](./modules/llm-stack/helm/cpu/cpu-tinyllama-light-ingress.tpl) | [gpu-tinyllama-light-ingress](./modules/llm-stack/helm/gpu/gpu-tinyllama-light-ingress.tpl)
 
 ---
 
