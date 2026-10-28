@@ -41,8 +41,12 @@ spec:
 
   # Resource requirements
   resources:
-    cpu: "2"
-    memory: "8Gi"
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+    limits:
+      cpu: "2"
+      memory: "8Gi"
 
   # Environment variables
   env:
