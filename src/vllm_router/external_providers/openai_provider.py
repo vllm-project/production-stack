@@ -100,7 +100,12 @@ class OpenAIProvider(ExternalProviderAdapter):
         self, session: aiohttp.ClientSession, url: str, headers: dict, payload: dict
     ) -> ExternalProviderResponse:
         async with session.post(url, json=payload, headers=headers) as response:
-            response_data = await response.json()
+            # A non-JSON body (a proxy's HTML 502, a plain-text 503) is a response,
+            # not a transport error: wrap it and keep the upstream status.
+            try:
+                response_data = await response.json(content_type=None)
+            except ValueError:
+                response_data = {"error": {"message": await response.text()}}
             return ExternalProviderResponse(
                 status_code=response.status,
                 headers=dict(response.headers),
