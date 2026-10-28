@@ -189,16 +189,17 @@ This table documents all available configuration values for the Production Stack
 | `servingEngineSpec.modelSpec[].keda.fallback` | map | - | Fallback configuration when scaler fails |
 | `servingEngineSpec.modelSpec[].keda.fallback.failureThreshold` | integer | - | Number of consecutive failures before fallback |
 | `servingEngineSpec.modelSpec[].keda.fallback.replicas` | integer | - | Number of replicas to scale to in fallback |
-| `servingEngineSpec.modelSpec[].keda.triggers` | list | See below | List of KEDA trigger configurations (Prometheus-based) |
+| `servingEngineSpec.modelSpec[].keda.serverAddress` | string | - | Prometheus URL for the default trigger; defaults to `prometheus-operated` in the release namespace when `kube-prometheus-stack.enabled`, otherwise in `monitoring` |
+| `servingEngineSpec.modelSpec[].keda.triggers` | list | queue length of this model | List of KEDA trigger configurations (Prometheus-based). The default is `sum(vllm:num_requests_waiting{namespace="<ns>",service="<release>-<model>-engine-service"})` with threshold `5`; it needs `servingEngineSpec.serviceMonitor.enabled` |
 | `servingEngineSpec.modelSpec[].keda.triggers[].type` | string | - | Trigger type (e.g., `"prometheus"`) |
 | `servingEngineSpec.modelSpec[].keda.triggers[].metadata.serverAddress` | string | - | Prometheus server URL (e.g., <http://prometheus-operated.monitoring.svc:9090>) |
 | `servingEngineSpec.modelSpec[].keda.triggers[].metadata.metricName` | string | - | Name of the metric to monitor |
-| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.query` | string | - | PromQL query to fetch the metric |
+| `servingEngineSpec.modelSpec[].keda.triggers[].metadata.query` | string | - | PromQL query to fetch the metric; must return a single value (use `sum()`) |
 | `servingEngineSpec.modelSpec[].keda.triggers[].metadata.threshold` | string | - | Threshold value that triggers scaling |
 | `servingEngineSpec.modelSpec[].keda.advanced` | map | - | Advanced KEDA configuration options |
 | `servingEngineSpec.modelSpec[].keda.advanced.restoreToOriginalReplicaCount` | boolean | `false` | Restore original replica count when ScaledObject is deleted |
 | `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig` | map | - | HPA-specific configuration |
-| `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig.name` | string | `keda-hpa-{scaled-object-name}` | Custom name for HPA resource |
+| `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig.name` | string | `keda-hpa-<scaledobject name>` | Custom name for HPA resource |
 | `servingEngineSpec.modelSpec[].keda.advanced.horizontalPodAutoscalerConfig.behavior` | map | - | HPA scaling behavior configuration (see [K8s docs](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)) |
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers` | map | - | Scaling modifiers for composite metrics |
 | `servingEngineSpec.modelSpec[].keda.advanced.scalingModifiers.target` | string | - | Target value for the composed metric |
