@@ -699,6 +699,15 @@ async def route_general_request(
             )
 
     if last_error:
+        if isinstance(last_error, aiohttp.ClientError):
+            # Same status and body as proxy_multipart_request for an unreachable backend.
+            if tracing_active:
+                end_span(span, error=last_error, status_code=503)
+            return JSONResponse(
+                status_code=503,
+                content={"error": f"Failed to connect to backend: {last_error}"},
+                headers={"X-Request-Id": request_id},
+            )
         end_span(span, error=last_error, status_code=500) if tracing_active else None
         raise last_error
 
