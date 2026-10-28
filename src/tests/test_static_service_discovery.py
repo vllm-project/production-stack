@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import MagicMock
 
 import pytest
@@ -234,3 +235,45 @@ def test_has_ever_seen_model_when_model_is_alias_returns_true():
     assert discovery_instance.has_ever_seen_model("llama") is True
     assert discovery_instance.has_ever_seen_model("llama3") is True
     assert discovery_instance.has_ever_seen_model("unknown-model") is False
+
+
+def test_check_model_health_waits_the_interval_after_a_failed_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # An unknown model type (a dynamic config reload does not validate it)
+    # makes every check raise KeyError. The loop must still wait between checks.
+    discovery_instance = StaticServiceDiscovery(
+        app=None,
+        urls=["http://127.0.0.1:1"],
+        models=["m-a"],
+        model_types=["chta"],
+        static_backend_health_check_interval=60,
+    )
+    checks = []
+    real_check = discovery_instance.get_unhealthy_endpoint_hashes
+
+    def counting_check():
+        checks.append(1)
+        if len(checks) == 3:
+            discovery_instance._running = False
+        return real_check()
+
+    sleeps = []
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+
+    monkeypatch.setattr(
+        discovery_instance, "get_unhealthy_endpoint_hashes", counting_check
+    )
+    monkeypatch.setattr("vllm_router.service_discovery.asyncio.sleep", fake_sleep)
+    errors = []
+    monkeypatch.setattr(
+        "vllm_router.service_discovery.logger.error", lambda msg: errors.append(msg)
+    )
+
+    asyncio.run(discovery_instance.check_model_health())
+
+    assert len(checks) == 3
+    assert sleeps == [60, 60, 60]
+    assert errors == ["Static health check failed: KeyError('chta')"] * 3
