@@ -1,0 +1,109 @@
+suite: test operator deployment configuration
+templates:
+  - deployment-operator.yaml
+  - service-metrics.yaml
+tests:
+  - it: should render a deployment with default values
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: vllm-vllm-stack-operator
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "lmcache/production-stack-operator:latest"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--leader-elect"
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--metrics-bind-address=:8443"
+      - hasDocuments:
+          count: 1
+          template: service-metrics.yaml
+
+  - it: should not render the metrics service when metrics are disabled
+    release:
+      name: vllm
+      namespace: default
+    asserts:
+      - hasDocuments:
+          count: 0
+          template: service-metrics.yaml
+
+  - it: should render metrics flags and service when metrics are enabled
+    release:
+      name: vllm
+      namespace: default
+    set:
+      metrics:
+        enabled: true
+        service:
+          port: 9090
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--metrics-bind-address=:9090"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--metrics-secure=false"
+      - containsDocument:
+          kind: Service
+          apiVersion: v1
+          name: vllm-vllm-stack-operator-metrics
+          template: service-metrics.yaml
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+          template: service-metrics.yaml
+
+  - it: should not pass --leader-elect when leader election is disabled
+    release:
+      name: vllm
+      namespace: default
+    set:
+      leaderElection:
+        enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--leader-elect"
+
+  - it: should use a custom image and extra args
+    release:
+      name: vllm
+      namespace: default
+    set:
+      image:
+        repository: "ghcr.io/vllm-project/production-stack-operator"
+        tag: "v0.2.0"
+      extraArgs:
+        - "--zap-log-level=debug"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "ghcr.io/vllm-project/production-stack-operator:v0.2.0"
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--zap-log-level=debug"
+
+  - it: should honor replicaCount and resources
+    release:
+      name: vllm
+      namespace: default
+    set:
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 100m

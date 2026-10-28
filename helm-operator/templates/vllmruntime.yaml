@@ -1,0 +1,23 @@
+{{- range $i, $rt := .Values.vllmRuntimes }}
+{{- if gt $i 0 }}
+---
+{{- end }}
+{{- $spec := deepCopy ($.Values.vllmRuntimeDefaults | default dict) }}
+{{- if $rt.spec }}
+{{- $spec = mergeOverwrite $spec $rt.spec }}
+{{- end }}
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: VLLMRuntime
+metadata:
+  name: {{ include "vllm-stack-operator.runtimeResourceName" (dict "root" $ "i" $i "rt" $rt) }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/component: vllm-runtime
+    {{ include "vllm-stack-operator.runtimeSetLabelKey" $ }}: {{ include "vllm-stack-operator.fullname" $ }}
+    {{- with $rt.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}
