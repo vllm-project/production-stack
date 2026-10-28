@@ -296,6 +296,8 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 if config != self.current_config or self._reconfigure_pending:
                     logger.info(
                         "DynamicConfigWatcher: Config changed, reconfiguring..."
+                        if config != self.current_config
+                        else "DynamicConfigWatcher: Retrying failed reconfiguration..."
                     )
                     self.reconfigure_all(config)
                     logger.info("DynamicConfigWatcher: Config reconfiguration complete")
