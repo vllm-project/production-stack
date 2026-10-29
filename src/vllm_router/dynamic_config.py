@@ -39,6 +39,9 @@ from vllm_router.utils import (
 
 logger = init_logger(__name__)
 
+# Checks to skip a config that failed to apply before retrying it.
+FAILED_CONFIG_SKIP_CHECKS = 30
+
 
 @dataclass
 class DynamicRouterConfig:
@@ -158,6 +161,9 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         self.current_config = init_config
         self.app = app
         self._reconfigure_pending = False
+        # A config whose reconfigure raised, and how many more checks to skip it.
+        self._failed_config = None
+        self._skip_checks = 0
 
         # Watcher thread
         self.running = True
@@ -293,13 +299,24 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                     config = DynamicRouterConfig.from_json(self.config_path)
                 else:
                     raise ValueError("Unsupported config file type.")
-                if config != self.current_config or self._reconfigure_pending:
+                if config != self._failed_config:
+                    self._failed_config, self._skip_checks = None, 0
+                if self._skip_checks:
+                    self._skip_checks -= 1
+                elif config != self.current_config or self._reconfigure_pending:
                     logger.info(
                         "DynamicConfigWatcher: Config changed, reconfiguring..."
                         if config != self.current_config
                         else "DynamicConfigWatcher: Retrying failed reconfiguration..."
                     )
-                    self.reconfigure_all(config)
+                    try:
+                        self.reconfigure_all(config)
+                    except Exception:
+                        # Retry slowly rather than never: a callbacks module
+                        # can become importable later.
+                        self._failed_config = config
+                        self._skip_checks = FAILED_CONFIG_SKIP_CHECKS
+                        raise
                     logger.info("DynamicConfigWatcher: Config reconfiguration complete")
                     self.current_config = config
                     self._reconfigure_pending = False
