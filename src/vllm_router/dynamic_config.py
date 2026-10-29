@@ -311,15 +311,19 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                     )
                     try:
                         self.reconfigure_all(config)
-                    except Exception:
+                        logger.info(
+                            "DynamicConfigWatcher: Config reconfiguration complete"
+                        )
+                        self.current_config = config
+                        self._reconfigure_pending = False
+                    except Exception as e:
                         # Retry slowly rather than never: a callbacks module
                         # can become importable later.
                         self._failed_config = config
                         self._skip_checks = FAILED_CONFIG_SKIP_CHECKS
-                        raise
-                    logger.info("DynamicConfigWatcher: Config reconfiguration complete")
-                    self.current_config = config
-                    self._reconfigure_pending = False
+                        logger.warning(
+                            f"DynamicConfigWatcher: Error applying config: {e}"
+                        )
             except Exception as e:
                 logger.warning(f"DynamicConfigWatcher: Error loading config file: {e}")
 
