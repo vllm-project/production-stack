@@ -384,6 +384,13 @@ class TestEndpointAccessLogFilter:
         )
         assert filter_instance.filter(record)
 
+    @pytest.mark.parametrize("paths", [None, []])
+    def test_disable_access_log_for_endpoints_without_paths_adds_no_filter(self, paths):
+        access_logger = logging.getLogger("uvicorn.access")
+        filters_before = list(access_logger.filters)
+        log.disable_access_log_for_endpoints(paths)
+        assert access_logger.filters == filters_before
+
     def test_disable_access_log_for_endpoints_survives_uvicorn_logging_setup(
         self,
     ):
