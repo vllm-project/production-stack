@@ -397,12 +397,19 @@ class TestEndpointAccessLogFilter:
         """uvicorn reconfigures logging on startup; the filter must persist."""
         access_logger = logging.getLogger("uvicorn.access")
         original_filters = list(access_logger.filters)
+        original_handlers = list(access_logger.handlers)
+        # uvicorn.Config() runs dictConfig, which replaces the logger's handlers.
+        # A sentinel handler proves that the logging setup really ran.
+        sentinel_handler = logging.NullHandler()
+        access_logger.addHandler(sentinel_handler)
         try:
             log.disable_access_log_for_endpoints(["/health"])
             uvicorn.Config(app=None, log_level="info")
+            assert sentinel_handler not in access_logger.handlers
             assert any(
                 isinstance(f, log.EndpointAccessLogFilter)
                 for f in access_logger.filters
             )
         finally:
             access_logger.filters = original_filters
+            access_logger.handlers = original_handlers
