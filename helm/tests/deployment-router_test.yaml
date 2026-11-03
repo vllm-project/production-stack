@@ -88,6 +88,8 @@ tests:
         path: spec.template.spec.securityContext
         value:
           runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
     - equal:
         path: spec.template.spec.containers[0].image
         value: custom-repo/lmstack-router:v1
@@ -95,6 +97,10 @@ tests:
         path: spec.template.spec.containers[0].securityContext
         value:
           runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
     - contains:
         path: spec.template.spec.containers[0].env
         content:
@@ -140,6 +146,26 @@ tests:
           httpGet:
             path: /health
             port: router-port
+
+  - it: should render hardened security context defaults
+    release:
+      name: vllm
+    set:
+      routerSpec:
+        enableRouter: true
+    asserts:
+    - equal:
+        path: spec.template.spec.securityContext
+        value:
+          seccompProfile:
+            type: RuntimeDefault
+    - equal:
+        path: spec.template.spec.containers[0].securityContext
+        value:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
 
   - it: should not render VLLM_API_KEY
     set:
