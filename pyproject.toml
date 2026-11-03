@@ -47,12 +47,12 @@ semantic_cache = [
 ]
 lmcache = [
     "lmcache==0.5.6",
-    "vllm==0.32.0",
+    "vllm==0.33.0",
 ]
 test = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.3",
-    "vllm==0.32.0"
+    "vllm==0.33.0"
 ]
 
 [build-system]
@@ -75,3 +75,7 @@ test = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.3"
 ]
+
+[tool.uv]
+# vllm/lmcache only ship Linux CUDA wheels; s390x has a protobuf conflict between them
+environments = ["sys_platform == 'linux' and platform_machine != 's390x'"]
