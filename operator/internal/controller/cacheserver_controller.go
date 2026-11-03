@@ -177,11 +177,13 @@ func (r *CacheServerReconciler) deploymentForCacheServer(cacheServer *production
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: cacheServer.Spec.PodSecurityContext,
 					Containers: []corev1.Container{
 						{
 							Name:            "cache-server",
 							Image:           image,
 							ImagePullPolicy: imagePullPolicy,
+							SecurityContext: cacheServer.Spec.SecurityContext,
 							Command: []string{
 								"/opt/venv/bin/lmcache_server",
 								"0.0.0.0",
@@ -214,9 +216,13 @@ func (r *CacheServerReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, cs
 	// Generate the expected deployment
 	expectedDep := r.deploymentForCacheServer(cs)
 
+	// Guard against deployments with no containers (e.g. hand-edited or corrupted).
+	if len(expectedDep.Spec.Template.Spec.Containers) == 0 || len(dep.Spec.Template.Spec.Containers) == 0 {
+		return true
+	}
+
 	// Compare image
-	if len(dep.Spec.Template.Spec.Containers) > 0 &&
-		expectedDep.Spec.Template.Spec.Containers[0].Image != dep.Spec.Template.Spec.Containers[0].Image {
+	if expectedDep.Spec.Template.Spec.Containers[0].Image != dep.Spec.Template.Spec.Containers[0].Image {
 		return true
 	}
 
@@ -224,6 +230,19 @@ func (r *CacheServerReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, cs
 	expectedResources := expectedDep.Spec.Template.Spec.Containers[0].Resources
 	actualResources := dep.Spec.Template.Spec.Containers[0].Resources
 	if !reflect.DeepEqual(expectedResources, actualResources) {
+		return true
+	}
+
+	// Compare security contexts so changes roll out to existing deployments.
+	// Only compare when the CR sets them: when it does not, defaulting applied
+	// to the live deployment by the API server or admission controllers must
+	// not trigger perpetual updates.
+	if expectedDep.Spec.Template.Spec.SecurityContext != nil &&
+		!reflect.DeepEqual(expectedDep.Spec.Template.Spec.SecurityContext, dep.Spec.Template.Spec.SecurityContext) {
+		return true
+	}
+	if expectedDep.Spec.Template.Spec.Containers[0].SecurityContext != nil &&
+		!reflect.DeepEqual(expectedDep.Spec.Template.Spec.Containers[0].SecurityContext, dep.Spec.Template.Spec.Containers[0].SecurityContext) {
 		return true
 	}
 
