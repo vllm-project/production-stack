@@ -9,3 +9,13 @@ updates:
       github-actions:
         patterns:
           - "*"
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
