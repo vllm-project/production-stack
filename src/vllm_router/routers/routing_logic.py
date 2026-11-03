@@ -20,6 +20,7 @@ import json
 import math
 import os
 import random
+import socket
 import threading
 import time
 import uuid
@@ -368,6 +369,49 @@ class KvawareRouter(RoutingInterface):
             except concurrent.futures.CancelledError:
                 pass
             self.lmcache_cluster_monitor_task = None
+        # Release the controller ports so that a router rebuilt by a dynamic
+        # config reload can bind them again. The sockets belong to the kv
+        # manager loop, so close them there.
+        if hasattr(self, "loop") and self.loop.is_running():
+
+            async def close_kv_manager():
+                self._close_kv_manager()
+
+            asyncio.run_coroutine_threadsafe(close_kv_manager(), self.loop).result()
+        elif hasattr(self, "kv_manager"):
+            self._close_kv_manager()
+        self._wait_for_controller_ports()
+
+    def _wait_for_controller_ports(self, timeout: float = 1.0):
+        # Closing a ZMQ socket returns before libzmq's I/O thread unbinds the
+        # port, so wait until the ports can be bound again. SO_REUSEADDR
+        # matches libzmq, so worker connections left in TIME_WAIT don't count.
+        deadline = time.monotonic() + timeout
+        for port in (
+            self.lmcache_controller_port,
+            self.lmcache_controller_reply_port,
+            self.lmcache_controller_heartbeat_port,
+        ):
+            if port is None:
+                continue
+            while time.monotonic() < deadline:
+                with socket.socket() as probe:
+                    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    try:
+                        probe.bind(("0.0.0.0", port))
+                        break
+                    except OSError:
+                        pass
+                time.sleep(0.01)
+
+    def _close_kv_manager(self):
+        if hasattr(self.kv_manager, "close"):
+            self.kv_manager.close()
+            return
+        # lmcache 0.3.11's LMCacheControllerManager has no close()
+        for name in ("controller_pull_socket", "controller_reply_socket"):
+            if hasattr(self.kv_manager, name):
+                getattr(self.kv_manager, name).close(linger=0)
 
     async def route_request(
         self,
