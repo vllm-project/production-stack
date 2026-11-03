@@ -59,26 +59,41 @@ class EngineStats:
         gpu_prefix_cache_hits_total = 0
         gpu_prefix_cache_queries_total = 0
         gpu_cache_usage_perc = 0.0
+        saw_kv_usage = False
 
         for family in text_string_to_metric_families(vllm_scrape):
             for sample in family.samples:
                 if sample.name == "vllm:num_requests_running":
-                    num_running_reqs = sample.value
+                    # Sum across data-parallel engines; assignment would keep
+                    # only the last engine's sample.
+                    num_running_reqs += sample.value
                 elif sample.name == "vllm:num_requests_waiting":
-                    num_queuing_reqs = sample.value
+                    num_queuing_reqs += sample.value
                 elif sample.name == "vllm:gpu_prefix_cache_hit_rate":
+                    # Fallback when totals are absent; overwritten below when
+                    # queries_total > 0 so DP engines get a correct combined rate.
                     gpu_prefix_cache_hit_rate = sample.value
                 elif sample.name == "vllm:gpu_prefix_cache_hits_total":
-                    gpu_prefix_cache_hits_total = sample.value
+                    gpu_prefix_cache_hits_total += sample.value
                 elif sample.name == "vllm:gpu_prefix_cache_queries_total":
-                    gpu_prefix_cache_queries_total = sample.value
+                    gpu_prefix_cache_queries_total += sample.value
                 elif sample.name in (
                     "vllm:gpu_cache_usage_perc",
                     "vllm:kv_cache_usage_perc",
                 ):
                     # vLLM renamed gpu_cache_usage_perc to kv_cache_usage_perc;
-                    # newer releases only export the new name.
-                    gpu_cache_usage_perc = sample.value
+                    # newer releases only export the new name. Take the max so
+                    # one full engine is not hidden by idle peers.
+                    if not saw_kv_usage:
+                        gpu_cache_usage_perc = sample.value
+                        saw_kv_usage = True
+                    else:
+                        gpu_cache_usage_perc = max(gpu_cache_usage_perc, sample.value)
+
+        if gpu_prefix_cache_queries_total > 0:
+            gpu_prefix_cache_hit_rate = (
+                gpu_prefix_cache_hits_total / gpu_prefix_cache_queries_total
+            )
 
         return EngineStats(
             num_running_requests=num_running_reqs,
