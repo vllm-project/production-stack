@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import math
 import threading
 import time
 from dataclasses import dataclass
@@ -100,8 +101,7 @@ class EngineStatsScraper(metaclass=SingletonMeta):
                 to scrape the metrics.
 
         Raises:
-            ValueError: if the service discover module is have
-            not been initialized.
+            ValueError: if scrape_interval is missing, non-finite or not positive.
 
         """
         # Allow multiple calls but require the first call provide scrape_interval.
@@ -111,6 +111,8 @@ class EngineStatsScraper(metaclass=SingletonMeta):
             raise ValueError(
                 "EngineStatsScraper must be initialized with scrape_interval"
             )
+        if not math.isfinite(scrape_interval) or scrape_interval <= 0:
+            raise ValueError("Scrape interval must be finite and greater than 0.")
         self.engine_stats: Dict[str, EngineStats] = {}
         self.engine_stats_lock = threading.Lock()
         self.scrape_interval = scrape_interval
@@ -168,10 +170,12 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         Sleep for self.scrape_interval seconds if self.running is True.
         Otherwise, break the loop.
         """
-        for _ in range(int(self.scrape_interval / check_interval)):
-            if not self.running:
+        deadline = time.monotonic() + self.scrape_interval
+        while self.running:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 break
-            time.sleep(check_interval)
+            time.sleep(min(check_interval, remaining))
 
     def _scrape_worker(self):
         """
