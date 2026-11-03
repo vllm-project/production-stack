@@ -79,6 +79,16 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 		log.Error(err, "Failed to get VLLMRuntime")
 		return ctrl.Result{}, err
 	}
+	if _, err := buildResourceRequirements(vllmRuntime.Spec.DeploymentConfig.Resources); err != nil {
+		return ctrl.Result{}, fmt.Errorf("build VLLMRuntime resources: %w", err)
+	}
+	if vllmRuntime.Spec.DeploymentConfig.SidecarConfig.Enabled {
+		if _, err := buildResourceRequirements(
+			vllmRuntime.Spec.DeploymentConfig.SidecarConfig.Resources,
+		); err != nil {
+			return ctrl.Result{}, fmt.Errorf("build VLLMRuntime sidecar resources: %w", err)
+		}
+	}
 
 	// Check if the service already exists, if not create a new one
 	foundService := &corev1.Service{}
@@ -272,7 +282,10 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 	)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new deployment
-		dep := r.deploymentForVLLMRuntime(vllmRuntime)
+		dep, err := r.deploymentForVLLMRuntime(vllmRuntime)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 		log.Info(
 			"Creating a new Deployment",
 			"Deployment.Namespace",
@@ -300,7 +313,11 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 	}
 
 	// Update the deployment if needed
-	if r.deploymentNeedsUpdate(ctx, found, vllmRuntime) {
+	needsUpdate, err := r.deploymentNeedsUpdate(ctx, found, vllmRuntime)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if needsUpdate {
 		log.Info(
 			"Updating Deployment",
 			"Deployment.Namespace",
@@ -309,7 +326,10 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 			found.Name,
 		)
 		// Create new deployment spec
-		newDep := r.deploymentForVLLMRuntime(vllmRuntime)
+		newDep, err := r.deploymentForVLLMRuntime(vllmRuntime)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
 		err = r.Update(ctx, newDep)
 		if err != nil {
@@ -388,7 +408,7 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 // deploymentForVLLMRuntime returns a VLLMRuntime Deployment object
 func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
-) *appsv1.Deployment {
+) (*appsv1.Deployment, error) {
 	labels := map[string]string{"app": vllmRuntime.Name}
 	maps.Copy(labels, vllmRuntime.Labels)
 
@@ -613,40 +633,9 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		}
 	}
 
-	// Build resource requirements
-	resources := corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{},
-		Limits:   corev1.ResourceList{},
-	}
-
-	if vllmRuntime.Spec.DeploymentConfig.Resources.CPU != "" {
-		resources.Requests[corev1.ResourceCPU] = resource.MustParse(
-			vllmRuntime.Spec.DeploymentConfig.Resources.CPU,
-		)
-		resources.Limits[corev1.ResourceCPU] = resource.MustParse(
-			vllmRuntime.Spec.DeploymentConfig.Resources.CPU,
-		)
-	}
-
-	if vllmRuntime.Spec.DeploymentConfig.Resources.Memory != "" {
-		resources.Requests[corev1.ResourceMemory] = resource.MustParse(
-			vllmRuntime.Spec.DeploymentConfig.Resources.Memory,
-		)
-		resources.Limits[corev1.ResourceMemory] = resource.MustParse(
-			vllmRuntime.Spec.DeploymentConfig.Resources.Memory,
-		)
-	}
-
-	if vllmRuntime.Spec.DeploymentConfig.Resources.GPU != "" {
-		// Parse GPU resource as a decimal value
-		// Determine which GPU type to use (default nvidia.com/gpu)
-		gpuType := "nvidia.com/gpu"
-		if vllmRuntime.Spec.DeploymentConfig.Resources.GPUType != "" {
-			gpuType = vllmRuntime.Spec.DeploymentConfig.Resources.GPUType
-		}
-		gpuResource := resource.MustParse(vllmRuntime.Spec.DeploymentConfig.Resources.GPU)
-		resources.Requests[corev1.ResourceName(gpuType)] = gpuResource
-		resources.Limits[corev1.ResourceName(gpuType)] = gpuResource
+	resources, err := buildResourceRequirements(vllmRuntime.Spec.DeploymentConfig.Resources)
+	if err != nil {
+		return nil, fmt.Errorf("build VLLMRuntime resources: %w", err)
 	}
 
 	// Get the image from Image spec or use default
@@ -797,7 +786,11 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 	}
 
 	if vllmRuntime.Spec.DeploymentConfig.SidecarConfig.Enabled {
-		containers = append(containers, r.buildSidecarContainer(vllmRuntime))
+		sidecar, err := r.buildSidecarContainer(vllmRuntime)
+		if err != nil {
+			return nil, err
+		}
+		containers = append(containers, sidecar)
 	}
 
 	dep := &appsv1.Deployment{
@@ -834,13 +827,13 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 
 	// Set the owner reference
 	ctrl.SetControllerReference(vllmRuntime, dep, r.Scheme)
-	return dep
+	return dep, nil
 }
 
 // buildSidecarContainer builds the sidecar container configuration
 func (r *VLLMRuntimeReconciler) buildSidecarContainer(
 	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
-) corev1.Container {
+) (corev1.Container, error) {
 	sidecarConfig := vllmRuntime.Spec.DeploymentConfig.SidecarConfig
 
 	// Build sidecar volume mounts
@@ -882,52 +875,13 @@ func (r *VLLMRuntimeReconciler) buildSidecarContainer(
 		})
 	}
 
-	// Build sidecar resources
-	sidecarResources := corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{},
-		Limits:   corev1.ResourceList{},
-	}
-
-	if sidecarConfig.Resources.CPU != "" {
-		sidecarResources.Requests[corev1.ResourceCPU] = resource.MustParse(
-			sidecarConfig.Resources.CPU,
-		)
-		sidecarResources.Limits[corev1.ResourceCPU] = resource.MustParse(
-			sidecarConfig.Resources.CPU,
-		)
-	} else {
-		sidecarResources.Requests[corev1.ResourceCPU] = resource.MustParse("0.5")
-		sidecarResources.Limits[corev1.ResourceCPU] = resource.MustParse("0.5")
-	}
-
-	if sidecarConfig.Resources.Memory != "" {
-		sidecarResources.Requests[corev1.ResourceMemory] = resource.MustParse(
-			sidecarConfig.Resources.Memory,
-		)
-		sidecarResources.Limits[corev1.ResourceMemory] = resource.MustParse(
-			sidecarConfig.Resources.Memory,
-		)
-	} else {
-		sidecarResources.Requests[corev1.ResourceMemory] = resource.MustParse("128Mi")
-		sidecarResources.Limits[corev1.ResourceMemory] = resource.MustParse("128Mi")
-	}
-
-	if sidecarConfig.Resources.GPU != "" {
-		gpuType := "nvidia.com/gpu"
-		if sidecarConfig.Resources.GPUType != "" {
-			gpuType = sidecarConfig.Resources.GPUType
-		}
-		gpuResource := resource.MustParse(sidecarConfig.Resources.GPU)
-		sidecarResources.Requests[corev1.ResourceName(gpuType)] = gpuResource
-		sidecarResources.Limits[corev1.ResourceName(gpuType)] = gpuResource
-	} else {
-		gpuType := "nvidia.com/gpu"
-		if sidecarConfig.Resources.GPUType != "" {
-			gpuType = sidecarConfig.Resources.GPUType
-		}
-		zeroQty := resource.MustParse("0")
-		sidecarResources.Requests[corev1.ResourceName(gpuType)] = zeroQty
-		sidecarResources.Limits[corev1.ResourceName(gpuType)] = zeroQty
+	// Preserve the sidecar defaults while allowing requests and limits to
+	// override them independently without generating an invalid request/limit
+	// pair around an explicit one-sided value.
+	sidecarResourceConfig := applySidecarResourceDefaults(sidecarConfig.Resources)
+	sidecarResources, err := buildResourceRequirements(sidecarResourceConfig)
+	if err != nil {
+		return corev1.Container{}, fmt.Errorf("build VLLMRuntime sidecar resources: %w", err)
 	}
 
 	// Get sidecar image
@@ -951,7 +905,7 @@ func (r *VLLMRuntimeReconciler) buildSidecarContainer(
 		VolumeMounts:    sidecarVolumeMounts,
 	}
 
-	return sidecarContainer
+	return sidecarContainer, nil
 }
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
@@ -959,15 +913,18 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 	ctx context.Context,
 	dep *appsv1.Deployment,
 	vr *productionstackv1alpha1.VLLMRuntime,
-) bool {
+) (bool, error) {
 
 	log := log.FromContext(ctx)
 	// Generate the expected deployment
-	expectedDep := r.deploymentForVLLMRuntime(vr)
+	expectedDep, err := r.deploymentForVLLMRuntime(vr)
+	if err != nil {
+		return false, err
+	}
 
 	// Compare replicas
 	if *dep.Spec.Replicas != vr.Spec.DeploymentConfig.Replicas {
-		return true
+		return true, nil
 	}
 
 	// Compare model URL
@@ -979,7 +936,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 	}
 	if expectedModelURL != actualModelURL {
 		log.Info("Model URL mismatch", "expected", expectedModelURL, "actual", actualModelURL)
-		return true
+		return true, nil
 	}
 
 	// Compare port
@@ -987,7 +944,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 	actualPort := dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort
 	if expectedPort != actualPort {
 		log.Info("Port mismatch", "expected", expectedPort, "actual", actualPort)
-		return true
+		return true, nil
 	}
 
 	// Compare image
@@ -999,15 +956,15 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			"actual",
 			dep.Spec.Template.Spec.Containers[0].Image,
 		)
-		return true
+		return true, nil
 	}
 
-	// Compare resources
-	expectedResources := expectedDep.Spec.Template.Spec.Containers[0].Resources
-	actualResources := dep.Spec.Template.Spec.Containers[0].Resources
-	if !reflect.DeepEqual(expectedResources, actualResources) {
+	// Compare resources for every container, including optional sidecars.
+	expectedResources := containerResourcesByName(expectedDep.Spec.Template.Spec.Containers)
+	actualResources := containerResourcesByName(dep.Spec.Template.Spec.Containers)
+	if !containerResourceRequirementsEqual(expectedResources, actualResources) {
 		log.Info("Resources mismatch", "expected", expectedResources, "actual", actualResources)
-		return true
+		return true, nil
 	}
 
 	// Compare LM Cache configuration
@@ -1049,7 +1006,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			"actual",
 			actualLMCacheConfig,
 		)
-		return true
+		return true, nil
 	}
 
 	actualAdditionalArgs := dep.Spec.Template.Spec.Affinity.NodeAffinity
@@ -1062,7 +1019,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			"actual",
 			actualAdditionalArgs,
 		)
-		return true
+		return true, nil
 	}
 
 	actualTolerations := dep.Spec.Template.Spec.Tolerations
@@ -1075,7 +1032,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			"actual",
 			actualTolerations,
 		)
-		return true
+		return true, nil
 	}
 
 	expectedRuntimeClass := expectedDep.Spec.Template.Spec.RuntimeClassName
@@ -1089,7 +1046,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			"actual",
 			actualRuntimeClass,
 		)
-		return true
+		return true, nil
 	}
 
 	expectedPodAnnotations := expectedDep.Spec.Template.Annotations
@@ -1107,7 +1064,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 				actualPodAnnotations[k],
 			)
 
-			return true
+			return true, nil
 		}
 	}
 
@@ -1120,7 +1077,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 		findVolumeByName(dep.Spec.Template.Spec.Volumes, "dshm"),
 	) {
 		log.Info("shm volume mismatch")
-		return true
+		return true, nil
 	}
 
 	if len(dep.Spec.Template.Spec.Containers) > 0 &&
@@ -1129,10 +1086,10 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			findVolumeMountByName(dep.Spec.Template.Spec.Containers[0].VolumeMounts, "dshm"),
 		) {
 		log.Info("shm volume mount mismatch")
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 // findVolumeByName returns a pointer to the named volume, or nil if absent.
@@ -1153,6 +1110,14 @@ func findVolumeMountByName(mounts []corev1.VolumeMount, name string) *corev1.Vol
 		}
 	}
 	return nil
+}
+
+func containerResourcesByName(containers []corev1.Container) map[string]corev1.ResourceRequirements {
+	resources := make(map[string]corev1.ResourceRequirements, len(containers))
+	for _, container := range containers {
+		resources[container.Name] = container.Resources
+	}
+	return resources
 }
 
 // updateStatus updates the status of the VLLMRuntime

@@ -48,10 +48,15 @@ spec:
   deploymentConfig:
     # Resource requirements
     resources:
-      cpu: "5"
-      memory: "32Gi"
+      # GPU remains shared between requests and limits.
       gpu: "1"
       gpuType: "nvidia.com/gpu"
+      requests:
+        cpu: "2"
+        memory: "16Gi"
+      limits:
+        cpu: "5"
+        memory: "32Gi"
 
     # Image configuration
     image:
@@ -75,8 +80,12 @@ spec:
         name: "lmcache/lmstack-sidecar:latest"
         pullPolicy: "Always"
       resources:
-        cpu: "0.5"
-        memory: "128Mi"
+        requests:
+          cpu: "250m"
+          memory: "64Mi"
+        limits:
+          cpu: "0.5"
+          memory: "128Mi"
       mountPath: "/data"
 
   # Storage configuration
