@@ -3,7 +3,7 @@ servingEngineSpec:
   modelSpec:
   - name: "gpt-oss-20b"
     repository: "lmcache/vllm-openai"
-    tag: "v0.3.9post2"
+    tag: "v0.5.4"
     modelURL: "openai/gpt-oss-20b"
     replicaCount: 2
     requestCPU: 8

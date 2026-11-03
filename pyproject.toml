@@ -47,13 +47,21 @@ semantic_cache = [
     "huggingface-hub==0.34.0",
 ]
 lmcache = [
-    "lmcache==0.3.11",
-    "vllm==0.13.0",
+    # lmcache's controller<->worker ZMQ messages are NOT a stable protocol
+    # across versions (a 0.3.x controller rejects a 0.4+/0.5+ worker's
+    # RegisterMsg as an unknown type), so the router-side lmcache MUST match
+    # the engines' lmcache exactly - keep this pin in lockstep with the
+    # engine images you deploy. vllm is required for hash parity: kv-aware
+    # chunk hashes are rooted in vLLM's NONE_HASH and hash fn, and a router
+    # without the engines' vllm derives a different chain (every lookup
+    # silently misses).
+    "lmcache==0.5.4",
+    "vllm==0.22.0",
 ]
 test = [
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.3",
-    "vllm==0.13.0"
+    "vllm==0.22.0"
 ]
 
 [build-system]
