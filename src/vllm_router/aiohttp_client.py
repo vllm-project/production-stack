@@ -26,7 +26,11 @@ class AiohttpClientWrapper:
         """Instantiate the client. Call from the FastAPI startup hook."""
         # To fully leverage the router's concurrency capabilities,
         # we set the maximum number of connections to be unlimited.
-        connector = aiohttp.TCPConnector(limit=0)
+        # Resolve with getaddrinfo: aiohttp[speedups] makes c-ares the default
+        # resolver, and its query cache keeps a failed lookup (NXDOMAIN) for
+        # up to an hour, so a backend created after the router first tried it
+        # stays unreachable long after DNS answers.
+        connector = aiohttp.TCPConnector(limit=0, resolver=aiohttp.ThreadedResolver())
         self.async_client = aiohttp.ClientSession(
             connector=connector, connector_owner=True
         )
