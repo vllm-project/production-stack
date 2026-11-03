@@ -294,6 +294,7 @@ tests:
             enablePrefixCaching: true
             maxModelLen: 1024
             gpuMemoryUtilization: 0.8
+            maxLoras: 4
           lmcacheConfig:
             enabled: true
             cpuOffloadingBufferSize: "10"
@@ -322,6 +323,8 @@ tests:
           - "1024"
           - "--gpu-memory-utilization"
           - "0.8"
+          - "--max-loras"
+          - "4"
           - "--kv-transfer-config"
           - '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'
     - documentIndex: 0
