@@ -131,6 +131,7 @@ run_test() {
     test_cmd="$test_cmd --routing-logic $routing_logic"
     test_cmd="$test_cmd --result-dir '$result_dir'"
     test_cmd="$test_cmd --discovery-type static"
+    test_cmd="$test_cmd --model $MODEL"
     test_cmd="$test_cmd --session-key $SESSION_KEY"
 
     if [ "$VERBOSE" = "true" ]; then
