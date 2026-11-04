@@ -14,7 +14,7 @@ Welcome to the tutorials for vLLM Production Stack! This series of tutorials is 
    Learn how to customize vLLM options when using vLLM Production Stack.
 
 4. [Load Model from Persistent Volume](03-load-model-from-pv.md)
-   Discover how to load models from a persistent volume to ensure efficient resource usage.
+   Learn how to persist the Hugging Face cache or serve a pre-downloaded model offline from a persistent volume.
 
 5. [Launch Multiple Models](04-launch-multiple-model.md)
    Learn how to deploy and manage multiple models simultaneously in your vLLM environment.
