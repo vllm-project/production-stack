@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import re
 
 from fastapi import (
     APIRouter,
@@ -141,6 +142,15 @@ async def show_version():
     return JSONResponse(content=ver)
 
 
+def _model_catalog_sort_key(card: ModelCard) -> tuple[int, int, str, str]:
+    """Sort numeric display prefixes first, then unnumbered model IDs."""
+    model_id = card.id
+    prefix = re.match(r"^(\d+)\s*-\s*", model_id)
+    if prefix:
+        return (0, int(prefix.group(1)), model_id.casefold(), model_id)
+    return (1, 0, model_id.casefold(), model_id)
+
+
 @main_router.get("/v1/models")
 async def show_models(request: Request):
     """
@@ -187,6 +197,9 @@ async def show_models(request: Request):
             )
             existing_models.add(model_id)
 
+    # Sort the complete catalog, including external providers, without changing
+    # discovery order or the metadata selected during deduplication.
+    model_cards.sort(key=_model_catalog_sort_key)
     model_list = ModelList(data=model_cards)
     return JSONResponse(content=model_list.model_dump())
 

@@ -1,5 +1,6 @@
 import json
 import logging
+from itertools import permutations
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,16 +16,19 @@ def _build_request():
     return request
 
 
-def _build_endpoint(model_payload):
-    model_id = model_payload["id"]
+def _build_endpoint(model_payload, *additional_payloads):
+    payloads = [model_payload, *additional_payloads]
+    model_ids = [payload["id"] for payload in payloads]
     return EndpointInfo(
         url="http://engine",
-        model_names=[model_id],
+        model_names=model_ids,
         Id="engine-1",
         added_timestamp=0.0,
-        model_label=model_id,
+        model_label=model_ids[0],
         sleep=False,
-        model_info={model_id: ModelInfo.from_dict(model_payload)},
+        model_info={
+            payload["id"]: ModelInfo.from_dict(payload) for payload in payloads
+        },
     )
 
 
@@ -113,3 +117,115 @@ async def test_show_models_does_not_warn_for_preserved_backend_fields(
 
     assert response.status_code == 200
     assert "ignored" not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint_order", list(permutations(range(3))))
+@pytest.mark.parametrize("reverse_model_order", [False, True])
+@pytest.mark.parametrize("reverse_provider_order", [False, True])
+async def test_show_models_order_is_independent_of_discovery(
+    monkeypatch, endpoint_order, reverse_model_order, reverse_provider_order
+):
+    payloads = {
+        model_id: {
+            "id": model_id,
+            "object": "model",
+            "created": 123,
+            "owned_by": "vllm",
+            "root": f"models/{model_id}",
+            "parent": None,
+            "max_model_len": 262144,
+            "permission": [{"id": "perm-1", "allow_sampling": True}],
+        }
+        for model_id in ["70 - Zeta", "alias-zeta", "2 - Beta", "01 - Alpha"]
+    }
+    groups = [
+        ["70 - Zeta", "alias-zeta"],
+        ["2 - Beta", "01 - Alpha"],
+        ["2 - Beta"],  # Another backend serving the same model.
+    ]
+    endpoints = [
+        _build_endpoint(
+            *(
+                payloads[model_id]
+                for model_id in (
+                    list(reversed(groups[index]))
+                    if reverse_model_order
+                    else groups[index]
+                )
+            )
+        )
+        for index in endpoint_order
+    ]
+    discovery_order = [list(endpoint.model_info) for endpoint in endpoints]
+    monkeypatch.setattr(
+        "vllm_router.routers.main_router.get_service_discovery",
+        lambda: MagicMock(get_endpoint_info=lambda: endpoints),
+    )
+    request = _build_request()
+    registry = MagicMock()
+    provider_ids = ["10 - Delta", "alias-z", "2 - Beta"]
+    registry.get_all_external_model_ids.return_value = (
+        list(reversed(provider_ids)) if reverse_provider_order else provider_ids
+    )
+    registry.get_provider_name.return_value = "test-provider"
+    request.app.state.external_provider_registry = registry
+
+    response = await show_models(request)
+
+    cards = json.loads(response.body)["data"]
+    assert [card["id"] for card in cards] == [
+        "01 - Alpha",
+        "2 - Beta",
+        "10 - Delta",
+        "70 - Zeta",
+        "alias-z",
+        "alias-zeta",
+    ]
+    by_id = {card["id"]: card for card in cards}
+    for model_id, payload in payloads.items():
+        assert by_id[model_id] == payload
+    assert by_id["10 - Delta"]["owned_by"] == "test-provider"
+    assert by_id["alias-z"]["owned_by"] == "test-provider"
+    assert [list(endpoint.model_info) for endpoint in endpoints] == discovery_order
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reverse_order", [False, True])
+async def test_show_models_numeric_prefixes_and_case_ties(monkeypatch, reverse_order):
+    expected_ids = [
+        "01 - Alpha",
+        "02 - Beta",
+        "2 - Beta",
+        "2 - beta",
+        "10 - Delta",
+        "70 - Zeta",
+        "Alias",
+        "alias",
+        "alias-z",
+        "alias-zeta",
+        "release-10",
+        "release-2",
+    ]
+    model_ids = list(reversed(expected_ids)) if reverse_order else expected_ids
+    endpoint = _build_endpoint(*({"id": model_id} for model_id in model_ids))
+    monkeypatch.setattr(
+        "vllm_router.routers.main_router.get_service_discovery",
+        lambda: MagicMock(get_endpoint_info=lambda: [endpoint]),
+    )
+
+    response = await show_models(_build_request())
+
+    assert [card["id"] for card in json.loads(response.body)["data"]] == expected_ids
+
+
+@pytest.mark.asyncio
+async def test_show_models_empty_catalog(monkeypatch):
+    monkeypatch.setattr(
+        "vllm_router.routers.main_router.get_service_discovery",
+        lambda: MagicMock(get_endpoint_info=lambda: []),
+    )
+
+    response = await show_models(_build_request())
+
+    assert json.loads(response.body) == {"object": "list", "data": []}

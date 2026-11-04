@@ -145,6 +145,12 @@ Test the stack's OpenAI-compatible API by querying the available models:
 
    curl -o- http://localhost:30080/v1/models
 
+The combined model list is ordered independently of discovery timing. IDs with a
+numeric prefix followed by a hyphen (for example, ``2 - Beta`` and ``10 - Delta``)
+appear first, in numeric order. Unnumbered IDs follow in case-insensitive
+alphabetical order, with the original ID breaking ties. This ordering includes
+external-provider models and only affects the catalog, not inference routing.
+
 Expected output:
 
 .. code-block:: json
