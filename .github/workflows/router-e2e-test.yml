@@ -182,9 +182,17 @@ jobs:
           activate-environment: true
 
       - name: Install Python dependencies
+        # shortcut: the GPU runner's NVIDIA driver only supports CUDA 12.4, so install the CUDA 12.9
+        # builds of vllm/torch; lmcache's cuda-python>=13 is overridden (the router only uses its
+        # pure-Python controller messages). Drop this once the runner driver supports CUDA 13 (>=580).
         run: |
           uv pip install --upgrade pip
-          uv pip install -e ".[semantic_cache,lmcache,test]"
+          printf 'torch==2.13.0+cu129\ncuda-python>=12.9,<13\n' > "$RUNNER_TEMP/cu129-overrides.txt"
+          uv pip install -e ".[semantic_cache,lmcache,test]" \
+            "vllm @ https://github.com/vllm-project/vllm/releases/download/v0.32.0/vllm-0.32.0%2Bcu129-cp38-abi3-manylinux_2_28_x86_64.whl" \
+            --overrides "$RUNNER_TEMP/cu129-overrides.txt" \
+            --extra-index-url https://download.pytorch.org/whl/cu129 \
+            --index-strategy unsafe-best-match
 
       - name: Start 2 vLLM serve backends
         run: |
