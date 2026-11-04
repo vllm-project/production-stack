@@ -1,0 +1,34 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>powerhome/renovate-config",
+    "github>powerhome/renovate-config:publication-age-containers"
+  ],
+  "enabledManagers": [
+    "dockerfile"
+  ],
+  "packageRules": [
+    {
+      "description": "Disable Dockerfile updates outside the audited publication-age inputs.",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Enable only the audited third-party publication-age inputs.",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchFileNames": [
+        "docker/Dockerfile.router-release",
+        "docker/Dockerfile.operator-release"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/astral-sh/uv",
+        "gcr.io/distroless/static-debian12"
+      ],
+      "enabled": true
+    }
+  ]
+}
