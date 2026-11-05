@@ -234,3 +234,41 @@ def test_has_ever_seen_model_when_model_is_alias_returns_true():
     assert discovery_instance.has_ever_seen_model("llama") is True
     assert discovery_instance.has_ever_seen_model("llama3") is True
     assert discovery_instance.has_ever_seen_model("unknown-model") is False
+
+
+def test_get_endpoint_info_advertises_configured_max_model_len() -> None:
+    discovery_instance = StaticServiceDiscovery(
+        app=None,
+        urls=["http://127.0.0.1:1", "http://127.0.0.1:2", "http://127.0.0.1:3"],
+        models=["m-a", "m-a", "m-b"],
+        model_max_lens={"m-a": 131072},
+    )
+    infos = {
+        model_id: info
+        for endpoint in discovery_instance.get_endpoint_info()
+        for model_id, info in endpoint.model_info.items()
+    }
+    assert infos["m-a"].to_dict()["max_model_len"] == 131072
+    assert "max_model_len" not in infos["m-b"].to_dict()
+
+
+def test_get_endpoint_info_created_is_stable_across_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    discovery_instance = StaticServiceDiscovery(
+        app=None, urls=["http://127.0.0.1:1"], models=["m-a"]
+    )
+    first = discovery_instance.get_endpoint_info()[0].model_info["m-a"].created
+    monkeypatch.setattr("vllm_router.service_discovery.time.time", lambda: first + 3600)
+    second = discovery_instance.get_endpoint_info()[0].model_info["m-a"].created
+    assert first == second == discovery_instance.added_timestamp
+
+
+def test_init_when_model_max_lens_names_unknown_model_raises_value_error() -> None:
+    with pytest.raises(ValueError, match="not static models: m-typo"):
+        StaticServiceDiscovery(
+            app=None,
+            urls=["http://127.0.0.1:1"],
+            models=["m-a"],
+            model_max_lens={"m-typo": 131072},
+        )

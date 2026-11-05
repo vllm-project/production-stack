@@ -213,3 +213,85 @@ def test_parse_args_log_format_accepts_json(monkeypatch: pytest.MonkeyPatch) -> 
     )
     args = parser.parse_args()
     assert args.log_format == "json"
+
+
+def _load_yaml_config(monkeypatch: pytest.MonkeyPatch, config: dict):
+    with tempfile.NamedTemporaryFile() as f:
+        monkeypatch.setattr(sys, "argv", [sys.argv[0], "--dynamic-config-yaml", f.name])
+        f.write(yaml.safe_dump(config).encode())
+        f.seek(0)
+        test_parser = argparse.ArgumentParser("test")
+        test_parser.add_argument("--dynamic-config-yaml", type=str)
+        test_parser.add_argument("--dynamic-config-json", type=str)
+        args = test_parser.parse_args()
+        return parser.load_initial_config_from_config_file_if_required(
+            test_parser, args
+        )
+
+
+def test_load_initial_config_when_yaml_models_set_max_model_len_adds_static_model_max_lens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = _load_yaml_config(
+        monkeypatch,
+        {
+            "service_discovery": "static",
+            "static_models": {
+                "llama3": {
+                    "static_backends": ["http://a:8000", "http://b:8000"],
+                    "max_model_len": 131072,
+                },
+                "qwen": {"static_backends": ["http://c:8000"]},
+                "org/model": {
+                    "static_backends": ["http://d:8000"],
+                    "max_model_len": 32768,
+                },
+            },
+        },
+    )
+    assert args.static_models == "llama3,llama3,org/model,qwen"  # safe_dump sorts keys
+    assert args.static_model_max_lens == "llama3:131072,org/model:32768"
+
+
+def test_load_initial_config_when_no_yaml_model_sets_max_model_len_leaves_it_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = _load_yaml_config(
+        monkeypatch,
+        {"static_models": {"llama3": {"static_backends": ["http://a:8000"]}}},
+    )
+    assert getattr(args, "static_model_max_lens", None) is None
+
+
+@pytest.mark.parametrize("value", ["131072", 0, True, 1.5])
+def test_load_initial_config_when_yaml_max_model_len_is_not_a_positive_integer_raises_value_error(
+    monkeypatch: pytest.MonkeyPatch, value
+) -> None:
+    with pytest.raises(ValueError, match="must be a positive integer"):
+        _load_yaml_config(
+            monkeypatch,
+            {
+                "static_models": {
+                    "llama3": {
+                        "static_backends": ["http://a:8000"],
+                        "max_model_len": value,
+                    }
+                }
+            },
+        )
+
+
+def test_validate_args_when_static_model_max_lens_names_unknown_model_raises_value_error() -> (
+    None
+):
+    with pytest.raises(ValueError, match="not static models: typo"):
+        parser.validate_args(
+            MagicMock(
+                routing_logic="roundrobin",
+                service_discovery="static",
+                static_backends="http://a:8000",
+                static_models="llama3",
+                static_backend_health_checks=False,
+                static_model_max_lens="llama3:131072,typo:4096",
+            )
+        )

@@ -88,6 +88,15 @@ def validate_static_model_types(model_types: str | None) -> None:
             )
 
 
+def validate_static_model_max_lens(model_max_lens: str, models: str) -> None:
+    max_lens = utils.parse_static_model_max_lens(model_max_lens)
+    unknown = sorted(set(max_lens) - set(utils.parse_comma_separated_args(models)))
+    if unknown:
+        raise ValueError(
+            f"Static model max lengths name models that are not static models: {', '.join(unknown)}"
+        )
+
+
 # --- Argument Parsing and Initialization ---
 def validate_args(args):
     verify_required_args_provided(args)
@@ -102,6 +111,9 @@ def validate_args(args):
             )
         if args.static_backend_health_checks:
             validate_static_model_types(args.static_model_types)
+        model_max_lens = getattr(args, "static_model_max_lens", None)
+        if isinstance(model_max_lens, str) and model_max_lens:
+            validate_static_model_max_lens(model_max_lens, args.static_models)
     if args.service_discovery == "k8s" and args.k8s_port is None:
         raise ValueError("K8s port must be provided when using K8s service discovery.")
     if args.routing_logic == "session" and args.session_key is None:
@@ -179,6 +191,15 @@ def parse_args():
         type=str,
         default=None,
         help="Specify the static model types of each model. This is used for the backend health check, separated by commas. E.g. chat,embeddings,rerank",
+    )
+    parser.add_argument(
+        "--static-model-max-lens",
+        type=str,
+        default=None,
+        help="The max_model_len that /v1/models advertises for static models, as "
+        "model:max_model_len pairs separated by commas. Keyed by model name, so "
+        "it does not need to line up with --static-backends. "
+        "E.g. model1:131072,model2:32768",
     )
     parser.add_argument(
         "--static-model-labels",
