@@ -1144,11 +1144,15 @@ async def route_sleep_wakeup_request(
                     response.raise_for_status()
                     response_status = response.status
 
-            pod_name = endpoints[0].pod_name
+            # Each discovery labels the engine by the name it tracks it under:
+            # the pod (pod IP), the service (service name) or the engine Id
+            # (static, which sets neither).
+            target = endpoints[0]
+            label_name = target.pod_name or target.service_name or target.Id
             if endpoint == "/sleep":
-                service_discovery.add_sleep_label(pod_name)
+                service_discovery.add_sleep_label(label_name)
             elif endpoint == "/wake_up":
-                service_discovery.remove_sleep_label(pod_name)
+                service_discovery.remove_sleep_label(label_name)
 
             return JSONResponse(
                 status_code=response_status,
