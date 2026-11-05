@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import dataclasses
 import json
 import threading
 import time
@@ -92,27 +93,14 @@ class DynamicRouterConfig:
 
     @staticmethod
     def from_args(args) -> "DynamicRouterConfig":
+        # Every field name above is also an argparse destination, so read them
+        # by name. A field added to the dataclass and the parser is then carried
+        # without a second edit here.
         return DynamicRouterConfig(
-            service_discovery=args.service_discovery,
-            static_backends=args.static_backends,
-            static_models=args.static_models,
-            static_model_types=args.static_model_types,
-            static_aliases=args.static_aliases,
-            static_backend_health_checks=args.static_backend_health_checks,
-            static_backend_health_check_interval=args.static_backend_health_check_interval,
-            static_backend_health_check_timeout_seconds=args.static_backend_health_check_timeout_seconds,
-            k8s_port=args.k8s_port,
-            k8s_namespace=args.k8s_namespace,
-            k8s_label_selector=args.k8s_label_selector,
-            # Routing logic configurations
-            routing_logic=args.routing_logic,
-            session_key=args.session_key,
-            priority_header=args.priority_header,
-            priority_field=args.priority_field,
-            priority_default=args.priority_default,
-            priority_threshold=args.priority_threshold,
-            # Logging Options
-            callbacks=args.callbacks,
+            **{
+                f.name: getattr(args, f.name)
+                for f in dataclasses.fields(DynamicRouterConfig)
+            }
         )
 
     @staticmethod
