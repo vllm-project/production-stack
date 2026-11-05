@@ -1,0 +1,23 @@
+{{- if .Values.networkPolicy.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vllm-stack-operator.fullname" . | trunc 41 | trimSuffix "-" }}-allow-metrics-traffic
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vllm-stack-operator.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vllm-stack-operator.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Only allow scraping from namespaces matching networkPolicy.metricsNamespaceSelector
+    - from:
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.metricsNamespaceSelector | nindent 12 }}
+      ports:
+        - port: {{ .Values.metrics.service.port }}
+          protocol: TCP
+{{- end }}

@@ -1,0 +1,19 @@
+{{- if .Values.vllmRouter.enabled -}}
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: VLLMRouter
+metadata:
+  name: {{ include "vllm-stack-operator.routerName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: vllm-router
+    {{- with .Values.vllmRouter.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- toYaml (omit .Values.vllmRouter.spec "k8sLabelSelector") | nindent 2 }}
+  # Defaults to the shared label this chart puts on every VLLMRuntime (whose
+  # labels the operator copies onto engine pods), so one router serves all
+  # models of this release.
+  k8sLabelSelector: {{ .Values.vllmRouter.spec.k8sLabelSelector | default (printf "%s=%s" (include "vllm-stack-operator.runtimeSetLabelKey" .) (include "vllm-stack-operator.fullname" .)) | quote }}
+{{- end }}
