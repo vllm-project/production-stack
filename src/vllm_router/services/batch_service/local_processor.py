@@ -21,8 +21,8 @@ from uuid import uuid4
 
 import aiosqlite
 
-from vllm_router.batch.batch import BatchInfo, BatchStatus
 from vllm_router.log import init_logger
+from vllm_router.services.batch_service.batch import BatchInfo, BatchStatus
 from vllm_router.services.batch_service.processor import BatchProcessor
 from vllm_router.services.files_service import Storage
 
@@ -124,8 +124,6 @@ class LocalBatchProcessor(BatchProcessor):
                     metadata,
                 ) = row
                 # Convert status string to BatchStatus enum.
-                from vllm_router.batch.batch import BatchStatus
-
                 return BatchInfo(
                     id=batch_id,
                     status=BatchStatus(status),
