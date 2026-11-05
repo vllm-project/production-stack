@@ -164,7 +164,7 @@ Learn more about cwic commands on my [coreweave-blog-post](https://cloudthrill.c
 
 **Model Options:**
 There are 3 different vllm deployment charts:
-- [gpu-gpt-oss-20b](./config/gpu-gpt-oss-20-cw.tpl) | [oss flagship LLM collection](./config/gpu-gpt-qwn-gem-glm-cw.tpl) | [tiny-llama](./config/gpu-llama-light-ingress-cw.tpl) . (for DeepseekV3 read 🐳here)
+- [gpu-gpt-oss-20b](./config/llm-stack/helm/gpu/gpu-gpt-oss-20-cw.tpl) | [oss flagship LLM collection](./config/llm-stack/helm/gpu/gpu-gpt-qwn-gem-glm-cw.tpl) | [tiny-llama](./config/llm-stack/helm/gpu/gpu-llama-light-ingress-cw.tpl) . (for DeepseekV3 read 🐳here)
 
 ---
 
@@ -282,7 +282,7 @@ This stack provides extensive customization options to tailor your deployment:
 **📓 Configuration templates:**
 
 - **Environment variables**: [`env-vars.template`](./env-vars.template)
-- **Terraform variables**: [`terraform.tfvars.template`](./terraform.tfvars.template)
+- **Terraform variables**: [`terraform.tfvars.template`](./terrafom.tfvars.template)
 
 
 <details><summary><b> Full list of variables 👇🏼</b></summary>
