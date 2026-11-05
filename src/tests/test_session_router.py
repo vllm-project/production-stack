@@ -2,7 +2,8 @@ from typing import Any, Dict
 
 import pytest
 
-from vllm_router.routers.routing_logic import SessionRouter
+from vllm_router.routers import routing_logic
+from vllm_router.routers.routing_logic import SessionRouter, cleanup_routing_logic
 
 
 class EndpointInfo:
@@ -302,3 +303,76 @@ async def test_session_key_in_request_body():
         endpoints, None, request_stats, request, request.body
     )
     assert url2 == "http://engine1.com"
+
+
+MODEL_A = [EndpointInfo(url=f"http://a{i}.com") for i in range(8)]
+MODEL_B = [EndpointInfo(url=f"http://b{i}.com") for i in range(8)]
+SESSION_IDS = [f"session{i}" for i in range(20)]
+
+
+@pytest.fixture
+def fresh_router():
+    cleanup_routing_logic()
+    yield SessionRouter(session_key="session_id")
+    cleanup_routing_logic()
+
+
+@pytest.fixture
+def ring_builds(monkeypatch):
+    builds = []
+
+    class CountingHashRing(routing_logic.HashRing):
+        def __init__(self, nodes=None, **kwargs):
+            builds.append(frozenset(nodes or ()))
+            super().__init__(nodes, **kwargs)
+
+    monkeypatch.setattr(routing_logic, "HashRing", CountingHashRing)
+    return builds
+
+
+async def route_session(router, endpoints, session_id):
+    request = Request(headers={"session_id": session_id})
+    return await router.route_request(endpoints, None, {}, request, {})
+
+
+@pytest.mark.asyncio
+async def test_alternating_models_build_each_ring_once(fresh_router, ring_builds):
+    for sid in SESSION_IDS:
+        await route_session(fresh_router, MODEL_A, sid)
+        await route_session(fresh_router, MODEL_B, sid)
+
+    assert sorted(map(len, ring_builds)) == [8, 8]
+
+
+@pytest.mark.asyncio
+async def test_alternating_models_route_like_single_model(fresh_router):
+    single = [await route_session(fresh_router, MODEL_A, sid) for sid in SESSION_IDS]
+
+    cleanup_routing_logic()
+    router = SessionRouter(session_key="session_id")
+    alternating = []
+    for sid in SESSION_IDS:
+        alternating.append(await route_session(router, MODEL_A, sid))
+        await route_session(router, MODEL_B, sid)
+
+    assert alternating == single
+
+
+@pytest.mark.asyncio
+async def test_no_session_id_builds_no_ring(fresh_router, ring_builds):
+    request = Request(headers={})
+    url = await fresh_router.route_request(MODEL_A, None, {}, request, {})
+
+    assert url in [e.url for e in MODEL_A]
+    assert ring_builds == []
+
+
+@pytest.mark.asyncio
+async def test_ring_cache_clear_keeps_session_placement(fresh_router):
+    before = [await route_session(fresh_router, MODEL_A, sid) for sid in SESSION_IDS]
+
+    for i in range(routing_logic.RoutingInterface._MAX_CACHE_SIZE + 1):
+        await route_session(fresh_router, [EndpointInfo(url=f"http://x{i}.com")], "s")
+
+    after = [await route_session(fresh_router, MODEL_A, sid) for sid in SESSION_IDS]
+    assert after == before

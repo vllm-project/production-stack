@@ -47,7 +47,7 @@ async def test_kvaware_routes_to_longest_reported_prefix(threshold):
     router.tokenizers = {"test-model": Tokenizer()}
     router.threshold = threshold
     router.session_key = "x-session-id"
-    router.hash_ring = routing_logic.HashRing()
+    router._hash_rings = {}
     router.instance_id_to_ip = {
         "instance-a": url_a,
         "instance-b": url_b,
@@ -111,7 +111,7 @@ async def test_kvaware_uses_tokenizer_for_each_model(monkeypatch):
     router.tokenizers = {}
     router.threshold = 0
     router.session_key = "x-session-id"
-    router.hash_ring = routing_logic.HashRing()
+    router._hash_rings = {}
     router.instance_id_to_ip = {}
 
     async def query_manager(msg):
@@ -165,7 +165,7 @@ async def test_kvaware_ignores_cached_dead_holder(instance_map):
     router.tokenizers = {"test-model": Tokenizer()}
     router.threshold = 1000
     router.session_key = "x-session-id"
-    router.hash_ring = routing_logic.HashRing()
+    router._hash_rings = {}
     router.instance_id_to_ip = instance_map
 
     async def query_manager(_msg):
@@ -196,7 +196,7 @@ async def test_kvaware_refreshes_unknown_dead_holder_and_uses_live_match():
     router.tokenizers = {"test-model": Tokenizer()}
     router.threshold = 1000
     router.session_key = "x-session-id"
-    router.hash_ring = routing_logic.HashRing()
+    router._hash_rings = {}
     router.instance_id_to_ip = {"instance-b": url_b}
 
     async def query_manager(msg):
