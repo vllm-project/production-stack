@@ -102,6 +102,29 @@ def test_sum_is_exact_again_once_the_window_has_turned_over():
     assert monitor.get_average() == sum(monitor.values) / len(monitor.values)
 
 
+def test_sum_is_exact_once_as_many_values_expired_as_remain():
+    # The running sum is recomputed as soon as the values expired since the
+    # last recompute number at least those left in the window.
+    rng = random.Random(2)
+    monitor = MovingAverageMonitor(WINDOW)
+    n = 100
+
+    def add(timestamp, count, low, high):
+        for _ in range(count):
+            monitor.update(timestamp, rng.uniform(low, high))
+
+    add(0.0, n, 1e9, 2e9)
+    add(WINDOW, n, 0, 1)
+    monitor.update_no_value(WINDOW + 0.5)  # n expire, n remain
+    assert monitor.get_sum() == sum(monitor.values)
+    add(WINDOW + 1, n + 1, 1e9, 2e9)
+    monitor.update_no_value(2 * WINDOW + 0.5)  # n expire, n + 1 remain
+    add(WINDOW + 2, n + 3, 0, 1)
+    monitor.update_no_value(2 * WINDOW + 1.5)  # 2n + 1 expired, n + 3 remain
+    assert len(monitor.values) == n + 3
+    assert monitor.get_sum() == sum(monitor.values)
+
+
 def test_hour_long_outlier_leaving_the_window_keeps_the_sum_close():
     # Realistic magnitudes: latencies of 50 ms to 5 s and one request that took
     # an hour. Its expiry does not trigger a re-sum, so this checks the error
