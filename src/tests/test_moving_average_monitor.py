@@ -1,5 +1,7 @@
 import math
 import random
+import sys
+import threading
 
 import pytest
 
@@ -129,3 +131,58 @@ def test_empty_monitor_and_boundary():
     monitor.update_no_value(10.0 + WINDOW + 1e-6)
     assert monitor.get_sum() == 0
     assert monitor.get_average() == -1
+
+
+def test_concurrent_updates_and_reads_stay_consistent():
+    # With --log-stats, log_stats() runs get_request_stats() on its own thread
+    # while the event loop records requests on the same monitors.
+    old_interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)  # switch threads often enough to hit the race
+    try:
+        for _ in range(10):
+            monitor = MovingAverageMonitor(0.5)
+            start = threading.Barrier(2)
+            done = threading.Event()
+            errors = []
+            torn_averages = []
+            overlapping_reads = 0
+
+            def writer():
+                try:
+                    start.wait()
+                    for i in range(20000):
+                        monitor.update(i * 1e-4, 1)
+                except Exception as e:
+                    errors.append(e)
+                finally:
+                    done.set()
+
+            def expirer():
+                nonlocal overlapping_reads
+                try:
+                    start.wait()
+                    t = 0.0
+                    while not done.is_set():
+                        overlapping_reads += 1
+                        monitor.update_no_value(t)
+                        t += 1e-4
+                        # Every value is 1, so a consistent read is 1.0 or -1.
+                        average = monitor.get_average()
+                        if average not in (1.0, -1):
+                            torn_averages.append(average)
+                except Exception as e:
+                    errors.append(e)
+
+            threads = [threading.Thread(target=f) for f in (writer, expirer)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            assert errors == []
+            # Guard against a vacuous pass where the writer ran alone.
+            assert overlapping_reads >= 100
+            assert torn_averages == []
+            assert len(monitor.timestamps) == len(monitor.values)
+            assert monitor.get_sum() == sum(monitor.values)
+    finally:
+        sys.setswitchinterval(old_interval)

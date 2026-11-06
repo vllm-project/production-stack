@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import threading
 from collections import deque
 from dataclasses import dataclass
 from typing import Deque, Dict, Tuple
@@ -63,6 +64,12 @@ class MovingAverageMonitor:
         self.sliding_window_size = sliding_window_size
         self.timestamps: Deque[float] = deque()
         self.values: Deque[float] = deque()
+        # Running sum of self.values, so the per-request stats calls are O(1).
+        self._sum = 0
+        # Values expired since self._sum was last recomputed from the window.
+        self._expired = 0
+        # The --log-stats thread reads the monitors while the event loop updates.
+        self._lock = threading.Lock()
 
     def update(self, timestamp: float, value: float):
         """
@@ -75,31 +82,39 @@ class MovingAverageMonitor:
         This method adds the new data point to the sliding window and
         removes any data point that is older than the sliding window size.
         """
-        self.timestamps.append(timestamp)
-        self.values.append(value)
-        while (
-            self.timestamps
-            and self.timestamps[0] < timestamp - self.sliding_window_size
-        ):
-            self.timestamps.popleft()
-            self.values.popleft()
+        with self._lock:
+            self._sum += value
+            self.timestamps.append(timestamp)
+            self.values.append(value)
+            self._expire(timestamp)
 
     def update_no_value(self, timestamp: float):
         """
         Update the throughput monitor with a new timestamp with no value
         """
+        with self._lock:
+            self._expire(timestamp)
+
+    def _expire(self, timestamp: float):
         while (
             len(self.timestamps) > 0
             and self.timestamps[0] < timestamp - self.sliding_window_size
         ):
             self.timestamps.popleft()
-            self.values.popleft()
+            self._sum -= self.values.popleft()
+            self._expired += 1
+        # Re-sum per window of expiries; until then error is ~eps * |expired values|.
+        if self._expired >= len(self.values):
+            self._sum = sum(self.values)
+            self._expired = 0
 
     def get_average(self) -> float:
-        return sum(self.values) / len(self.values) if self.values else -1
+        with self._lock:
+            return self._sum / len(self.values) if self.values else -1
 
     def get_sum(self) -> float:
-        return sum(self.values)
+        with self._lock:
+            return self._sum
 
 
 class RequestStatsMonitor(metaclass=SingletonMeta):
