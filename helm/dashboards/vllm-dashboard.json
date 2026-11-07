@@ -823,7 +823,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "vllm:gpu_prefix_cache_hits_total{endpoint=\"service-port\"} / vllm:gpu_prefix_cache_queries_total",
+          "expr": "vllm:prefix_cache_hits_total{endpoint=\"service-port\"} / vllm:prefix_cache_queries_total",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{instance}}",
