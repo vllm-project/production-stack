@@ -77,12 +77,8 @@ spec:
             periodSeconds: {{ .Values.cacheserverSpec.livenessProbe.periodSeconds | default 10 }}
             failureThreshold: {{ .Values.cacheserverSpec.livenessProbe.failureThreshold | default 3 }}
             timeoutSeconds: {{ .Values.cacheserverSpec.livenessProbe.timeoutSeconds | default 5 }}
-            exec:
-              command:
-              - "/opt/venv/bin/python3"
-              - "/workspace/LMCache/examples/kubernetes/health_probe.py"
-              - "127.0.0.1"
-              - "{{ .Values.cacheserverSpec.containerPort }}"
+            tcpSocket:
+              port: caserver-cport
           {{- end }}
           {{- with .Values.cacheserverSpec.containerSecurityContext }}
           securityContext:

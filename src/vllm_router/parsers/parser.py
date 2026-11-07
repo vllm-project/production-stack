@@ -131,6 +131,14 @@ def parse_args():
         "--port", type=int, default=8001, help="The port to run the server on."
     )
     parser.add_argument(
+        "--timeout-keep-alive",
+        type=int,
+        default=5,
+        help="Seconds to keep an idle HTTP keep-alive connection open before "
+        "closing it (uvicorn default: 5). Raise it when clients reuse "
+        "connections across requests spaced more than a few seconds apart.",
+    )
+    parser.add_argument(
         "--root-path",
         type=str,
         default="",
@@ -465,7 +473,8 @@ def parse_args():
         help="The minimum prefix match length required for prefixaware "
         "routing to reuse a matched endpoint. If the longest prefix "
         "match is shorter than this value, the request falls back to "
-        "QPS-based routing. Note: prefix matches are computed in "
+        "least-inflight routing via request_stats (same load signal as "
+        "loadaware). Note: prefix matches are computed in "
         "chunks (chunk_size, default 128 characters), so this "
         "threshold is effectively quantized to that granularity. "
         "Defaults to 0, which disables the threshold.",

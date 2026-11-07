@@ -497,7 +497,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 	if vllmRuntime.Spec.VLLMConfig.GpuMemoryUtilization != "" {
 		args = append(
 			args,
-			"--gpu_memory_utilization",
+			"--gpu-memory-utilization",
 			vllmRuntime.Spec.VLLMConfig.GpuMemoryUtilization,
 		)
 	}
