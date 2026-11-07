@@ -69,3 +69,32 @@ async def test_transcription_rejects_non_numeric_temperature():
     assert response.status_code == 400
     assert json.loads(response.body) == {"error": "Invalid multipart/form-data request"}
     assert response.headers["X-Request-Id"] == REQUEST_ID
+
+
+@pytest.mark.parametrize("model", [["test-model"], {"name": "test-model"}, 123, True])
+@pytest.mark.asyncio
+async def test_general_request_rejects_non_string_model(model, monkeypatch):
+    # With aliases configured, an unhashable model used to raise in the alias lookup.
+    service_discovery = SimpleNamespace(
+        get_endpoint_info=lambda: [],
+        aliases={"alias-model": "test-model"},
+    )
+    monkeypatch.setattr(
+        "vllm_router.services.request_service.request.get_service_discovery",
+        lambda: service_discovery,
+    )
+    monkeypatch.setattr(
+        "vllm_router.services.request_service.request.is_request_rewriter_initialized",
+        lambda: False,
+    )
+    body = json.dumps({"model": model, "prompt": "hi"}).encode()
+
+    response = await route_general_request(
+        _json_request(body), "/v1/completions", BackgroundTasks()
+    )
+
+    assert response.status_code == 400
+    assert json.loads(response.body) == {
+        "error": "Invalid request: 'model' must be a string."
+    }
+    assert response.headers["X-Request-Id"] == REQUEST_ID
