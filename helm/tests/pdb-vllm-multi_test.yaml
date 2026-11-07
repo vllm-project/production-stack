@@ -190,3 +190,26 @@ tests:
           app.kubernetes.io/managed-by: helm
           environment: test
           release: test
+
+  - it: should render maxUnavailable when it is set to 0
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "opt125m"
+            repository: "vllm/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            pdb:
+              enabled: true
+              maxUnavailable: 0
+    asserts:
+    - equal:
+        path: spec.maxUnavailable
+        value: 0
+    - notExists:
+        path: spec.minAvailable

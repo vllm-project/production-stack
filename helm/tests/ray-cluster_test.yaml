@@ -1008,3 +1008,33 @@ tests:
       equal:
         path: spec.workerGroupSpecs[0].template.spec.containers[0].resources.requests.memory
         value: "16Gi"
+
+  - it: should render lmcache without vllmConfig
+    set:
+      servingEngineSpec:
+        enableEngine: true
+        modelSpec:
+          - name: "test-model"
+            repository: "lmcache/vllm-openai"
+            tag: "latest"
+            modelURL: "facebook/opt-125m"
+            replicaCount: 1
+            requestCPU: 1
+            requestMemory: "1Gi"
+            requestGPU: 1
+            lmcacheConfig:
+              enabled: true
+              cpuOffloadingBufferSize: "10"
+            raySpec:
+              enabled: true
+              headNode:
+                requestCPU: 1
+                requestMemory: "1Gi"
+                requestGPU: 1
+    asserts:
+    - documentSelector:
+        path: metadata.name
+        value: test-model-vllm-start-script
+      matchRegex:
+        path: data["vllm-entrypoint.sh"]
+        pattern: '--kv-transfer-config'

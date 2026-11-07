@@ -739,7 +739,7 @@ data:
 
     {{- if $modelSpec.lmcacheConfig }}
       {{- if $modelSpec.lmcacheConfig.enabled }}
-        {{- if hasKey $modelSpec.vllmConfig "v1" }}
+        {{- if and $modelSpec.vllmConfig (hasKey $modelSpec.vllmConfig "v1") }}
           {{- if eq (toString $modelSpec.vllmConfig.v1) "1" }}
     ARGS+=("--kv-transfer-config" "{\"kv_connector\":\"LMCacheConnectorV1\",\"kv_role\":\"kv_both\"}")
           {{- else }}
