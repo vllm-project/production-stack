@@ -10,6 +10,46 @@ import yaml
 from vllm_router.parsers import parser
 
 
+@pytest.mark.parametrize("interval", ["0", "-1"])
+def test_parse_args_rejects_nonpositive_engine_stats_interval(monkeypatch, interval):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "vllm-router",
+            "--service-discovery",
+            "external-only",
+            "--routing-logic",
+            "roundrobin",
+            "--engine-stats-interval",
+            interval,
+        ],
+    )
+    with pytest.raises(
+        ValueError, match="Engine stats interval must be greater than 0"
+    ):
+        parser.parse_args()
+
+
+def test_json_config_accepts_fractional_engine_stats_interval(monkeypatch, tmp_path):
+    config = tmp_path / "router.json"
+    config.write_text(json.dumps({"engine_stats_interval": 0.5}))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "vllm-router",
+            "--service-discovery",
+            "external-only",
+            "--routing-logic",
+            "roundrobin",
+            "--dynamic-config-json",
+            str(config),
+        ],
+    )
+    assert parser.parse_args().engine_stats_interval == 0.5
+
+
 def test_verify_required_args_provided_when_routing_logic_missing_raises_systemexit() -> (
     None
 ):
