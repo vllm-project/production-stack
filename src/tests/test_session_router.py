@@ -1,6 +1,7 @@
 from typing import Any, Dict
 
 import pytest
+from prometheus_client import REGISTRY
 
 from vllm_router.routers.routing_logic import SessionRouter
 
@@ -68,6 +69,37 @@ async def test_route_request_without_session_id():
 
     # Ensure the endpoint with the lowest QPS is selected
     assert url == "http://engine2.com"
+
+
+@pytest.mark.parametrize(
+    "headers, fallbacks",
+    [
+        pytest.param({}, 1, id="no-session-id"),
+        pytest.param({"session_id": "abc123"}, 0, id="session-id"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_route_request_counts_missing_session_id_as_fallback(headers, fallbacks):
+    """
+    Test that only a request without a session ID is counted as a fallback.
+    """
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+    request_stats = {
+        "http://engine1.com": RequestStats(qps=10),
+        "http://engine2.com": RequestStats(qps=5),
+    }
+    request = Request(headers=headers)
+    labels = {"routing_logic": "session", "reason": "no_session_id"}
+
+    router = SessionRouter(session_key="session_id")
+    before = REGISTRY.get_sample_value("vllm:routing_fallbacks_total", labels) or 0
+    await router.route_request(endpoints, None, request_stats, request, {})
+    after = REGISTRY.get_sample_value("vllm:routing_fallbacks_total", labels) or 0
+
+    assert after - before == fallbacks
 
 
 @pytest.mark.asyncio

@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+from prometheus_client import REGISTRY
 
 import vllm_router.routers.routing_logic as routing_logic
 from vllm_router.routers.routing_logic import KvawareRouter
@@ -30,6 +31,11 @@ class EndpointInfo:
 class Tokenizer:
     def encode(self, prompt):
         return list(range(1000))
+
+
+def fallback_count(reason):
+    labels = {"routing_logic": "kvaware", "reason": reason}
+    return REGISTRY.get_sample_value("vllm:routing_fallbacks_total", labels) or 0
 
 
 @pytest.mark.parametrize(
@@ -186,6 +192,57 @@ async def test_kvaware_ignores_cached_dead_holder(instance_map):
     )
 
     assert selected == url_b
+
+
+@pytest.mark.parametrize(
+    "layout_info, reason",
+    [
+        pytest.param({}, "no_cache_hit", id="nothing-cached"),
+        pytest.param(
+            {"dead-instance": ("LocalCPUBackend", 1000)},
+            "no_live_holder",
+            id="only-dead-holder",
+        ),
+        pytest.param(
+            {"instance-b": ("LocalCPUBackend", 100)},
+            "below_threshold",
+            id="short-match",
+        ),
+        pytest.param({"instance-b": ("LocalCPUBackend", 1000)}, None, id="cache-hit"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_kvaware_counts_fallbacks_by_reason(layout_info, reason):
+    url_a = "http://10.0.0.1:8000"
+    url_b = "http://10.0.0.2:8000"
+    router = KvawareRouter.__new__(KvawareRouter)
+    router.tokenizers = {"test-model": Tokenizer()}
+    router.threshold = 0
+    router.session_key = "x-session-id"
+    router.hash_ring = routing_logic.HashRing()
+    router.instance_id_to_ip = {
+        "dead-instance": "http://10.0.0.9:8000",
+        "instance-a": url_a,
+        "instance-b": url_b,
+    }
+
+    async def query_manager(_msg):
+        return SimpleNamespace(layout_info=layout_info)
+
+    router.query_manager = query_manager
+    reasons = ("no_cache_hit", "no_live_holder", "below_threshold")
+    before = {r: fallback_count(r) for r in reasons}
+
+    await router.route_request(
+        [EndpointInfo(url_a), EndpointInfo(url_b)],
+        {},
+        {},
+        SimpleNamespace(headers={}),
+        {"prompt": "test"},
+    )
+
+    counted = {r: fallback_count(r) - before[r] for r in reasons}
+    assert counted == {r: 1 if r == reason else 0 for r in reasons}
 
 
 @pytest.mark.asyncio
