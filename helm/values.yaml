@@ -1,6 +1,11 @@
 # -- Default values for llmstack helm chart
 # -- Declare variables to be passed into your templates.
 
+# -- Global configuration
+global:
+  # -- Override the registry of images managed by this chart. Leave empty to use each configured image unchanged.
+  imageRegistry: ""
+
 # -- Serving engine configuration
 servingEngineSpec:
   # -- Whether to enable the serving engine

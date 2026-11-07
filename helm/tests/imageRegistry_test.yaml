@@ -1,0 +1,150 @@
+suite: global image registry
+templates:
+  - deployment-router.yaml
+  - deployment-cache-server.yaml
+  - deployment-lora-controller.yaml
+  - deployment-vllm-multi.yaml
+  - ray-cluster.yaml
+values:
+  - values/image-registry.yaml
+tests:
+  - it: preserves configured images when the override is empty
+    set:
+      global.imageRegistry: ""
+    asserts:
+      - template: deployment-router.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "ghcr.io/lmcache/lmstack-router:v1"
+      - template: deployment-cache-server.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "registry.example.org:5000/lmcache/cache:v2"
+      - template: deployment-lora-controller.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "lmcache/lmstack-lora-controller:latest"
+      - template: deployment-lora-controller.yaml
+        equal:
+          path: spec.template.spec.initContainers[0].image
+          value: "busybox:1.37"
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "vllm/vllm-openai:v3"
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.containers[1].image
+          value: "lmcache/lmstack-sidecar:latest"
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.initContainers[0].image
+          value: "busybox:1.36"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.headGroupSpec.template.spec.containers[0].image
+          value: "localhost:5000/team/ray-vllm:v4"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.workerGroupSpecs[0].template.spec.containers[0].image
+          value: "localhost:5000/team/ray-vllm:v4"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.headGroupSpec.template.spec.initContainers[0].image
+          value: "localhost/tools/init@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.workerGroupSpecs[0].template.spec.initContainers[0].image
+          value: "docker.io/library/busybox:1.36"
+  - it: overrides images for all chart-managed containers
+    set:
+      global.imageRegistry: "mirror.example.com:5000"
+    asserts:
+      - template: deployment-router.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "mirror.example.com:5000/lmcache/lmstack-router:v1"
+      - template: deployment-cache-server.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "mirror.example.com:5000/lmcache/cache:v2"
+      - template: deployment-lora-controller.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "mirror.example.com:5000/lmcache/lmstack-lora-controller:latest"
+      - template: deployment-lora-controller.yaml
+        equal:
+          path: spec.template.spec.initContainers[0].image
+          value: "mirror.example.com:5000/busybox:1.37"
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "mirror.example.com:5000/vllm/vllm-openai:v3"
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.containers[1].image
+          value: "mirror.example.com:5000/lmcache/lmstack-sidecar:latest"
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.initContainers[0].image
+          value: "mirror.example.com:5000/busybox:1.36"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.headGroupSpec.template.spec.containers[0].image
+          value: "mirror.example.com:5000/team/ray-vllm:v4"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.workerGroupSpecs[0].template.spec.containers[0].image
+          value: "mirror.example.com:5000/team/ray-vllm:v4"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.headGroupSpec.template.spec.initContainers[0].image
+          value: "mirror.example.com:5000/tools/init@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      - template: ray-cluster.yaml
+        documentIndex: 0
+        equal:
+          path: spec.workerGroupSpecs[0].template.spec.initContainers[0].image
+          value: "mirror.example.com:5000/library/busybox:1.36"
+  - it: keeps nested namespaces
+    set:
+      global.imageRegistry: "mirror.example.com"
+      routerSpec.repository: "team/subteam/router"
+    asserts:
+      - template: deployment-router.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "mirror.example.com/team/subteam/router:v1"
+  - it: does not duplicate an already matching registry
+    set:
+      global.imageRegistry: "mirror.example.com"
+      routerSpec.repository: "mirror.example.com/team/router"
+    asserts:
+      - template: deployment-router.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "mirror.example.com/team/router:v1"
+  - it: allows a registry path prefix and trailing slash
+    set:
+      global.imageRegistry: "mirror.example.com/cache/"
+      routerSpec.repository: "ghcr.io/team/router"
+    asserts:
+      - template: deployment-router.yaml
+        equal:
+          path: spec.template.spec.containers[0].image
+          value: "mirror.example.com/cache/team/router:v1"
+  - it: does not manufacture a registry-only reference for an empty image
+    set:
+      global.imageRegistry: "mirror.example.com"
+      servingEngineSpec.sidecar.image: ""
+    asserts:
+      - template: deployment-vllm-multi.yaml
+        equal:
+          path: spec.template.spec.containers[1].image
+          value: ""

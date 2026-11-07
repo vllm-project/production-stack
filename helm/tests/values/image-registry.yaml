@@ -1,0 +1,47 @@
+routerSpec:
+  repository: ghcr.io/lmcache/lmstack-router
+  tag: v1
+cacheserverSpec:
+  enabled: true
+  image:
+    repository: registry.example.org:5000/lmcache/cache
+    tag: v2
+loraController:
+  enableLoraController: true
+sharedPvcStorage:
+  enabled: true
+servingEngineSpec:
+  modelSpec:
+    - name: engine
+      repository: vllm/vllm-openai
+      tag: v3
+      modelURL: example/model
+      replicaCount: 1
+      requestCPU: 1
+      requestMemory: 1Gi
+      requestGPU: 0
+      pvcStorage: 1Gi
+      enableLoRA: true
+      initContainer:
+        name: init
+        image: busybox:1.36
+    - name: ray
+      repository: localhost:5000/team/ray-vllm
+      tag: v4
+      modelURL: example/model
+      replicaCount: 1
+      requestCPU: 1
+      requestMemory: 1Gi
+      requestGPU: 0
+      initContainer:
+        name: worker-init
+        image: docker.io/library/busybox:1.36
+      raySpec:
+        enabled: true
+        headNode:
+          requestCPU: 1
+          requestMemory: 1Gi
+          requestGPU: 0
+          initContainer:
+            name: head-init
+            image: localhost/tools/init@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
