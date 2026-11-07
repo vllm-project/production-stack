@@ -488,6 +488,19 @@ Open the webpage at `http://<IP of your node>:8080` to access the Grafana web pa
 
 If you use the LMCache image in the production stack, the chart includes a dedicated LMCache dashboard (provisioned automatically alongside the main vLLM dashboard when `grafanaDashboards.enabled` is set to `true`). It contains six fields showing the benefits of CPU offloading: Average time to first token (sec), Cache hit rate (%) in last 1 minute, LMCache retrieve speed (K Tokens / sec), Local CPU cache usage (GB), Number of requested tokens in total, and Number of hit tokens in total.
 
+### Router Dashboard
+
+The chart also ships a router dashboard (`vllm-router-dashboard.json`) built from the metrics the router itself exports, so it needs `routerSpec.serviceMonitor.enabled` set to `true`. It complements the engine-focused vLLM dashboard and shows:
+
+- Overview: requests received, live QPS, healthy pods, average latency, errors and router CPU
+- Latency percentiles (p50, p95, p99) and QPS over time
+- Input and output token throughput by model
+- Requests and latency per backend, which helps spot uneven load balancing
+- In-flight requests by state and errors by type
+- Router host CPU, memory and disk usage
+
+Use the `Backend` and `Model` variables at the top to narrow the view. Token throughput comes from the `usage` field of non-streaming responses, so streaming traffic is not counted there.
+
 ### Use Prometheus Adapter to export vLLM metrics
 
 The vLLM router can export metrics to Prometheus using the [Prometheus Adapter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter).
