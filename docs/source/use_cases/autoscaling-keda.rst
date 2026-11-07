@@ -160,8 +160,10 @@ Update your ``values.yaml`` file to enable KEDA autoscaling:
                metadata:
                  serverAddress: http://vllm-kube-prometheus-stack-prometheus:9090
                  metricName: vllm:num_requests_waiting
-                 query: vllm:num_requests_waiting
+                 query: sum(vllm:num_requests_waiting{service="vllm-llama3-engine-service"})
                  threshold: '5'
+     serviceMonitor:
+       enabled: true
 
    routerSpec:
      serviceMonitor:
@@ -169,6 +171,10 @@ Update your ``values.yaml`` file to enable KEDA autoscaling:
 
    kube-prometheus-stack:
      enabled: true
+
+.. note::
+
+   The query must return a single value, so wrap it in ``sum()``; without it KEDA fails with "returned multiple elements" once there are 2 or more replicas. Selecting by the engine service limits the query to this model. If you leave out ``triggers``, the chart uses the same query for this model by default.
 
 .. note::
 
@@ -260,7 +266,7 @@ Enable scale-to-zero by setting ``minReplicaCount: 0`` and adding a traffic-base
          metadata:
            serverAddress: http://vllm-kube-prometheus-stack-prometheus:9090
            metricName: vllm:num_requests_waiting
-           query: vllm:num_requests_waiting
+           query: sum(vllm:num_requests_waiting{service="vllm-llama3-engine-service"})
            threshold: '5'
        # Traffic-based keepalive (prevents scale-to-zero when traffic exists)
        - type: prometheus

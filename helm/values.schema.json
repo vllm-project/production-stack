@@ -1245,38 +1245,12 @@
                                                     "behavior": {
                                                         "description": "HPA scaling behavior configuration, see https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/",
                                                         "type": "object"
-                                                    },
-                                                    "name": {
-                                                        "description": "Custom name for the HPA resource",
-                                                        "type": "string"
                                                     }
                                                 }
                                             },
                                             "restoreToOriginalReplicaCount": {
                                                 "description": "Restore original replica count when ScaledObject is deleted",
                                                 "type": "boolean"
-                                            },
-                                            "scalingModifiers": {
-                                                "description": "Scaling modifiers for composite metrics",
-                                                "type": "object",
-                                                "properties": {
-                                                    "activationTarget": {
-                                                        "description": "Activation target for the composed metric",
-                                                        "type": "string"
-                                                    },
-                                                    "formula": {
-                                                        "description": "Formula to compose metrics together",
-                                                        "type": "string"
-                                                    },
-                                                    "metricType": {
-                                                        "description": "Metric type (AverageValue or Value)",
-                                                        "type": "string"
-                                                    },
-                                                    "target": {
-                                                        "description": "Target value for the composed metric",
-                                                        "type": "string"
-                                                    }
-                                                }
                                             }
                                         }
                                     },
@@ -1302,10 +1276,6 @@
                                             }
                                         }
                                     },
-                                    "idleReplicaCount": {
-                                        "description": "Number of replicas to scale to when no triggers are active",
-                                        "type": "integer"
-                                    },
                                     "initialCooldownPeriod": {
                                         "description": "Initial cooldown period in seconds before scaling down after creation",
                                         "type": "integer"
@@ -1323,37 +1293,13 @@
                                         "description": "How often KEDA should check the metrics (in seconds)",
                                         "type": "integer"
                                     },
+                                    "serverAddress": {
+                                        "description": "Prometheus address used by the default trigger. Defaults to prometheus-operated in the release namespace when kube-prometheus-stack is enabled, otherwise in the monitoring namespace.",
+                                        "type": "string"
+                                    },
                                     "triggers": {
-                                        "description": "List of KEDA trigger configurations",
-                                        "type": "object",
-                                        "properties": {
-                                            "metadata": {
-                                                "description": "Trigger metadata",
-                                                "type": "object",
-                                                "properties": {
-                                                    "metricName": {
-                                                        "description": "Name of the metric to monitor",
-                                                        "type": "string"
-                                                    },
-                                                    "query": {
-                                                        "description": "Prometheus query to fetch the metric",
-                                                        "type": "string"
-                                                    },
-                                                    "serverAddress": {
-                                                        "description": "Prometheus server address",
-                                                        "type": "string"
-                                                    },
-                                                    "threshold": {
-                                                        "description": "Threshold value that triggers scaling",
-                                                        "type": "string"
-                                                    }
-                                                }
-                                            },
-                                            "type": {
-                                                "description": "Trigger type",
-                                                "type": "string"
-                                            }
-                                        }
+                                        "description": "List of KEDA trigger configurations. If empty, the default trigger scales on the average queue length of this model's engines.",
+                                        "type": "array"
                                     }
                                 }
                             },
