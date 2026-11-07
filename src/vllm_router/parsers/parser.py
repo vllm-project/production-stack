@@ -88,6 +88,14 @@ def validate_static_model_types(model_types: str | None) -> None:
             )
 
 
+def validate_disable_access_log_for_endpoints(endpoints: str) -> None:
+    for endpoint in utils.parse_comma_separated_args(endpoints):
+        if not endpoint.startswith("/"):
+            raise ValueError(
+                f"The endpoint '{endpoint}' in --disable-access-log-for-endpoints must start with '/'."
+            )
+
+
 # --- Argument Parsing and Initialization ---
 def validate_args(args):
     verify_required_args_provided(args)
@@ -110,6 +118,8 @@ def validate_args(args):
         )
     if args.log_stats and args.log_stats_interval <= 0:
         raise ValueError("Log stats interval must be greater than 0.")
+    if args.disable_access_log_for_endpoints:
+        validate_disable_access_log_for_endpoints(args.disable_access_log_for_endpoints)
     if args.engine_stats_interval <= 0:
         raise ValueError("Engine stats interval must be greater than 0.")
     if args.request_stats_window <= 0:
@@ -394,6 +404,14 @@ def parse_args():
         choices=["text", "json"],
         help="Log output format. 'text' for human-readable colored output, "
         "'json' for structured JSON logging. Default is 'text'.",
+    )
+    parser.add_argument(
+        "--disable-access-log-for-endpoints",
+        type=str,
+        default=None,
+        help="Comma-separated list of endpoint paths  to exclude from uvicorn access "
+        "logs, e.g. '/health,/metrics,/ping'. Paths are relative to --root-path. "
+        "Default is empty (all requests are logged).",
     )
 
     parser.add_argument(

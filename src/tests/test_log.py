@@ -2,6 +2,7 @@ import json
 import logging
 
 import pytest
+import uvicorn
 from starlette.datastructures import Headers, MutableHeaders
 
 from vllm_router import log
@@ -333,3 +334,82 @@ class TestJsonFormatter:
         logger = log.init_logger("test.init_json")
         for handler in logger.handlers:
             assert isinstance(handler.formatter, log.JsonFormatter)
+
+
+class TestEndpointAccessLogFilter:
+    """Test suite for EndpointAccessLogFilter."""
+
+    @pytest.fixture
+    def filter_instance(self):
+        return log.EndpointAccessLogFilter(["/health", "/metrics"])
+
+    @staticmethod
+    def _access_record(path: str) -> logging.LogRecord:
+        return logging.LogRecord(
+            name="uvicorn.access",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg='%s - "%s %s HTTP/%s" %d',
+            args=("127.0.0.1:1234", "GET", path, "1.1", 200),
+            exc_info=None,
+        )
+
+    def test_filter_drops_listed_path(self, filter_instance):
+        assert not filter_instance.filter(self._access_record("/health"))
+
+    def test_filter_ignores_query_string(self, filter_instance):
+        assert not filter_instance.filter(self._access_record("/metrics?x=1"))
+
+    def test_filter_keeps_unlisted_path(self, filter_instance):
+        assert filter_instance.filter(self._access_record("/v1/models"))
+
+    def test_filter_requires_exact_match(self, filter_instance):
+        assert filter_instance.filter(self._access_record("/health/extra"))
+
+    def test_filter_matches_paths_under_root_path(self):
+        filter_instance = log.EndpointAccessLogFilter(["/health"], root_path="/vllm")
+        assert not filter_instance.filter(self._access_record("/vllm/health"))
+        assert filter_instance.filter(self._access_record("/health"))
+
+    def test_filter_keeps_non_access_records(self, filter_instance):
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="msg",
+            args=None,
+            exc_info=None,
+        )
+        assert filter_instance.filter(record)
+
+    @pytest.mark.parametrize("paths", [None, []])
+    def test_disable_access_log_for_endpoints_without_paths_adds_no_filter(self, paths):
+        access_logger = logging.getLogger("uvicorn.access")
+        filters_before = list(access_logger.filters)
+        log.disable_access_log_for_endpoints(paths)
+        assert access_logger.filters == filters_before
+
+    def test_disable_access_log_for_endpoints_survives_uvicorn_logging_setup(
+        self,
+    ):
+        """uvicorn reconfigures logging on startup; the filter must persist."""
+        access_logger = logging.getLogger("uvicorn.access")
+        original_filters = list(access_logger.filters)
+        original_handlers = list(access_logger.handlers)
+        # uvicorn.Config() runs dictConfig, which replaces the logger's handlers.
+        # A sentinel handler proves that the logging setup really ran.
+        sentinel_handler = logging.NullHandler()
+        access_logger.addHandler(sentinel_handler)
+        try:
+            log.disable_access_log_for_endpoints(["/health"])
+            uvicorn.Config(app=None, log_level="info")
+            assert sentinel_handler not in access_logger.handlers
+            assert any(
+                isinstance(f, log.EndpointAccessLogFilter)
+                for f in access_logger.filters
+            )
+        finally:
+            access_logger.filters = original_filters
+            access_logger.handlers = original_handlers

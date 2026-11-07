@@ -26,7 +26,13 @@ from vllm_router.dynamic_config import (
     initialize_dynamic_config_watcher,
 )
 from vllm_router.experimental import get_feature_gates, initialize_feature_gates
-from vllm_router.log import JsonFormatter, init_logger, set_log_format, set_log_level
+from vllm_router.log import (
+    JsonFormatter,
+    disable_access_log_for_endpoints,
+    init_logger,
+    set_log_format,
+    set_log_level,
+)
 from vllm_router.parsers.parser import parse_args
 from vllm_router.routers.batches_router import batches_router
 from vllm_router.routers.files_router import files_router
@@ -384,6 +390,10 @@ def main():
     args = parse_args()
     set_log_level(args.log_level)
     set_log_format(args.log_format)
+    disable_access_log_for_endpoints(
+        parse_comma_separated_args(args.disable_access_log_for_endpoints),
+        args.root_path,
+    )
     initialize_all(app, args)
     if args.log_stats:
         threading.Thread(

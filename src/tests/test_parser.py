@@ -213,3 +213,16 @@ def test_parse_args_log_format_accepts_json(monkeypatch: pytest.MonkeyPatch) -> 
     )
     args = parser.parse_args()
     assert args.log_format == "json"
+
+
+def test_validate_disable_access_log_for_endpoints_when_endpoint_has_no_leading_slash_raises_value_error() -> (
+    None
+):
+    with pytest.raises(ValueError):
+        parser.validate_disable_access_log_for_endpoints("/health,metrics")
+
+
+def test_validate_disable_access_log_for_endpoints_when_all_endpoints_start_with_slash_does_not_raise_error() -> (
+    None
+):
+    parser.validate_disable_access_log_for_endpoints("/health,/metrics")

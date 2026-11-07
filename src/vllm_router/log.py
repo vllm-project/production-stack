@@ -191,6 +191,36 @@ class TokenRedactionFilter(logging.Filter):
         return True
 
 
+class EndpointAccessLogFilter(logging.Filter):
+    """Logger filter that drops uvicorn access log records for the given paths.
+
+    Paths are relative to ``root_path``, because uvicorn logs the request path
+    with the root path prepended (e.g. ``/vllm/health`` for ``/health``).
+    """
+
+    def __init__(self, paths: list[str], root_path: str = ""):
+        super().__init__()
+        self.paths = {root_path + path for path in paths}
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # uvicorn logs access records as:
+        # '%s - "%s %s HTTP/%s" %d' % (client, method, path, http_version, status)
+        if not isinstance(record.args, tuple) or len(record.args) < 3:
+            return True
+        path_with_query = str(record.args[2])
+        path = path_with_query.split("?", 1)[0]
+        return path not in self.paths
+
+
+def disable_access_log_for_endpoints(
+    paths: list[str] | None, root_path: str = ""
+) -> None:
+    if paths:
+        logging.getLogger("uvicorn.access").addFilter(
+            EndpointAccessLogFilter(paths, root_path)
+        )
+
+
 def init_logger(name: str, log_level=None) -> Logger:
     if log_level is None:
         log_level = _LOG_LEVEL
