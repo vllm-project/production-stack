@@ -404,6 +404,12 @@ class StaticServiceDiscovery(ServiceDiscovery):
                         timeout=aiohttp.ClientTimeout(total=None),
                     )
 
+    def add_sleep_label(self, engine_id: str) -> None:
+        """Static discovery does not track sleep, so there is nothing to label."""
+
+    def remove_sleep_label(self, engine_id: str) -> None:
+        """Static discovery does not track sleep, so there is nothing to label."""
+
     def has_ever_seen_model(self, model_name: str) -> bool:
         """Check if the model is in the static list of models."""
         return (
