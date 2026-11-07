@@ -1,7 +1,6 @@
 faiss-cpu>=1.7.4
-huggingface-hub==0.33.0
 pytest
 pytest-asyncio
 sentence-transformers>=2.2.2
-transformers==4.51.1
-vllm==0.13.0
+transformers==5.19.0
+vllm==0.32.0
