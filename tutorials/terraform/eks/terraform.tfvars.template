@@ -76,3 +76,7 @@ enable_lb_ctl = false # Enable AWS Load Balancer Controller default true
 # public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
 # private_subnet_cidrs = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]
 # vpc_name = "vllm-vpc-prod"
+# To reuse an existing VPC instead (vpc_cidr and subnet CIDRs are then ignored):
+# create_vpc         = false
+# vpc_id             = "vpc-0123456789abcdef0"
+# private_subnet_ids = ["subnet-0aaa...", "subnet-0bbb...", "subnet-0ccc..."] # optional, default: internal-elb tagged subnets

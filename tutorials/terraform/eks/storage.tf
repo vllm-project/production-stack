@@ -20,11 +20,11 @@ resource "aws_efs_file_system" "eks-efs" {
   }
 }
 
-# Create mount targets in each private subnet
+# Create one mount target per AZ (EFS allows only one per AZ)
 resource "aws_efs_mount_target" "eks-efs-mounts" {
-  count = local.enable_efs_storage ? length(local.private_subnet_ids) : 0
+  count = local.enable_efs_storage ? length(local.private_subnet_ids_per_az) : 0
   file_system_id  = aws_efs_file_system.eks-efs[0].id
-  subnet_id       = local.private_subnet_ids[count.index]
+  subnet_id       = local.private_subnet_ids_per_az[count.index]
   security_groups = [aws_security_group.efs-sg[0].id, module.eks.cluster_primary_security_group_id]
 
   # being explicit helps Terraform order things correctly
@@ -46,7 +46,7 @@ resource "aws_security_group" "efs-sg" {
     from_port   = 2049
     to_port     = 2049
     protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
+    cidr_blocks = local.vpc_cidr_blocks
     description = "Allow NFS traffic from VPC"
   }
 
