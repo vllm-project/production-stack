@@ -101,4 +101,4 @@ class HashTrie:
             match_length += self.chunk_size
             selected_endpoints = intersection
 
-        return match_length, selected_endpoints
+        return min(match_length, len(request)), selected_endpoints

@@ -474,9 +474,9 @@ def parse_args():
         "routing to reuse a matched endpoint. If the longest prefix "
         "match is shorter than this value, the request falls back to "
         "least-inflight routing via request_stats (same load signal as "
-        "loadaware). Note: prefix matches are computed in "
-        "chunks (chunk_size, default 128 characters), so this "
-        "threshold is effectively quantized to that granularity. "
+        "loadaware). Prefix matches are computed in chunks "
+        "(chunk_size, default 128 characters); a matching final "
+        "partial chunk is counted at its actual character length. "
         "Defaults to 0, which disables the threshold.",
     )
 
