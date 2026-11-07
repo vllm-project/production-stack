@@ -20,8 +20,7 @@ This tutorial introduces the newly added `/v1/audio/transcriptions` endpoint in 
 Start a vLLM backend with the `whisper-small` model:
 
 ```bash
-vllm serve \
-  --task transcription openai/whisper-small \
+vllm serve openai/whisper-small \
   --host 0.0.0.0 --port 8002
 ```
 
