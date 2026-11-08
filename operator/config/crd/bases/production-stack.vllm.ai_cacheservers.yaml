@@ -139,6 +139,8 @@ spec:
                     description: HTTPPort maps to --http-port, the metrics and control
                       HTTP frontend.
                     format: int32
+                    maximum: 65535
+                    minimum: 1
                     type: integer
                   instanceId:
                     description: |-
@@ -225,6 +227,8 @@ spec:
                   Port is the ZMQ port the cache server listens on and the Service
                   exposes. Engines reach it through lmCacheConfig.multiprocess.port.
                 format: int32
+                maximum: 65535
+                minimum: 1
                 type: integer
               replicas:
                 default: 1

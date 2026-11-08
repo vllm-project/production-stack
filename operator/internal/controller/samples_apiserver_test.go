@@ -174,4 +174,27 @@ var _ = Describe("Samples against the API server", func() {
 		err = k8sClient.Create(ctx, rt)
 		Expect(apierrors.IsInvalid(err)).To(BeTrue(), "VLLMRuntime auto: %v", err)
 	})
+
+	It("rejects ports outside 1-65535", func() {
+		for name, mutate := range map[string]func(*productionstackv1alpha1.CacheServer){
+			"port 0":         func(cs *productionstackv1alpha1.CacheServer) { cs.Spec.Port = 0 },
+			"port 70000":     func(cs *productionstackv1alpha1.CacheServer) { cs.Spec.Port = 70000 },
+			"httpPort 70000": func(cs *productionstackv1alpha1.CacheServer) { cs.Spec.Multiprocess.HTTPPort = 70000 },
+			"httpPort -1":    func(cs *productionstackv1alpha1.CacheServer) { cs.Spec.Multiprocess.HTTPPort = -1 },
+		} {
+			cs := &productionstackv1alpha1.CacheServer{}
+			readSample(sampleCacheServerFile, cs)
+			cs.Name = "cacheserver-bad-port"
+			mutate(cs)
+			err := k8sClient.Create(ctx, cs)
+			Expect(apierrors.IsInvalid(err)).To(BeTrue(), "CacheServer %s: %v", name, err)
+		}
+
+		rt := &productionstackv1alpha1.VLLMRuntime{}
+		readSample(sampleRuntimeFile, rt)
+		rt.Name = "vllmruntime-bad-port"
+		rt.Spec.LMCacheConfig.Multiprocess.Port = 70000
+		err := k8sClient.Create(ctx, rt)
+		Expect(apierrors.IsInvalid(err)).To(BeTrue(), "VLLMRuntime multiprocess.port 70000: %v", err)
+	})
 })

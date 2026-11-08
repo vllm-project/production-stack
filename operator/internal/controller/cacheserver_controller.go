@@ -359,6 +359,13 @@ func cacheServerStrategy(cs *productionstackv1alpha1.CacheServer) appsv1.Deploym
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
 func (r *CacheServerReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, cs *productionstackv1alpha1.CacheServer) bool {
+	// Every comparison below reads the first container. A live Deployment
+	// without one cannot be compared, so rewrite it from the spec rather
+	// than index out of range.
+	if len(dep.Spec.Template.Spec.Containers) == 0 {
+		return true
+	}
+
 	// Compare replicas
 	if *dep.Spec.Replicas != cs.Spec.Replicas {
 		return true
@@ -367,8 +374,7 @@ func (r *CacheServerReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, cs
 	expectedDep := r.deploymentForCacheServer(cs)
 
 	// Compare image
-	if len(dep.Spec.Template.Spec.Containers) > 0 &&
-		expectedDep.Spec.Template.Spec.Containers[0].Image != dep.Spec.Template.Spec.Containers[0].Image {
+	if expectedDep.Spec.Template.Spec.Containers[0].Image != dep.Spec.Template.Spec.Containers[0].Image {
 		return true
 	}
 

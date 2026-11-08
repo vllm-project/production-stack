@@ -474,6 +474,8 @@ spec:
                         default: 9000
                         description: Port is the cache server ZMQ port.
                         format: int32
+                        maximum: 65535
+                        minimum: 1
                         type: integer
                       transferMode:
                         default: lmcache_driven

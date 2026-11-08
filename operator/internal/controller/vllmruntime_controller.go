@@ -1093,6 +1093,16 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 ) bool {
 
 	log := log.FromContext(ctx)
+
+	// Every comparison below reads the first container, and the port check
+	// its first port. A live Deployment edited to drop either cannot be
+	// compared, so rewrite it from the spec rather than index out of range.
+	if len(dep.Spec.Template.Spec.Containers) == 0 ||
+		len(dep.Spec.Template.Spec.Containers[0].Ports) == 0 {
+		log.Info("Deployment has no vLLM container or port to compare; updating it")
+		return true
+	}
+
 	// Generate the expected deployment
 	expectedDep := r.deploymentForVLLMRuntime(vr)
 

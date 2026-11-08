@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -128,5 +129,30 @@ func TestCacheServerPodFieldsDrift(t *testing.T) {
 		if !r.deploymentNeedsUpdate(stored, cs) {
 			t.Errorf("%s not detected as drift", name)
 		}
+	}
+}
+
+// TestDeploymentNeedsUpdateWithoutContainer checks drift detection rewrites a
+// live Deployment that has lost the container, or the vLLM port, it compares,
+// instead of indexing out of range and crashing the reconciler.
+func TestDeploymentNeedsUpdateWithoutContainer(t *testing.T) {
+	csr := &CacheServerReconciler{Scheme: newTestScheme()}
+	noContainers := csr.deploymentForCacheServer(mpCacheServer())
+	noContainers.Spec.Template.Spec.Containers = nil
+	if !csr.deploymentNeedsUpdate(noContainers, mpCacheServer()) {
+		t.Error("cache server Deployment without containers not reported as drift")
+	}
+
+	vr := &VLLMRuntimeReconciler{Scheme: newTestScheme()}
+	noContainers = vr.deploymentForVLLMRuntime(mpRuntime())
+	noContainers.Spec.Template.Spec.Containers = nil
+	if !vr.deploymentNeedsUpdate(context.Background(), noContainers, mpRuntime()) {
+		t.Error("runtime Deployment without containers not reported as drift")
+	}
+
+	noPorts := vr.deploymentForVLLMRuntime(mpRuntime())
+	noPorts.Spec.Template.Spec.Containers[0].Ports = nil
+	if !vr.deploymentNeedsUpdate(context.Background(), noPorts, mpRuntime()) {
+		t.Error("runtime Deployment without a container port not reported as drift")
 	}
 }

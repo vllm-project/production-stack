@@ -31,6 +31,8 @@ type CacheServerSpec struct {
 
 	// Port is the ZMQ port the cache server listens on and the Service
 	// exposes. Engines reach it through lmCacheConfig.multiprocess.port.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
 	// +kubebuilder:default=9000
 	Port int32 `json:"port"`
 
@@ -110,6 +112,8 @@ type MultiprocessSpec struct {
 	ChunkSize int32 `json:"chunkSize,omitempty"`
 
 	// HTTPPort maps to --http-port, the metrics and control HTTP frontend.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
 	// +kubebuilder:default=8080
 	HTTPPort int32 `json:"httpPort,omitempty"`
 

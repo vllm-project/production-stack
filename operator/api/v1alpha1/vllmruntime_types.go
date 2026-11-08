@@ -334,6 +334,8 @@ type MPConnectorConfig struct {
 	Host string `json:"host,omitempty"`
 
 	// Port is the cache server ZMQ port.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
 	// +kubebuilder:default=9000
 	Port int32 `json:"port,omitempty"`
 
