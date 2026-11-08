@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -51,6 +52,12 @@ type DeploymentConfig struct {
 	// /dev/shm (typically 64Mi) is too small. Accepts any Kubernetes quantity.
 	// +optional
 	ShmSize string `json:"shmSize,omitempty"`
+
+	// HostIPC places the engine in the host IPC namespace so it shares /dev/shm
+	// with a cache server on the same node. Needed only for the shared-memory
+	// KV transfer path, where it must be set on the cache server too. It
+	// overrides ShmSize, since the host's /dev/shm replaces the emptyDir.
+	HostIPC bool `json:"hostIPC,omitempty"`
 
 	// Resource requirements
 	Resources ResourceRequirements `json:"resources"`
@@ -193,6 +200,11 @@ type VLLMConfig struct {
 	// Maximum number of LoRAs
 	MaxLoras int32 `json:"maxLoras,omitempty"`
 
+	// MaxNumBatchedTokens caps the tokens in one batch. With LMCache it should
+	// be sized against the cache server's chunk size, so a prefill covers whole
+	// chunks.
+	MaxNumBatchedTokens int32 `json:"maxNumBatchedTokens,omitempty"`
+
 	// Extra arguments for vllm serve
 	ExtraArgs []string `json:"extraArgs,omitempty"`
 
@@ -224,8 +236,19 @@ type ModelSpec struct {
 	// Tool call parser
 	ToolCallParser string `json:"toolCallParser,omitempty"`
 
-	// Maximum model length
-	MaxModelLen int32 `json:"maxModelLen,omitempty"`
+	// MaxModelLen is the context length, as a number or one of vLLM's
+	// shorthands: "auto" (equivalently -1) derives it from the model config,
+	// and suffixed forms such as "32k" or "32K" are accepted.
+	// +kubebuilder:validation:XIntOrString
+	MaxModelLen intstr.IntOrString `json:"maxModelLen,omitempty"`
+
+	// TrustRemoteCode allows executing model code shipped in the repository.
+	// Required by architectures vLLM does not implement natively.
+	TrustRemoteCode bool `json:"trustRemoteCode,omitempty"`
+
+	// ReasoningParser names the parser that separates reasoning traces from
+	// the answer, for example "qwen3".
+	ReasoningParser string `json:"reasoningParser,omitempty"`
 
 	// Data type
 	DType string `json:"dtype,omitempty"`
@@ -247,25 +270,94 @@ type HuggingFaceTokenSecret struct {
 	HFTokenKeyName string `json:"hfTokenKeyName,omitempty"`
 }
 
-// LMCacheConfig defines the LM Cache configuration
+// LMCacheConfig configures LMCache for the engine, in one of two modes.
 type LMCacheConfig struct {
 	// Enabled enables LM Cache
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled,omitempty"`
 
-	// CPUOffloadingBufferSize is the size of the CPU offloading buffer
+	// Mode selects where the KV cache lives.
+	//
+	// Multiprocess, the default, hands the cache to a CacheServer running
+	// `lmcache server`, reached through the LMCacheMPConnector and configured
+	// by the multiprocess block. InProcess keeps the cache inside the engine
+	// process (LMCacheConnectorV1), offloading to CPU memory, local disk and an
+	// optional remote backend; it is configured by the cpuOffloadingBufferSize,
+	// diskOffloadingBufferSize, remoteUrl and remoteSerde fields.
+	// +kubebuilder:validation:Enum=InProcess;Multiprocess
+	// +kubebuilder:default=Multiprocess
+	Mode LMCacheMode `json:"mode,omitempty"`
+
+	// CPUOffloadingBufferSize is the size of the CPU offloading buffer.
+	// InProcess mode only.
 	// +kubebuilder:default="4Gi"
 	CPUOffloadingBufferSize string `json:"cpuOffloadingBufferSize,omitempty"`
 
-	// DiskOffloadingBufferSize is the size of the disk offloading buffer
+	// DiskOffloadingBufferSize is the size of the disk offloading buffer.
+	// InProcess mode only.
 	// +kubebuilder:default="8Gi"
 	DiskOffloadingBufferSize string `json:"diskOffloadingBufferSize,omitempty"`
 
-	// RemoteURL is the URL of the remote cache server
+	// RemoteURL is the URL of the remote cache backend. InProcess mode only.
+	// lm:// URLs need LMCache 0.5.6 or older, which still ships the server
+	// they point at.
 	RemoteURL string `json:"remoteUrl,omitempty"`
 
-	// RemoteSerde is the serialization format for the remote cache
+	// RemoteSerde is the serialization format for the remote cache.
+	// InProcess mode only.
 	RemoteSerde string `json:"remoteSerde,omitempty"`
+
+	// Multiprocess configures the connection to the cache server.
+	// Multiprocess mode only.
+	// +kubebuilder:default={}
+	Multiprocess MPConnectorConfig `json:"multiprocess,omitempty"`
+}
+
+// LMCacheMode selects where the engine's KV cache lives.
+type LMCacheMode string
+
+const (
+	// LMCacheModeInProcess keeps the cache in the engine process, using the
+	// LMCacheConnectorV1 KV connector.
+	LMCacheModeInProcess LMCacheMode = "InProcess"
+
+	// LMCacheModeMultiprocess connects the engine to a CacheServer using the
+	// LMCacheMPConnector KV connector.
+	LMCacheModeMultiprocess LMCacheMode = "Multiprocess"
+)
+
+// MPConnectorConfig configures the LMCacheMPConnector on the engine side. The
+// fields become kv_connector_extra_config entries under the lmcache.mp. prefix.
+type MPConnectorConfig struct {
+	// Host is the cache server address, including scheme, for example
+	// tcp://cacheserver-sample.default.svc.cluster.local.
+	Host string `json:"host,omitempty"`
+
+	// Port is the cache server ZMQ port.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:default=9000
+	Port int32 `json:"port,omitempty"`
+
+	// TransferMode maps to lmcache.mp.mp_transfer_mode and must agree with the
+	// cache server's --supported-transfer-mode.
+	//
+	// lmcache_driven, the only supported mode, has the cache server copy KV
+	// out of this engine's GPU memory over CUDA IPC.
+	// +kubebuilder:validation:Enum=lmcache_driven
+	// +kubebuilder:default=lmcache_driven
+	TransferMode string `json:"transferMode,omitempty"`
+
+	// IsolatedIPC maps to lmcache.mp.isolated_ipc, for a worker and a server
+	// that share no host IPC namespace or /dev/shm. Must match the cache
+	// server's --isolated-ipc.
+	IsolatedIPC bool `json:"isolatedIpc,omitempty"`
+
+	// ExtraConfig holds further kv_connector_extra_config entries, merged into
+	// the generated config. Keys are used verbatim, so they must carry the
+	// lmcache.mp. prefix where the adapter expects one. Values set here win
+	// over the generated ones.
+	ExtraConfig map[string]string `json:"extraConfig,omitempty"`
 }
 
 // StorageConfig defines the storage configuration
