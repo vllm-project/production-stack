@@ -66,6 +66,8 @@ tests:
             parentRefs:
               - name: gateway
                 namespace: default
+            timeouts:
+              requests: 300s
     asserts:
     - hasDocuments:
         count: 2
@@ -183,3 +185,8 @@ tests:
           - path:
               type: PathPrefix
               value: /
+    - documentIndex: 1
+      equal:
+        path: spec.rules[0].timeouts
+        value:
+          requests: 300s
