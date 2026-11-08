@@ -39,10 +39,11 @@ spec:
   # LM Cache configuration
   lmCacheConfig:
     enabled: true
-    cpuOffloadingBufferSize: "15"
-    diskOffloadingBufferSize: "0"
-    remoteUrl: "lm://cacheserver-sample.default.svc.cluster.local:80"
-    remoteSerde: "naive"
+    mode: Multiprocess
+    multiprocess:
+      host: "tcp://cacheserver-sample.default.svc.cluster.local"
+      port: 9000
+      isolatedIpc: true
 
   # Deployment configuration
   deploymentConfig:
@@ -56,7 +57,7 @@ spec:
     # Image configuration
     image:
       registry: "docker.io"
-      name: "lmcache/vllm-openai:2025-05-27-v1"
+      name: "lmcache/vllm-openai:v0.5.5"
       pullPolicy: "IfNotPresent"
       pullSecretName: ""
 

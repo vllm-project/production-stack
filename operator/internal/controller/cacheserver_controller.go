@@ -23,6 +23,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,6 +89,18 @@ func (r *CacheServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
+	// Keep the Service ports in step with spec.port and multiprocess.httpPort,
+	// including Services created by an older operator that published port 80.
+	if expectedPorts := cacheServerServicePorts(cacheServer); servicePortsDiffer(foundService.Spec.Ports, expectedPorts) {
+		log.Info("Updating Service ports", "Service.Namespace", foundService.Namespace, "Service.Name", foundService.Name)
+		foundService.Spec.Ports = expectedPorts
+		if err := r.Update(ctx, foundService); err != nil {
+			log.Error(err, "Failed to update Service", "Service.Namespace", foundService.Namespace, "Service.Name", foundService.Name)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
 	// Check if the deployment already exists, if not create a new one
 	found := &appsv1.Deployment{}
 	err = r.Get(ctx, types.NamespacedName{Name: cacheServer.Name, Namespace: cacheServer.Namespace}, found)
@@ -131,6 +144,124 @@ func (r *CacheServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{}, nil
 }
 
+// cacheServerCommand builds the `lmcache server` command for a CacheServer
+// from Spec.Multiprocess. The server always binds 0.0.0.0 so the Service can
+// reach it from other pods.
+func cacheServerCommand(cs *productionstackv1alpha1.CacheServer) []string {
+	mp := cs.Spec.Multiprocess
+
+	// --l1-size-gb and --eviction-policy are required by the server, so fall
+	// back to the API defaults when a spec was built without them.
+	l1SizeGB := mp.L1SizeGB
+	if l1SizeGB <= 0 {
+		l1SizeGB = 10
+	}
+	evictionPolicy := mp.EvictionPolicy
+	if evictionPolicy == "" {
+		evictionPolicy = "LRU"
+	}
+	chunkSize := mp.ChunkSize
+	if chunkSize <= 0 {
+		chunkSize = 256
+	}
+
+	cmd := []string{
+		"/opt/venv/bin/lmcache",
+		"server",
+		"--host", "0.0.0.0",
+		"--port", fmt.Sprintf("%d", cs.Spec.Port),
+		"--l1-size-gb", fmt.Sprintf("%d", l1SizeGB),
+		"--eviction-policy", evictionPolicy,
+		"--chunk-size", fmt.Sprintf("%d", chunkSize),
+	}
+
+	cmd = append(cmd, "--supported-transfer-mode", mpTransferMode(mp.TransferMode))
+	if mp.HTTPPort > 0 {
+		cmd = append(cmd, "--http-port", fmt.Sprintf("%d", mp.HTTPPort))
+	}
+	if mp.L1InitSizeGB > 0 {
+		cmd = append(cmd, "--l1-init-size-gb", fmt.Sprintf("%d", mp.L1InitSizeGB))
+	}
+	if mp.L1AlignBytes > 0 {
+		cmd = append(cmd, "--l1-align-bytes", fmt.Sprintf("%d", mp.L1AlignBytes))
+	}
+	if mp.EvictionTriggerWatermark != "" {
+		cmd = append(cmd, "--eviction-trigger-watermark", mp.EvictionTriggerWatermark)
+	}
+	if mp.EvictionRatio != "" {
+		cmd = append(cmd, "--eviction-ratio", mp.EvictionRatio)
+	}
+	for _, adapter := range mp.L2Adapters {
+		cmd = append(cmd, "--l2-adapter", adapter)
+	}
+	if mp.MaxWorkers > 0 {
+		cmd = append(cmd, "--max-workers", fmt.Sprintf("%d", mp.MaxWorkers))
+	}
+	if mp.MaxGPUWorkers > 0 {
+		cmd = append(cmd, "--max-gpu-workers", fmt.Sprintf("%d", mp.MaxGPUWorkers))
+	}
+	if mp.MaxCPUWorkers > 0 {
+		cmd = append(cmd, "--max-cpu-workers", fmt.Sprintf("%d", mp.MaxCPUWorkers))
+	}
+	if mp.InstanceID != "" {
+		cmd = append(cmd, "--instance-id", mp.InstanceID)
+	}
+	// Both flags default to false on the server, so only the enabling form is
+	// ever rendered.
+	if mp.SeparateObjectGroups {
+		cmd = append(cmd, "--separate-object-groups")
+	}
+	if mp.IsolatedIPC {
+		cmd = append(cmd, "--isolated-ipc")
+	}
+
+	return append(cmd, mp.ExtraArgs...)
+}
+
+// cacheServerContainerPorts lists the ports the cache server container exposes:
+// the ZMQ port engines connect to, and the HTTP frontend for metrics.
+func cacheServerContainerPorts(cs *productionstackv1alpha1.CacheServer) []corev1.ContainerPort {
+	ports := []corev1.ContainerPort{
+		{
+			Name:          "zmq",
+			ContainerPort: cs.Spec.Port,
+			Protocol:      corev1.ProtocolTCP,
+		},
+	}
+	if cs.Spec.Multiprocess.HTTPPort > 0 {
+		ports = append(ports, corev1.ContainerPort{
+			Name:          "metrics",
+			ContainerPort: cs.Spec.Multiprocess.HTTPPort,
+			Protocol:      corev1.ProtocolTCP,
+		})
+	}
+	return ports
+}
+
+// defaultMPTransferMode is the transfer mode rendered when a spec leaves it
+// empty. It is also the API default, so this only matters for objects that
+// bypassed defaulting.
+const defaultMPTransferMode = "lmcache_driven"
+
+// mpTransferMode returns mode, or the default when mode is empty.
+func mpTransferMode(mode string) string {
+	if mode == "" {
+		return defaultMPTransferMode
+	}
+	return mode
+}
+
+// cacheServerEnv builds the environment for the cache server container.
+func cacheServerEnv(cs *productionstackv1alpha1.CacheServer) []corev1.EnvVar {
+	// nil rather than an empty slice: the API server drops an empty env list,
+	// and a CacheServer with no env must compare equal to what it reads back.
+	var env []corev1.EnvVar
+	for _, e := range cs.Spec.Env {
+		env = append(env, corev1.EnvVar{Name: e.Name, Value: e.Value})
+	}
+	return env
+}
+
 // deploymentForCacheServer returns a CacheServer Deployment object
 func (r *CacheServerReconciler) deploymentForCacheServer(cacheServer *productionstackv1alpha1.CacheServer) *appsv1.Deployment {
 	labels := map[string]string{
@@ -172,27 +303,25 @@ func (r *CacheServerReconciler) deploymentForCacheServer(cacheServer *production
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
+			Strategy: cacheServerStrategy(cacheServer),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					HostIPC:          cacheServer.Spec.HostIPC,
+					Volumes:          cacheServer.Spec.Volumes,
+					RuntimeClassName: runtimeClassOrNil(cacheServer.Spec.RuntimeClassName),
 					Containers: []corev1.Container{
 						{
 							Name:            "cache-server",
 							Image:           image,
 							ImagePullPolicy: imagePullPolicy,
-							Command: []string{
-								"/opt/venv/bin/lmcache_server",
-								"0.0.0.0",
-								fmt.Sprintf("%d", cacheServer.Spec.Port)},
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "http",
-									ContainerPort: cacheServer.Spec.Port,
-								},
-							},
-							Resources: resources,
+							Command:         cacheServerCommand(cacheServer),
+							Ports:           cacheServerContainerPorts(cacheServer),
+							Env:             cacheServerEnv(cacheServer),
+							Resources:       resources,
+							VolumeMounts:    cacheServer.Spec.VolumeMounts,
 						},
 					},
 				},
@@ -203,6 +332,29 @@ func (r *CacheServerReconciler) deploymentForCacheServer(cacheServer *production
 	// Set the owner reference
 	ctrl.SetControllerReference(cacheServer, dep, r.Scheme)
 	return dep
+}
+
+// runtimeClassOrNil converts a RuntimeClass name into the pointer a PodSpec
+// wants, mapping the empty string to nil. Passing a pointer to "" instead would
+// ask the API server for a RuntimeClass literally named "", which no cluster
+// has, and the pod would never be admitted.
+func runtimeClassOrNil(name string) *string {
+	if name == "" {
+		return nil
+	}
+	return &name
+}
+
+// cacheServerStrategy renders spec.deploymentStrategy into a DeploymentStrategy.
+//
+// Recreate matters for the cache server: its L1 arena is pinned host
+// memory, and a rolling update would have the new pod try to pin a second arena
+// while the old one still holds the first.
+func cacheServerStrategy(cs *productionstackv1alpha1.CacheServer) appsv1.DeploymentStrategy {
+	if cs.Spec.DeploymentStrategy == string(appsv1.RecreateDeploymentStrategyType) {
+		return appsv1.DeploymentStrategy{Type: appsv1.RecreateDeploymentStrategyType}
+	}
+	return appsv1.DeploymentStrategy{Type: appsv1.RollingUpdateDeploymentStrategyType}
 }
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
@@ -224,6 +376,66 @@ func (r *CacheServerReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, cs
 	expectedResources := expectedDep.Spec.Template.Spec.Containers[0].Resources
 	actualResources := dep.Spec.Template.Spec.Containers[0].Resources
 	if !reflect.DeepEqual(expectedResources, actualResources) {
+		return true
+	}
+
+	// Compare the rendered server command, so a change to the mode or to any
+	// multiprocess flag rolls the deployment.
+	if !reflect.DeepEqual(
+		expectedDep.Spec.Template.Spec.Containers[0].Command,
+		dep.Spec.Template.Spec.Containers[0].Command,
+	) {
+		return true
+	}
+
+	// Compare environment and ports. Semantic equality, because the API server
+	// returns an empty env list as nil.
+	if !equality.Semantic.DeepEqual(
+		expectedDep.Spec.Template.Spec.Containers[0].Env,
+		dep.Spec.Template.Spec.Containers[0].Env,
+	) {
+		return true
+	}
+	if !reflect.DeepEqual(
+		expectedDep.Spec.Template.Spec.Containers[0].Ports,
+		dep.Spec.Template.Spec.Containers[0].Ports,
+	) {
+		return true
+	}
+
+	// Compare the IPC namespace.
+	if expectedDep.Spec.Template.Spec.HostIPC != dep.Spec.Template.Spec.HostIPC {
+		return true
+	}
+
+	// Compare storage. Semantic equality, because the API server stores an
+	// empty list as nil and a plain DeepEqual would roll the deployment on
+	// every reconcile.
+	if !equality.Semantic.DeepEqual(
+		expectedDep.Spec.Template.Spec.Volumes,
+		dep.Spec.Template.Spec.Volumes,
+	) {
+		return true
+	}
+	if !equality.Semantic.DeepEqual(
+		expectedDep.Spec.Template.Spec.Containers[0].VolumeMounts,
+		dep.Spec.Template.Spec.Containers[0].VolumeMounts,
+	) {
+		return true
+	}
+
+	// Compare the RuntimeClass. A cache server under the wrong RuntimeClass
+	// cannot see the engines' GPUs and falls back to StubCPUDevice in
+	// lmcache_driven mode.
+	if !equality.Semantic.DeepEqual(
+		expectedDep.Spec.Template.Spec.RuntimeClassName,
+		dep.Spec.Template.Spec.RuntimeClassName,
+	) {
+		return true
+	}
+
+	// Compare the update strategy.
+	if expectedDep.Spec.Strategy.Type != dep.Spec.Strategy.Type {
 		return true
 	}
 
@@ -257,6 +469,46 @@ func (r *CacheServerReconciler) updateStatus(ctx context.Context, cs *production
 	})
 }
 
+// cacheServerServicePorts lists the ports the CacheServer Service publishes.
+// The ZMQ port is published on its own number, so the port in the engine's
+// lmcache.mp.port matches the port in the spec, and the HTTP frontend is
+// published alongside it.
+func cacheServerServicePorts(cs *productionstackv1alpha1.CacheServer) []corev1.ServicePort {
+	ports := []corev1.ServicePort{
+		{
+			Name:       "zmq",
+			Port:       cs.Spec.Port,
+			TargetPort: intstr.FromInt32(cs.Spec.Port),
+			Protocol:   corev1.ProtocolTCP,
+		},
+	}
+	if cs.Spec.Multiprocess.HTTPPort > 0 {
+		ports = append(ports, corev1.ServicePort{
+			Name:       "metrics",
+			Port:       cs.Spec.Multiprocess.HTTPPort,
+			TargetPort: intstr.FromInt32(cs.Spec.Multiprocess.HTTPPort),
+			Protocol:   corev1.ProtocolTCP,
+		})
+	}
+	return ports
+}
+
+// servicePortsDiffer reports whether the live Service ports differ from the
+// expected ones in name, port, target port or protocol. Fields the API server
+// fills in, such as NodePort, are ignored.
+func servicePortsDiffer(actual, expected []corev1.ServicePort) bool {
+	if len(actual) != len(expected) {
+		return true
+	}
+	for i := range expected {
+		a, e := actual[i], expected[i]
+		if a.Name != e.Name || a.Port != e.Port || a.TargetPort != e.TargetPort || a.Protocol != e.Protocol {
+			return true
+		}
+	}
+	return false
+}
+
 // serviceForCacheServer returns a CacheServer Service object
 func (r *CacheServerReconciler) serviceForCacheServer(cacheServer *productionstackv1alpha1.CacheServer) *corev1.Service {
 	labels := map[string]string{
@@ -271,14 +523,7 @@ func (r *CacheServerReconciler) serviceForCacheServer(cacheServer *productionsta
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
 			Selector: labels,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "http",
-					Port:       80,
-					TargetPort: intstr.FromInt32(cacheServer.Spec.Port),
-					Protocol:   corev1.ProtocolTCP,
-				},
-			},
+			Ports:    cacheServerServicePorts(cacheServer),
 		},
 	}
 

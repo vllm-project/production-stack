@@ -163,6 +163,13 @@ spec:
                     - RollingUpdate
                     - Recreate
                     type: string
+                  hostIPC:
+                    description: |-
+                      HostIPC places the engine in the host IPC namespace so it shares /dev/shm
+                      with a cache server on the same node. Needed only for the shared-memory
+                      KV transfer path, where it must be set on the cache server too. It
+                      overrides ShmSize, since the host's /dev/shm replaces the emptyDir.
+                    type: boolean
                   image:
                     description: Image configuration
                     properties:
@@ -408,24 +415,88 @@ spec:
                 properties:
                   cpuOffloadingBufferSize:
                     default: 4Gi
-                    description: CPUOffloadingBufferSize is the size of the CPU offloading
-                      buffer
+                    description: |-
+                      CPUOffloadingBufferSize is the size of the CPU offloading buffer.
+                      InProcess mode only.
                     type: string
                   diskOffloadingBufferSize:
                     default: 8Gi
-                    description: DiskOffloadingBufferSize is the size of the disk
-                      offloading buffer
+                    description: |-
+                      DiskOffloadingBufferSize is the size of the disk offloading buffer.
+                      InProcess mode only.
                     type: string
                   enabled:
                     default: false
                     description: Enabled enables LM Cache
                     type: boolean
+                  mode:
+                    default: Multiprocess
+                    description: |-
+                      Mode selects where the KV cache lives.
+
+                      Multiprocess, the default, hands the cache to a CacheServer running
+                      `lmcache server`, reached through the LMCacheMPConnector and configured
+                      by the multiprocess block. InProcess keeps the cache inside the engine
+                      process (LMCacheConnectorV1), offloading to CPU memory, local disk and an
+                      optional remote backend; it is configured by the cpuOffloadingBufferSize,
+                      diskOffloadingBufferSize, remoteUrl and remoteSerde fields.
+                    enum:
+                    - InProcess
+                    - Multiprocess
+                    type: string
+                  multiprocess:
+                    default: {}
+                    description: |-
+                      Multiprocess configures the connection to the cache server.
+                      Multiprocess mode only.
+                    properties:
+                      extraConfig:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          ExtraConfig holds further kv_connector_extra_config entries, merged into
+                          the generated config. Keys are used verbatim, so they must carry the
+                          lmcache.mp. prefix where the adapter expects one. Values set here win
+                          over the generated ones.
+                        type: object
+                      host:
+                        description: |-
+                          Host is the cache server address, including scheme, for example
+                          tcp://cacheserver-sample.default.svc.cluster.local.
+                        type: string
+                      isolatedIpc:
+                        description: |-
+                          IsolatedIPC maps to lmcache.mp.isolated_ipc, for a worker and a server
+                          that share no host IPC namespace or /dev/shm. Must match the cache
+                          server's --isolated-ipc.
+                        type: boolean
+                      port:
+                        default: 9000
+                        description: Port is the cache server ZMQ port.
+                        format: int32
+                        type: integer
+                      transferMode:
+                        default: lmcache_driven
+                        description: |-
+                          TransferMode maps to lmcache.mp.mp_transfer_mode and must agree with the
+                          cache server's --supported-transfer-mode.
+
+                          lmcache_driven, the only supported mode, has the cache server copy KV
+                          out of this engine's GPU memory over CUDA IPC.
+                        enum:
+                        - lmcache_driven
+                        type: string
+                    type: object
                   remoteSerde:
-                    description: RemoteSerde is the serialization format for the remote
-                      cache
+                    description: |-
+                      RemoteSerde is the serialization format for the remote cache.
+                      InProcess mode only.
                     type: string
                   remoteUrl:
-                    description: RemoteURL is the URL of the remote cache server
+                    description: |-
+                      RemoteURL is the URL of the remote cache backend. InProcess mode only.
+                      lm:// URLs need LMCache 0.5.6 or older, which still ships the server
+                      they point at.
                     type: string
                 type: object
               model:
@@ -455,9 +526,14 @@ spec:
                         type: string
                     type: object
                   maxModelLen:
-                    description: Maximum model length
-                    format: int32
-                    type: integer
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: |-
+                      MaxModelLen is the context length, as a number or one of vLLM's
+                      shorthands: "auto" (equivalently -1) derives it from the model config,
+                      and suffixed forms such as "32k" or "32K" are accepted.
+                    x-kubernetes-int-or-string: true
                   maxNumSeqs:
                     description: Maximum number of sequences
                     format: int32
@@ -465,9 +541,19 @@ spec:
                   modelURL:
                     description: Model URL
                     type: string
+                  reasoningParser:
+                    description: |-
+                      ReasoningParser names the parser that separates reasoning traces from
+                      the answer, for example "qwen3".
+                    type: string
                   toolCallParser:
                     description: Tool call parser
                     type: string
+                  trustRemoteCode:
+                    description: |-
+                      TrustRemoteCode allows executing model code shipped in the repository.
+                      Required by architectures vLLM does not implement natively.
+                    type: boolean
                 required:
                 - modelURL
                 type: object
@@ -539,6 +625,13 @@ spec:
                     type: string
                   maxLoras:
                     description: Maximum number of LoRAs
+                    format: int32
+                    type: integer
+                  maxNumBatchedTokens:
+                    description: |-
+                      MaxNumBatchedTokens caps the tokens in one batch. With LMCache it should
+                      be sized against the cache server's chunk size, so a prefill covers whole
+                      chunks.
                     format: int32
                     type: integer
                   port:

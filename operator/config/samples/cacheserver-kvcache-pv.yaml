@@ -1,0 +1,23 @@
+# Disk for the cache server's L2 (cold) KV-cache tier.
+#
+# Point hostPath.path at a directory on a dedicated local drive of the GPU
+# node (NVMe is best), never the disk that holds etcd or the root filesystem:
+# heavy L2 writes there can stall etcd. The L2 tier keeps KV cache there across
+# cache server restarts.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: lmcache-kvcache-pv
+  labels:
+    app.kubernetes.io/name: production-stack
+spec:
+  capacity:
+    storage: 200Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  # Empty, so only the claim that names this volume binds to it.
+  storageClassName: ""
+  hostPath:
+    path: /mnt/lmcache/kvcache
+    type: DirectoryOrCreate

@@ -18,13 +18,16 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"reflect"
+	"strconv"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -385,6 +388,153 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 	return ctrl.Result{}, nil
 }
 
+// maxModelLenArg renders the --max-model-len value and reports whether the
+// flag should be passed at all.
+//
+// The field is int-or-string because vLLM accepts a plain count, the sentinels
+// "auto" and -1 for deriving it from the model config, and suffixed forms such
+// as "32k". An unset field is the integer zero, which means "leave it to vLLM"
+// rather than a context length of nothing.
+func maxModelLenArg(maxModelLen intstr.IntOrString) (string, bool) {
+	if maxModelLen.Type == intstr.String {
+		if maxModelLen.StrVal == "" {
+			return "", false
+		}
+		return maxModelLen.StrVal, true
+	}
+	if maxModelLen.IntVal == 0 {
+		return "", false
+	}
+	return strconv.Itoa(int(maxModelLen.IntVal)), true
+}
+
+// kvTransferConfigArg returns the value following --kv-transfer-config in args,
+// or the empty string when the flag is absent.
+func kvTransferConfigArg(args []string) string {
+	for i, arg := range args {
+		if arg == "--kv-transfer-config" && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
+// lmcacheEnvValues picks the in-process LMCache settings out of a container's
+// env, for comparing the expected and the running Deployment.
+func lmcacheEnvValues(env []corev1.EnvVar) map[string]string {
+	values := map[string]string{}
+	for _, e := range env {
+		switch e.Name {
+		case "LMCACHE_USE_EXPERIMENTAL",
+			"LMCACHE_LOCAL_CPU", "LMCACHE_MAX_LOCAL_CPU_SIZE",
+			"LMCACHE_LOCAL_DISK", "LMCACHE_MAX_LOCAL_DISK_SIZE",
+			"LMCACHE_REMOTE_URL", "LMCACHE_REMOTE_SERDE":
+			values[e.Name] = e.Value
+		}
+	}
+	return values
+}
+
+// kvTransferConfig is the --kv-transfer-config document passed to vllm serve.
+type kvTransferConfig struct {
+	KVConnector string `json:"kv_connector"`
+	KVRole      string `json:"kv_role"`
+	// ExtraConfig is omitted for the local connectors, which take no extra
+	// configuration.
+	ExtraConfig map[string]any `json:"kv_connector_extra_config,omitempty"`
+}
+
+// isLMCacheMultiprocess reports whether the runtime attaches to a CacheServer
+// rather than keeping its LMCache in process. Multiprocess is the API default,
+// so an empty mode, from an object that bypassed defaulting, counts as
+// Multiprocess too; only an explicit InProcess keeps the cache in process.
+func isLMCacheMultiprocess(vllmRuntime *productionstackv1alpha1.VLLMRuntime) bool {
+	return vllmRuntime.Spec.LMCacheConfig.Mode != productionstackv1alpha1.LMCacheModeInProcess
+}
+
+// lmcacheKVTransferConfig renders the --kv-transfer-config value for a runtime.
+//
+// InProcess mode selects the in-process connector, LMCacheConnectorV1 or, for
+// the legacy engine, LMCacheConnector, and renders exactly the document main
+// always has, so existing runtimes do not roll. Multiprocess mode selects the
+// LMCacheMPConnector, with the cache server address and transfer mode in the
+// extra config.
+//
+// Args:
+//
+//	vllmRuntime: The runtime whose LMCacheConfig is rendered.
+//
+// Returns:
+//
+//	The JSON document.
+func lmcacheKVTransferConfig(
+	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
+) string {
+	lmCache := vllmRuntime.Spec.LMCacheConfig
+
+	if !isLMCacheMultiprocess(vllmRuntime) {
+		connector := "LMCacheConnector"
+		if vllmRuntime.Spec.VLLMConfig.V1 {
+			connector = "LMCacheConnectorV1"
+		}
+		// Marshalling cannot fail: both values are strings.
+		encoded, _ := json.Marshal(kvTransferConfig{KVConnector: connector, KVRole: "kv_both"})
+		return string(encoded)
+	}
+
+	mp := lmCache.Multiprocess
+	extra := map[string]any{}
+	if mp.Host != "" {
+		extra["lmcache.mp.host"] = mp.Host
+	}
+	if mp.Port > 0 {
+		extra["lmcache.mp.port"] = mp.Port
+	}
+	extra["lmcache.mp.mp_transfer_mode"] = mpTransferMode(mp.TransferMode)
+	if mp.IsolatedIPC {
+		extra["lmcache.mp.isolated_ipc"] = true
+	}
+	// User-supplied entries win, so an escape hatch exists for keys the spec
+	// does not model, including overrides of the generated ones.
+	for key, value := range mp.ExtraConfig {
+		extra[key] = value
+	}
+
+	config := kvTransferConfig{
+		KVConnector: "LMCacheMPConnector",
+		KVRole:      "kv_both",
+		ExtraConfig: extra,
+	}
+	// Marshalling cannot fail: every value is a string, an int32 or a bool.
+	encoded, _ := json.Marshal(config)
+	return string(encoded)
+}
+
+// inProcessLMCacheEnv renders the in-process LMCache settings as the
+// environment variables LMCache reads, in the same form main always has.
+func inProcessLMCacheEnv(lmCache productionstackv1alpha1.LMCacheConfig) []corev1.EnvVar {
+	var env []corev1.EnvVar
+	if lmCache.CPUOffloadingBufferSize != "" {
+		env = append(env,
+			corev1.EnvVar{Name: "LMCACHE_LOCAL_CPU", Value: "True"},
+			corev1.EnvVar{Name: "LMCACHE_MAX_LOCAL_CPU_SIZE", Value: lmCache.CPUOffloadingBufferSize},
+		)
+	}
+	if lmCache.DiskOffloadingBufferSize != "" {
+		env = append(env,
+			corev1.EnvVar{Name: "LMCACHE_LOCAL_DISK", Value: "True"},
+			corev1.EnvVar{Name: "LMCACHE_MAX_LOCAL_DISK_SIZE", Value: lmCache.DiskOffloadingBufferSize},
+		)
+	}
+	if lmCache.RemoteURL != "" {
+		env = append(env,
+			corev1.EnvVar{Name: "LMCACHE_REMOTE_URL", Value: lmCache.RemoteURL},
+			corev1.EnvVar{Name: "LMCACHE_REMOTE_SERDE", Value: lmCache.RemoteSerde},
+		)
+	}
+	return env
+}
+
 // deploymentForVLLMRuntime returns a VLLMRuntime Deployment object
 func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
@@ -458,6 +608,14 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		args = append(args, "--tool-call-parser", vllmRuntime.Spec.Model.ToolCallParser)
 	}
 
+	if vllmRuntime.Spec.Model.ReasoningParser != "" {
+		args = append(args, "--reasoning-parser", vllmRuntime.Spec.Model.ReasoningParser)
+	}
+
+	if vllmRuntime.Spec.Model.TrustRemoteCode {
+		args = append(args, "--trust-remote-code")
+	}
+
 	if vllmRuntime.Spec.VLLMConfig.EnableChunkedPrefill {
 		args = append(args, "--enable-chunked-prefill")
 	} else {
@@ -470,12 +628,8 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		args = append(args, "--no-enable-prefix-caching")
 	}
 
-	if vllmRuntime.Spec.Model.MaxModelLen > 0 {
-		args = append(
-			args,
-			"--max-model-len",
-			fmt.Sprintf("%d", vllmRuntime.Spec.Model.MaxModelLen),
-		)
+	if maxModelLen, ok := maxModelLenArg(vllmRuntime.Spec.Model.MaxModelLen); ok {
+		args = append(args, "--max-model-len", maxModelLen)
 	}
 
 	if vllmRuntime.Spec.Model.DType != "" {
@@ -504,6 +658,14 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 
 	if vllmRuntime.Spec.VLLMConfig.MaxLoras > 0 {
 		args = append(args, "--max_loras", fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.MaxLoras))
+	}
+
+	if vllmRuntime.Spec.VLLMConfig.MaxNumBatchedTokens > 0 {
+		args = append(
+			args,
+			"--max-num-batched-tokens",
+			fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.MaxNumBatchedTokens),
+		)
 	}
 
 	if vllmRuntime.Spec.VLLMConfig.ExtraArgs != nil {
@@ -544,62 +706,26 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 				Name:  "LMCACHE_LOG_LEVEL",
 				Value: "DEBUG",
 			},
-			corev1.EnvVar{
+		)
+		if !isLMCacheMultiprocess(vllmRuntime) {
+			env = append(env, corev1.EnvVar{
 				Name:  "LMCACHE_USE_EXPERIMENTAL",
 				Value: "True",
-			},
-			corev1.EnvVar{
-				Name:  "VLLM_RPC_TIMEOUT",
-				Value: "1000000",
-			},
-		)
-
-		// Add KV transfer config based on V1 flag
-		var lmcache_config string
-		if vllmRuntime.Spec.VLLMConfig.V1 {
-			lmcache_config = `{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}`
-		} else {
-			lmcache_config = `{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}`
+			})
 		}
-		args = append(args, "--kv-transfer-config", lmcache_config)
+		env = append(env, corev1.EnvVar{
+			Name:  "VLLM_RPC_TIMEOUT",
+			Value: "1000000",
+		})
 
-		if vllmRuntime.Spec.LMCacheConfig.CPUOffloadingBufferSize != "" {
-			env = append(env,
-				corev1.EnvVar{
-					Name:  "LMCACHE_LOCAL_CPU",
-					Value: "True",
-				},
-				corev1.EnvVar{
-					Name:  "LMCACHE_MAX_LOCAL_CPU_SIZE",
-					Value: vllmRuntime.Spec.LMCacheConfig.CPUOffloadingBufferSize,
-				},
-			)
-		}
+		args = append(args, "--kv-transfer-config", lmcacheKVTransferConfig(vllmRuntime))
 
-		if vllmRuntime.Spec.LMCacheConfig.DiskOffloadingBufferSize != "" {
-			env = append(env,
-				corev1.EnvVar{
-					Name:  "LMCACHE_LOCAL_DISK",
-					Value: "True",
-				},
-				corev1.EnvVar{
-					Name:  "LMCACHE_MAX_LOCAL_DISK_SIZE",
-					Value: vllmRuntime.Spec.LMCacheConfig.DiskOffloadingBufferSize,
-				},
-			)
-		}
-
-		if vllmRuntime.Spec.LMCacheConfig.RemoteURL != "" {
-			env = append(env,
-				corev1.EnvVar{
-					Name:  "LMCACHE_REMOTE_URL",
-					Value: vllmRuntime.Spec.LMCacheConfig.RemoteURL,
-				},
-				corev1.EnvVar{
-					Name:  "LMCACHE_REMOTE_SERDE",
-					Value: vllmRuntime.Spec.LMCacheConfig.RemoteSerde,
-				},
-			)
+		// The offloading and remote settings configure the cache inside the
+		// engine process. In Multiprocess mode the cache lives in the
+		// CacheServer instead, so they are not rendered even though the API
+		// still fills in their defaults.
+		if !isLMCacheMultiprocess(vllmRuntime) {
+			env = append(env, inProcessLMCacheEnv(vllmRuntime.Spec.LMCacheConfig)...)
 		}
 	}
 
@@ -741,7 +867,11 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 	// Mount an emptyDir (medium=Memory) at /dev/shm when a size is requested.
 	// Tensor parallelism communicates over shared memory, and the container
 	// default /dev/shm is usually too small for it.
-	if vllmRuntime.Spec.DeploymentConfig.ShmSize != "" {
+	// hostIPC already replaces /dev/shm with the host's tmpfs, which is the
+	// point of enabling it, so an emptyDir would mask the segment the cache
+	// server shares.
+	if vllmRuntime.Spec.DeploymentConfig.ShmSize != "" &&
+		!vllmRuntime.Spec.DeploymentConfig.HostIPC {
 		shmSource := corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
 		}
@@ -821,7 +951,8 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 					Annotations: vllmRuntime.Spec.DeploymentConfig.PodAnnotations,
 				},
 				Spec: corev1.PodSpec{
-					RuntimeClassName: &vllmRuntime.Spec.DeploymentConfig.RuntimeClass,
+					RuntimeClassName: runtimeClassOrNil(vllmRuntime.Spec.DeploymentConfig.RuntimeClass),
+					HostIPC:          vllmRuntime.Spec.DeploymentConfig.HostIPC,
 					Affinity:         affinity,
 					Tolerations:      vllmRuntime.Spec.DeploymentConfig.Toleration,
 					ImagePullSecrets: imagePullSecrets,
@@ -1010,57 +1141,67 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 		return true
 	}
 
-	// Compare LM Cache configuration
-	expectedLMCacheConfig := vr.Spec.LMCacheConfig
-	actualLMCacheConfig := dep.Spec.Template.Spec.Containers[0].Env
-
-	// Extract actual values from environment variables
-	actualEnabled := false
-	actualCPUOffloadingBufferSize := ""
-	actualDiskOffloadingBufferSize := ""
-	actualRemoteURL := ""
-	actualRemoteSerde := ""
-
-	for _, env := range actualLMCacheConfig {
-		switch env.Name {
-		case "LMCACHE_USE_EXPERIMENTAL":
-			actualEnabled = env.Value == "True"
-		case "LMCACHE_MAX_LOCAL_CPU_SIZE":
-			actualCPUOffloadingBufferSize = env.Value
-		case "LMCACHE_MAX_LOCAL_DISK_SIZE":
-			actualDiskOffloadingBufferSize = env.Value
-		case "LMCACHE_REMOTE_URL":
-			actualRemoteURL = env.Value
-		case "LMCACHE_REMOTE_SERDE":
-			actualRemoteSerde = env.Value
-		}
-	}
-
-	// Compare specific fields
-	if expectedLMCacheConfig.Enabled != actualEnabled ||
-		expectedLMCacheConfig.CPUOffloadingBufferSize != actualCPUOffloadingBufferSize ||
-		expectedLMCacheConfig.DiskOffloadingBufferSize != actualDiskOffloadingBufferSize ||
-		expectedLMCacheConfig.RemoteURL != actualRemoteURL ||
-		expectedLMCacheConfig.RemoteSerde != actualRemoteSerde {
+	// Compare the rendered KV connector configuration. It carries the
+	// connector, so it catches a mode switch; in Multiprocess mode it also
+	// carries the cache server address and transfer mode. It is absent when
+	// LMCache is disabled, so it also catches LMCache being turned on or off.
+	expectedKVConfig := kvTransferConfigArg(expectedDep.Spec.Template.Spec.Containers[0].Args)
+	actualKVConfig := kvTransferConfigArg(dep.Spec.Template.Spec.Containers[0].Args)
+	if expectedKVConfig != actualKVConfig {
 		log.Info(
-			"LM Cache configuration mismatch",
-			"expected",
-			expectedLMCacheConfig,
-			"actual",
-			actualLMCacheConfig,
+			"KV transfer config mismatch",
+			"expected", expectedKVConfig,
+			"actual", actualKVConfig,
 		)
 		return true
 	}
 
-	actualAdditionalArgs := dep.Spec.Template.Spec.Affinity.NodeAffinity
-	expectedAdditionalArgs := expectedDep.Spec.Template.Spec.Affinity.NodeAffinity
-	if !reflect.DeepEqual(expectedAdditionalArgs, actualAdditionalArgs) {
+	// Compare the in-process LMCache settings, which are rendered as env vars
+	// rather than args. Only in InProcess mode: in Multiprocess mode they are
+	// not rendered, and comparing their API defaults against nothing would
+	// report drift that no update can resolve, rolling the engine on every
+	// reconcile.
+	if vr.Spec.LMCacheConfig.Enabled && !isLMCacheMultiprocess(vr) {
+		expectedEnv := lmcacheEnvValues(expectedDep.Spec.Template.Spec.Containers[0].Env)
+		actualEnv := lmcacheEnvValues(dep.Spec.Template.Spec.Containers[0].Env)
+		if !maps.Equal(expectedEnv, actualEnv) {
+			log.Info(
+				"In-process LMCache configuration mismatch",
+				"expected", expectedEnv,
+				"actual", actualEnv,
+			)
+			return true
+		}
+	}
+
+	// Compare the whole affinity rather than dereferencing its node half:
+	// a runtime without nodeSelectorTerms renders no affinity at all, so both
+	// sides are nil. Semantic equality treats nil and empty lists as equal, as
+	// the API server's round trip does.
+	expectedAffinity := expectedDep.Spec.Template.Spec.Affinity
+	actualAffinity := dep.Spec.Template.Spec.Affinity
+	if !equality.Semantic.DeepEqual(expectedAffinity, actualAffinity) {
 		log.Info(
-			"Node affinity mismatch",
+			"Affinity mismatch",
 			"expected",
-			expectedAdditionalArgs,
+			expectedAffinity,
 			"actual",
-			actualAdditionalArgs,
+			actualAffinity,
+		)
+		return true
+	}
+
+	// hostIPC decides whether the engine shares the host /dev/shm with a cache
+	// server, so toggling it must roll the pods.
+	expectedHostIPC := expectedDep.Spec.Template.Spec.HostIPC
+	actualHostIPC := dep.Spec.Template.Spec.HostIPC
+	if expectedHostIPC != actualHostIPC {
+		log.Info(
+			"HostIPC mismatch",
+			"expected",
+			expectedHostIPC,
+			"actual",
+			actualHostIPC,
 		)
 		return true
 	}
