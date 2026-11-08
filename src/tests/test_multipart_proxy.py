@@ -3,9 +3,11 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 import httpx
 import pytest
+import starlette.formparsers
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 from fastapi import FastAPI
+from starlette.datastructures import UploadFile
 
 import vllm_router.service_discovery as service_discovery_module
 from vllm_router.aiohttp_client import AiohttpClientWrapper
@@ -36,6 +38,27 @@ AUDIO_MODEL = "openai/whisper-tiny"
 IMAGE_MODEL = "image-edit-model"
 
 
+@pytest.fixture
+def multipart_upload_files(monkeypatch):
+    # Keep handles observable after the request instead of relying on GC.
+    files = []
+    spooled_temporary_file = starlette.formparsers.SpooledTemporaryFile
+
+    def record_file(*args, **kwargs):
+        file = spooled_temporary_file(*args, **kwargs)
+        files.append(file)
+        return file
+
+    monkeypatch.setattr(starlette.formparsers, "SpooledTemporaryFile", record_file)
+    # Exercise real disk-backed uploads without sending large request bodies.
+    monkeypatch.setattr(starlette.formparsers.MultiPartParser, "spool_max_size", 1)
+    try:
+        yield files
+    finally:
+        for file in files:
+            file.close()
+
+
 @asynccontextmanager
 async def multipart_backend(endpoint, handler):
     app = web.Application()
@@ -51,7 +74,7 @@ async def multipart_backend(endpoint, handler):
 
 
 @asynccontextmanager
-async def router_client(backend_url, model=AUDIO_MODEL):
+async def router_client(backend_url, model=AUDIO_MODEL, aliases=None):
     app = FastAPI()
     app.include_router(main_router)
 
@@ -61,6 +84,7 @@ async def router_client(backend_url, model=AUDIO_MODEL):
             app=app,
             urls=[backend_url],
             models=[model],
+            aliases=aliases,
         )
         stack.callback(
             setattr, service_discovery_module, "_global_service_discovery", None
@@ -227,3 +251,195 @@ async def test_image_edit_accepts_standard_multipart_request():
         "content_type": "image/png",
         "content": b"fake-image",
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("use_alias", [False, True])
+@pytest.mark.parametrize(
+    "endpoint,model,upload_key,stream,filename",
+    [
+        ("/v1/audio/transcriptions", AUDIO_MODEL, "file", False, "input.bin"),
+        ("/v1/audio/transcriptions", AUDIO_MODEL, "file", True, "input.bin"),
+        ("/v1/audio/translations", AUDIO_MODEL, "file", False, "input.bin"),
+        ("/v1/audio/translations", AUDIO_MODEL, "file", False, "speech sample.wav"),
+        ("/v1/audio/translations", AUDIO_MODEL, "file", False, "语音.wav"),
+        ("/v1/images/edits", IMAGE_MODEL, "image", False, "input.bin"),
+        ("/v1/images/edits", IMAGE_MODEL, "image", False, "input image.png"),
+        ("/v1/images/edits", IMAGE_MODEL, "image", False, "图像.png"),
+    ],
+)
+async def test_multipart_model_aliases(
+    endpoint, model, upload_key, stream, filename, use_alias
+):
+    received = {}
+    alias = "model-alias"
+    content = b"\x00\xffmodel-alias\x80"
+
+    async def capture(request):
+        form = await request.post()
+        upload = form[upload_key]
+        received.update(
+            model=form["model"],
+            prompt=form["prompt"],
+            filename=upload.filename,
+            content_type=upload.content_type,
+            content=upload.file.read(),
+            stream=form.get("stream"),
+        )
+        if stream:
+            return web.Response(
+                text='data: {"text": "transcribed"}\n\n',
+                content_type="text/event-stream",
+            )
+        return web.json_response({"text": "processed"})
+
+    async with multipart_backend(endpoint, capture) as backend_url:
+        async with router_client(
+            backend_url, model=model, aliases={alias: model}
+        ) as client:
+            data = {"model": alias if use_alias else model, "prompt": alias}
+            if stream:
+                data["stream"] = "true"
+            response = await client.post(
+                endpoint,
+                data=data,
+                files={upload_key: (filename, content, "application/octet-stream")},
+            )
+
+    assert response.status_code == 200
+    if stream:
+        assert response.headers["content-type"].startswith("text/event-stream")
+        assert response.text == 'data: {"text": "transcribed"}\n\n'
+    else:
+        assert response.json() == {"text": "processed"}
+    assert received == {
+        "model": model,
+        "prompt": alias,
+        "filename": filename,
+        "content_type": "application/octet-stream",
+        "content": content,
+        "stream": "true" if stream else None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_image_edit_alias_preserves_repeated_fields_and_uploads():
+    received = {}
+
+    async def capture(request):
+        form = await request.post()
+        received["model"] = form["model"]
+        received["images"] = [
+            (upload.filename, upload.content_type, upload.file.read())
+            for upload in form.getall("image")
+        ]
+        received["extra"] = form.getall("extra")
+        return web.json_response({"data": []})
+
+    async with multipart_backend("/v1/images/edits", capture) as backend_url:
+        async with router_client(
+            backend_url, model=IMAGE_MODEL, aliases={"image-alias": IMAGE_MODEL}
+        ) as client:
+            response = await client.post(
+                "/v1/images/edits",
+                data={"model": "image-alias", "extra": ["first", "second"]},
+                files=[
+                    ("image", ("first.png", b"first-image", "image/png")),
+                    ("image", ("second.png", b"second-image", "image/png")),
+                ],
+            )
+
+    assert response.status_code == 200
+    assert received == {
+        "model": IMAGE_MODEL,
+        "images": [
+            ("first.png", "image/png", b"first-image"),
+            ("second.png", "image/png", b"second-image"),
+        ],
+        "extra": ["first", "second"],
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint,model,upload_key",
+    [
+        ("/v1/audio/translations", AUDIO_MODEL, "file"),
+        ("/v1/images/edits", IMAGE_MODEL, "image"),
+    ],
+)
+@pytest.mark.parametrize(
+    "requested_model,expected_status",
+    [("canonical", 200), ("alias", 200), (None, 400), ("unknown", 404)],
+)
+async def test_multipart_request_closes_uploads(
+    endpoint,
+    model,
+    upload_key,
+    requested_model,
+    expected_status,
+    multipart_upload_files,
+):
+    async def capture(request):
+        form = await request.post()
+        assert form["model"] == model
+        assert len(form.getall(upload_key)) == 2
+        return web.json_response({"text": "processed"})
+
+    async with multipart_backend(endpoint, capture) as backend_url:
+        async with router_client(
+            backend_url, model=model, aliases={"model-alias": model}
+        ) as client:
+            models = {"canonical": model, "alias": "model-alias", "unknown": "unknown"}
+            data = {"model": models[requested_model]} if requested_model else {}
+            response = await client.post(
+                endpoint,
+                data=data,
+                files=[
+                    (upload_key, ("first.bin", b"first-upload")),
+                    (upload_key, ("second.bin", b"second-upload")),
+                ],
+            )
+
+    assert response.status_code == expected_status
+    assert len(multipart_upload_files) == 2
+    assert all(file._rolled for file in multipart_upload_files)
+    assert all(file.closed for file in multipart_upload_files)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint,model,upload_key",
+    [
+        ("/v1/audio/translations", AUDIO_MODEL, "file"),
+        ("/v1/images/edits", IMAGE_MODEL, "image"),
+    ],
+)
+async def test_multipart_request_closes_uploads_when_read_fails(
+    endpoint, model, upload_key, multipart_upload_files, monkeypatch
+):
+    async def fail_read(self, size=-1):
+        raise OSError("upload read failed")
+
+    monkeypatch.setattr(UploadFile, "read", fail_read)
+
+    async def unexpected_request(request):
+        pytest.fail("An upload read failure must not reach the backend")
+
+    async with multipart_backend(endpoint, unexpected_request) as backend_url:
+        async with router_client(
+            backend_url, model=model, aliases={"model-alias": model}
+        ) as client:
+            with pytest.raises(OSError, match="upload read failed"):
+                await client.post(
+                    endpoint,
+                    data={"model": "model-alias"},
+                    files=[
+                        (upload_key, ("first.bin", b"first-upload")),
+                        (upload_key, ("second.bin", b"second-upload")),
+                    ],
+                )
+
+    assert len(multipart_upload_files) == 2
+    assert all(file._rolled for file in multipart_upload_files)
+    assert all(file.closed for file in multipart_upload_files)
