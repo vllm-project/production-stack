@@ -824,8 +824,11 @@ cacheserverSpec:
   image:
     # -- Docker image repository for the cache server
     repository: "lmcache/vllm-openai"
-    # -- Docker image tag for the cache server
-    tag: "latest"
+    # -- Docker image tag for the cache server.
+    # Pin to v0.5.6 (LMCache 0.5.6): the chart runs /opt/venv/bin/lmcache_server and sets
+    # LMCACHE_REMOTE_URL=lm://... for engines. LMCache 0.5.7+ removed lmcache_server and the
+    # lm:// connector (LMCache#5785), so tags newer than v0.5.6 break the cache server and lm://.
+    tag: "v0.5.6"
   # -- Image pull policy for the cache server
   imagePullPolicy: "IfNotPresent" # @schema enum:[Always,IfNotPresent,Never]
   # -- Image pull secrets for private container registries

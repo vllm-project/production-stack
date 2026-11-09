@@ -334,7 +334,7 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 |-------|------|---------|-------------|
 | `cacheserverSpec.enabled` | boolean | `false` | Whether to enable the cache server deployment |
 | `cacheserverSpec.image.repository` | string | `"lmcache/vllm-openai"` | Docker image repository for the cache server |
-| `cacheserverSpec.image.tag` | string | `"latest"` | Docker image tag for the cache server |
+| `cacheserverSpec.image.tag` | string | `"v0.5.6"` | Docker image tag for the cache server (must ship LMCache 0.5.6 with `lmcache_server` / `lm://`; see note below) |
 | `cacheserverSpec.imagePullPolicy` | string | `"Always"` | Image pull policy for the cache server |
 | `cacheserverSpec.imagePullSecrets` | list | `[]` | Image pull secrets for private container registries |
 | `cacheserverSpec.replicaCount` | integer | `1` | Number of replicas for the cache server pod |
@@ -356,6 +356,8 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `cacheserverSpec.serde` | string | - | Serialization/deserialization format |
 
 > `cacheserverSpec.resources` is passed through directly to the pod container resources block, so you can use extended resource keys (for example `rdma/ib`) in addition to cpu/memory.
+
+> **LMCache `lm://` / `lmcache_server` version pin:** When the cache server is enabled, the chart runs `/opt/venv/bin/lmcache_server` and sets `LMCACHE_REMOTE_URL=lm://<release>-cache-server-service:<servicePort>` on engines that use LMCache. Those pieces exist in LMCache 0.5.6 (`lmcache/vllm-openai:v0.5.6`) and were removed in LMCache 0.5.7+ (see [LMCache#5785](https://github.com/LMCache/LMCache/pull/5785)). Keep `cacheserverSpec.image.tag` (and matching engine tags that use `lm://`) on `v0.5.6` unless you migrate off the legacy TCP server / `lm://` connector.
 
 ### LoRA Adapters Configuration
 
