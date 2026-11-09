@@ -1,6 +1,7 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import aiohttp
 import pytest
 
 from vllm_router.routers.routing_logic import (
@@ -155,6 +156,26 @@ async def test_raises_after_all_attempts_exhausted(setup):
 
         with pytest.raises(ConnectionError):
             await route_general_request(req, "/v1/chat/completions", MagicMock())
+
+
+@pytest.mark.asyncio
+async def test_unreachable_backends_return_503_after_all_attempts(setup):
+    req, router = setup
+
+    async def fail(*a, **kw):
+        raise aiohttp.ClientConnectionError("down")
+        yield
+
+    with patch(
+        "vllm_router.services.request_service.request.process_request", side_effect=fail
+    ):
+        from vllm_router.services.request_service.request import route_general_request
+
+        response = await route_general_request(req, "/v1/chat/completions", MagicMock())
+
+    assert response.status_code == 503
+    assert json.loads(response.body) == {"error": "Failed to connect to backend: down"}
+    assert "X-Request-Id" in response.headers
 
 
 @pytest.mark.asyncio
