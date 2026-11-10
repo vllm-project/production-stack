@@ -75,7 +75,7 @@ When migration is enabled for a request, the router stops forwarding raw byte ch
 - extracts the generated content from each forwarded frame (`choices[].text` for `/v1/completions`, `choices[].delta.content` for `/v1/chat/completions`) and appends it to a bounded per-request buffer;
 - remembers the stream `id`, `created`, and `model` of the first frame, so that migrated frames can be rewritten to present a single coherent stream.
 
-The buffer holds at most `max_tokens` worth of text per active migratable stream.
+The buffer is bounded by delivered *tokens*, not characters: the router counts delivered content frames (about one token each) and stops treating a stream as migratable once it exceeds `max_tokens` (when the client set none, a fixed hard cap of 32768 delivered tokens). The text held for a stream is therefore roughly `tokens x ~4 bytes`, a few hundred KB at worst.
 
 #### 3. Mid-stream migration
 
@@ -89,7 +89,7 @@ When an engine fails after `N` frames have been forwarded, the router:
    - drop the initial role-only chunk of a chat stream (the client has already seen it);
    - rewrite `id` / `created` / `model` to the values from the first segment;
    - suppress intermediate `[DONE]` and the final usage chunk of a segment unless it is the last segment;
-   - emit one merged usage chunk (when `stream_options.include_usage` is set) whose `completion_tokens` is the sum over segments.
+   - emit one merged usage chunk (when `stream_options.include_usage` is set). Accounting in Phase 1: `completion_tokens` = tokens delivered before the failure (counted from forwarded content frames) + the `completion_tokens` reported by the final segment. `prompt_tokens` comes from the first segment's usage when it was received. Since usage normally arrives at the end of a stream, the first segment usually fails before emitting it, so the router derives it as the final segment's `prompt_tokens` minus the tokens delivered before the failure. The final segment's `prompt_tokens` is never reported as is, because it includes the already-delivered text. The result is approximate only at the re-tokenization join point.
 4. Repeats on further failures up to `--max-migrations-per-request`. When the budget or the healthy engines are exhausted, the stream is terminated with an SSE `error` frame and then closed, which is cleaner than a silent cut.
 
 #### Semantics of a migrated continuation
@@ -97,6 +97,7 @@ When an engine fails after `N` frames have been forwarded, the router:
 Autoregressive sampling is a sequence of conditional draws, so a continuation conditioned on the delivered prefix is a statistically valid sample from the same model. It is not byte-identical to what the failed engine would have produced. Consequently:
 
 - **Seeded requests** (`seed` set) cannot be reproduced after migration. Phase 1 treats them as non-migratable (retry-before-first-byte only), unless the operator opts in.
+- **Stateful sampling parameters:** `presence_penalty`, `frequency_penalty` and `repetition_penalty` depend on the generation history. After migration the delivered text is part of the *prompt* on the new engine, so penalties no longer account for it as generated output (for `repetition_penalty` the text is still seen, but as prompt). Output quality can drift for requests that rely on these. Phase 1 therefore treats requests with a non-zero `presence_penalty` or `frequency_penalty` as non-migratable (they get retry-before-first-byte only), and documents the `repetition_penalty` caveat. Relaxing this is a later, opt-in decision.
 - **Tokenization boundaries:** re-tokenizing `prompt + delivered_text` can differ from the original token sequence at the join point. This changes the continuation only at the boundary and is acceptable in Phase 1. Phase 2 removes it by resuming from token ids (see below).
 
 #### Eligibility (Phase 1)
@@ -106,6 +107,7 @@ A request is migratable mid-stream only if all of the following hold. Anything e
 - `stream: true`, on `/v1/completions` or `/v1/chat/completions`
 - `n == 1`, no `best_of`
 - no `seed`
+- no non-zero `presence_penalty` / `frequency_penalty` (their history would reset, see above)
 - no structured / guided output (`response_format`, `guided_*`): the grammar state would restart at the beginning of the continuation
 - no tool / function calls (partial tool-call JSON cannot be safely resumed)
 - no `echo`, no `prompt_logprobs`
@@ -117,13 +119,16 @@ Non-streaming requests are never migrated mid-flight (nothing has been sent to t
 - **Architecture / Components:**
   - `src/vllm_router/services/request_service/request.py`: failure classification in `route_general_request`, and the migration loop around `process_request`.
   - new `src/vllm_router/services/request_service/migration.py`: SSE frame parser, continuation-request builder, stream rewriter, eligibility check.
-  - `src/vllm_router/stats/` and service discovery: passive health ejection. An engine that fails N times in a window is temporarily excluded from routing without waiting for the next health probe.
+  - `src/vllm_router/stats/` and service discovery: passive health ejection. An engine that fails N consecutive times is temporarily excluded from routing without waiting for the next health probe. **Safeguard:** ejection never removes more than a configurable fraction of the engines serving a model (default 50%, and always at least one engine stays eligible), so a transient network event that fails every engine at once cannot black out the router. Engines are re-admitted automatically after the ejection period.
   - `src/vllm_router/parsers/parser.py`: new flags. `src/vllm_router/app.py`: wiring.
 - **Interface Changes** (all off by default; existing behavior is unchanged when disabled):
   - `--enable-request-migration`
   - `--max-migrations-per-request` (default `1`)
   - `--migration-stall-timeout-seconds` (inter-chunk stall detection; default disabled)
-  - `--retry-on-backend-5xx` (retry `500/502/503/504` before the first byte)
+  - `--retry-on-backend-5xx` (retry `502/503/504` before the first byte; `500` is excluded by default, see Open Question 3)
+  - `--passive-ejection-failure-threshold` (consecutive failures before ejection; default `0` = disabled)
+  - `--passive-ejection-seconds` (ejection duration; default `30`)
+  - `--passive-ejection-max-fraction` (maximum fraction of a model's engines that may be ejected at once; default `0.5`)
   - New response header `X-Request-Migrations: <n>` (useful for debugging; also logged).
 - **Metrics:**
   - `vllm_router:request_migrations_total{reason,outcome}`
@@ -135,7 +140,7 @@ Non-streaming requests are never migrated mid-flight (nothing has been sent to t
   - Disabled: no overhead.
   - Enabled: SSE frame parsing on the streaming path adds CPU per chunk and forwards at frame granularity instead of arbitrary chunk boundaries (negligible latency change for token-sized frames). This will be benchmarked against the current passthrough path.
   - A migration costs one extra prefill of `prompt + delivered_tokens` on the new engine. With prefix-aware or KV-aware routing, the router can prefer an engine that already holds the shared prefix, which reduces this cost.
-- **Resource Constraints:** a bounded text buffer per migratable stream (up to `max_tokens` characters). No GPU impact on the router.
+- **Resource Constraints:** a bounded text buffer per migratable stream (bounded by delivered tokens as described above, roughly 4 bytes per token, so about 128 KB at the 32768-token hard cap). No GPU impact on the router.
 - **Interaction with other features:**
   - *Priority routing* ([#996](https://github.com/vllm-project/production-stack/pull/996)): the continuation request keeps the original priority.
   - *Router-side queuing* ([#876](https://github.com/vllm-project/production-stack/pull/876)): a migrated request should re-enter admission with a priority boost so that it does not wait behind newer arrivals. This is a follow-up once queuing lands.
@@ -161,6 +166,7 @@ Non-streaming requests are never migrated mid-flight (nothing has been sent to t
 - Migrated output is a valid continuation, not an identical one. Some users with strict reproducibility needs will want it disabled for their traffic (it is opt-in and excluded for seeded requests).
 - Re-prefill cost on migration, which is highest for long prompts and long delivered outputs.
 - Token accounting is approximate in Phase 1 (see Open Questions).
+- Stateful sampling parameters (penalties) cannot carry their generation history across engines, which is why such requests are excluded in Phase 1.
 - Restricted eligibility means structured-output and tool-calling workloads, where agent traffic is concentrated, are not covered at first.
 
 ## Alternatives
@@ -183,10 +189,9 @@ Delivered as small, independently reviewable PRs:
 ## Open Questions
 
 1. **Scope of "instance fails".** Does the roadmap item also cover planned drains (scale-in, rolling updates) or only unplanned failures? This RFC treats unplanned failures as the target and leaves planned drains to Phase 3.
-2. **Token ids.** Does the supported vLLM version expose generated token ids in streaming responses (for example via `return_token_ids`) and accept token-id prompts on both endpoints? This determines whether Phase 2 can be done without engine changes.
-3. **Usage accounting.** In Phase 1, `prompt_tokens` and `completion_tokens` in a merged usage chunk are derived from segment usage and delivered frame counts. Is approximate accounting acceptable until Phase 2?
-4. **Default for `500`.** Should a backend `500` before the first byte be retried by default, given that some `500`s are request-specific (for example a bad request that crashes the handler) and could be retried onto every engine?
-5. **Overlap.** Is anyone already working on retry or failover improvements that this should be coordinated with?
+2. **Token ids and per-chunk usage.** Does the supported vLLM version expose generated token ids in streaming responses (for example via `return_token_ids`), accept token-id prompts on both endpoints, and support `stream_options.continuous_usage_stats`? Per-chunk usage would give exact delivered-token counts in Phase 1 and remove the estimate above. This determines whether Phase 2 can be done without engine changes.
+3. **Default for `500`.** Should a backend `500` before the first byte be retried by default, given that some `500`s are request-specific (for example a bad request that crashes the handler) and could be retried onto every engine?
+4. **Overlap.** Is anyone already working on retry or failover improvements that this should be coordinated with?
 
 ## References
 
