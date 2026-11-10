@@ -1005,8 +1005,20 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 	// Compare resources
 	expectedResources := expectedDep.Spec.Template.Spec.Containers[0].Resources
 	actualResources := dep.Spec.Template.Spec.Containers[0].Resources
-	if !reflect.DeepEqual(expectedResources, actualResources) {
-		log.Info("Resources mismatch", "expected", expectedResources, "actual", actualResources)
+	resourcesDiffer := func(expected, actual corev1.ResourceList) bool {
+		for resName, expectedQty := range expected {
+			actualQty, exists := actual[resName]
+			if !exists || expectedQty.Cmp(actualQty) != 0 {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	if resourcesDiffer(expectedResources.Requests, actualResources.Requests) ||
+		resourcesDiffer(expectedResources.Limits, actualResources.Limits) {
+		log.Info("Resources mismatch")
 		return true
 	}
 
@@ -1052,8 +1064,16 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 		return true
 	}
 
-	actualAdditionalArgs := dep.Spec.Template.Spec.Affinity.NodeAffinity
-	expectedAdditionalArgs := expectedDep.Spec.Template.Spec.Affinity.NodeAffinity
+	var actualAdditionalArgs, expectedAdditionalArgs *corev1.NodeAffinity
+
+	if affinity := dep.Spec.Template.Spec.Affinity; affinity != nil {
+		actualAdditionalArgs = affinity.NodeAffinity
+	}
+
+	if affinity := expectedDep.Spec.Template.Spec.Affinity; affinity != nil {
+		expectedAdditionalArgs = affinity.NodeAffinity
+	}
+
 	if !reflect.DeepEqual(expectedAdditionalArgs, actualAdditionalArgs) {
 		log.Info(
 			"Node affinity mismatch",
@@ -1062,6 +1082,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			"actual",
 			actualAdditionalArgs,
 		)
+
 		return true
 	}
 
@@ -1125,7 +1146,10 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 
 	if len(dep.Spec.Template.Spec.Containers) > 0 &&
 		!reflect.DeepEqual(
-			findVolumeMountByName(expectedDep.Spec.Template.Spec.Containers[0].VolumeMounts, "dshm"),
+			findVolumeMountByName(
+				expectedDep.Spec.Template.Spec.Containers[0].VolumeMounts,
+				"dshm",
+			),
 			findVolumeMountByName(dep.Spec.Template.Spec.Containers[0].VolumeMounts, "dshm"),
 		) {
 		log.Info("shm volume mount mismatch")
@@ -1164,7 +1188,11 @@ func (r *VLLMRuntimeReconciler) updateStatus(
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Get the latest version of the VLLMRuntime
 		latestVR := &productionstackv1alpha1.VLLMRuntime{}
-		if err := r.Get(ctx, types.NamespacedName{Name: vr.Name, Namespace: vr.Namespace}, latestVR); err != nil {
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{Name: vr.Name, Namespace: vr.Namespace},
+			latestVR,
+		); err != nil {
 			return err
 		}
 
