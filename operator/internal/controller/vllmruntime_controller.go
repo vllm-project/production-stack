@@ -1064,8 +1064,16 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 		return true
 	}
 
-	actualAdditionalArgs := dep.Spec.Template.Spec.Affinity.NodeAffinity
-	expectedAdditionalArgs := expectedDep.Spec.Template.Spec.Affinity.NodeAffinity
+	var actualAdditionalArgs, expectedAdditionalArgs *corev1.NodeAffinity
+
+	if affinity := dep.Spec.Template.Spec.Affinity; affinity != nil {
+		actualAdditionalArgs = affinity.NodeAffinity
+	}
+
+	if affinity := expectedDep.Spec.Template.Spec.Affinity; affinity != nil {
+		expectedAdditionalArgs = affinity.NodeAffinity
+	}
+
 	if !reflect.DeepEqual(expectedAdditionalArgs, actualAdditionalArgs) {
 		log.Info(
 			"Node affinity mismatch",
@@ -1074,6 +1082,7 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			"actual",
 			actualAdditionalArgs,
 		)
+
 		return true
 	}
 
