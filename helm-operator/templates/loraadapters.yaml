@@ -1,0 +1,16 @@
+{{- range .Values.loraAdapters }}
+---
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: LoraAdapter
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/component: lora-adapter
+    {{- with .labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- toYaml .spec | nindent 2 }}
+{{- end }}

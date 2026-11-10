@@ -18,6 +18,111 @@ Prerequisites
 Installation
 ------------
 
+You can deploy the operator either with Helm (recommended, installs the CRDs and
+the controller manager in one step) or with plain kubectl manifests. Both methods
+install the same resources.
+
+Installing with Helm
+^^^^^^^^^^^^^^^^^^^^
+
+The ``helm-operator`` chart ships the four CRDs (``VLLMRuntime``, ``VLLMRouter``,
+``CacheServer``, ``LoraAdapter``) in its ``crds/`` directory and renders the
+custom resources themselves from values. A single ``helm install`` therefore
+deploys the operator **and** a complete inference service (vLLM engine + router)
+without any additional ``kubectl apply`` steps:
+
+.. code-block:: bash
+
+   helm install vllm-stack ./helm-operator -n production-stack-system --create-namespace
+
+Watch the rollout and, once the engine pods are ready, query the router:
+
+.. code-block:: bash
+
+   kubectl get pods -n production-stack-system
+   kubectl port-forward svc/vllm-stack-vllm-stack-operator-router 30080:80 -n production-stack-system
+   curl http://localhost:30080/v1/models
+
+The model, images, replicas, routing strategy, cache server and LoRA adapters
+are all configured through the chart values, mirroring the sample custom
+resources. For example, to serve a different model:
+
+.. code-block:: bash
+
+   cat > my-model.yaml <<EOF
+   vllmRuntimes:
+     - name: ""
+       spec:
+         model:
+           modelURL: "Qwen/Qwen2.5-7B-Instruct"
+   EOF
+   helm install vllm-stack ./helm-operator -n production-stack-system \
+     --create-namespace -f my-model.yaml
+
+Serving multiple models
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The chart serves any number of models behind a single router: define **one
+``vllmRuntimes`` entry per model** in your values file. Shared configuration
+lives in ``vllmRuntimeDefaults``; each entry is deep-merged over it and only
+carries the differences — raise ``deploymentConfig.replicas`` for more copies
+of the same model, add a new entry for a different model or resource profile:
+
+.. code-block:: yaml
+
+   vllmRuntimes:
+     - spec:
+         model:
+           modelURL: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+         deploymentConfig:
+           resources: {cpu: "16", memory: "64Gi", gpu: "8"}
+     - spec:
+         model:
+           modelURL: "Qwen/Qwen2.5-7B-Instruct"
+         deploymentConfig:
+           replicas: 3
+
+Each entry becomes one ``VLLMRuntime`` custom resource labelled with a shared
+release label (``production-stack.vllm.ai/runtime-set``); the operator copies
+that label onto the engine pods, and the ``VLLMRouter`` selects on it — so the
+router discovers every engine of the release and routes each request by its
+``model`` field. Every model gets its own Deployment, Service and PVC;
+autoscaling (KEDA) is configured per entry.
+
+Clients use one endpoint and pick the model by name:
+
+.. code-block:: bash
+
+   curl http://localhost:30080/v1/chat/completions \
+     -H "Content-Type: application/json" \
+     -d '{"model": "Qwen/Qwen2.5-7B-Instruct", "messages": [{"role": "user", "content": "hi"}]}'
+
+See ``helm-operator/README.md`` for the full list of values.
+
+.. note::
+   **Shared storage prerequisite**: the operator creates one PVC per
+   ``VLLMRuntime`` and mounts it in every engine pod. With more than one
+   replica (or replicas spread across nodes) the backing StorageClass must
+   support ``ReadWriteMany`` (NFS, CephFS, JuiceFS, AWS EFS, GCP Filestore,
+   Azure Files, Longhorn). The cluster default StorageClass is often RWO-only
+   (local-path, cloud block disks), which makes multi-node replicas fail with
+   ``Multi-Attach`` errors. Point
+   ``vllmRuntime.spec.storageConfig.storageClassName`` at an RWX-capable
+   class, keep a single replica, or disable ``storageConfig``. Details in the
+   chart README.
+
+.. note::
+   Helm never upgrades or deletes CRDs placed in a chart's ``crds/`` directory.
+   When upgrading to an operator version that ships CRD changes, apply them
+   manually:
+
+   .. code-block:: bash
+
+      kubectl apply --server-side -f helm-operator/crds/
+
+Installing with kubectl
+^^^^^^^^^^^^^^^^^^^^^^^
+
 1. **Clone the repository**
 
    First, clone the vLLM production stack repository:
