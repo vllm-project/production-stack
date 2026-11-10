@@ -13,7 +13,7 @@
 
 ## Summary
 
-This proposal makes the router resilient to vLLM engine failures. Today the router can only recover from a failure that happens *before* any response bytes are sent to the client. This proposal extends recovery in two steps: (1) retry on another engine for failures that are provably safe to retry (connection errors, backend `5xx` before the first byte, and non-streaming requests), and (2) **mid-stream migration**, where a streaming request whose engine dies after some tokens have already been delivered is transparently continued on a healthy engine, with no duplicated or lost tokens visible to the client.
+This proposal makes the router resilient to vLLM engine failures. Today the router can only recover from a failure that happens *before* any response bytes are sent to the client. Retrying failures that happen *before* the first byte (connection errors, backend `5xx`, with backoff) is already being proposed in [#939](https://github.com/vllm-project/production-stack/pull/939), and this proposal builds on it instead of adding a second retry mechanism. What this proposal adds is the part nobody covers yet: (1) **mid-stream migration**, where a streaming request whose engine dies after some tokens have already been delivered is transparently continued on a healthy engine, with no duplicated or lost tokens visible to the client, (2) **hung-engine detection** with a stall timeout, and (3) **passive ejection** of engines that keep failing.
 
 This addresses the roadmap item "(P0) Request migration when the vLLM instance fails" in [#855](https://github.com/vllm-project/production-stack/issues/855).
 
@@ -23,17 +23,25 @@ Engine pods fail in normal operation: OOM, GPU/Xid errors, node preemption (spot
 
 ### Current behavior
 
-All references are to `src/vllm_router/services/request_service/request.py`.
+All references are to `src/vllm_router/services/request_service/request.py` on current `main`.
 
-- `route_general_request` has a failover loop (`max_instance_failover_reroute_attempts`, around line 621). It retries on another engine only if `process_request` raises **before it yields the response headers** (`await anext(stream_generator)`).
+- `route_general_request` has a failover loop (`max_instance_failover_reroute_attempts`). It retries on another engine only if `process_request` raises **before it yields the response headers** (`await anext(stream_generator)`).
 - Once headers are yielded and the body is streaming, an engine failure surfaces as an exception inside `traced_stream` and the client's stream is cut. No recovery is attempted.
-- A backend `5xx` is not an exception. `process_request` yields the status code and the body to the client, so an engine that returns `500/503` (for example one that is crash-looping or shutting down) is not retried.
+- A backend `5xx` is not an exception. `process_request` yields the status code and the body to the client, so an engine that returns `500/503` (for example one that is crash-looping or shutting down) is not retried. [#939](https://github.com/vllm-project/production-stack/pull/939) proposes retrying these.
 - `process_request` uses `aiohttp.ClientTimeout(total=None)`, so a hung engine (stalled, not closed) is never detected. The client waits indefinitely.
 - Response bytes are forwarded as they arrive from `iter_any()`, with no awareness of SSE frame boundaries. The router cannot know which tokens were actually delivered.
 
+### Related work
+
+- [#939](https://github.com/vllm-project/production-stack/pull/939) (open): opt-in automatic retry with exponential backoff and jitter. It retries transport failures on another engine and retryable statuses (`408/429/500/502/503/504`) after a backoff, under one budget (`--max-retries`, enabled by `--enable-retries`). **This proposal does not re-implement pre-first-byte retries; it reuses #939's failure classification and retry budget once it lands.** It only retries before response headers, so a failure after the first token is still unhandled, which is the gap this RFC addresses.
+- [#984](https://github.com/vllm-project/production-stack/pull/984) (open): exposes `max_instance_failover_reroute_attempts` in the dynamic config. Today a dynamic config reload rebuilds the router and resets this setting to its default. Every setting added here must be carried through the dynamic config the same way.
+- [#1164](https://github.com/vllm-project/production-stack/pull/1164) (open): returns `503` with a JSON body when failover ends on a connection error. The terminal error behavior in this RFC (SSE `error` frame mid-stream, `503` before headers) should stay consistent with it.
+- [#1115](https://github.com/vllm-project/production-stack/pull/1115) (merged): request stats are keyed per dispatch, not per `X-Request-Id`, and released in `finally`. A retry or migration of the same request therefore gets its own accounting on each engine.
+- [#876](https://github.com/vllm-project/production-stack/pull/876) / [#905](https://github.com/vllm-project/production-stack/pull/905) (open): router-side queuing. A migrated request should re-enter admission with a priority boost (Phase 3).
+
 ### Goals
 
-- A request that is safe to retry is retried on another healthy engine on `5xx`, connection failure, or stall before the first byte.
+- Pre-first-byte failures are retried on another healthy engine by reusing the mechanism from [#939](https://github.com/vllm-project/production-stack/pull/939), not a new one.
 - A streaming request that loses its engine mid-generation continues on another engine, and the client receives one coherent stream: no duplicated tokens, no gap, one `[DONE]`.
 - Migration is opt-in, bounded (maximum migrations per request), and observable (metrics, logs, trace attributes).
 - Requests that cannot be migrated correctly are *not* silently corrupted. They fail the same way they do today, and a metric records why.
@@ -57,12 +65,12 @@ Introduce a small classifier that maps a failure to `retryable-before-first-byte
 
 | Failure | Before first byte | After first byte |
 |---|---|---|
-| Connect error / reset / DNS | retry | n/a |
-| Backend `502/503/504` | retry | n/a (status already sent) |
-| Backend `500` | retry (configurable) | n/a |
+| Connect error / reset / DNS | retry (existing failover loop, [#939](https://github.com/vllm-project/production-stack/pull/939) when enabled) | n/a |
+| Backend `502/503/504` | retry via [#939](https://github.com/vllm-project/production-stack/pull/939) when enabled | n/a (status already sent) |
+| Backend `500` | per [#939](https://github.com/vllm-project/production-stack/pull/939)'s retryable set | n/a |
 | Backend `4xx` | fatal (client error, pass through) | n/a |
 | Connection dropped / `ClientPayloadError` / `ServerDisconnectedError` | retry | migrate |
-| Stall (no chunk for `stall-timeout`) | retry | migrate |
+| Stall (no chunk for `stall-timeout`) | retry (via the same classification) | migrate |
 | Client disconnect | stop, no retry | stop, no migration |
 
 The failed engine is added to a per-request exclusion set so that the retry or migration never lands on the same engine.
@@ -125,14 +133,14 @@ Non-streaming requests are never migrated mid-flight (nothing has been sent to t
   - `--enable-request-migration`
   - `--max-migrations-per-request` (default `1`)
   - `--migration-stall-timeout-seconds` (inter-chunk stall detection; default disabled)
-  - `--retry-on-backend-5xx` (retry `502/503/504` before the first byte; `500` is excluded by default, see Open Question 3)
   - `--passive-ejection-failure-threshold` (consecutive failures before ejection; default `0` = disabled)
   - `--passive-ejection-seconds` (ejection duration; default `30`)
   - `--passive-ejection-max-fraction` (maximum fraction of a model's engines that may be ejected at once; default `0.5`)
+  - Pre-first-byte retry flags (`--enable-retries`, `--max-retries`, backoff settings) are owned by [#939](https://github.com/vllm-project/production-stack/pull/939) and are not duplicated here.
+  - All new settings are also added to the dynamic config, so that a reload does not reset them (see [#984](https://github.com/vllm-project/production-stack/pull/984)).
   - New response header `X-Request-Migrations: <n>` (useful for debugging; also logged).
 - **Metrics:**
   - `vllm_router:request_migrations_total{reason,outcome}`
-  - `vllm_router:request_retries_total{reason}`
   - `vllm_router:migration_not_eligible_total{reason}`
   - `vllm_router:migration_gap_seconds` (time between the last token from the failed engine and the first token from the new one)
   - `vllm_router:migrated_tokens_total` (tokens re-prefilled on the new engine)
@@ -155,7 +163,7 @@ Non-streaming requests are never migrated mid-flight (nothing has been sent to t
 - **Integration/E2E Tests:**
   - A fake backend that dies (connection reset / `kill`) after `k` frames: assert the client sees one coherent stream with exactly the expected total token count and a single `[DONE]`.
   - A fake backend that stalls: assert detection after the stall timeout and migration.
-  - Backend returns `503` before the first byte: assert retry on another engine.
+  - Interaction with [#939](https://github.com/vllm-project/production-stack/pull/939): a `503` before the first byte is retried by that mechanism, and a later mid-stream failure of the retried attempt is migrated, without exceeding either budget.
   - Migration budget exhausted: assert the SSE error frame and clean close.
   - Run against a real vLLM engine in at least one test to validate `continue_final_message` behavior on the pinned vLLM version.
 - **Negative Tests:** invalid flag values, migration enabled with unsupported routing logic (disaggregated prefill), a single healthy engine, client disconnect during migration (no leaked tasks or stats entries), and `request_stats` consistency (no double-counted or never-completed requests after a migration).
@@ -181,7 +189,7 @@ Non-streaming requests are never migrated mid-flight (nothing has been sent to t
 Delivered as small, independently reviewable PRs:
 
 - **Phase 0 (this RFC):** agree on scope, eligibility, and flags.
-- **Phase 1a: safe retries.** Failure classifier, `--retry-on-backend-5xx`, full retry of non-streaming requests, stall timeout for hung engines, passive ejection, metrics. No streaming changes.
+- **Phase 1a: hung-engine detection and passive ejection.** Stall timeout for streaming requests, passive ejection with the max-fraction safeguard, shared failure classification, metrics, dynamic config support. No retry-policy code: pre-first-byte retries come from [#939](https://github.com/vllm-project/production-stack/pull/939). If #939 stalls, I am happy to help rebase and finish it rather than fork it.
 - **Phase 1b: streaming migration.** SSE frame parser, continuation builder for completions and chat, rewriter, `--enable-request-migration`, E2E tests with a fault-injecting fake backend.
 - **Phase 2: exact resume.** Resume from token ids instead of text (removes the tokenization-boundary drift and gives exact usage accounting) once the engine API for returning and accepting token ids is confirmed on the supported vLLM versions. Prefix-aware target selection to cut re-prefill cost.
 - **Phase 3: integration.** Re-admission with priority boost after queuing lands, planned-drain migration using KV transfer, and extended eligibility (structured output, tool calls).
@@ -190,12 +198,16 @@ Delivered as small, independently reviewable PRs:
 
 1. **Scope of "instance fails".** Does the roadmap item also cover planned drains (scale-in, rolling updates) or only unplanned failures? This RFC treats unplanned failures as the target and leaves planned drains to Phase 3.
 2. **Token ids and per-chunk usage.** Does the supported vLLM version expose generated token ids in streaming responses (for example via `return_token_ids`), accept token-id prompts on both endpoints, and support `stream_options.continuous_usage_stats`? Per-chunk usage would give exact delivered-token counts in Phase 1 and remove the estimate above. This determines whether Phase 2 can be done without engine changes.
-3. **Default for `500`.** Should a backend `500` before the first byte be retried by default, given that some `500`s are request-specific (for example a bad request that crashes the handler) and could be retried onto every engine?
-4. **Overlap.** Is anyone already working on retry or failover improvements that this should be coordinated with?
+3. **Budget sharing.** Should migration share [#939](https://github.com/vllm-project/production-stack/pull/939)'s retry budget (`--max-retries`) or have its own (`--max-migrations-per-request`)? Proposed: its own, because a migration re-prefills the whole context and costs much more than a pre-first-byte retry, while the pre-first-byte attempts of the same request still count against #939's budget.
+4. **Sequencing with #939.** Is #939 expected to land? This RFC assumes it does and builds on its classification. If it will not, Phase 1a would need to carry a minimal classification helper.
 
 ## References
 
 - [Roadmap #855: (P0) Request migration when the vLLM instance fails](https://github.com/vllm-project/production-stack/issues/855)
 - [Priority routing #996](https://github.com/vllm-project/production-stack/pull/996)
 - [Router-side request queuing RFC #876](https://github.com/vllm-project/production-stack/pull/876)
+- Retry with backoff: [#939](https://github.com/vllm-project/production-stack/pull/939)
+- Failover settings in dynamic config: [#984](https://github.com/vllm-project/production-stack/pull/984)
+- Terminal error on failover: [#1164](https://github.com/vllm-project/production-stack/pull/1164)
+- Request stats keyed per dispatch: [#1115](https://github.com/vllm-project/production-stack/pull/1115)
 - Existing failover loop: `src/vllm_router/services/request_service/request.py` (`route_general_request`, `process_request`)
