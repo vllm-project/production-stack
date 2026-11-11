@@ -333,3 +333,48 @@ class TestJsonFormatter:
         logger = log.init_logger("test.init_json")
         for handler in logger.handlers:
             assert isinstance(handler.formatter, log.JsonFormatter)
+
+
+class TestErrorStreamRedaction:
+    """The stderr handler carries its own filter chain."""
+
+    def test_error_stream_handler_carries_the_redaction_filter(self):
+        logger = log.init_logger("test-error-stream-redaction")
+
+        error_handlers = [
+            h
+            for h in logger.handlers
+            if isinstance(h, logging.StreamHandler) and h.level == logging.WARNING
+        ]
+        assert error_handlers, "expected a WARNING-level stream handler"
+
+        for handler in error_handlers:
+            assert any(
+                isinstance(f, log.TokenRedactionFilter) for f in handler.filters
+            ), "the WARNING handler must redact, since the stdout chain never runs for it"
+
+    def test_error_stream_handler_redacts_a_warning_record(self):
+        logger = log.init_logger("test-error-stream-redaction-applied")
+        handler = next(
+            h
+            for h in logger.handlers
+            if isinstance(h, logging.StreamHandler) and h.level == logging.WARNING
+        )
+        redaction = next(
+            f for f in handler.filters if isinstance(f, log.TokenRedactionFilter)
+        )
+
+        record = logging.LogRecord(
+            name="test",
+            level=logging.WARNING,
+            pathname="test.py",
+            lineno=1,
+            msg="Upstream rejected the request, headers: %s",
+            args=(Headers({"authorization": "Bearer super-secret-token"}),),
+            exc_info=None,
+        )
+
+        redaction.filter(record)
+
+        assert "super-secret-token" not in record.getMessage()
+        assert "Bearer ****" in record.getMessage()
