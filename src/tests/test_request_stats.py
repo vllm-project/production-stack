@@ -204,8 +204,11 @@ async def test_multipart_request_counts_overlapping_requests_sharing_an_id(
     async def post(*args, **kwargs):
         return _StreamingBackendResponse()
 
+    async def route_request(*args):
+        return URL
+
     state = types.SimpleNamespace(
-        router=types.SimpleNamespace(route_request=lambda *args: URL),
+        router=types.SimpleNamespace(route_request=route_request),
         engine_stats_scraper=types.SimpleNamespace(get_engine_stats=lambda: {}),
         request_stats_monitor=monitor,
         aiohttp_client_wrapper=lambda: types.SimpleNamespace(post=post),
