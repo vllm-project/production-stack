@@ -59,6 +59,39 @@ def test_completed_request_releases_per_request_bookkeeping(monitor):
     assert monitor.first_token_time == {}
 
 
+def test_avg_decoding_length_is_time_from_first_token_to_completion(monitor):
+    now = 1000.0
+    monitor.on_new_request(URL, "req-1", now)
+    monitor.on_request_response(URL, "req-1", now + 0.5)
+    monitor.on_request_complete(URL, "req-1", now + 3.0)
+    monitor.on_new_request(URL, "req-2", now + 1)
+    monitor.on_request_response(URL, "req-2", now + 2.0)
+    monitor.on_request_complete(URL, "req-2", now + 3.0)
+
+    stats = monitor.get_request_stats(now + 4)
+    assert stats[URL].avg_decoding_length == pytest.approx(1.75)
+    assert stats[URL].avg_latency == pytest.approx(2.5)
+
+
+def test_avg_decoding_length_skips_requests_that_failed_in_prefill(monitor):
+    now = 1000.0
+    monitor.on_new_request(URL, "req-1", now)
+    monitor.on_request_complete(URL, "req-1", now + 1)
+
+    stats = monitor.get_request_stats(now + 2)
+    assert stats[URL].avg_decoding_length == -1
+
+
+def test_avg_decoding_length_drops_samples_outside_the_window(monitor):
+    now = 1000.0
+    monitor.on_new_request(URL, "req-1", now)
+    monitor.on_request_response(URL, "req-1", now + 0.5)
+    monitor.on_request_complete(URL, "req-1", now + 2.5)
+
+    assert monitor.get_request_stats(now + 5)[URL].avg_decoding_length == 2.0
+    assert monitor.get_request_stats(now + 30)[URL].avg_decoding_length == -1
+
+
 class _RaisingRequestCM:
     async def __aenter__(self):
         raise ConnectionError("backend down")
