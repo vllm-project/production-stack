@@ -1071,8 +1071,8 @@ class PriorityRouter(RoutingInterface):
             lowest_load: float = min(loads.values())
 
             least_loaded_engines: List[str] = []
-            for url in endpoint_urls:
-                if loads[url] == lowest_load:
+            for url, load in loads.items():
+                if load == lowest_load:
                     least_loaded_engines.append(url)
 
             return random.choice(least_loaded_engines)
