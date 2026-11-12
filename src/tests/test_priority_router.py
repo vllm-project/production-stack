@@ -212,4 +212,5 @@ async def test_custom_priority_field_is_forwarded_as_vllm_priority(
     body = dict(request_json)
     await router.route_request(endpoints, None, {}, Request(headers), body)
 
-    assert body["priority"] == -5
+    # The client's fields are forwarded as sent, plus vLLM's `priority`.
+    assert body == {**request_json, "priority": -5}
