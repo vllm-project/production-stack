@@ -967,6 +967,9 @@ class PriorityRouter(RoutingInterface):
     steered to the least-loaded engine (by live request-stats load); all
     other requests round-robin across every healthy engine, including the
     least-loaded one, so no engine is ever reserved and left idle.
+
+    When several engines have the same lowest _engine_load(),
+    a request goes to one of them at random.
     """
 
     def __init__(
@@ -1062,10 +1065,17 @@ class PriorityRouter(RoutingInterface):
         endpoint_urls = tuple(sorted(endpoint.url for endpoint in endpoints))
 
         if priority < self.priority_threshold:
-            return min(
-                endpoint_urls,
-                key=lambda url: self._engine_load(url, request_stats),
-            )
+            loads: Dict[str, float] = {}
+            for url in endpoint_urls:
+                loads[url] = self._engine_load(url, request_stats)
+            lowest_load: float = min(loads.values())
+
+            least_loaded_engines: List[str] = []
+            for url in endpoint_urls:
+                if loads[url] == lowest_load:
+                    least_loaded_engines.append(url)
+
+            return random.choice(least_loaded_engines)
 
         idx = self._next_index.get(endpoint_urls, 0)
         self._next_index[endpoint_urls] = idx + 1
