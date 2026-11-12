@@ -404,6 +404,7 @@ def main():
         "port": args.port,
         "log_level": args.log_level,
         "root_path": args.root_path,
+        "timeout_keep_alive": args.timeout_keep_alive,
     }
     if args.log_format == "json":
         # Map 'trace' to 'DEBUG' since TRACE is not a standard Python

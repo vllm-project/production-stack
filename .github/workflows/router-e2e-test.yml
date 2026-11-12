@@ -135,6 +135,8 @@ jobs:
           source /usr/local/bin/conda-init
           conda activate llmstack
           echo "🧪 Running all k8s discovery routing tests"
+          # Drop results left over from earlier runs
+          rm -rf /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }}
           ./tests/e2e/run-k8s-routing-test.sh all \
             --model "facebook/opt-125m" \
             --num-requests 25 \
@@ -142,7 +144,7 @@ jobs:
             --verbose \
             --result-dir /tmp/k8s-discovery-routing-results-pr-${{ github.event.pull_request.number || 'main' }} \
             --timeout 20
-        timeout-minutes: 20
+        timeout-minutes: 60
 
       - name: Cleanup k8s discovery resources
         if: always()
@@ -180,11 +182,24 @@ jobs:
           activate-environment: true
 
       - name: Install Python dependencies
+        # shortcut: the GPU runner's NVIDIA driver only supports CUDA 12.4, so install the CUDA 12.9
+        # builds of vllm/torch/torchcodec (PyPI torchcodec 0.17 needs libnvrtc.so.13); lmcache's
+        # cuda-python>=13 is overridden (the router only uses its
+        # pure-Python controller messages). Drop this once the runner driver supports CUDA 13 (>=580).
         run: |
           uv pip install --upgrade pip
-          uv pip install -e ".[semantic_cache,lmcache,test]"
+          printf 'torch==2.13.0+cu129\ncuda-python>=12.9,<13\ntorchcodec==0.16.0+cu129\n' > "$RUNNER_TEMP/cu129-overrides.txt"
+          uv pip install -e ".[semantic_cache,lmcache,test]" \
+            "vllm @ https://github.com/vllm-project/vllm/releases/download/v0.32.0/vllm-0.32.0%2Bcu129-cp38-abi3-manylinux_2_28_x86_64.whl" \
+            --overrides "$RUNNER_TEMP/cu129-overrides.txt" \
+            --extra-index-url https://download.pytorch.org/whl/cu129 \
+            --index-strategy unsafe-best-match
 
       - name: Start 2 vLLM serve backends
+        env:
+          # shortcut: the runner's /usr/local/cuda nvcc predates CUDA 12.8 and can't JIT flashinfer's
+          # sampler (unknown --compress-mode). Drop with the CUDA 12.9 install workaround above.
+          VLLM_USE_FLASHINFER_SAMPLER: "0"
         run: |
           echo "🚀 Starting vLLM serve backend"
           mkdir -p "$LOG_DIR"

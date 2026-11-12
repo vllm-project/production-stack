@@ -47,11 +47,6 @@ jobs:
             kubectl patch "$pvc" -n default -p '{"metadata":{"finalizers":null}}' --type=merge || true
           done
 
-      - name: Prune host docker
-        run: |
-          sudo docker system prune -af --volumes || true
-          sudo docker builder prune -af || true
-
       - name: Prune minikube docker
         run: |
           minikube ssh -- 'docker system prune -af --volumes' || true
