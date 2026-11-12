@@ -1,4 +1,5 @@
-from typing import Any, Dict
+import random
+from typing import Any, Dict, List
 
 import pytest
 
@@ -29,6 +30,18 @@ class RequestStats:
 class Request:
     def __init__(self, headers: Dict[str, str] = None):
         self.headers = headers or {}
+
+
+@pytest.fixture
+def choices(monkeypatch: pytest.MonkeyPatch):
+    calls: List[List[str]] = []
+
+    def choose_last(seq: List[str]):
+        calls.append(list(seq))
+        return seq[-1]
+
+    monkeypatch.setattr(random, "choice", choose_last)
+    return calls
 
 
 @pytest.mark.asyncio
@@ -92,6 +105,84 @@ async def test_high_priority_request_selects_least_loaded_engine():
     assert url == "http://engine2.com"
     # Priority must be injected back into the forwarded body.
     assert request_json["priority"] == -1
+
+
+@pytest.mark.asyncio
+async def test_high_priority_request_chooses_among_all_tied_engines(
+    choices: List[List[str]],
+):
+    router: PriorityRouter = PriorityRouter(priority_default=0, priority_threshold=0)
+    endpoints: List[EndpointInfo] = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+        EndpointInfo(url="http://engine3.com"),
+    ]
+    request: Request = Request(headers={"x-request-priority": "-1"})
+
+    url: str = await router.route_request(endpoints, None, {}, request, {})
+
+    assert choices == [
+        ["http://engine1.com", "http://engine2.com", "http://engine3.com"]
+    ]
+    assert url == "http://engine3.com"
+
+
+@pytest.mark.asyncio
+async def test_high_priority_request_chooses_only_among_least_loaded_engines(
+    choices: List[List[str]],
+):
+    router: PriorityRouter = PriorityRouter(priority_default=0, priority_threshold=0)
+    endpoints: List[EndpointInfo] = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+        EndpointInfo(url="http://engine3.com"),
+    ]
+    request_stats: Dict[str, RequestStats] = {
+        "http://engine1.com": RequestStats(),
+        "http://engine2.com": RequestStats(in_prefill_requests=1),
+        "http://engine3.com": RequestStats(),
+    }
+    request: Request = Request(headers={"x-request-priority": "-1"})
+
+    url: str = await router.route_request(endpoints, None, request_stats, request, {})
+
+    assert choices == [["http://engine1.com", "http://engine3.com"]]
+    assert url == "http://engine3.com"
+
+
+@pytest.mark.asyncio
+async def test_high_priority_requests_follow_load_changes(choices: List[List[str]]):
+    router: PriorityRouter = PriorityRouter(priority_default=0, priority_threshold=0)
+    endpoints: List[EndpointInfo] = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+        EndpointInfo(url="http://engine3.com"),
+    ]
+    request_stats: Dict[str, RequestStats] = {
+        "http://engine1.com": RequestStats(in_decoding_requests=2),
+        "http://engine2.com": RequestStats(),
+        "http://engine3.com": RequestStats(in_prefill_requests=1),
+    }
+    request: Request = Request(headers={"x-request-priority": "-1"})
+
+    urls: List[str] = []
+    for _ in range(3):
+        url: str = await router.route_request(
+            endpoints, None, request_stats, request, {}
+        )
+        request_stats[url].in_prefill_requests += 1
+        urls.append(url)
+
+    assert choices == [
+        ["http://engine2.com"],
+        ["http://engine2.com", "http://engine3.com"],
+        ["http://engine2.com"],
+    ]
+    assert urls == [
+        "http://engine2.com",
+        "http://engine3.com",
+        "http://engine2.com",
+    ]
 
 
 @pytest.mark.asyncio
