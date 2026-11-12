@@ -222,6 +222,14 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             self.in_decoding_requests[engine_url] = max(
                 0, self.in_decoding_requests.get(engine_url, 1) - 1
             )
+            if engine_url not in self.decoding_length_monitors:
+                self.decoding_length_monitors[engine_url] = MovingAverageMonitor(
+                    self.sliding_window_size
+                )
+            # Decoding length is the time from the first token to completion
+            self.decoding_length_monitors[engine_url].update(
+                timestamp, timestamp - self.first_token_time[key]
+            )
         else:  # failed in prefill stage
             self.in_prefill_requests[engine_url] = max(
                 0, self.in_prefill_requests.get(engine_url, 1) - 1
@@ -285,6 +293,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             finished = self.finished_requests.get(engine_url, 0)
 
             if engine_url in self.decoding_length_monitors:
+                self.decoding_length_monitors[engine_url].update_no_value(current_time)
                 avg_dec_len = self.decoding_length_monitors[engine_url].get_average()
             else:
                 avg_dec_len = -1
