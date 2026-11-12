@@ -20,7 +20,23 @@
                 },
                 "containerSecurityContext": {
                     "description": "Container-level security context configuration",
-                    "type": "object"
+                    "type": "object",
+                    "properties": {
+                        "allowPrivilegeEscalation": {
+                            "type": "boolean"
+                        },
+                        "capabilities": {
+                            "type": "object",
+                            "properties": {
+                                "drop": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 "enabled": {
                     "description": "Whether to enable the cache server",
@@ -106,7 +122,17 @@
                 },
                 "securityContext": {
                     "description": "Pod-level security context configuration",
-                    "type": "object"
+                    "type": "object",
+                    "properties": {
+                        "seccompProfile": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
                 },
                 "serde": {
                     "description": "Serialization/deserialization format for the cache server",
@@ -494,7 +520,23 @@
                 },
                 "containerSecurityContext": {
                     "description": "Container-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#securitycontext-v1-core",
-                    "type": "object"
+                    "type": "object",
+                    "properties": {
+                        "allowPrivilegeEscalation": {
+                            "type": "boolean"
+                        },
+                        "capabilities": {
+                            "type": "object",
+                            "properties": {
+                                "drop": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 "enableRouter": {
                     "description": "Whether to enable the router service",
@@ -896,7 +938,17 @@
                 },
                 "securityContext": {
                     "description": "Pod-level security context configuration. https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.32/#podsecuritycontext-v1-core",
-                    "type": "object"
+                    "type": "object",
+                    "properties": {
+                        "seccompProfile": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
                 },
                 "serviceAccountName": {
                     "description": "The name of an existing service account to use for the router deployment.",

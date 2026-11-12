@@ -10,6 +10,26 @@ tests:
     - hasDocuments:
         count: 0
 
+  - it: should render hardened security context defaults
+    release:
+      name: vllm
+    set:
+      cacheserverSpec:
+        enabled: true
+    asserts:
+    - equal:
+        path: spec.template.spec.securityContext
+        value:
+          seccompProfile:
+            type: RuntimeDefault
+    - equal:
+        path: spec.template.spec.containers[0].securityContext
+        value:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+
 
   - it: should render a deployment with custom values
     release:
@@ -134,6 +154,8 @@ tests:
         value:
           runAsUser: 1000
           runAsGroup: 3000
+          seccompProfile:
+            type: RuntimeDefault
 
     - notExists:
         path: spec.template.spec.affinity
@@ -178,3 +200,7 @@ tests:
         path: spec.template.spec.containers[0].securityContext
         value:
           runAsNonRoot: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
