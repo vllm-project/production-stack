@@ -494,9 +494,10 @@ def parse_args():
         type=str,
         default="priority",
         help="The request body field carrying the per-request priority for "
-        "priority routing, used when the header is absent. This value is "
-        "also injected into the forwarded body so vLLM's priority "
-        "scheduler can use it. Only used when --routing-logic=priority.",
+        "priority routing, used when the header is absent. The resolved "
+        "priority is forwarded in the body's `priority` field so vLLM's "
+        "priority scheduler can use it. Only used when "
+        "--routing-logic=priority.",
     )
 
     parser.add_argument(

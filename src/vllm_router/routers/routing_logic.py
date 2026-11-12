@@ -1041,8 +1041,8 @@ class PriorityRouter(RoutingInterface):
                 indicating the request-level performance of each engine
             request (Request): The incoming request
             request_json (Dict): The request body; the resolved priority is
-                injected back into this dict so it can be forwarded to the
-                engine for in-engine preemption.
+                written into this dict under vLLM's `priority` key so it can
+                be forwarded to the engine for in-engine preemption.
         """
         if not endpoints:
             raise ValueError("PriorityRouter requires at least one endpoint")
@@ -1057,7 +1057,9 @@ class PriorityRouter(RoutingInterface):
             self._warned_scheduling_policy = True
 
         priority = self.extract_priority(request, request_json)
-        request_json[self.priority_field] = priority
+        # vLLM's scheduler only reads "priority"; --priority-field is just
+        # where the router looks for the client's value.
+        request_json["priority"] = priority
 
         endpoint_urls = tuple(sorted(endpoint.url for endpoint in endpoints))
 

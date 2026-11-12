@@ -184,3 +184,33 @@ async def test_priority_threshold_defaults_to_priority_default():
     router = PriorityRouter(priority_default=5)
 
     assert router.priority_threshold == 5
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "headers, request_json",
+    [
+        ({"x-request-priority": "-5"}, {"model": "m", "prompt": "hi"}),
+        ({}, {"model": "m", "prompt": "hi", "tier": -5}),
+    ],
+    ids=["header", "custom_body_field"],
+)
+async def test_custom_priority_field_is_forwarded_as_vllm_priority(
+    headers: Dict[str, str], request_json: Dict[str, Any]
+):
+    """
+    --priority-field only names where the client's priority is read from;
+    vLLM's scheduler reads the body's `priority` key, so the resolved value
+    must be forwarded there.
+    """
+    router = PriorityRouter(priority_field="tier", priority_default=0)
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+
+    body = dict(request_json)
+    await router.route_request(endpoints, None, {}, Request(headers), body)
+
+    # The client's fields are forwarded as sent, plus vLLM's `priority`.
+    assert body == {**request_json, "priority": -5}
