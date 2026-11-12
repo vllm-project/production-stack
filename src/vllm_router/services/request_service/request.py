@@ -42,6 +42,7 @@ from vllm_router.services.request_service.rewriter import (
 )
 from vllm_router.utils import (
     replace_model_in_request_body,
+    resolve_model_alias,
     update_content_length,
 )
 
@@ -518,7 +519,7 @@ async def route_general_request(
 
     aliases = getattr(service_discovery, "aliases", None)
     if aliases and requested_model in aliases.keys():
-        requested_model = aliases[requested_model]
+        requested_model = resolve_model_alias(requested_model, aliases)
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
 
@@ -779,6 +780,10 @@ async def route_orchestrated_disaggregated_request(
     in_router_time = time.time()
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
+    if isinstance(request_json, dict) and "model" in request_json:
+        request_json["model"] = resolve_model_alias(
+            request_json["model"], getattr(get_service_discovery(), "aliases", None)
+        )
 
     logger.info(f"[{request_id}] Starting orchestrated disaggregated inference")
 
@@ -973,6 +978,10 @@ async def route_disaggregated_prefill_request(
     # Same as vllm, Get request_id from X-Request-Id header if available
     request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
     request_json = await request.json()
+    if isinstance(request_json, dict) and "model" in request_json:
+        request_json["model"] = resolve_model_alias(
+            request_json["model"], getattr(get_service_discovery(), "aliases", None)
+        )
 
     # Save original request for decode phase
     orig_request_json = request_json.copy()
