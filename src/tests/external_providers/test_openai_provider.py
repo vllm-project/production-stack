@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
+from aiohttp import web
+from aiohttp.test_utils import TestServer
 
 from vllm_router.external_providers.base import ExternalProviderResponse
 from vllm_router.external_providers.models import ExternalModelConfig
@@ -178,6 +180,54 @@ class TestOpenAIProviderSendRequest:
             await openai_provider.send_request(
                 "/v1/chat/completions", {"model": "gpt-4o"}
             )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "body, content_type, expected",
+        [
+            (
+                "upstream overloaded",
+                "text/plain",
+                {"error": {"message": "upstream overloaded"}},
+            ),
+            (
+                '{"error": {"message": "busy"}}',
+                "text/plain",
+                {"error": {"message": "busy"}},
+            ),
+        ],
+    )
+    async def test_non_json_content_type_keeps_status_without_retry(
+        self, monkeypatch, body, content_type, expected
+    ):
+        posts = 0
+
+        async def handler(request):
+            nonlocal posts
+            posts += 1
+            return web.Response(status=503, text=body, content_type=content_type)
+
+        app = web.Application()
+        app.router.add_post("/v1/chat/completions", handler)
+        async with TestServer(app) as server:
+            monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+            provider = OpenAIProvider(
+                make_provider_config(
+                    api_base=str(server.make_url("")),
+                    api_key_env_var="OPENAI_API_KEY",
+                    max_retries=2,
+                )
+            )
+            try:
+                result = await provider.send_request(
+                    "/v1/chat/completions", {"model": "gpt-4o"}
+                )
+            finally:
+                await provider.close()
+
+        assert result.status_code == 503
+        assert result.body == expected
+        assert posts == 1
 
 
 class TestOpenAIProviderHealthCheck:
