@@ -1112,7 +1112,8 @@ class DisaggregatedPrefillRouter(RoutingInterface):
         if is_prefill:
             if not prefiller_endpoints:
                 logger.warning(
-                    f"No prefill endpoints found with labels {self.prefill_model_labels}"
+                    f"No prefill endpoints found with labels {self.prefill_model_labels}. "
+                    f"Available endpoints: {[(e.url, e.model_label) for e in endpoints]}"
                 )
                 raise HTTPException(
                     status_code=503,
@@ -1121,7 +1122,8 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             return prefiller_endpoints[0].url
         if not decoder_endpoints:
             logger.warning(
-                f"No decode endpoints found with labels {self.decode_model_labels}"
+                f"No decode endpoints found with labels {self.decode_model_labels}. "
+                f"Available endpoints: {[(e.url, e.model_label) for e in endpoints]}"
             )
             raise HTTPException(
                 status_code=503,
