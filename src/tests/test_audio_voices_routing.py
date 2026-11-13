@@ -180,3 +180,17 @@ async def test_body_model_still_wins_over_query_param():
 
     assert resp.status_code == 200
     assert client.request.call_args.kwargs["url"] == "http://tts-engine/v1/audio/voices"
+
+
+@pytest.mark.asyncio
+async def test_voices_get_body_without_model_falls_back_to_query_param():
+    req, sd, client = _make_request(
+        _make_router(RoundRobinRouter),
+        {"model": "tts-model"},
+        body=json.dumps({"voice": "alloy"}).encode(),
+    )
+
+    resp, body = await _route(req, sd, rewriter_on=False)
+
+    assert resp.status_code == 200
+    assert client.request.call_args.kwargs["url"] == "http://tts-engine/v1/audio/voices"

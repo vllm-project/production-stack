@@ -294,13 +294,15 @@ async def process_request(
     try:
         # Check if this is a streaming request and extract model name
         try:
+            is_streaming = False
+            model_name = None
             if body:
                 request_json = json.loads(body)
                 is_streaming = request_json.get("stream", False)
-                model_name = request_json.get("model", "unknown")
-            else:
-                # body-less GET (e.g. /v1/audio/voices), see route_general_request
-                is_streaming = False
+                model_name = request_json.get("model")
+            if not model_name:
+                # a GET (e.g. /v1/audio/voices) may name the model only in
+                # the query string, see route_general_request
                 model_name = request.query_params.get("model", "unknown")
         except (JSONDecodeError, UnicodeDecodeError, ValueError):
             # If we can't parse the body as JSON, assume it's not streaming
@@ -489,9 +491,9 @@ async def route_general_request(
         return response_overwrite
 
     requested_model = request_json.get("model", None)
-    if requested_model is None and not request_body and request.method == "GET":
-        # a body-less GET (e.g. /v1/audio/voices) can only name the model in
-        # the query string
+    if requested_model is None and request.method == "GET":
+        # a GET (e.g. /v1/audio/voices) usually has no body and names the
+        # model in the query string; fall back to it when the body omits it
         requested_model = request.query_params.get("model")
     if requested_model is None:
         end_span(span, status_code=400) if tracing_active else None
