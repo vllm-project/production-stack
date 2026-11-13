@@ -294,9 +294,14 @@ async def process_request(
     try:
         # Check if this is a streaming request and extract model name
         try:
-            request_json = json.loads(body)
-            is_streaming = request_json.get("stream", False)
-            model_name = request_json.get("model", "unknown")
+            if body:
+                request_json = json.loads(body)
+                is_streaming = request_json.get("stream", False)
+                model_name = request_json.get("model", "unknown")
+            else:
+                # body-less GET (e.g. /v1/audio/voices), see route_general_request
+                is_streaming = False
+                model_name = request.query_params.get("model", "unknown")
         except (JSONDecodeError, UnicodeDecodeError, ValueError):
             # If we can't parse the body as JSON, assume it's not streaming
             raise HTTPException(
@@ -484,11 +489,18 @@ async def route_general_request(
         return response_overwrite
 
     requested_model = request_json.get("model", None)
+    if requested_model is None and not request_body and request.method == "GET":
+        # a body-less GET (e.g. /v1/audio/voices) can only name the model in
+        # the query string
+        requested_model = request.query_params.get("model")
     if requested_model is None:
         end_span(span, status_code=400) if tracing_active else None
         return JSONResponse(
             status_code=400,
-            content={"error": "Invalid request: missing 'model' in request body."},
+            content={
+                "error": "Invalid request: missing 'model' in request body "
+                "(or in the 'model' query parameter for GET requests)."
+            },
             headers={"X-Request-Id": request_id},
         )
 
@@ -496,8 +508,8 @@ async def route_general_request(
     if span is not None:
         span.set_attribute("vllm.model", requested_model)
 
-    # Apply request rewriting if enabled
-    if is_request_rewriter_initialized():
+    # Apply request rewriting if enabled (a body-less GET has nothing to rewrite)
+    if request_body and is_request_rewriter_initialized():
         rewriter = get_request_rewriter()
         rewritten_body = rewriter.rewrite_request(
             request_body, requested_model, endpoint
@@ -519,8 +531,9 @@ async def route_general_request(
     aliases = getattr(service_discovery, "aliases", None)
     if aliases and requested_model in aliases.keys():
         requested_model = aliases[requested_model]
-        request_body = replace_model_in_request_body(request_json, requested_model)
-        update_content_length(request, request_body)
+        if request_body:
+            request_body = replace_model_in_request_body(request_json, requested_model)
+            update_content_length(request, request_body)
 
     # Check if this model should be routed to an external provider
     registry = getattr(request.app.state, "external_provider_registry", None)
@@ -606,7 +619,7 @@ async def route_general_request(
             endpoints, engine_stats, request_stats, request
         )
 
-    if isinstance(request.app.state.router, PriorityRouter):
+    if isinstance(request.app.state.router, PriorityRouter) and request_body:
         # PriorityRouter injects the resolved priority into request_json so
         # vLLM's own priority scheduler can preempt within the engine.
         request_body = json.dumps(request_json)
