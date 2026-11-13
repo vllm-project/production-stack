@@ -34,6 +34,11 @@ CASES = [
     (OPERATOR_COMMAND, ["m", "--port", "8000", "--enable-sleep-mode"], True),
     (OPERATOR_COMMAND, ["m", "--port", "8000"], False),
     (OPERATOR_COMMAND, ["m", "--no-enable-sleep-mode"], False),
+    # explicit value form, as some helm/k8s configs pass it
+    (OPERATOR_COMMAND, ["m", "--enable-sleep-mode=true"], True),
+    (OPERATOR_COMMAND, ["m", "--enable-sleep-mode=1"], True),
+    (OPERATOR_COMMAND, ["m", "--enable-sleep-mode=false"], False),
+    (["sh", "-c"], ["vllm serve m --enable-sleep-mode=True --port 8000"], True),
     # whole shell line in one entry
     (["sh", "-c"], ["vllm serve m --enable-sleep-mode --port 8000"], True),
     (["sh", "-c", "vllm serve m --enable-sleep-mode"], None, True),

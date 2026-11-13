@@ -44,12 +44,18 @@ def _container_enables_sleep_mode(container) -> bool:
     `command` or in `args` (the operator runs `vllm serve` as the command and
     puts the model flags, extraArgs included, in `args`), and either may hold
     a whole shell line such as `["sh", "-c", "vllm serve ... --enable-sleep-mode"]`.
+    The `--enable-sleep-mode=<value>` form counts only for a truthy value.
     """
     if not container.command:
         return True
     for part in list(container.command) + list(container.args or []):
-        if "--enable-sleep-mode" in str(part).split():
-            return True
+        for word in str(part).split():
+            if word == "--enable-sleep-mode":
+                return True
+            if word.startswith("--enable-sleep-mode="):
+                value = word.split("=", 1)[1].strip("'\"").lower()
+                if value in ("true", "1", "yes", "on"):
+                    return True
     return False
 
 
