@@ -34,6 +34,7 @@ from vllm_router.utils import (
     SingletonMeta,
     parse_comma_separated_args,
     parse_static_aliases,
+    parse_static_model_max_lens,
     parse_static_urls,
 )
 
@@ -57,6 +58,7 @@ class DynamicRouterConfig:
     static_aliases: Optional[str] = None
     static_model_labels: Optional[str] = None
     static_model_types: Optional[str] = None
+    static_model_max_lens: Optional[str] = None
     static_backend_health_checks: Optional[bool] = False
     static_backend_health_check_interval: Optional[int] = 60
     static_backend_health_check_timeout_seconds: Optional[int] = 10
@@ -97,6 +99,7 @@ class DynamicRouterConfig:
             static_backends=args.static_backends,
             static_models=args.static_models,
             static_model_types=args.static_model_types,
+            static_model_max_lens=getattr(args, "static_model_max_lens", None),
             static_aliases=args.static_aliases,
             static_backend_health_checks=args.static_backend_health_checks,
             static_backend_health_check_interval=args.static_backend_health_check_interval,
@@ -192,6 +195,11 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 ),
                 decode_model_labels=parse_comma_separated_args(
                     config.decode_model_labels
+                ),
+                model_max_lens=(
+                    parse_static_model_max_lens(config.static_model_max_lens)
+                    if config.static_model_max_lens
+                    else None
                 ),
             )
         elif config.service_discovery == "k8s":

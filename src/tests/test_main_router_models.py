@@ -113,3 +113,25 @@ async def test_show_models_does_not_warn_for_preserved_backend_fields(
 
     assert response.status_code == 200
     assert "ignored" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_show_models_advertises_static_max_model_len(monkeypatch):
+    from vllm_router.service_discovery import StaticServiceDiscovery
+
+    discovery = StaticServiceDiscovery(
+        app=None,
+        urls=["http://127.0.0.1:1", "http://127.0.0.1:2"],
+        models=["long-model", "plain-model"],
+        model_max_lens={"long-model": 1048576},
+    )
+    monkeypatch.setattr(
+        "vllm_router.routers.main_router.get_service_discovery", lambda: discovery
+    )
+
+    response = await show_models(_build_request())
+
+    cards = {card["id"]: card for card in json.loads(response.body)["data"]}
+    assert cards["long-model"]["max_model_len"] == 1048576
+    assert "max_model_len" not in cards["plain-model"]
+    assert cards["long-model"]["created"] == discovery.added_timestamp

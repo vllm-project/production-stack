@@ -232,9 +232,16 @@ class StaticServiceDiscovery(ServiceDiscovery):
         static_backend_health_check_timeout_seconds: int = 10,
         prefill_model_labels: List[str] | None = None,
         decode_model_labels: List[str] | None = None,
+        model_max_lens: Dict[str, int] | None = None,
     ):
         self.app = app
         self._validate_index_aligned_lists(urls, models, model_labels, model_types)
+        unknown = sorted(set(model_max_lens or {}) - set(models))
+        if unknown:
+            raise ValueError(
+                f"model_max_lens names models that are not static models: {', '.join(unknown)}"
+            )
+        self.model_max_lens = model_max_lens or {}
         self.urls = urls
         self.models = models
         self.aliases = aliases
@@ -334,7 +341,7 @@ class StaticServiceDiscovery(ServiceDiscovery):
     def _get_model_info(self, model: str) -> Dict[str, ModelInfo]:
         """
         Get detailed model information. For static serving engines, we don't query the engine, instead we use predefined
-        static model info.
+        static model info: max_model_len when it is configured, and the time the backends were added as `created`.
 
         Args:
             model: the model name
@@ -350,7 +357,12 @@ class StaticServiceDiscovery(ServiceDiscovery):
                 parent=None,
                 is_adapter=False,
                 root=None,
-                created=int(time.time()),
+                created=self.added_timestamp,
+                extra_fields=(
+                    {"max_model_len": self.model_max_lens[model]}
+                    if model in self.model_max_lens
+                    else {}
+                ),
             )
         }
 
