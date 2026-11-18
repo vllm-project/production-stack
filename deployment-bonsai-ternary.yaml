@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bonsai-ternary-mig
+  namespace: bonsai-ternary
+  labels:
+    app: bonsai-ternary-mig
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: bonsai-ternary-mig
+  template:
+    metadata:
+      labels:
+        app: bonsai-ternary-mig
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: llama-server
+        image: llama.cpp-server:prism-b8846-d104cf1
+        command:
+        - "/opt/prism-release/llama-server"
+        - "--host"
+        - "0.0.0.0"
+        - "--port"
+        - "8080"
+        - "-m"
+        - "/model/Ternary-Bonsai-8B-Q2_0.gguf"
+        - "--ctx-size"
+        - "2048"
+        - "--threads"
+        - "8"
+        resources:
+          limits:
+            nvidia.com/mig-1g.10gb: 1
+          requests:
+            nvidia.com/mig-1g.10gb: 1
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: model-storage
+          mountPath: /model
+          readOnly: true
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: ollama-models-store-pvc
