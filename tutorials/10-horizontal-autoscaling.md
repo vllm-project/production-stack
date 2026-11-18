@@ -14,15 +14,18 @@ This tutorial guides you through setting up horizontal pod autoscaling (HPA) for
   - [2. Deploy the Observability Stack](#2-deploy-the-observability-stack)
   - [3. Configure Prometheus Adapter](#3-configure-prometheus-adapter)
   - [4. Verify Metrics Export](#4-verify-metrics-export)
-  - [5. Test the Autoscaling](#5-test-the-autoscaling)
-  - [6. Cleanup](#6-cleanup)
+  - [5. Set Up Horizontal Pod Autoscaling](#5-set-up-horizontal-pod-autoscaling)
+  - [6. Test the Autoscaling](#6-test-the-autoscaling)
+  - [7. Cleanup](#7-cleanup)
 
 ## Prerequisites
 
-1. A working vLLM deployment on Kubernetes (follow [01-minimal-helm-installation](01-minimal-helm-installation.md))
-2. Kubernetes environment with 2 GPUs
-3. `kubectl` and `helm` installed
+1. A local clone of this repository
+2. A Kubernetes cluster that can schedule two GPU replicas on the same node, since the example shares a `ReadWriteOnce` volume
+3. `kubectl`, `helm`, `jq`, and Python 3 with the `openai` package installed
 4. Basic understanding of Kubernetes and metrics
+
+Run the commands from the repository root. The vLLM deployment and HPA use the `default` namespace.
 
 ## Steps
 
@@ -35,11 +38,7 @@ Follow the instructions in [02-basic-vllm-config.md](02-basic-vllm-config.md) to
 The observability stack is based on kube-prometheus-stack and includes Prometheus, Grafana, and other monitoring tools.
 
 ```bash
-# Navigate to the observability directory
-cd production-stack/observability
-
-# Install the observability stack
-sudo bash install.sh
+bash observability/install.sh
 ```
 
 ### 3. Configure Prometheus Adapter
@@ -112,7 +111,7 @@ spec:
 Apply the HPA to your Kubernetes cluster:
 
 ```bash
-kubectl apply -f assets/hpa-10.yaml
+kubectl apply -f tutorials/assets/hpa-10.yaml
 ```
 
 Explanation of the HPA configuration:
@@ -128,12 +127,12 @@ The above HPA will:
 - Scale up when there are more than 1 requests waiting in the queue
 - Scale down when the queue length decreases
 
-### 5. Test the Autoscaling
+### 6. Test the Autoscaling
 
 Monitor the HPA status:
 
 ```bash
-kubectl get hpa vllm-hpa -w
+kubectl --namespace default get hpa vllm-hpa -w
 ```
 
 The output should show the HPA status and the current number of replicas.
@@ -143,27 +142,27 @@ NAME       REFERENCE                                     TARGETS   MINPODS   MAX
 vllm-hpa   Deployment/vllm-llama3-deployment-vllm   0/1       1         2         1          34s
 ```
 
-We provide a load test script in [assets/example-10-load-generator.py](assets/example-10-load-generator.py) to test the autoscaling.
+In a second terminal, forward port 30080 to the serving engine Service created by the basic configuration.
 
 ```bash
-# In the production-stack/tutorials directory
-kubectl port-forward svc/vllm-engine-service 30080:80 &
-python3 assets/example-10-load-generator.py --num-requests 100 --prompt-len 10000
+kubectl --namespace default port-forward svc/vllm-llama3-engine-service 30080:80
 ```
 
-You should see the HPA scale up the number of replicas to 2 and there is a new vLLM pod created.
-
-### 6. Cleanup
-
-To remove the observability stack and HPA:
+Once the port forward is listening, run the [load generator](assets/example-10-load-generator.py) from the repository root in another terminal. Use a shorter prompt to leave room for generation within the configured 4,096-token limit.
 
 ```bash
-# Remove HPA
-kubectl delete -f assets/hpa-10.yaml
+python3 tutorials/assets/example-10-load-generator.py --num-requests 100 --prompt-len 1000
+```
 
-# Uninstall observability stack (in the production-stack/tutorials directory)
-cd ../observability # Go back to the observability directory
-sudo bash uninstall.sh
+Watch the HPA status. If the waiting-request metric stays above the target, the HPA can request a second replica.
+
+### 7. Cleanup
+
+Stop the port forward and the HPA watch with Ctrl+C. Then remove the HPA and the observability stack.
+
+```bash
+kubectl delete -f tutorials/assets/hpa-10.yaml
+bash observability/uninstall.sh
 ```
 
 ## Upcoming Features for HPA in vLLM Production Stack
