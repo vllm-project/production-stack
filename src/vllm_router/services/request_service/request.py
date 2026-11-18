@@ -1117,8 +1117,11 @@ async def route_sleep_wakeup_request(
 
     # Forward any additional query parameters (e.g. /sleep `level` and `mode`,
     # /wake_up `tags`) to the upstream engine. `id` is router-only and is
-    # consumed above to pick the target engine.
-    upstream_params = {k: v for k, v in request.query_params.items() if k != "id"}
+    # consumed above to pick the target engine. multi_items() keeps repeated
+    # keys: vLLM reads `tags` with getlist(), and items() keeps only the last.
+    upstream_params = [
+        (k, v) for k, v in request.query_params.multi_items() if k != "id"
+    ]
 
     async with aiohttp.ClientSession() as client:
         if endpoint == "/is_sleeping":
