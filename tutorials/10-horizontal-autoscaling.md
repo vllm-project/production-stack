@@ -142,10 +142,10 @@ NAME       REFERENCE                                     TARGETS   MINPODS   MAX
 vllm-hpa   Deployment/vllm-llama3-deployment-vllm   0/1       1         2         1          34s
 ```
 
-In a second terminal, forward port 30080 to the serving engine Service created by the basic configuration.
+In a second terminal, forward port 30080 to the router Service created by the basic configuration. The router distributes requests across the ready engine Pods as the deployment scales.
 
 ```bash
-kubectl --namespace default port-forward svc/vllm-llama3-engine-service 30080:80
+kubectl --namespace default port-forward svc/vllm-router-service 30080:80
 ```
 
 Once the port forward is listening, run the [load generator](assets/example-10-load-generator.py) from the repository root in another terminal. Use a shorter prompt to leave room for generation within the configured 4,096-token limit.
