@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,6 +73,9 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// Error reading the object - requeue the request.
 		log.Error(err, "Failed to get VLLMRouter")
 		return ctrl.Result{}, err
+	}
+	if _, err := buildResourceRequirements(router.Spec.Resources); err != nil {
+		return ctrl.Result{}, fmt.Errorf("build VLLMRouter resources: %w", err)
 	}
 
 	// Create ServiceAccount if it doesn't exist
@@ -154,7 +156,10 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	err = r.Get(ctx, types.NamespacedName{Name: router.Name, Namespace: router.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new deployment
-		dep := r.deploymentForVLLMRouter(router)
+		dep, err := r.deploymentForVLLMRouter(router)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 		log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 		err = r.Create(ctx, dep)
 		if err != nil {
@@ -169,10 +174,17 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Update the deployment if needed
-	if r.deploymentNeedsUpdate(found, router) {
+	needsUpdate, err := r.deploymentNeedsUpdate(found, router)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if needsUpdate {
 		log.Info("Updating Deployment", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
 		// Create new deployment spec
-		newDep := r.deploymentForVLLMRouter(router)
+		newDep, err := r.deploymentForVLLMRouter(router)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 
 		err = r.Update(ctx, newDep)
 		if err != nil {
@@ -193,7 +205,9 @@ func (r *VLLMRouterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 // deploymentForVLLMRouter returns a VLLMRouter Deployment object
-func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.VLLMRouter) *appsv1.Deployment {
+func (r *VLLMRouterReconciler) deploymentForVLLMRouter(
+	router *servingv1alpha1.VLLMRouter,
+) (*appsv1.Deployment, error) {
 	labels := map[string]string{"app": router.Name}
 	for k, v := range router.Labels {
 		labels[k] = v
@@ -223,20 +237,9 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 		})
 	}
 
-	// Build resource requirements
-	resources := corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{},
-		Limits:   corev1.ResourceList{},
-	}
-
-	if router.Spec.Resources.CPU != "" {
-		resources.Requests[corev1.ResourceCPU] = resource.MustParse(router.Spec.Resources.CPU)
-		resources.Limits[corev1.ResourceCPU] = resource.MustParse(router.Spec.Resources.CPU)
-	}
-
-	if router.Spec.Resources.Memory != "" {
-		resources.Requests[corev1.ResourceMemory] = resource.MustParse(router.Spec.Resources.Memory)
-		resources.Limits[corev1.ResourceMemory] = resource.MustParse(router.Spec.Resources.Memory)
+	resources, err := buildResourceRequirements(router.Spec.Resources)
+	if err != nil {
+		return nil, fmt.Errorf("build VLLMRouter resources: %w", err)
 	}
 
 	// Get the image from Image spec or use default
@@ -362,41 +365,47 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 
 	// Set the owner reference
 	ctrl.SetControllerReference(router, dep, r.Scheme)
-	return dep
+	return dep, nil
 }
 
 // deploymentNeedsUpdate checks if the deployment needs to be updated
-func (r *VLLMRouterReconciler) deploymentNeedsUpdate(dep *appsv1.Deployment, router *servingv1alpha1.VLLMRouter) bool {
+func (r *VLLMRouterReconciler) deploymentNeedsUpdate(
+	dep *appsv1.Deployment,
+	router *servingv1alpha1.VLLMRouter,
+) (bool, error) {
 	// Compare replicas
 	if *dep.Spec.Replicas != router.Spec.Replicas {
-		return true
+		return true, nil
 	}
 	// Generate the expected deployment
-	expectedDep := r.deploymentForVLLMRouter(router)
+	expectedDep, err := r.deploymentForVLLMRouter(router)
+	if err != nil {
+		return false, err
+	}
 
 	// Guard against deployments with no containers (e.g. hand-edited or corrupted).
 	if len(expectedDep.Spec.Template.Spec.Containers) == 0 || len(dep.Spec.Template.Spec.Containers) == 0 {
-		return true
+		return true, nil
 	}
 
 	// Compare image
 	if expectedDep.Spec.Template.Spec.Containers[0].Image != dep.Spec.Template.Spec.Containers[0].Image {
-		return true
+		return true, nil
 	}
 
 	// Compare resources
 	expectedResources := expectedDep.Spec.Template.Spec.Containers[0].Resources
 	actualResources := dep.Spec.Template.Spec.Containers[0].Resources
-	if !reflect.DeepEqual(expectedResources, actualResources) {
-		return true
+	if !resourceRequirementsEqual(expectedResources, actualResources) {
+		return true, nil
 	}
 
 	// Compare container args
 	if !reflect.DeepEqual(expectedDep.Spec.Template.Spec.Containers[0].Args, dep.Spec.Template.Spec.Containers[0].Args) {
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 // updateStatus updates the status of the VLLMRouter
