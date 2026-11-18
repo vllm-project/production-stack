@@ -30,6 +30,11 @@ servingEngineSpec:
       chatTemplateConfigMap: |-
         {% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content']}}{% if (loop.last and add_generation_prompt) or not loop.last %}{{ '<|im_end|>' + '\n'}}{% endif %}{% endfor %}
         {% if add_generation_prompt and messages[-1]['role'] != 'assistant' %}{{ '<|im_start|>assistant\n' }}{% endif %}
+  # An engine that dies during startup keeps its container running, so only this
+  # probe can restart it. Keep the budget well under the 600s in wait-for-pods.sh,
+  # which has to fit the restart and a second startup (#1133).
+  startupProbe:
+    failureThreshold: 30
   containerSecurityContext:
     capabilities:
       add:
