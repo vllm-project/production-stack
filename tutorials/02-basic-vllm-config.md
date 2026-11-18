@@ -64,7 +64,7 @@ servingEngineSpec:
     vllmConfig:
       enableChunkedPrefill: false
       enablePrefixCaching: false
-      maxModelLen: 16384
+      maxModelLen: 4096
       dtype: "bfloat16"
       extraArgs: ["--gpu-memory-utilization", "0.8"]
 
@@ -77,7 +77,7 @@ Deploy the configuration using Helm:
 
 ```bash
 helm repo add vllm https://vllm-project.github.io/production-stack
-helm install vllm vllm/vllm-stack -f tutorials/assets/values-02-basic-config.yaml
+helm install vllm vllm/vllm-stack --namespace default -f tutorials/assets/values-02-basic-config.yaml
 ```
 
 Expected output:
@@ -98,7 +98,7 @@ REVISION: 1
 1. Check the status of the pods:
 
    ```bash
-   kubectl get pods
+   kubectl --namespace default get pods
    ```
 
    Expected output:
@@ -117,7 +117,7 @@ REVISION: 1
 2. Verify the service is exposed correctly:
 
    ```bash
-   kubectl get services
+   kubectl --namespace default get services
    ```
 
    Expected output:
@@ -125,12 +125,12 @@ REVISION: 1
    Ensure there are services for both the serving engine and the router:
 
    ```plaintext
-   NAME                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
-   vllm-engine-service   ClusterIP   10.103.98.170    <none>        80/TCP    4m
-   vllm-router-service   ClusterIP   10.103.110.107   <none>        80/TCP    4m
+   NAME                         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                        AGE
+   vllm-llama3-engine-service   ClusterIP   10.103.98.170    <none>        80/TCP,55555/TCP,9999/TCP      4m
+   vllm-router-service          ClusterIP   10.103.110.107   <none>        80/TCP,9000/TCP                4m
    ```
 
-   - The `vllm-engine-service` exposes the serving engine.
+   - The `vllm-llama3-engine-service` exposes the serving engine.
    - The `vllm-router-service` handles routing and load balancing across model-serving pods.
 
 3. Test the health endpoint:

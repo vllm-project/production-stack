@@ -99,7 +99,7 @@ prometheus:
           - key: app.kubernetes.io/managed-by
             operator: In
             values:
-              - Helm
+              - helm
           - key: environment
             operator: In
             values:
