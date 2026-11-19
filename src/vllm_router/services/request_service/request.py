@@ -227,6 +227,26 @@ def _build_backend_request_headers(
     return headers
 
 
+def _backend_query_params(
+    request: Request, *, resolved_model: Optional[str] = None
+) -> Optional[dict]:
+    """Query string to send upstream.
+
+    Drops router-only ``id`` (engine pin), matching the sleep/wake path.
+    If ``resolved_model`` is set and the client sent ``model``, replace it so
+    a body-less GET with an alias forwards the canonical name.
+    """
+    query_params = getattr(request, "query_params", None)
+    if not query_params:
+        return None
+    params = {key: value for key, value in query_params.items() if key != "id"}
+    if not params:
+        return None
+    if resolved_model is not None and "model" in params:
+        params["model"] = resolved_model
+    return params
+
+
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
@@ -237,6 +257,7 @@ async def process_request(
     background_tasks: BackgroundTasks,
     debug_request=None,
     parent_span_context=None,
+    resolved_model: Optional[str] = None,
 ):
     """
     Process a request by sending it to the chosen backend.
@@ -249,7 +270,10 @@ async def process_request(
         endpoint: The endpoint to send the request to on the backend.
         debug_request: The original request object from the client, used for
             optional debug logging.
-        parent_span_context: OpenTelemetry context from parent span for trace propagation.
+        parent_span_context: OpenTelemetry context from parent span for trace
+            propagation.
+        resolved_model: Canonical model id after alias resolution. Used to
+            rewrite a body-less GET's ``model`` query param before forwarding.
 
     Yields:
         The response headers and status code, followed by the response content.
@@ -296,7 +320,7 @@ async def process_request(
         # A body-less GET (e.g. /v1/audio/voices) is a non-streaming request.
         if not body:
             is_streaming = False
-            model_name = "unknown"
+            model_name = resolved_model or "unknown"
         else:
             try:
                 request_json = json.loads(body)
@@ -335,6 +359,7 @@ async def process_request(
             method=request.method,
             url=backend_url + endpoint,
             headers=headers,
+            params=_backend_query_params(request, resolved_model=resolved_model),
             data=body or None,
             timeout=aiohttp.ClientTimeout(total=None),
         ) as backend_response:
@@ -689,6 +714,7 @@ async def route_general_request(
                 endpoint,
                 background_tasks,
                 parent_span_context=span_context,
+                resolved_model=requested_model,
             )
             headers, status = await anext(stream_generator)
             media_type = headers.get("content-type", "text/event-stream")

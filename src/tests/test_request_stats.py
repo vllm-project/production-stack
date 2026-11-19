@@ -142,8 +142,40 @@ async def test_process_request_empty_body_forwards_without_data(monitor):
 
     assert captured["method"] == "GET"
     assert captured["data"] is None
+    assert captured["params"] is None
     stats = monitor.get_request_stats(time.time())
     assert stats[URL].finished_requests == 1
+
+
+@pytest.mark.asyncio
+async def test_process_request_forwards_query_params_except_id(monitor):
+    captured = {}
+
+    def capturing_cm(**kw):
+        captured.update(kw)
+        return _OkRequestCM()
+
+    request = _fake_request(monitor, _OkRequestCM)
+    request.method = "GET"
+    request.query_params = {"model": "my-tts", "id": "engine-1"}
+    request.app.state.aiohttp_client_wrapper = lambda: types.SimpleNamespace(
+        request=lambda **kw: capturing_cm(**kw)
+    )
+
+    gen = process_request(
+        request,
+        b"",
+        URL,
+        "req-1",
+        "/v1/audio/voices",
+        None,
+        resolved_model="tts",
+    )
+    async for _ in gen:
+        pass
+
+    assert captured["params"] == {"model": "tts"}
+    assert "id" not in captured["params"]
 
 
 @pytest.mark.asyncio

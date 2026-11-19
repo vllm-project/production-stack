@@ -6,12 +6,14 @@ no body. POST routes still require a JSON body field.
 """
 
 import json
+import types
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from vllm_router.routers.routing_logic import RoundRobinRouter
+from vllm_router.services.request_service.request import _backend_query_params
 from vllm_router.utils import SingletonABCMeta
 
 
@@ -33,6 +35,23 @@ def cleanup_singletons():
         del SingletonABCMeta._instances[cls]
 
 
+class _FakeContent:
+    async def iter_any(self):
+        yield b'{"voices":["aiden"]}'
+
+
+class _OkRequestCM:
+    async def __aenter__(self):
+        return types.SimpleNamespace(
+            status=200,
+            headers={"content-type": "application/json"},
+            content=_FakeContent(),
+        )
+
+    async def __aexit__(self, *exc):
+        return False
+
+
 @contextmanager
 def _make_request(
     *,
@@ -40,12 +59,16 @@ def _make_request(
     body=b"",
     query_params=None,
     aliases=None,
+    aiohttp_capture=None,
+    endpoints=None,
 ):
     router = RoundRobinRouter()
     router.max_instance_failover_reroute_attempts = 0
 
     sd = MagicMock()
-    sd.get_endpoint_info.return_value = ENDPOINTS
+    sd.get_endpoint_info.return_value = (
+        endpoints if endpoints is not None else ENDPOINTS
+    )
     sd.aliases = aliases
     sd.has_ever_seen_model.return_value = True
 
@@ -69,6 +92,16 @@ def _make_request(
         return body
 
     req.body = _body
+
+    if aiohttp_capture is not None:
+
+        def request_cm(**kw):
+            aiohttp_capture.update(kw)
+            return _OkRequestCM()
+
+        state.aiohttp_client_wrapper = lambda: types.SimpleNamespace(
+            request=lambda **kw: request_cm(**kw)
+        )
 
     patches = [
         patch(
@@ -104,6 +137,25 @@ def _json_backend(captured):
         yield b'{"voices":["aiden"]}'
 
     return backend
+
+
+def test_backend_query_params_drops_id_and_rewrites_alias():
+    req = types.SimpleNamespace(
+        query_params={"model": "my-tts", "id": "engine-1", "foo": "bar"}
+    )
+    assert _backend_query_params(req) == {"model": "my-tts", "foo": "bar"}
+    assert _backend_query_params(req, resolved_model="tts") == {
+        "model": "tts",
+        "foo": "bar",
+    }
+
+
+def test_backend_query_params_none_when_empty_or_id_only():
+    assert _backend_query_params(types.SimpleNamespace(query_params={})) is None
+    assert (
+        _backend_query_params(types.SimpleNamespace(query_params={"id": "e"})) is None
+    )
+    assert _backend_query_params(types.SimpleNamespace()) is None
 
 
 @pytest.mark.asyncio
@@ -194,3 +246,38 @@ async def test_get_voices_resolves_alias_without_rewriting_empty_body():
     assert resp.status_code == 200
     assert captured["body"] == b""
     assert captured["backend_url"] == "http://tts-engine"
+
+
+@pytest.mark.asyncio
+async def test_get_voices_forwards_query_model_and_strips_router_id():
+    aiohttp_kw = {}
+    with _make_request(
+        query_params={"model": "tts", "id": "engine-1"},
+        aiohttp_capture=aiohttp_kw,
+        endpoints=[EndpointInfo(url="http://tts-engine", Id="engine-1")],
+    ) as (req, _):
+        from vllm_router.services.request_service.request import route_general_request
+
+        resp = await route_general_request(req, "/v1/audio/voices", MagicMock())
+
+    assert resp.status_code == 200
+    assert aiohttp_kw["method"] == "GET"
+    assert aiohttp_kw["data"] is None
+    assert aiohttp_kw["params"] == {"model": "tts"}
+    assert "id" not in aiohttp_kw["params"]
+
+
+@pytest.mark.asyncio
+async def test_get_voices_forwards_canonical_model_after_alias():
+    aiohttp_kw = {}
+    with _make_request(
+        query_params={"model": "my-tts"},
+        aliases={"my-tts": "tts"},
+        aiohttp_capture=aiohttp_kw,
+    ) as (req, _):
+        from vllm_router.services.request_service.request import route_general_request
+
+        resp = await route_general_request(req, "/v1/audio/voices", MagicMock())
+
+    assert resp.status_code == 200
+    assert aiohttp_kw["params"] == {"model": "tts"}
