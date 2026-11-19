@@ -250,8 +250,9 @@ servingEngineSpec:
       pollingInterval: 15
       # -- How long to wait before scaling down after scaling up (in seconds).
       cooldownPeriod: 360
-      # -- Number of replicas to scale to when no triggers are active
-      idleReplicaCount: 0
+      # Number of replicas when no trigger is active (only 0 is supported). The default queue-length
+      # trigger is inactive whenever the queue is empty, so add a traffic-based trigger before enabling this.
+      # idleReplicaCount: 0
       # -- Initial cooldown period in seconds before scaling down after creation
       initialCooldownPeriod: 60
       # -- Fallback configuration when scaler fails
@@ -260,40 +261,30 @@ servingEngineSpec:
         failureThreshold: 3
         # -- Number of replicas to scale to in fallback
         replicas: 2
-      # -- List of KEDA trigger configurations
-      triggers:
-        # -- Trigger type
-        type: "prometheus"
-        # -- Trigger metadata
-        metadata:
-          # -- Prometheus server address
-          serverAddress: "http://prometheus-operated.monitoring.svc:9090"
-          # -- Name of the metric to monitor
-          metricName: "vllm:num_requests_waiting"
-          # -- Prometheus query to fetch the metric
-          query: "vllm:num_requests_waiting"
-          # -- Threshold value that triggers scaling
-          threshold: "5"
+      # -- Prometheus address used by the default trigger. Defaults to prometheus-operated in the release namespace when kube-prometheus-stack is enabled, otherwise in the monitoring namespace.
+      serverAddress: ""
+      # -- List of KEDA trigger configurations. If empty, the default trigger scales on the average queue length of this model's engines.
+      triggers: []
+      # Example of a custom trigger. The query must return a single value, so aggregate it:
+      # triggers:
+      #   - type: "prometheus"
+      #     metadata:
+      #       serverAddress: "http://prometheus-operated.monitoring.svc:9090"
+      #       metricName: "vllm:num_requests_running"
+      #       query: 'sum(vllm:num_requests_running{service="<release>-<model>-engine-service"})'
+      #       threshold: "4"
       # -- Advanced KEDA configuration
       advanced:
         # --  Restore original replica count when ScaledObject is deleted
         restoreToOriginalReplicaCount: false
         # -- HPA-specific configuration
         horizontalPodAutoscalerConfig:
-          # -- Custom name for the HPA resource
-          name: "keda-hpa-{scaled-object-name}"
+          # Custom name for the HPA resource. Defaults to keda-hpa-<scaledobject name>.
+          # name: ""
           # -- HPA scaling behavior configuration, see https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
           behavior: {}
-        # -- Scaling modifiers for composite metrics
-        scalingModifiers:
-          # -- Target value for the composed metric
-          target: ""
-          # -- Activation target for the composed metric
-          activationTarget: ""
-          # -- Metric type (AverageValue or Value)
-          metricType: "AverageValue"
-          # -- Formula to compose metrics together
-          formula: ""
+        # Scaling modifiers for composite metrics can be set under scalingModifiers,
+        # see https://keda.sh/docs/latest/reference/scaledobject-spec/#scalingmodifiers
 
     # -- RaySec configuration, to deploy the model as a rayCluster instead of a deployment
     raySpec:

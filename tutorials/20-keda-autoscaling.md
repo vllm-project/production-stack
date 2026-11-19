@@ -122,7 +122,7 @@ spec:
       metadata:
         serverAddress: http://prometheus-operated.monitoring.svc:9090
         metricName: vllm:num_requests_waiting
-        query: vllm:num_requests_waiting
+        query: sum(vllm:num_requests_waiting{service="vllm-llama3-engine-service"})
         threshold: '5'
 ```
 
@@ -135,7 +135,7 @@ kubectl apply -f assets/keda-scaled-object.yaml
 
 This tells KEDA to:
 
-* Monitor `vllm:num_requests_waiting`
+* Monitor `vllm:num_requests_waiting` of the `vllm-llama3-engine-service` engines. The query is wrapped in `sum()` because KEDA needs a single value once there are 2 or more replicas, and the `service` selector limits it to this model. Adjust the service name if you used a different release or model name.
 * Scale between 1 and 2 replicas
 * Scale up when the queue exceeds 5 requests
 
@@ -212,7 +212,7 @@ spec:
         # Name of the metric to monitor
         metricName: vllm:num_requests_waiting
         # Prometheus query to fetch the metric
-        query: vllm:num_requests_waiting
+        query: sum(vllm:num_requests_waiting{service="vllm-llama3-engine-service"})
         # Threshold value that triggers scaling
         # When queue length exceeds this value, KEDA will scale up
         threshold: '5'

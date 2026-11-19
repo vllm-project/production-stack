@@ -23,7 +23,7 @@ spec:
         # Name of the metric to monitor
         metricName: vllm:num_requests_waiting
         # Prometheus query to fetch the metric
-        query: vllm:num_requests_waiting
+        query: sum(vllm:num_requests_waiting{service="vllm-llama3-engine-service"})
         # Threshold value that triggers scaling
         # When queue length exceeds this value, KEDA will scale up
         threshold: '5'
