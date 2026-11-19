@@ -17,8 +17,9 @@ metadata:
    {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- with $modelSpec.pdb.maxUnavailable }}
-  maxUnavailable: {{ . }}
+  {{- $maxUnavailable := $modelSpec.pdb.maxUnavailable }}
+  {{- if and (not (kindIs "invalid" $maxUnavailable)) (ne (toString $maxUnavailable) "") }}
+  maxUnavailable: {{ $maxUnavailable }}
   {{- else }}
   minAvailable: {{ $modelSpec.pdb.minAvailable | default 0 }}
   {{- end }}

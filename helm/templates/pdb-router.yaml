@@ -13,8 +13,9 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- with .Values.routerSpec.pdb.maxUnavailable }}
-  maxUnavailable: {{ . }}
+  {{- $maxUnavailable := .Values.routerSpec.pdb.maxUnavailable }}
+  {{- if and (not (kindIs "invalid" $maxUnavailable)) (ne (toString $maxUnavailable) "") }}
+  maxUnavailable: {{ $maxUnavailable }}
   {{- else }}
   minAvailable: {{ .Values.routerSpec.pdb.minAvailable | default 0 }}
   {{- end }}
