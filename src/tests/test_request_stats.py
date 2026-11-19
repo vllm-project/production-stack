@@ -122,6 +122,31 @@ async def test_process_request_releases_slot_when_backend_errors(monitor):
 
 
 @pytest.mark.asyncio
+async def test_process_request_empty_body_forwards_without_data(monitor):
+    # Body-less GET must not 400 on json.loads("") and must omit the body.
+    captured = {}
+
+    def capturing_cm(**kw):
+        captured.update(kw)
+        return _OkRequestCM()
+
+    request = _fake_request(monitor, _OkRequestCM)
+    request.method = "GET"
+    request.app.state.aiohttp_client_wrapper = lambda: types.SimpleNamespace(
+        request=lambda **kw: capturing_cm(**kw)
+    )
+
+    gen = process_request(request, b"", URL, "req-1", "/v1/audio/voices", None)
+    async for _ in gen:
+        pass
+
+    assert captured["method"] == "GET"
+    assert captured["data"] is None
+    stats = monitor.get_request_stats(time.time())
+    assert stats[URL].finished_requests == 1
+
+
+@pytest.mark.asyncio
 async def test_process_request_releases_slot_on_unparsable_body(monitor):
     # on_new_request runs before the body is parsed; a non-JSON body must still
     # release the slot and surface as a 400.

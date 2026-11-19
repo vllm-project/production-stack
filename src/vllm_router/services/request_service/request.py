@@ -292,16 +292,21 @@ async def process_request(
     http_status_code = None
 
     try:
-        # Check if this is a streaming request and extract model name
-        try:
-            request_json = json.loads(body)
-            is_streaming = request_json.get("stream", False)
-            model_name = request_json.get("model", "unknown")
-        except (JSONDecodeError, UnicodeDecodeError, ValueError):
-            # If we can't parse the body as JSON, assume it's not streaming
-            raise HTTPException(
-                status_code=400, detail="Request body is not JSON parsable."
-            )
+        # Check if this is a streaming request and extract model name.
+        # A body-less GET (e.g. /v1/audio/voices) is a non-streaming request.
+        if not body:
+            is_streaming = False
+            model_name = "unknown"
+        else:
+            try:
+                request_json = json.loads(body)
+                is_streaming = request_json.get("stream", False)
+                model_name = request_json.get("model", "unknown")
+            except (JSONDecodeError, UnicodeDecodeError, ValueError):
+                # If we can't parse the body as JSON, assume it's not streaming
+                raise HTTPException(
+                    status_code=400, detail="Request body is not JSON parsable."
+                )
 
         # Add streaming info to span after parsing
         if span is not None:
@@ -330,7 +335,7 @@ async def process_request(
             method=request.method,
             url=backend_url + endpoint,
             headers=headers,
-            data=body,
+            data=body or None,
             timeout=aiohttp.ClientTimeout(total=None),
         ) as backend_response:
             http_status_code = backend_response.status
@@ -484,6 +489,12 @@ async def route_general_request(
         return response_overwrite
 
     requested_model = request_json.get("model", None)
+    # Body-less GET (e.g. /v1/audio/voices) cannot carry the model in JSON;
+    # accept it from the query string. POST still requires a body field.
+    if requested_model is None and not request_body:
+        method = getattr(request, "method", "") or ""
+        if method.upper() == "GET" and request.query_params:
+            requested_model = request.query_params.get("model")
     if requested_model is None:
         end_span(span, status_code=400) if tracing_active else None
         return JSONResponse(
@@ -496,8 +507,9 @@ async def route_general_request(
     if span is not None:
         span.set_attribute("vllm.model", requested_model)
 
-    # Apply request rewriting if enabled
-    if is_request_rewriter_initialized():
+    # Apply request rewriting if enabled. Skip on a body-less GET: there is
+    # nothing to rewrite, and json.loads(b"") would 400.
+    if request_body and is_request_rewriter_initialized():
         rewriter = get_request_rewriter()
         rewritten_body = rewriter.rewrite_request(
             request_body, requested_model, endpoint
@@ -519,8 +531,9 @@ async def route_general_request(
     aliases = getattr(service_discovery, "aliases", None)
     if aliases and requested_model in aliases.keys():
         requested_model = aliases[requested_model]
-        request_body = replace_model_in_request_body(request_json, requested_model)
-        update_content_length(request, request_body)
+        if request_body:
+            request_body = replace_model_in_request_body(request_json, requested_model)
+            update_content_length(request, request_body)
 
     # Check if this model should be routed to an external provider
     registry = getattr(request.app.state, "external_provider_registry", None)
@@ -606,7 +619,7 @@ async def route_general_request(
             endpoints, engine_stats, request_stats, request
         )
 
-    if isinstance(request.app.state.router, PriorityRouter):
+    if request_body and isinstance(request.app.state.router, PriorityRouter):
         # PriorityRouter injects the resolved priority into request_json so
         # vLLM's own priority scheduler can preempt within the engine.
         request_body = json.dumps(request_json)
