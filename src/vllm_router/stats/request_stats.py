@@ -229,10 +229,18 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         self.finished_requests[engine_url] += 1
 
         request_start_time = self.request_start_time.pop(key)
-        self.first_token_time.pop(key, None)
+        first_token_time = self.first_token_time.pop(key, None)
         self.latency_monitors[engine_url].update(
             timestamp, timestamp - request_start_time
         )
+        if first_token_time is not None:
+            if engine_url not in self.decoding_length_monitors:
+                self.decoding_length_monitors[engine_url] = MovingAverageMonitor(
+                    self.sliding_window_size
+                )
+            self.decoding_length_monitors[engine_url].update(
+                timestamp, timestamp - first_token_time
+            )
 
     def on_request_swapped(self, engine_url: str, request_id: str, timestamp: float):
         # This function should be called if a request is determined to be swapped from GPU to CPU.
@@ -285,6 +293,7 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             finished = self.finished_requests.get(engine_url, 0)
 
             if engine_url in self.decoding_length_monitors:
+                self.decoding_length_monitors[engine_url].update_no_value(current_time)
                 avg_dec_len = self.decoding_length_monitors[engine_url].get_average()
             else:
                 avg_dec_len = -1

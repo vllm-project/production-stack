@@ -48,6 +48,33 @@ def test_on_request_complete_is_idempotent(monitor):
     assert stats[URL].in_decoding_requests == 0
 
 
+def test_avg_decoding_length_is_time_from_first_token_to_completion(monitor):
+    monitor.on_new_request(URL, "r1", 100.0)
+    monitor.on_request_response(URL, "r1", 100.5)
+    monitor.on_request_complete(URL, "r1", 103.0)
+    stats = monitor.get_request_stats(104.0)[URL]
+    assert stats.ttft == 0.5
+    assert stats.avg_latency == 3.0
+    assert stats.avg_decoding_length == 2.5
+
+
+def test_avg_decoding_length_skips_prefill_failures(monitor):
+    monitor.on_new_request(URL, "r1", 100.0)
+    monitor.on_request_complete(URL, "r1", 101.0)
+    stats = monitor.get_request_stats(102.0)[URL]
+    assert stats.avg_decoding_length == -1
+    assert stats.finished_requests == 1
+
+
+def test_avg_decoding_length_prunes_with_the_sliding_window(monitor):
+    # fixture window is 10s; a sample at t=103 is gone by t=114.
+    monitor.on_new_request(URL, "r1", 100.0)
+    monitor.on_request_response(URL, "r1", 100.5)
+    monitor.on_request_complete(URL, "r1", 103.0)
+    assert monitor.get_request_stats(104.0)[URL].avg_decoding_length == 2.5
+    assert monitor.get_request_stats(114.0)[URL].avg_decoding_length == -1
+
+
 def test_completed_request_releases_per_request_bookkeeping(monitor):
     # Per-request entries must not accumulate for the life of the process.
     now = time.time()
