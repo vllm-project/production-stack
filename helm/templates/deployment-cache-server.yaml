@@ -60,9 +60,17 @@ spec:
         - name: "lmcache-server"
           image: "{{ .Values.cacheserverSpec.image.repository }}:{{ .Values.cacheserverSpec.image.tag }}"
           command:
-          - "/opt/venv/bin/lmcache_server"
-          - "0.0.0.0"
-          - "{{ .Values.cacheserverSpec.containerPort }}"
+          - "/opt/venv/bin/lmcache"
+          - "server"
+          args:
+            - --http-host
+            - "0.0.0.0"
+            - --http-port
+            - "{{ .Values.cacheserverSpec.containerPort }}"
+            - --l1-size-gb
+            - {{ .Values.cacheserverSpec.l1SizeGb | quote }}
+            - --eviction-policy
+            - {{ .Values.cacheserverSpec.evictionPolicy | quote }}
           {{- with .Values.cacheserverSpec.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
