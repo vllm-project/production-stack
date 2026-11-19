@@ -31,6 +31,30 @@ from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
 
+_ENABLE_SLEEP_MODE_FLAG = "--enable-sleep-mode"
+
+
+def _container_enables_sleep_mode(container) -> bool:
+    """Return True if the vLLM container is started with --enable-sleep-mode.
+
+    A missing command (image entrypoint, not overridden) is treated as
+    enabled so the /is_sleeping probe decides. Otherwise look for the
+    exact ``--enable-sleep-mode`` token in command and args, splitting
+    each entry on whitespace so a ``sh -c "vllm serve ... --enable-sleep-mode"``
+    wrapper still matches. ``--no-enable-sleep-mode`` does not match.
+    """
+    command = getattr(container, "command", None)
+    if not command:
+        return True
+    args = getattr(container, "args", None) or []
+    tokens: List[str] = []
+    for part in list(command) + list(args):
+        if part is None:
+            continue
+        tokens.extend(str(part).split())
+    return _ENABLE_SLEEP_MODE_FLAG in tokens
+
+
 _global_service_discovery: "Optional[ServiceDiscovery]" = None
 _MODEL_INFO_KNOWN_FIELDS = frozenset(
     {
@@ -577,11 +601,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             )
             for container in pod.spec.containers:
                 if container.name == "vllm":
-                    if (
-                        not container.command
-                        or "--enable-sleep-mode" in container.command
-                    ):
-                        enable_sleep_mode = True
+                    enable_sleep_mode = _container_enables_sleep_mode(container)
                     break
             return enable_sleep_mode
         except client.rest.ApiException as e:
@@ -1072,11 +1092,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
                     # override the image entrypoint, which is an ordinary
                     # deployment rather than a signal that sleep mode is off.
                     # Same guard as K8sPodIPServiceDiscovery above.
-                    if (
-                        not container.command
-                        or "--enable-sleep-mode" in container.command
-                    ):
-                        enable_sleep_mode = True
+                    enable_sleep_mode = _container_enables_sleep_mode(container)
                     break
             return enable_sleep_mode
         except client.rest.ApiException as e:
