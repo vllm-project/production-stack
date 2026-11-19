@@ -75,6 +75,11 @@ async def route_embeddings(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/v1/embeddings", background_tasks)
 
 
+@main_router.post("/pooling")
+async def route_pooling(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/pooling", background_tasks)
+
+
 @main_router.post("/tokenize")
 async def route_tokenize(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/tokenize", background_tasks)
@@ -103,6 +108,16 @@ async def route_v1_score(request: Request, background_tasks: BackgroundTasks):
 @main_router.post("/score")
 async def route_score(request: Request, background_tasks: BackgroundTasks):
     return await route_general_request(request, "/score", background_tasks)
+
+
+@main_router.post("/v1/systemone")
+async def route_v1_systemone(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/systemone", background_tasks)
+
+
+@main_router.post("/v1/decisions")
+async def route_v1_decisions(request: Request, background_tasks: BackgroundTasks):
+    return await route_general_request(request, "/v1/decisions", background_tasks)
 
 
 @main_router.post("/sleep")
