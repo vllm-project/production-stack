@@ -26,6 +26,10 @@
                     "description": "Whether to enable the cache server",
                     "type": "boolean"
                 },
+                "evictionPolicy": {
+                    "description": "Eviction policy for the cache server",
+                    "type": "string"
+                },
                 "image": {
                     "description": "Image configuration for the cache Server",
                     "type": "object",
@@ -52,6 +56,10 @@
                 "imagePullSecrets": {
                     "description": "Image pull secrets for private container registries",
                     "type": "array"
+                },
+                "l1SizeGb": {
+                    "description": "L1 cache size in GB for the cache server",
+                    "type": "string"
                 },
                 "labels": {
                     "description": "Customized labels for the cache server deployment and service",

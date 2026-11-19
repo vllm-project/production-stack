@@ -834,6 +834,10 @@ cacheserverSpec:
   replicaCount: 1
   # -- Port the cache server container is listening on
   containerPort: 8000
+  # -- L1 cache size in GB for the cache server
+  l1SizeGb: "1"
+  # -- Eviction policy for the cache server
+  evictionPolicy: "LRU"
   # -- Kubernetes service type for the cache server
   serviceType: ClusterIP # @schema enum:[ClusterIP,NodePort,LoadBalancer,ExternalName]
   # -- Port the cache server service will listen on
