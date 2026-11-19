@@ -48,7 +48,11 @@ def _container_enables_sleep_mode(container) -> bool:
         return True
     args = getattr(container, "args", None) or []
     tokens: List[str] = []
-    for part in list(command) + list(args):
+    for part in command:
+        if part is None:
+            continue
+        tokens.extend(str(part).split())
+    for part in args:
         if part is None:
             continue
         tokens.extend(str(part).split())
