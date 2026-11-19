@@ -14,7 +14,7 @@ from typing import Final
 
 from fastapi import FastAPI, Request
 from fastapi.responses import Response, StreamingResponse
-from vllm.entrypoints.openai.protocol import (
+from vllm.entrypoints.openai.chat_completion.protocol import (
     ChatCompletionRequest,
     ChatCompletionResponseStreamChoice,
     ChatCompletionStreamResponse,

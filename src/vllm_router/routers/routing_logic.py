@@ -16,6 +16,7 @@ import abc
 import asyncio
 import concurrent.futures
 import enum
+import json
 import math
 import os
 import random
@@ -916,8 +917,14 @@ class PrefixAwareRouter(RoutingInterface):
             else:
                 prompt = ""
         else:
-            # Handle regular completions
-            prompt = request_json["prompt"]
+            # completions use prompt; /v1/systemone uses state, /v1/decisions
+            # and /v1/embeddings use input. none of them (e.g. /v1/score) -> ""
+            prompt = request_json.get(
+                "prompt", request_json.get("state", request_json.get("input", ""))
+            )
+            if not isinstance(prompt, str):
+                # state/input/batched prompt can be JSON; trie hashes strings
+                prompt = json.dumps(prompt, sort_keys=True)
 
         available_endpoints = set(endpoint.url for endpoint in endpoints)
         match_length, matched_endpoint = await self.hashtrie.longest_prefix_match(
@@ -925,12 +932,21 @@ class PrefixAwareRouter(RoutingInterface):
         )
 
         if match_length < self.prefix_min_match_length:
-            # Fall back to QPS routing, but still record the prompt in the
-            # trie. Without this, a router configured with
-            # prefix_min_match_length > 0 starts with an empty trie, every
-            # request matches below the threshold, nothing is ever inserted,
-            # and prefix affinity never activates.
-            selected_endpoint = self._qps_routing(endpoints, request_stats)
+            # sub-threshold: no useful prefix affinity yet. least-inflight
+            # via request_stats (same signal as LoadAwareRouter.load_penalty).
+            # missing url => load 0. random among exact min. no engine_stats
+            # mix and no qps fallback on this branch (#1072 made in-flight
+            # counters trustworthy). still seed the trie (#990) so later
+            # turns can pin.
+            loads = {
+                info.url: LoadAwareRouter.load_penalty(request_stats, info.url)
+                for info in endpoints
+            }
+            selected_endpoint = None
+            if loads:
+                min_load = min(loads.values())
+                candidates = [u for u, load in loads.items() if load == min_load]
+                selected_endpoint = random.choice(candidates)
             if selected_endpoint is not None:
                 await self.hashtrie.insert(prompt, selected_endpoint)
             return selected_endpoint

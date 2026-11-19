@@ -226,6 +226,10 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
             priority_field=config.priority_field,
             priority_default=config.priority_default,
             priority_threshold=config.priority_threshold,
+            prefill_model_labels=parse_comma_separated_args(
+                config.prefill_model_labels
+            ),
+            decode_model_labels=parse_comma_separated_args(config.decode_model_labels),
         )
         self.app.state.router = routing_logic
         logger.info("DynamicConfigWatcher: Routing logic reconfiguration complete")
