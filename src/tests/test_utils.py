@@ -34,6 +34,22 @@ def test_parse_static_aliases_when_aliases_as_string_supplied_returns_dict(
     assert utils.parse_static_aliases(aliases) == expected_result
 
 
+@pytest.mark.parametrize(
+    "model,aliases,expected",
+    [
+        ("alias", {"alias": "canonical"}, "canonical"),
+        ("canonical", {"alias": "canonical"}, "canonical"),
+        (None, {"alias": "canonical"}, None),
+        (["alias"], {"alias": "canonical"}, ["alias"]),
+        ("alias", {}, "alias"),
+        ("", {"": "canonical"}, "canonical"),
+        ("alias", {"alias": ""}, ""),
+    ],
+)
+def test_exact_model_alias_resolution(model, aliases, expected):
+    assert utils.resolve_model_alias(model, aliases) == expected
+
+
 def test_replace_model_in_request_body_replaces_model() -> None:
     model = "mistral-nemo-instruct-2407"
     result = json.loads(

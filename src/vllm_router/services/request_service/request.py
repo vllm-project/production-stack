@@ -42,6 +42,7 @@ from vllm_router.services.request_service.rewriter import (
 )
 from vllm_router.utils import (
     replace_model_in_request_body,
+    resolve_model_alias,
     update_content_length,
 )
 
@@ -225,24 +226,6 @@ def _build_backend_request_headers(
     headers["X-Request-Id"] = request_id
 
     return headers
-
-
-def _resolve_model_alias(
-    model: Optional[str], aliases: Optional[dict]
-) -> Optional[str]:
-    """Canonical model id for a configured alias, or None if not an alias.
-
-    Callers pass the alias map of the service-discovery instance they
-    already hold; on the JSON path this keeps endpoint filtering and
-    alias resolution on one discovery configuration. An empty-string
-    model is looked up like any other name: the JSON path has always
-    resolved an explicitly configured "" alias.
-    """
-    if model is None:
-        return None
-    if aliases and model in aliases:
-        return aliases[model]
-    return None
 
 
 # TODO: (Brian) check if request is json beforehand
@@ -534,11 +517,9 @@ async def route_general_request(
     service_discovery = get_service_discovery()
     endpoints = service_discovery.get_endpoint_info()
 
-    resolved_model = _resolve_model_alias(
-        requested_model, getattr(service_discovery, "aliases", None)
-    )
-    if resolved_model is not None:
-        requested_model = resolved_model
+    aliases = getattr(service_discovery, "aliases", None)
+    if aliases and requested_model in aliases.keys():
+        requested_model = resolve_model_alias(requested_model, aliases)
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
 
@@ -1212,12 +1193,9 @@ async def route_general_transcriptions(
             headers={"X-Request-Id": request_id},
         )
 
-    # Match route_general_request: route and forward the canonical model.
-    resolved_model = _resolve_model_alias(
+    model = resolve_model_alias(
         model, getattr(get_service_discovery(), "aliases", None)
     )
-    if resolved_model is not None:
-        model = resolved_model
 
     logger.debug("==== Enter audio_transcriptions ====")
     logger.debug("Received upload: %s (%s)", file.filename, file.content_type)
@@ -1289,40 +1267,40 @@ async def route_multipart_request(
 
     logger.debug("Routing multipart request with model %s", model)
 
-    resolved_model = _resolve_model_alias(
+    resolved_model = resolve_model_alias(
         model, getattr(get_service_discovery(), "aliases", None)
     )
-    # A client may repeat the model field with different values; starlette
-    # routes by the last one while an aiohttp backend reads the first, so
-    # normalize every occurrence once anything needs rewriting.
-    mixed_model_fields = any(
-        key == "model" and value != model for key, value in form.multi_items()
+    # Starlette selects the last model and aiohttp the first. Both must agree.
+    needs_rewrite = resolved_model != model or any(
+        value != model for value in form.getlist("model")
     )
-    if resolved_model is None and not mixed_model_fields:
+    if not needs_rewrite:
         return await proxy_multipart_request(body, model, endpoint, request)
 
-    # Route and forward the canonical model, rebuilding the form so uploaded
-    # files and other fields are preserved. default_to_multipart keeps the
-    # original media type for forms without file parts; field quoting stays
-    # at aiohttp's default so special characters in filenames cannot break
-    # the backend's multipart parser. Files are read rather than passed as
-    # file objects: streaming a SpooledTemporaryFile would roll small
-    # uploads to disk while aiohttp computes Content-Length.
-    forwarded_model = resolved_model if resolved_model is not None else model
-    rebuilt = aiohttp.FormData(default_to_multipart=True)
-    for key, value in form.multi_items():
-        if key == "model":
-            rebuilt.add_field(key, forwarded_model)
-        elif hasattr(value, "read"):  # UploadFile
-            rebuilt.add_field(
-                key,
-                await value.read(),
-                filename=value.filename,
-                content_type=value.content_type,
-            )
-        else:
-            rebuilt.add_field(key, str(value))
-    return await proxy_multipart_request(rebuilt, forwarded_model, endpoint, request)
+    # Keep UTF-8 names and filenames literal. With quote_fields=False aiohttp
+    # escapes backslashes and double quotes and rejects forbidden header controls.
+    rebuilt = aiohttp.FormData(quote_fields=False, default_to_multipart=True)
+    try:
+        for key, value in form.multi_items():
+            if key == "model":
+                rebuilt.add_field(key, resolved_model)
+            elif isinstance(value, str):
+                rebuilt.add_field(key, value)
+            else:
+                # Passing the spooled file itself would roll small uploads to disk
+                # when aiohttp calculates Content-Length.
+                rebuilt.add_field(
+                    key,
+                    await value.read(),
+                    filename=value.filename,
+                    content_type=value.content_type,
+                )
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid multipart/form-data request"},
+        )
+    return await proxy_multipart_request(rebuilt, resolved_model, endpoint, request)
 
 
 async def proxy_multipart_request(

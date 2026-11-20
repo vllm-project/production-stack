@@ -51,7 +51,7 @@ async def multipart_backend(endpoint, handler):
 
 
 @asynccontextmanager
-async def router_client(backend_url, model=AUDIO_MODEL):
+async def router_client(backend_url, model=AUDIO_MODEL, *, aliases=None):
     app = FastAPI()
     app.include_router(main_router)
 
@@ -61,6 +61,7 @@ async def router_client(backend_url, model=AUDIO_MODEL):
             app=app,
             urls=[backend_url],
             models=[model],
+            aliases=aliases,
         )
         stack.callback(
             setattr, service_discovery_module, "_global_service_discovery", None
