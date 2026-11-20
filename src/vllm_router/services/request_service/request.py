@@ -227,30 +227,20 @@ def _build_backend_request_headers(
     return headers
 
 
-def _backend_query_params(
-    request: Request, *, resolved_model: Optional[str] = None
-) -> Optional[list[tuple[str, str]]]:
-    """Return query pairs in client order, omitting every router-only ``id``.
-
-    Preserve repeated keys. When supplied, ``resolved_model`` replaces all
-    ``model`` entries at the position of the first. Return ``None`` if empty.
-    """
-    query_params = getattr(request, "query_params", None)
-    if not query_params:
-        return None
-
+def _voices_query_params(request: Request, model: str) -> list[tuple[str, str]]:
+    """Forward one canonical model and preserve the order of other query pairs."""
     params = []
-    model_replaced = False
-    for key, value in query_params.multi_items():
-        if key == "id":
+    model_added = False
+    for key, value in request.query_params.multi_items():
+        if key == "id":  # The router consumes the engine pin.
             continue
-        if key == "model" and resolved_model is not None:
-            if model_replaced:
+        if key == "model":
+            if model_added:
                 continue
-            value = resolved_model
-            model_replaced = True
+            value = model
+            model_added = True
         params.append((key, value))
-    return params or None
+    return params
 
 
 # TODO: (Brian) check if request is json beforehand
@@ -263,7 +253,7 @@ async def process_request(
     background_tasks: BackgroundTasks,
     debug_request=None,
     parent_span_context=None,
-    resolved_model: Optional[str] = None,
+    voices_model: Optional[str] = None,
 ):
     """
     Process a request by sending it to the chosen backend.
@@ -278,8 +268,7 @@ async def process_request(
             optional debug logging.
         parent_span_context: OpenTelemetry context from parent span for trace
             propagation.
-        resolved_model: Canonical model id after alias resolution. Used to
-            rewrite a body-less GET's ``model`` query param before forwarding.
+        voices_model: Canonical model selected by a body-less audio voices GET.
 
     Yields:
         The response headers and status code, followed by the response content.
@@ -322,11 +311,11 @@ async def process_request(
     http_status_code = None
 
     try:
-        # Check if this is a streaming request and extract model name.
-        # A body-less GET (e.g. /v1/audio/voices) is a non-streaming request.
-        if not body:
+        params = None
+        if voices_model is not None:
             is_streaming = False
-            model_name = resolved_model or "unknown"
+            model_name = voices_model
+            params = _voices_query_params(request, voices_model)
         else:
             try:
                 request_json = json.loads(body)
@@ -365,7 +354,7 @@ async def process_request(
             method=request.method,
             url=backend_url + endpoint,
             headers=headers,
-            params=_backend_query_params(request, resolved_model=resolved_model),
+            params=params,
             data=body or None,
             timeout=aiohttp.ClientTimeout(total=None),
         ) as backend_response:
@@ -519,15 +508,15 @@ async def route_general_request(
         response_overwrite.headers["X-Request-Id"] = request_id
         return response_overwrite
 
-    requested_model = request_json.get("model", None)
-    missing_model_error = "Invalid request: missing 'model' in request body."
-    # Body-less GET (e.g. /v1/audio/voices) cannot carry the model in JSON;
-    # accept it from the query string. POST still requires a body field.
-    if requested_model is None and not request_body:
-        method = getattr(request, "method", "") or ""
-        if method.upper() == "GET":
-            requested_model = (request.query_params or {}).get("model")
-            missing_model_error = "Invalid request: missing 'model' query parameter."
+    is_voices_query = (
+        endpoint == "/v1/audio/voices" and request.method == "GET" and not request_body
+    )
+    if is_voices_query:
+        requested_model = request.query_params.get("model")
+        missing_model_error = "Invalid request: missing 'model' query parameter."
+    else:
+        requested_model = request_json.get("model")
+        missing_model_error = "Invalid request: missing 'model' in request body."
     if requested_model is None:
         end_span(span, status_code=400) if tracing_active else None
         return JSONResponse(
@@ -568,9 +557,13 @@ async def route_general_request(
             request_body = replace_model_in_request_body(request_json, requested_model)
             update_content_length(request, request_body)
 
-    # Check if this model should be routed to an external provider
+    # External adapters send JSON POSTs. Voice listings need a local GET backend.
     registry = getattr(request.app.state, "external_provider_registry", None)
-    if registry is not None and registry.is_external_model(requested_model):
+    if (
+        not is_voices_query
+        and registry is not None
+        and registry.is_external_model(requested_model)
+    ):
         try:
             response = await process_external_provider_request(
                 request, endpoint, request_json, request_id, background_tasks
@@ -722,7 +715,7 @@ async def route_general_request(
                 endpoint,
                 background_tasks,
                 parent_span_context=span_context,
-                resolved_model=requested_model,
+                voices_model=requested_model if is_voices_query else None,
             )
             headers, status = await anext(stream_generator)
             media_type = headers.get("content-type", "text/event-stream")

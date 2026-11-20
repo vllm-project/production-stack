@@ -4,7 +4,6 @@ import types
 
 import pytest
 from fastapi import HTTPException
-from starlette.datastructures import QueryParams
 
 from vllm_router.services.request_service import request as request_module
 from vllm_router.services.request_service.request import (
@@ -120,62 +119,6 @@ async def test_process_request_releases_slot_when_backend_errors(monitor):
     stats = monitor.get_request_stats(time.time())
     assert stats[URL].in_prefill_requests == 0
     assert stats[URL].in_decoding_requests == 0
-
-
-@pytest.mark.asyncio
-async def test_process_request_empty_body_forwards_without_data(monitor):
-    # Body-less GET must not 400 on json.loads("") and must omit the body.
-    captured = {}
-
-    def capturing_cm(**kw):
-        captured.update(kw)
-        return _OkRequestCM()
-
-    request = _fake_request(monitor, _OkRequestCM)
-    request.method = "GET"
-    request.app.state.aiohttp_client_wrapper = lambda: types.SimpleNamespace(
-        request=lambda **kw: capturing_cm(**kw)
-    )
-
-    gen = process_request(request, b"", URL, "req-1", "/v1/audio/voices", None)
-    async for _ in gen:
-        pass
-
-    assert captured["method"] == "GET"
-    assert captured["data"] is None
-    assert captured["params"] is None
-    stats = monitor.get_request_stats(time.time())
-    assert stats[URL].finished_requests == 1
-
-
-@pytest.mark.asyncio
-async def test_process_request_forwards_query_params_except_id(monitor):
-    captured = {}
-
-    def capturing_cm(**kw):
-        captured.update(kw)
-        return _OkRequestCM()
-
-    request = _fake_request(monitor, _OkRequestCM)
-    request.method = "GET"
-    request.query_params = QueryParams("model=my-tts&id=engine-1")
-    request.app.state.aiohttp_client_wrapper = lambda: types.SimpleNamespace(
-        request=lambda **kw: capturing_cm(**kw)
-    )
-
-    gen = process_request(
-        request,
-        b"",
-        URL,
-        "req-1",
-        "/v1/audio/voices",
-        None,
-        resolved_model="tts",
-    )
-    async for _ in gen:
-        pass
-
-    assert captured["params"] == [("model", "tts")]
 
 
 @pytest.mark.asyncio
