@@ -1,5 +1,5 @@
 """
-Tests for audio/binary response handling in route_general_request:
+Audio routing and response handling in route_general_request:
 
 1. The StreamingResponse media_type is taken from the backend Content-Type header
    instead of being hardcoded as "text/event-stream".
@@ -7,13 +7,16 @@ Tests for audio/binary response handling in route_general_request:
 """
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from starlette.datastructures import QueryParams
 
 from vllm_router.routers.routing_logic import (
+    PriorityRouter,
     RoundRobinRouter,
 )
+from vllm_router.services.request_service import request as request_service
 from vllm_router.utils import SingletonABCMeta
 
 
@@ -222,3 +225,112 @@ async def test_binary_response_does_not_raise(setup):
     # First yield is (headers, status), subsequent yields are bytes chunks
     assert chunks[0][1] == 200  # status
     assert binary_audio in chunks
+
+
+@pytest.fixture
+def backend_request(setup):
+    request, _ = setup
+    send = request.app.state.aiohttp_client_wrapper().request
+    response = MagicMock(status=200, headers={"content-type": "application/json"})
+    response.content.iter_any.return_value.__aiter__.return_value = [b"{}"]
+    send.return_value.__aenter__.return_value = response
+    return send
+
+
+@pytest.mark.asyncio
+async def test_bodyless_voices_get_routes_and_forwards_the_query_model(
+    setup, backend_request
+):
+    request, _ = setup
+    request.method = "GET"
+    request.body = AsyncMock(return_value=b"")
+    request.query_params = QueryParams("tag=a&model=old&id=engine-1&tag=b&model=alias")
+    request.app.state.router = PriorityRouter()
+    request.app.state.router.max_instance_failover_reroute_attempts = 0
+    request_service.is_request_rewriter_initialized.return_value = True
+    discovery = request_service.get_service_discovery()
+    discovery.aliases = {"alias": "tts-model"}
+    discovery.get_endpoint_info.return_value = [
+        EndpointInfo("http://tts-engine", Id="engine-1")
+    ]
+
+    with patch.object(request_service.request_latency_seconds, "labels") as latency:
+        response = await request_service.route_general_request(
+            request, "/v1/audio/voices", None
+        )
+        assert response.status_code == 200
+        assert [chunk async for chunk in response.body_iterator] == [b"{}"]
+        latency.assert_called_once_with(
+            server="http://tts-engine", model="tts-model", status="success"
+        )
+
+    forwarded = backend_request.call_args.kwargs
+    assert forwarded["method"] == "GET"
+    assert forwarded["url"] == "http://tts-engine/v1/audio/voices"
+    assert forwarded["data"] is None
+    assert forwarded["params"] == [("tag", "a"), ("model", "tts-model"), ("tag", "b")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method", "endpoint", "body", "query", "missing"),
+    [
+        ("GET", "/v1/audio/voices", b"", "", "query parameter"),
+        ("GET", "/v1/audio/voices", b"{}", "model=tts-model", "in request body"),
+        ("POST", "/v1/audio/speech", b"", "model=tts-model", "in request body"),
+    ],
+)
+async def test_missing_voice_or_body_model(
+    setup, method, endpoint, body, query, missing
+):
+    request, _ = setup
+    request.method = method
+    request.body = AsyncMock(return_value=body)
+    request.query_params = QueryParams(query)
+    response = await request_service.route_general_request(request, endpoint, None)
+    assert response.status_code == 400
+    assert missing in json.loads(response.body)["error"]
+    assert response.headers["X-Request-Id"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("method", "endpoint"),
+    [("POST", "/v1/chat/completions"), ("GET", "/v1/audio/voices")],
+)
+async def test_requests_with_a_json_body_do_not_forward_query_params(
+    setup, backend_request, method, endpoint
+):
+    request, _ = setup
+    request.method = method
+    body = b'{"model":"tts-model"}'
+    request.body = AsyncMock(return_value=body)
+    request.query_params = QueryParams("model=other&format=example")
+
+    response = await request_service.route_general_request(request, endpoint, None)
+    assert response.status_code == 200
+    assert [chunk async for chunk in response.body_iterator] == [b"{}"]
+    forwarded = backend_request.call_args.kwargs
+    assert forwarded["data"] == body
+    assert forwarded.get("params") is None
+
+
+@pytest.mark.asyncio
+async def test_bodyless_voices_get_uses_local_backends_only(setup, backend_request):
+    request, _ = setup
+    request.method = "GET"
+    request.body = AsyncMock(return_value=b"")
+    request.query_params = QueryParams("model=external")
+    discovery = request_service.get_service_discovery()
+    discovery.get_endpoint_info.return_value = []
+    discovery.has_ever_seen_model.return_value = False
+    provider = MagicMock()
+    provider.is_external_model.return_value = True
+    request.app.state.external_provider_registry = provider
+
+    response = await request_service.route_general_request(
+        request, "/v1/audio/voices", None
+    )
+    assert response.status_code == 404
+    provider.lookup_adapter.assert_not_called()
+    backend_request.assert_not_called()

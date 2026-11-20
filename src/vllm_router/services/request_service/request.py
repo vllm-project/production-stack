@@ -227,6 +227,22 @@ def _build_backend_request_headers(
     return headers
 
 
+def _voices_query_params(request: Request, model: str) -> list[tuple[str, str]]:
+    """Forward one canonical model and preserve the order of other query pairs."""
+    params = []
+    model_added = False
+    for key, value in request.query_params.multi_items():
+        if key == "id":  # The router consumes the engine pin.
+            continue
+        if key == "model":
+            if model_added:
+                continue
+            value = model
+            model_added = True
+        params.append((key, value))
+    return params
+
+
 # TODO: (Brian) check if request is json beforehand
 async def process_request(
     request: Request,
@@ -237,6 +253,7 @@ async def process_request(
     background_tasks: BackgroundTasks,
     debug_request=None,
     parent_span_context=None,
+    voices_model: Optional[str] = None,
 ):
     """
     Process a request by sending it to the chosen backend.
@@ -249,7 +266,9 @@ async def process_request(
         endpoint: The endpoint to send the request to on the backend.
         debug_request: The original request object from the client, used for
             optional debug logging.
-        parent_span_context: OpenTelemetry context from parent span for trace propagation.
+        parent_span_context: OpenTelemetry context from parent span for trace
+            propagation.
+        voices_model: Canonical model selected by a body-less audio voices GET.
 
     Yields:
         The response headers and status code, followed by the response content.
@@ -292,16 +311,21 @@ async def process_request(
     http_status_code = None
 
     try:
-        # Check if this is a streaming request and extract model name
-        try:
-            request_json = json.loads(body)
-            is_streaming = request_json.get("stream", False)
-            model_name = request_json.get("model", "unknown")
-        except (JSONDecodeError, UnicodeDecodeError, ValueError):
-            # If we can't parse the body as JSON, assume it's not streaming
-            raise HTTPException(
-                status_code=400, detail="Request body is not JSON parsable."
-            )
+        params = None
+        if voices_model is not None:
+            is_streaming = False
+            model_name = voices_model
+            params = _voices_query_params(request, voices_model)
+        else:
+            try:
+                request_json = json.loads(body)
+                is_streaming = request_json.get("stream", False)
+                model_name = request_json.get("model", "unknown")
+            except (JSONDecodeError, UnicodeDecodeError, ValueError):
+                # If we can't parse the body as JSON, assume it's not streaming
+                raise HTTPException(
+                    status_code=400, detail="Request body is not JSON parsable."
+                )
 
         # Add streaming info to span after parsing
         if span is not None:
@@ -330,7 +354,8 @@ async def process_request(
             method=request.method,
             url=backend_url + endpoint,
             headers=headers,
-            data=body,
+            params=params,
+            data=body or None,
             timeout=aiohttp.ClientTimeout(total=None),
         ) as backend_response:
             http_status_code = backend_response.status
@@ -483,12 +508,20 @@ async def route_general_request(
         response_overwrite.headers["X-Request-Id"] = request_id
         return response_overwrite
 
-    requested_model = request_json.get("model", None)
+    is_voices_query = (
+        endpoint == "/v1/audio/voices" and request.method == "GET" and not request_body
+    )
+    if is_voices_query:
+        requested_model = request.query_params.get("model")
+        missing_model_error = "Invalid request: missing 'model' query parameter."
+    else:
+        requested_model = request_json.get("model")
+        missing_model_error = "Invalid request: missing 'model' in request body."
     if requested_model is None:
         end_span(span, status_code=400) if tracing_active else None
         return JSONResponse(
             status_code=400,
-            content={"error": "Invalid request: missing 'model' in request body."},
+            content={"error": missing_model_error},
             headers={"X-Request-Id": request_id},
         )
 
@@ -496,8 +529,9 @@ async def route_general_request(
     if span is not None:
         span.set_attribute("vllm.model", requested_model)
 
-    # Apply request rewriting if enabled
-    if is_request_rewriter_initialized():
+    # Apply request rewriting if enabled. Skip on a body-less GET: there is
+    # nothing to rewrite, and json.loads(b"") would 400.
+    if request_body and is_request_rewriter_initialized():
         rewriter = get_request_rewriter()
         rewritten_body = rewriter.rewrite_request(
             request_body, requested_model, endpoint
@@ -519,12 +553,17 @@ async def route_general_request(
     aliases = getattr(service_discovery, "aliases", None)
     if aliases and requested_model in aliases.keys():
         requested_model = aliases[requested_model]
-        request_body = replace_model_in_request_body(request_json, requested_model)
-        update_content_length(request, request_body)
+        if request_body:
+            request_body = replace_model_in_request_body(request_json, requested_model)
+            update_content_length(request, request_body)
 
-    # Check if this model should be routed to an external provider
+    # External adapters send JSON POSTs. Voice listings need a local GET backend.
     registry = getattr(request.app.state, "external_provider_registry", None)
-    if registry is not None and registry.is_external_model(requested_model):
+    if (
+        not is_voices_query
+        and registry is not None
+        and registry.is_external_model(requested_model)
+    ):
         try:
             response = await process_external_provider_request(
                 request, endpoint, request_json, request_id, background_tasks
@@ -606,7 +645,7 @@ async def route_general_request(
             endpoints, engine_stats, request_stats, request
         )
 
-    if isinstance(request.app.state.router, PriorityRouter):
+    if request_body and isinstance(request.app.state.router, PriorityRouter):
         # PriorityRouter injects the resolved priority into request_json so
         # vLLM's own priority scheduler can preempt within the engine.
         request_body = json.dumps(request_json)
@@ -676,6 +715,7 @@ async def route_general_request(
                 endpoint,
                 background_tasks,
                 parent_span_context=span_context,
+                voices_model=requested_model if is_voices_query else None,
             )
             headers, status = await anext(stream_generator)
             media_type = headers.get("content-type", "text/event-stream")
