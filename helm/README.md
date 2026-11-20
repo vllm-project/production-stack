@@ -264,7 +264,7 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `routerSpec.k8sServiceDiscoveryType` | string | `"pod-ip"` | Service discovery Type ("pod-ip" or "service-name") if serviceDiscovery is "k8s" |
 | `routerSpec.staticBackends` | string | `""` | Comma-separated list of backend addresses if serviceDiscovery is "static" |
 | `routerSpec.staticModels` | string | `""` | Comma-separated list of model names if serviceDiscovery is "static" |
-| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing logic: `"roundrobin"`, `"session"`, `"prefixaware"`, `"kvaware"`, `"disaggregated_prefill"`, or `"disaggregated_prefill_orchestrated"` |
+| `routerSpec.routingLogic` | string | `"roundrobin"` | Routing strategy. Options are `roundrobin`, `session`, `prefixaware`, `kvaware`, `loadaware`, `priority`, `disaggregated_prefill`, and `disaggregated_prefill_orchestrated`. |
 | `routerSpec.prefixMinMatchLength` | integer | `0` | Minimum prefix match length for `prefixaware` routing to reuse a matched endpoint; below this, requests fall back to QPS routing. Quantized to the prefix chunk size (default 128). `0` disables it |
 | `routerSpec.sessionKey` | string | `""` | Session key if using "session" routing logic |
 | `routerSpec.extraArgs` | list | `[]` | Extra command line arguments to pass to the router |
@@ -283,8 +283,8 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `routerSpec.affinity` | map | {} | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
 | `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
 | `routerSpec.hf_token` | string | `""`| Hugging Face token for router |
-| `routerSpec.lmcacheControllerPort` | integer | `""` | LMCache controller port, used when `routingLogic` is `"kvaware"` (e.g. `9000`) |
-| `routerSpec.lmcacheConfig.logLevel` | string | `"INFO"`| Log level for LMCache in the router when routingLogic is kvaware |
+| `routerSpec.lmcacheControllerPort` | string/integer | `""` | LMCache controller port for `kvaware` and `loadaware` routing (e.g. `9000`) |
+| `routerSpec.lmcacheConfig.logLevel` | string | `"INFO"` | LMCache log level for the router deployment |
 | `routerSpec.livenessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's liveness probe |
 | `routerSpec.livenessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's liveness probe |
 | `routerSpec.livenessProbe.failureThreshold` | integer |`3`| Failure threshold for router's liveness probe |

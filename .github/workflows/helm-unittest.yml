@@ -25,5 +25,9 @@ jobs:
         version: v3.22.0
     - name: Install helm-unittest
       run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.2.1
+    - name: Check documented routing strategies in the values schema
+      run: |
+        jq -e '.properties.routerSpec.properties.routingLogic.enum |
+          index("priority") != null and index("loadaware") != null' helm/values.schema.json
     - name: Run helm unittest
       run: helm unittest helm
