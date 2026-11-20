@@ -140,3 +140,18 @@ func TestRouterKVEventsArgs(t *testing.T) {
 		t.Errorf("kv events args rendered for session routing: %v", args)
 	}
 }
+
+// TestKVTransferConfigArgForms checks the drift helper reads the KV connector
+// config in every spelling vLLM accepts.
+func TestKVTransferConfigArgForms(t *testing.T) {
+	const cfg = `{"kv_connector":"LMCacheMPConnector"}`
+	for name, args := range map[string][]string{
+		"separate":   {"serve", "--kv-transfer-config", cfg},
+		"equals":     {"serve", "--kv-transfer-config=" + cfg},
+		"underscore": {"serve", "--kv_transfer_config", cfg},
+	} {
+		if got := kvTransferConfigArg(args); got != cfg {
+			t.Errorf("%s: kvTransferConfigArg = %q, want %q", name, got, cfg)
+		}
+	}
+}

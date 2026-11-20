@@ -682,6 +682,8 @@ class KvEventSubscriber:
     def _handle(self, url: str, frames: List[bytes]) -> None:
         # vLLM's ZmqEventPublisher sends (topic, seq as 8-byte big-endian,
         # msgpack payload).
+        if not frames:
+            return
         if len(frames) == 3:
             _, seq_bytes, payload = frames
             seq = int.from_bytes(seq_bytes, "big")

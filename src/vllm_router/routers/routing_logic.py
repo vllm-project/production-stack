@@ -1433,14 +1433,15 @@ class KvEventAwareRouter(RoutingInterface):
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=self.tokenize_timeout),
             ) as resp:
-                if resp.status >= 500:
-                    resp.raise_for_status()
-                if resp.status >= 400:
+                if resp.status in (400, 422):
                     # The request itself cannot be tokenized (bad input): no
                     # reason to avoid this engine.
                     raise ValueError(
                         f"/tokenize returned {resp.status}: {await resp.text()}"
                     )
+                # Any other error (401/403/404/5xx) points at the engine or
+                # its configuration: put it on cooldown below.
+                resp.raise_for_status()
                 data = await resp.json()
         except (aiohttp.ClientError, asyncio.TimeoutError):
             self._tokenize_failed[engine.url] = time.time() + self.tokenize_cooldown

@@ -6,6 +6,7 @@ import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import aiohttp
 import msgpack
 import pytest
 
@@ -520,6 +521,71 @@ def test_tokenizer_is_least_loaded_engine_without_recent_failure():
     router._tokenize_failed[B] = time.time() - 1
     assert router._tokenizer_endpoint(eps, {A: 3, B: 0}).url == B
     assert B not in router._tokenize_failed
+
+
+class _FakeResponse:
+    def __init__(self, status, body=None):
+        self.status = status
+        self._body = body or {}
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def text(self):
+        return "error"
+
+    async def json(self):
+        return self._body
+
+    def raise_for_status(self):
+        if self.status >= 400:
+            raise aiohttp.ClientResponseError(
+                request_info=None, history=(), status=self.status
+            )
+
+
+def tokenize_with_status(router, status):
+    client = SimpleNamespace(
+        post=lambda *a, **k: _FakeResponse(status, {"tokens": [1]})
+    )
+    req = SimpleNamespace(
+        headers={},
+        app=SimpleNamespace(
+            state=SimpleNamespace(aiohttp_client_wrapper=lambda: client)
+        ),
+    )
+    eps = [endpoints()[0]]
+    return asyncio.run(router._prompt_tokens(eps, req, {"model": "m", "prompt": "x"}))
+
+
+@pytest.mark.parametrize("status", [400, 422])
+def test_tokenize_bad_input_does_not_cool_the_engine_down(status):
+    router = make_router()
+    with pytest.raises(ValueError):
+        tokenize_with_status(router, status)
+    assert router._tokenize_failed == {}
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 500, 503])
+def test_tokenize_engine_errors_cool_the_engine_down(status):
+    router = make_router()
+    with pytest.raises(aiohttp.ClientResponseError):
+        tokenize_with_status(router, status)
+    assert A in router._tokenize_failed
+
+
+def test_tokenize_success_returns_tokens():
+    assert tokenize_with_status(make_router(), 200) == [1]
+
+
+def test_empty_zmq_message_is_ignored():
+    sub = KvEventSubscriber.__new__(KvEventSubscriber)
+    sub.index = KvEventIndex()
+    sub._handle(A, [])
+    assert sub.index.snapshot() == {}
 
 
 def test_lora_request_routes_on_adapter_blocks():

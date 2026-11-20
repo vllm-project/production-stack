@@ -496,15 +496,10 @@ func flagValue(args []string, flag string) string {
 	return ""
 }
 
-// kvTransferConfigArg returns the value following --kv-transfer-config in args,
-// or the empty string when the flag is absent.
+// kvTransferConfigArg returns the value of --kv-transfer-config in args (either
+// "--flag value" or "--flag=value"), or the empty string when it is absent.
 func kvTransferConfigArg(args []string) string {
-	for i, arg := range args {
-		if arg == "--kv-transfer-config" && i+1 < len(args) {
-			return args[i+1]
-		}
-	}
-	return ""
+	return flagValue(args, "--kv-transfer-config")
 }
 
 // lmcacheEnvValues picks the in-process LMCache settings out of a container's
