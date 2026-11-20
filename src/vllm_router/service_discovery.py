@@ -20,6 +20,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
+from itertools import chain
 from typing import Any, Dict, List, Optional, Set
 
 import aiohttp
@@ -30,6 +31,32 @@ from vllm_router import utils
 from vllm_router.log import init_logger
 
 logger = init_logger(__name__)
+
+_ENABLE_SLEEP_MODE_FLAG = "--enable-sleep-mode"
+# Only these case-insensitive values opt in to probing with an explicit assignment.
+_SLEEP_MODE_TRUE_VALUES = frozenset({"true", "1", "yes", "on", "y", "t"})
+
+
+def _container_enables_sleep_mode(container) -> bool:
+    """Return whether discovery should query the container's ``/is_sleeping`` endpoint.
+
+    With no explicit command, the image entrypoint may enable sleep mode.
+    An explicit flag in command or args overrides that fallback. Scan in
+    order so the last flag wins, including in a shell command string.
+    """
+    command = getattr(container, "command", None) or ()
+    args = getattr(container, "args", None) or ()
+    enabled = not command
+    for part in chain(command, args):
+        for token in str(part).split():
+            flag, separator, value = token.partition("=")
+            flag = flag.replace("_", "-")
+            if flag == _ENABLE_SLEEP_MODE_FLAG:
+                enabled = not separator or value.lower() in _SLEEP_MODE_TRUE_VALUES
+            elif flag == "--no-enable-sleep-mode" and not separator:
+                enabled = False
+    return enabled
+
 
 _global_service_discovery: "Optional[ServiceDiscovery]" = None
 _MODEL_INFO_KNOWN_FIELDS = frozenset(
@@ -577,11 +604,7 @@ class K8sPodIPServiceDiscovery(ServiceDiscovery):
             )
             for container in pod.spec.containers:
                 if container.name == "vllm":
-                    if (
-                        not container.command
-                        or "--enable-sleep-mode" in container.command
-                    ):
-                        enable_sleep_mode = True
+                    enable_sleep_mode = _container_enables_sleep_mode(container)
                     break
             return enable_sleep_mode
         except client.rest.ApiException as e:
@@ -1068,15 +1091,7 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             enable_sleep_mode = False
             for container in pods.items[0].spec.containers:
                 if container.name == "vllm":
-                    # container.command is None whenever the pod does not
-                    # override the image entrypoint, which is an ordinary
-                    # deployment rather than a signal that sleep mode is off.
-                    # Same guard as K8sPodIPServiceDiscovery above.
-                    if (
-                        not container.command
-                        or "--enable-sleep-mode" in container.command
-                    ):
-                        enable_sleep_mode = True
+                    enable_sleep_mode = _container_enables_sleep_mode(container)
                     break
             return enable_sleep_mode
         except client.rest.ApiException as e:
