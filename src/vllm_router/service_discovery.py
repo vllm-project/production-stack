@@ -20,6 +20,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
+from itertools import chain
 from typing import Any, Dict, List, Optional, Set
 
 import aiohttp
@@ -32,31 +33,36 @@ from vllm_router.log import init_logger
 logger = init_logger(__name__)
 
 _ENABLE_SLEEP_MODE_FLAG = "--enable-sleep-mode"
+# Only these case-insensitive values opt in to probing with an explicit assignment.
+_SLEEP_MODE_TRUE_VALUES = frozenset({"true", "1", "yes", "on", "y", "t"})
 
 
 def _container_enables_sleep_mode(container) -> bool:
-    """Return True if the vLLM container is started with --enable-sleep-mode.
+    """Return whether discovery should query the container's ``/is_sleeping`` endpoint.
 
-    A missing command (image entrypoint, not overridden) is treated as
-    enabled so the /is_sleeping probe decides. Otherwise look for the
-    exact ``--enable-sleep-mode`` token in command and args, splitting
-    each entry on whitespace so a ``sh -c "vllm serve ... --enable-sleep-mode"``
-    wrapper still matches. ``--no-enable-sleep-mode`` does not match.
+    When command and args are both missing or empty, probe because the image
+    defaults may enable sleep mode. Otherwise scan command followed by args,
+    splitting each entry on whitespace to handle shell wrappers.
+
+    The last matching token wins. Bare ``--enable-sleep-mode`` enables probing.
+    Its ``=value`` form enables probing for true, 1, yes, on, y or t (ignoring
+    case). All other values, including an empty value, disable probing, as does
+    ``--no-enable-sleep-mode``. Without a matching token, skip the probe.
     """
-    command = getattr(container, "command", None)
-    if not command:
+    command = getattr(container, "command", None) or ()
+    args = getattr(container, "args", None) or ()
+    if not command and not args:
         return True
-    args = getattr(container, "args", None) or []
-    tokens: List[str] = []
-    for part in command:
-        if part is None:
-            continue
-        tokens.extend(str(part).split())
-    for part in args:
-        if part is None:
-            continue
-        tokens.extend(str(part).split())
-    return _ENABLE_SLEEP_MODE_FLAG in tokens
+
+    enabled = False
+    for part in chain(command, args):
+        for token in str(part).split():
+            flag, separator, value = token.partition("=")
+            if flag == _ENABLE_SLEEP_MODE_FLAG:
+                enabled = not separator or value.lower() in _SLEEP_MODE_TRUE_VALUES
+            elif token == "--no-enable-sleep-mode":
+                enabled = False
+    return enabled
 
 
 _global_service_discovery: "Optional[ServiceDiscovery]" = None
@@ -1092,10 +1098,6 @@ class K8sServiceNameServiceDiscovery(ServiceDiscovery):
             enable_sleep_mode = False
             for container in pods.items[0].spec.containers:
                 if container.name == "vllm":
-                    # container.command is None whenever the pod does not
-                    # override the image entrypoint, which is an ordinary
-                    # deployment rather than a signal that sleep mode is off.
-                    # Same guard as K8sPodIPServiceDiscovery above.
                     enable_sleep_mode = _container_enables_sleep_mode(container)
                     break
             return enable_sleep_mode
