@@ -2473,6 +2473,19 @@ spec:
                 description: K8sLabelSelector specifies the label selector for vLLM
                   runtime pods when using k8s service discovery
                 type: string
+              kvEventsPort:
+                description: |-
+                  KVEventsPort is the port of each engine's vLLM KV event publisher, used
+                  with "kvevents" routing. It must match the engines'
+                  vllmConfig.kvEvents.port. Defaults to 5557 in the router.
+                format: int32
+                maximum: 65535
+                minimum: 0
+                type: integer
+              kvEventsTopic:
+                description: KVEventsTopic is the ZMQ topic the engines publish KV
+                  events on.
+                type: string
               lmcacheControllerPort:
                 description: |-
                   LmcacheControllerPort is the port of the LMCache controller (used with kvaware routing).
@@ -2591,6 +2604,7 @@ spec:
                 - session
                 - prefixaware
                 - kvaware
+                - kvevents
                 type: string
               serviceAccountName:
                 description: ServiceAccountName for the router pod
@@ -3281,6 +3295,32 @@ spec:
                   gpuMemoryUtilization:
                     description: GPU memory utilization
                     type: string
+                  kvEvents:
+                    description: |-
+                      KVEvents publishes the engine's KV cache events (vLLM
+                      --kv-events-config) for the router's "kvevents" routing logic. vLLM
+                      reports its GPU prefix-cache blocks; with LMCache in Multiprocess mode
+                      (LMCache >= 0.5.6) the connector adds the cache server's CPU blocks.
+                    properties:
+                      enabled:
+                        description: |-
+                          Enabled turns the publisher on. Events are only produced with prefix
+                          caching enabled.
+                        type: boolean
+                      port:
+                        default: 5557
+                        description: |-
+                          Port the engine binds its ZMQ PUB socket on, on every interface. The
+                          router connects to it on each engine pod's IP.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1
+                        type: integer
+                      topic:
+                        description: Topic the events are published on. Must match
+                          the router's topic.
+                        type: string
+                    type: object
                   maxLoras:
                     description: Maximum number of LoRAs
                     format: int32

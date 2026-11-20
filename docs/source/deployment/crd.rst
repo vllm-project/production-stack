@@ -433,6 +433,103 @@ Sizing
 - **GPU memory**: the cache server's CUDA context takes about 700 MiB on each
   engine GPU. Leave room for it in ``gpuMemoryUtilization``.
 
+Cache-Aware Routing
+-------------------
+
+``kvaware`` and ``loadaware`` routing read an LMCache controller that engines
+register with from inside the engine process. Multiprocess engines never
+register, so on this stack both silently fall back to QPS balancing. Use
+``kvevents`` instead: every engine publishes vLLM KV cache events, and the
+router subscribes to each engine pod and keeps its own index of what is cached
+where.
+
+- vLLM reports its GPU prefix-cache blocks.
+- With LMCache 0.5.6 or later, the connector also reports the cache server's
+  CPU blocks, including chunks other engines stored through the same server.
+- Each request goes to the engine with the longest cached prefix (GPU before
+  CPU, then the less loaded engine). Load wins only when the fleet is clearly
+  imbalanced: the busiest engine has more than
+  ``--kv-events-balance-abs-threshold`` (8) in-flight requests over the idlest
+  *and* more than ``--kv-events-balance-rel-threshold`` (1.5) times as many.
+  Pass these through the router's ``extraArgs``. Without a cached prefix
+  anywhere the request falls back to the session key, or to QPS balancing.
+- Hybrid (Mamba/GDN) models are scored by the positions where every KV cache
+  group can resume, not by the attention blocks alone. Sliding-window groups
+  need every block of their window ending at the hit.
+- Requests for a LoRA adapter match only blocks cached for that adapter.
+
+Enable the publisher on the engines (``VLLMRuntime``):
+
+.. code-block:: yaml
+
+   vllmConfig:
+     enablePrefixCaching: true
+     kvEvents:
+       enabled: true
+       port: 5557        # default; vLLM binds tcp://*:5557 in each pod
+
+and point the router at the same port
+(``operator/config/samples/production-stack_v1alpha1_vllmrouter_kvevents.yaml``):
+
+.. code-block:: yaml
+
+   routingLogic: kvevents
+   kvEventsPort: 5557
+   sessionKey: x-user-id   # optional fallback
+
+.. list-table::
+   :header-rows: 1
+
+   * - Field
+     - Default
+     - Notes
+   * - ``VLLMRuntime`` ``vllmConfig.kvEvents.enabled``
+     - ``false``
+     - Renders ``--kv-events-config`` and a ``kv-events`` container port. A
+       ``--kv-events-config`` in ``extraArgs`` takes precedence.
+   * - ``VLLMRuntime`` ``vllmConfig.kvEvents.port``
+     - ``5557``
+     - Port of the ZMQ publisher.
+   * - ``VLLMRuntime`` ``vllmConfig.kvEvents.topic``
+     - none
+     - ZMQ topic; must match the router.
+   * - ``VLLMRouter`` ``kvEventsPort``, ``kvEventsTopic``
+     - ``5557``, none
+     - Where the router subscribes, on each engine pod's IP.
+
+The router must reach the engine pods directly on the event port, so use
+``serviceDiscovery: k8s`` (pod IPs) and allow the port in any NetworkPolicy.
+CPU blocks that another engine stored are announced when an engine runs its
+next scheduler step, so an idle engine reports them late; with a shared cache
+server every engine can load those chunks anyway.
+
+Limitations:
+
+- **DRAM and GPU only.** Events cover the cache server's L1 (DRAM). A chunk
+  evicted from L1 is reported as removed even when it is still in an L2
+  backend (for example NVMe), so the router stops scoring it although the
+  engines can still load it.
+- **No replay of lost events.** The router counts sequence gaps (logged as
+  ``KV event gap`` and in the periodic ``KV event index`` summary) but does
+  not fetch the missing batches, so a lost removal leaves a stale entry until
+  the block is stored again or the engine restarts. A sequence that restarts
+  (engine restart) resets that engine's index.
+- **The router keeps no history of its own.** A router that restarts, or a
+  replica that starts later than the others, sees only blocks stored after it
+  subscribed. A dynamic config reload with the same KV event port and topic
+  keeps the live index. An engine that drops out of service discovery (a
+  failed readiness probe, sleep mode) keeps its index for 60 s before it is
+  discarded.
+- **Data parallelism is not supported.** vLLM publishes data-parallel rank
+  ``r`` on port ``kvEvents.port + r``; the router subscribes only to
+  ``kvEventsPort``, so blocks cached by ranks above 0 are not seen.
+- **Prompts the router cannot rebuild are not indexed:** multimodal inputs,
+  ``cache_salt`` and prompt embeddings. Such requests fall back.
+- **vLLM event format.** The router decodes events encoded as tagged maps, as
+  vLLM 0.33 publishes them. Events in any other encoding are skipped with a
+  warning (``Ignoring KV events that are not tagged maps``) and every request
+  falls back.
+
 Testing the Deployment
 ----------------------
 

@@ -80,6 +80,15 @@ Then, send another request with the same prompt prefix:
 
 You should observe that the second request is routed to the same instance as the first request. This is because the KV cache aware router detects that the second request has a higher KV cache hit rate in the instance of the first request and routes it to the same instance to maximize KV cache utilization.
 
+.. note::
+   This router reads an LMCache controller that engines register with from
+   inside the engine process (in-process LMCache). Engines that use LMCache in
+   Multiprocess mode (``LMCacheMPConnector`` and a separate cache server) never
+   register, so every request falls back to QPS balancing. For those
+   deployments use ``--routing-logic kvevents``, which builds its index from the
+   engines' vLLM KV cache events (``--kv-events-config``) instead; see
+   :doc:`../deployment/crd` (Cache-Aware Routing).
+
 Step 4: Clean Up
 -----------------
 

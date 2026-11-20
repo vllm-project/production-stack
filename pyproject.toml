@@ -24,6 +24,8 @@ dependencies = [
     "uhashring==2.3",
     "uvicorn==0.34.0",
     "xxhash==3.5.0",
+    "pyzmq>=25.0",  # kvevents routing: subscribe to vLLM KV event publishers
+    "msgpack>=1.0",  # kvevents routing: decode KVEventBatch payloads
     "psutil==7.0.0",
     "pyyaml>=6.0.2",
     "opentelemetry-api>=1.28.0",

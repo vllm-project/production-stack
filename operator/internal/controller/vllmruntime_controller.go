@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -408,6 +409,93 @@ func maxModelLenArg(maxModelLen intstr.IntOrString) (string, bool) {
 	return strconv.Itoa(int(maxModelLen.IntVal)), true
 }
 
+// defaultKVEventsPort is vLLM's default KV event publisher port.
+const defaultKVEventsPort int32 = 5557
+
+// kvEventsPort returns the KV event publisher port, or 0 when publishing is
+// off.
+func kvEventsPort(vr *productionstackv1alpha1.VLLMRuntime) int32 {
+	kv := vr.Spec.VLLMConfig.KVEvents
+	if kv == nil || !kv.Enabled {
+		return 0
+	}
+	if kv.Port == 0 {
+		return defaultKVEventsPort
+	}
+	return kv.Port
+}
+
+// kvEventsConfigArg renders vllm serve's --kv-events-config value, or "" when
+// KV events are off or extraArgs already pass the flag.
+func kvEventsConfigArg(vr *productionstackv1alpha1.VLLMRuntime) string {
+	port := kvEventsPort(vr)
+	if port == 0 || hasFlag(vr.Spec.VLLMConfig.ExtraArgs, "--kv-events-config") {
+		return ""
+	}
+	cfg := map[string]any{
+		"enable_kv_cache_events": true,
+		"publisher":              "zmq",
+		"endpoint":               fmt.Sprintf("tcp://*:%d", port),
+	}
+	if topic := vr.Spec.VLLMConfig.KVEvents.Topic; topic != "" {
+		cfg["topic"] = topic
+	}
+	out, err := json.Marshal(cfg)
+	if err != nil {
+		// A map of strings and booleans always marshals.
+		panic(err)
+	}
+	return string(out)
+}
+
+// vllmContainerPorts lists the vLLM container's ports: HTTP first (drift
+// detection reads Ports[0]), then the KV event publisher when enabled.
+func vllmContainerPorts(vr *productionstackv1alpha1.VLLMRuntime) []corev1.ContainerPort {
+	ports := []corev1.ContainerPort{{Name: "http", ContainerPort: vr.Spec.VLLMConfig.Port}}
+	if port := kvEventsPort(vr); port != 0 {
+		ports = append(ports, corev1.ContainerPort{Name: "kv-events", ContainerPort: port})
+	}
+	return ports
+}
+
+// splitFlag splits "--name=value" into the flag name and value. vLLM accepts
+// underscores in flag names ("--kv_events_config"), so the name is
+// normalized to dashes.
+func splitFlag(arg string) (name, value string, hasValue bool) {
+	name, value, hasValue = strings.Cut(arg, "=")
+	if strings.HasPrefix(name, "--") {
+		name = "--" + strings.ReplaceAll(name[2:], "_", "-")
+	}
+	return name, value, hasValue
+}
+
+// hasFlag reports whether args pass flag, as "--flag value" or "--flag=value",
+// with dashes or underscores in the name.
+func hasFlag(args []string, flag string) bool {
+	return slices.ContainsFunc(args, func(arg string) bool {
+		name, _, _ := splitFlag(arg)
+		return name == flag
+	})
+}
+
+// flagValue returns the value of flag in args ("--flag value" or
+// "--flag=value", with dashes or underscores in the name), or "".
+func flagValue(args []string, flag string) string {
+	for i, arg := range args {
+		name, value, hasValue := splitFlag(arg)
+		if name != flag {
+			continue
+		}
+		if hasValue {
+			return value
+		}
+		if i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
 // kvTransferConfigArg returns the value following --kv-transfer-config in args,
 // or the empty string when the flag is absent.
 func kvTransferConfigArg(args []string) string {
@@ -676,6 +764,10 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		args = append(args, "--chat-template", "/etc/chat-template.json")
 	}
 
+	if kvEvents := kvEventsConfigArg(vllmRuntime); kvEvents != "" {
+		args = append(args, "--kv-events-config", kvEvents)
+	}
+
 	// Build environment variables
 	env := []corev1.EnvVar{}
 	if vllmRuntime.Spec.VLLMConfig.V1 {
@@ -912,17 +1004,12 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 			Command:         []string{"/opt/venv/bin/vllm", "serve"},
 			Args:            args,
 			Env:             env,
-			Ports: []corev1.ContainerPort{
-				{
-					Name:          "http",
-					ContainerPort: vllmRuntime.Spec.VLLMConfig.Port,
-				},
-			},
-			Resources:      resources,
-			VolumeMounts:   volumeMounts,
-			ReadinessProbe: readinessProbe,
-			StartupProbe:   startupProbe,
-			LivenessProbe:  livenessProbe,
+			Ports:           vllmContainerPorts(vllmRuntime),
+			Resources:       resources,
+			VolumeMounts:    volumeMounts,
+			ReadinessProbe:  readinessProbe,
+			StartupProbe:    startupProbe,
+			LivenessProbe:   livenessProbe,
 		},
 	}
 
@@ -1163,6 +1250,15 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 			"expected", expectedKVConfig,
 			"actual", actualKVConfig,
 		)
+		return true
+	}
+
+	// Compare the KV event publisher settings: the flag and the port that the
+	// router connects to.
+	expectedKVEvents := flagValue(expectedDep.Spec.Template.Spec.Containers[0].Args, "--kv-events-config")
+	actualKVEvents := flagValue(dep.Spec.Template.Spec.Containers[0].Args, "--kv-events-config")
+	if expectedKVEvents != actualKVEvents {
+		log.Info("KV events config mismatch", "expected", expectedKVEvents, "actual", actualKVEvents)
 		return true
 	}
 

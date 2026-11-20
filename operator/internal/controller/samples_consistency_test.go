@@ -41,12 +41,13 @@ import (
 const samplesDir = "../../config/samples"
 
 const (
-	sampleCacheServerFile = "production-stack_v1alpha1_cacheserver.yaml"
-	sampleRuntimeFile     = "production-stack_v1alpha1_vllmruntime.yaml"
-	sampleInProcessFile   = "production-stack_v1alpha1_vllmruntime_inprocess.yaml"
-	sampleRouterFile      = "production-stack_v1alpha1_vllmrouter.yaml"
-	sampleKVCachePVFile   = "cacheserver-kvcache-pv.yaml"
-	sampleKVCachePVCFile  = "cacheserver-kvcache-pvc.yaml"
+	sampleCacheServerFile    = "production-stack_v1alpha1_cacheserver.yaml"
+	sampleRuntimeFile        = "production-stack_v1alpha1_vllmruntime.yaml"
+	sampleInProcessFile      = "production-stack_v1alpha1_vllmruntime_inprocess.yaml"
+	sampleRouterFile         = "production-stack_v1alpha1_vllmrouter.yaml"
+	sampleKVEventsRouterFile = "production-stack_v1alpha1_vllmrouter_kvevents.yaml"
+	sampleKVCachePVFile      = "cacheserver-kvcache-pv.yaml"
+	sampleKVCachePVCFile     = "cacheserver-kvcache-pvc.yaml"
 )
 
 func loadSample[T any](t *testing.T, name string) *T {
@@ -304,6 +305,22 @@ func TestSamplesRouterAvoidsControllerRouting(t *testing.T) {
 	switch logic := sampleRouter(t).Spec.RoutingLogic; logic {
 	case "kvaware", "loadaware":
 		t.Errorf("routingLogic %q needs the LMCache controller, which MP engines do not register with", logic)
+	}
+}
+
+// TestSamplesKVEventsRouter checks the kvevents router sample selects the
+// runtime sample's pods and listens on the port engines publish on by default.
+func TestSamplesKVEventsRouter(t *testing.T) {
+	router := loadSample[productionstackv1alpha1.VLLMRouter](t, sampleKVEventsRouterFile)
+	if router.Spec.RoutingLogic != "kvevents" {
+		t.Fatalf("routingLogic = %q, want kvevents", router.Spec.RoutingLogic)
+	}
+	if router.Spec.KVEventsPort != defaultKVEventsPort {
+		t.Errorf("kvEventsPort = %d, want the engines' default %d", router.Spec.KVEventsPort, defaultKVEventsPort)
+	}
+	if router.Spec.K8sLabelSelector != sampleRouter(t).Spec.K8sLabelSelector {
+		t.Errorf("selector %q differs from the runtime sample's router %q",
+			router.Spec.K8sLabelSelector, sampleRouter(t).Spec.K8sLabelSelector)
 	}
 }
 

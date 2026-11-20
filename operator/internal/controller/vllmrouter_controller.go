@@ -290,6 +290,14 @@ func (r *VLLMRouterReconciler) deploymentForVLLMRouter(router *servingv1alpha1.V
 	if router.Spec.RoutingLogic == "kvaware" && router.Spec.LmcacheControllerPort != 0 {
 		args = append(args, "--lmcache-controller-port", fmt.Sprintf("%d", router.Spec.LmcacheControllerPort))
 	}
+	if router.Spec.RoutingLogic == "kvevents" {
+		if router.Spec.KVEventsPort != 0 {
+			args = append(args, "--kv-events-port", fmt.Sprintf("%d", router.Spec.KVEventsPort))
+		}
+		if router.Spec.KVEventsTopic != "" {
+			args = append(args, "--kv-events-topic", router.Spec.KVEventsTopic)
+		}
+	}
 	if router.Spec.EngineScrapeInterval != 0 {
 		args = append(args, "--engine-stats-interval", fmt.Sprintf("%d", router.Spec.EngineScrapeInterval))
 	}

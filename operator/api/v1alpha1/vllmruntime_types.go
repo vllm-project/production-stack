@@ -217,6 +217,32 @@ type VLLMConfig struct {
 
 	// Environment variables
 	Env []EnvVar `json:"env,omitempty"`
+
+	// KVEvents publishes the engine's KV cache events (vLLM
+	// --kv-events-config) for the router's "kvevents" routing logic. vLLM
+	// reports its GPU prefix-cache blocks; with LMCache in Multiprocess mode
+	// (LMCache >= 0.5.6) the connector adds the cache server's CPU blocks.
+	// +optional
+	KVEvents *KVEventsConfig `json:"kvEvents,omitempty"`
+}
+
+// KVEventsConfig configures vLLM's ZMQ KV cache event publisher.
+type KVEventsConfig struct {
+	// Enabled turns the publisher on. Events are only produced with prefix
+	// caching enabled.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Port the engine binds its ZMQ PUB socket on, on every interface. The
+	// router connects to it on each engine pod's IP.
+	// +kubebuilder:default=5557
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +optional
+	Port int32 `json:"port,omitempty"`
+
+	// Topic the events are published on. Must match the router's topic.
+	// +optional
+	Topic string `json:"topic,omitempty"`
 }
 
 // ModelSpec defines the model configuration
