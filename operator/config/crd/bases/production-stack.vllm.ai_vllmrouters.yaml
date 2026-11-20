@@ -85,6 +85,19 @@ spec:
                 description: K8sLabelSelector specifies the label selector for vLLM
                   runtime pods when using k8s service discovery
                 type: string
+              kvEventsPort:
+                description: |-
+                  KVEventsPort is the port of each engine's vLLM KV event publisher, used
+                  with "kvevents" routing. It must match the engines'
+                  vllmConfig.kvEvents.port. Defaults to 5557 in the router.
+                format: int32
+                maximum: 65535
+                minimum: 0
+                type: integer
+              kvEventsTopic:
+                description: KVEventsTopic is the ZMQ topic the engines publish KV
+                  events on.
+                type: string
               lmcacheControllerPort:
                 description: |-
                   LmcacheControllerPort is the port of the LMCache controller (used with kvaware routing).
@@ -203,6 +216,7 @@ spec:
                 - session
                 - prefixaware
                 - kvaware
+                - kvevents
                 type: string
               serviceAccountName:
                 description: ServiceAccountName for the router pod

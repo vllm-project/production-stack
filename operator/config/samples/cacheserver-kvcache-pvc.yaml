@@ -1,0 +1,17 @@
+# Claim on the KV-cache disk, mounted by the cache server.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lmcache-kvcache
+  labels:
+    app.kubernetes.io/name: production-stack
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # Bind to the volume in cacheserver-kvcache-pv.yaml rather than having
+  # the default StorageClass provision a new one.
+  storageClassName: ""
+  volumeName: lmcache-kvcache-pv
+  resources:
+    requests:
+      storage: 200Gi

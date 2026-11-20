@@ -51,7 +51,12 @@ var _ = Describe("CacheServer Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					// port and deploymentStrategy are sent even when unset, so
+					// the API's defaults never apply; give them valid values.
+					Spec: productionstackv1alpha1.CacheServerSpec{
+						Port:               9000,
+						DeploymentStrategy: "Recreate",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

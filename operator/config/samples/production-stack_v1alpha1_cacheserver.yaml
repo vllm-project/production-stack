@@ -6,23 +6,62 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: cacheserver-sample
 spec:
-  # Image configuration
+  # Image configuration. Must be the same image as the engines.
   image:
     registry: "docker.io"
-    name: "lmcache/vllm-openai:2025-04-18"
+    name: "lmcache/vllm-openai:v0.5.5"
     pullPolicy: "IfNotPresent"
     pullSecretName: ""
 
-  # Container port
-  port: 8000
-
-  # Resource requirements
-  resources:
-    cpu: "2"
-    memory: "16Gi"
+  # ZMQ port the engines connect to
+  port: 9000
 
   # Number of replicas
   replicas: 1
 
-  # Deployment strategy
+  # The L1 tier is pinned host memory; Recreate stops a rollout from pinning a
+  # second copy while the old pod still holds the first.
   deploymentStrategy: "Recreate"
+
+  # Resource requirements. Memory must cover l1SizeGb plus overhead.
+  # No GPU is requested: the server uses the engines' GPUs, made visible
+  # through the nvidia runtime below.
+  resources:
+    cpu: "4"
+    memory: "32Gi"
+
+  # GPU visibility without a GPU request, needed for lmcache_driven
+  runtimeClassName: "nvidia"
+  env:
+    - name: NVIDIA_VISIBLE_DEVICES
+      value: "all"
+
+  # `lmcache server` configuration. The transfer mode defaults to
+  # lmcache_driven: the server copies KV out of the engines' GPU memory over
+  # CUDA IPC.
+  multiprocess:
+    # L1 tier in host DRAM, in GB
+    l1SizeGb: 20
+    evictionPolicy: LRU
+    # Tokens per cache chunk. Must match the engines. For hybrid
+    # (Mamba/GDN) models it must also be a multiple of vLLM's attention block
+    # size, which the engine logs at startup.
+    chunkSize: 256
+    # The engines run in their own pods, so they do not share an IPC
+    # namespace with the server. Must match the VLLMRuntime.
+    isolatedIpc: true
+    # Prometheus metrics port
+    httpPort: 8080
+    # L2 tier on the KV-cache disk. base_path is under the volumeMount below,
+    # and max_capacity_gb stays below the 200Gi claim.
+    l2Adapters:
+      - '{"type": "fs_native", "base_path": "/kvcache", "max_capacity_gb": 180, "eviction": {"eviction_policy": "LRU", "trigger_watermark": 0.9, "eviction_ratio": 0.1}}'
+
+  # KV-cache disk, from cacheserver-kvcache-pvc.yaml
+  volumes:
+    - name: kvcache
+      persistentVolumeClaim:
+        claimName: lmcache-kvcache
+  volumeMounts:
+    - name: kvcache
+      mountPath: /kvcache

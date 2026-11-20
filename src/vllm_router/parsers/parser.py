@@ -245,6 +245,7 @@ def parse_args():
             "disaggregated_prefill",
             "disaggregated_prefill_orchestrated",
             "priority",
+            "kvevents",
         ],
         help="The routing logic to use",
     )
@@ -455,6 +456,43 @@ def parse_args():
         type=int,
         default=2000,
         help="The threshold for kv-aware routing.",
+    )
+
+    parser.add_argument(
+        "--kv-events-port",
+        type=int,
+        default=5557,
+        help="Port of each engine's vLLM KV event ZMQ publisher "
+        "(--kv-events-config endpoint), used by the 'kvevents' routing logic.",
+    )
+    parser.add_argument(
+        "--kv-events-topic",
+        type=str,
+        default="",
+        help="ZMQ topic the engines publish KV events on (kvevents routing).",
+    )
+    parser.add_argument(
+        "--kv-events-min-match-tokens",
+        type=int,
+        default=1,
+        help="Minimum cached-prefix length, in tokens, for the 'kvevents' "
+        "routing logic to override the session / QPS fallback.",
+    )
+    parser.add_argument(
+        "--kv-events-balance-abs-threshold",
+        type=int,
+        default=8,
+        help="kvevents routing ignores the cache and picks the least-loaded "
+        "engine when the busiest engine has more than this many in-flight "
+        "requests over the idlest one (and the relative threshold also holds).",
+    )
+    parser.add_argument(
+        "--kv-events-balance-rel-threshold",
+        type=float,
+        default=1.5,
+        help="kvevents routing: the busiest engine must also have more than "
+        "this multiple of the idlest engine's in-flight requests to switch to "
+        "load balancing.",
     )
 
     parser.add_argument(

@@ -15,7 +15,7 @@
 import json
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Optional
 
 from fastapi import FastAPI
@@ -72,6 +72,12 @@ class DynamicRouterConfig:
     priority_field: Optional[str] = "priority"
     priority_default: Optional[int] = 0
     priority_threshold: Optional[int] = None
+    # kvevents routing; None keeps the router's default
+    kv_events_port: Optional[int] = None
+    kv_events_topic: Optional[str] = None
+    kv_events_min_match_tokens: Optional[int] = None
+    kv_events_balance_abs_threshold: Optional[int] = None
+    kv_events_balance_rel_threshold: Optional[float] = None
 
     # Logging Options
     callbacks: Optional[str] = None
@@ -111,6 +117,11 @@ class DynamicRouterConfig:
             priority_field=args.priority_field,
             priority_default=args.priority_default,
             priority_threshold=args.priority_threshold,
+            kv_events_port=args.kv_events_port,
+            kv_events_topic=args.kv_events_topic,
+            kv_events_min_match_tokens=args.kv_events_min_match_tokens,
+            kv_events_balance_abs_threshold=args.kv_events_balance_abs_threshold,
+            kv_events_balance_rel_threshold=args.kv_events_balance_rel_threshold,
             # Logging Options
             callbacks=args.callbacks,
         )
@@ -156,6 +167,8 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         self.config_file_type = config_file_type
         self.watch_interval = watch_interval
         self.current_config = init_config
+        # Startup (command-line) settings, for fields a config file leaves unset
+        self.init_config = init_config
         self.app = app
 
         # Watcher thread
@@ -215,10 +228,38 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
 
         logger.info("DynamicConfigWatcher: Service discovery reconfiguration complete")
 
+    KV_EVENTS_FIELDS = (
+        "kv_events_port",
+        "kv_events_topic",
+        "kv_events_min_match_tokens",
+        "kv_events_balance_abs_threshold",
+        "kv_events_balance_rel_threshold",
+    )
+
+    def with_startup_kv_events(
+        self, config: DynamicRouterConfig
+    ) -> DynamicRouterConfig:
+        """Fill the kvevents settings a config file leaves unset from the
+        command line. The KV event port and topic must match the engines'
+        publishers, so an omitted setting keeps its startup value rather than
+        resetting to the default; and a file that only mirrors the command
+        line then compares equal to it instead of triggering a reconfigure."""
+        init = getattr(self, "init_config", None)
+        if init is None:
+            return config
+        unset = {
+            f: getattr(init, f)
+            for f in DynamicConfigWatcher.KV_EVENTS_FIELDS
+            if getattr(config, f) is None
+        }
+        return replace(config, **unset) if unset else config
+
     def reconfigure_routing_logic(self, config: DynamicRouterConfig):
         """
         Reconfigures the router with the given config.
         """
+
+        config = DynamicConfigWatcher.with_startup_kv_events(self, config)
         routing_logic = reconfigure_routing_logic(
             config.routing_logic,
             session_key=config.session_key,
@@ -226,6 +267,11 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
             priority_field=config.priority_field,
             priority_default=config.priority_default,
             priority_threshold=config.priority_threshold,
+            kv_events_port=config.kv_events_port,
+            kv_events_topic=config.kv_events_topic,
+            kv_events_min_match_tokens=config.kv_events_min_match_tokens,
+            kv_events_balance_abs_threshold=config.kv_events_balance_abs_threshold,
+            kv_events_balance_rel_threshold=config.kv_events_balance_rel_threshold,
             prefill_model_labels=parse_comma_separated_args(
                 config.prefill_model_labels
             ),
@@ -291,6 +337,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                     config = DynamicRouterConfig.from_json(self.config_path)
                 else:
                     raise ValueError("Unsupported config file type.")
+                config = self.with_startup_kv_events(config)
                 if config != self.current_config:
                     logger.info(
                         "DynamicConfigWatcher: Config changed, reconfiguring..."

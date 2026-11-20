@@ -18,13 +18,17 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -385,6 +389,235 @@ func (r *VLLMRuntimeReconciler) Reconcile(
 	return ctrl.Result{}, nil
 }
 
+// maxModelLenArg renders the --max-model-len value and reports whether the
+// flag should be passed at all.
+//
+// The field is int-or-string because vLLM accepts a plain count, the sentinels
+// "auto" and -1 for deriving it from the model config, and suffixed forms such
+// as "32k". An unset field is the integer zero, which means "leave it to vLLM"
+// rather than a context length of nothing.
+func maxModelLenArg(maxModelLen intstr.IntOrString) (string, bool) {
+	if maxModelLen.Type == intstr.String {
+		if maxModelLen.StrVal == "" {
+			return "", false
+		}
+		return maxModelLen.StrVal, true
+	}
+	if maxModelLen.IntVal == 0 {
+		return "", false
+	}
+	return strconv.Itoa(int(maxModelLen.IntVal)), true
+}
+
+// defaultKVEventsPort is vLLM's default KV event publisher port.
+const defaultKVEventsPort int32 = 5557
+
+// kvEventsPort returns the KV event publisher port, or 0 when publishing is
+// off.
+func kvEventsPort(vr *productionstackv1alpha1.VLLMRuntime) int32 {
+	kv := vr.Spec.VLLMConfig.KVEvents
+	if kv == nil || !kv.Enabled {
+		return 0
+	}
+	if kv.Port == 0 {
+		return defaultKVEventsPort
+	}
+	return kv.Port
+}
+
+// kvEventsConfigArg renders vllm serve's --kv-events-config value, or "" when
+// KV events are off or extraArgs already pass the flag.
+func kvEventsConfigArg(vr *productionstackv1alpha1.VLLMRuntime) string {
+	port := kvEventsPort(vr)
+	if port == 0 || hasFlag(vr.Spec.VLLMConfig.ExtraArgs, "--kv-events-config") {
+		return ""
+	}
+	cfg := map[string]any{
+		"enable_kv_cache_events": true,
+		"publisher":              "zmq",
+		"endpoint":               fmt.Sprintf("tcp://*:%d", port),
+	}
+	if topic := vr.Spec.VLLMConfig.KVEvents.Topic; topic != "" {
+		cfg["topic"] = topic
+	}
+	out, err := json.Marshal(cfg)
+	if err != nil {
+		// A map of strings and booleans always marshals.
+		panic(err)
+	}
+	return string(out)
+}
+
+// vllmContainerPorts lists the vLLM container's ports: HTTP first (drift
+// detection reads Ports[0]), then the KV event publisher when enabled.
+func vllmContainerPorts(vr *productionstackv1alpha1.VLLMRuntime) []corev1.ContainerPort {
+	ports := []corev1.ContainerPort{{Name: "http", ContainerPort: vr.Spec.VLLMConfig.Port}}
+	if port := kvEventsPort(vr); port != 0 {
+		ports = append(ports, corev1.ContainerPort{Name: "kv-events", ContainerPort: port})
+	}
+	return ports
+}
+
+// splitFlag splits "--name=value" into the flag name and value. vLLM accepts
+// underscores in flag names ("--kv_events_config"), so the name is
+// normalized to dashes.
+func splitFlag(arg string) (name, value string, hasValue bool) {
+	name, value, hasValue = strings.Cut(arg, "=")
+	if strings.HasPrefix(name, "--") {
+		name = "--" + strings.ReplaceAll(name[2:], "_", "-")
+	}
+	return name, value, hasValue
+}
+
+// hasFlag reports whether args pass flag, as "--flag value" or "--flag=value",
+// with dashes or underscores in the name.
+func hasFlag(args []string, flag string) bool {
+	return slices.ContainsFunc(args, func(arg string) bool {
+		name, _, _ := splitFlag(arg)
+		return name == flag
+	})
+}
+
+// flagValue returns the value of flag in args ("--flag value" or
+// "--flag=value", with dashes or underscores in the name), or "".
+func flagValue(args []string, flag string) string {
+	for i, arg := range args {
+		name, value, hasValue := splitFlag(arg)
+		if name != flag {
+			continue
+		}
+		if hasValue {
+			return value
+		}
+		if i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
+// kvTransferConfigArg returns the value of --kv-transfer-config in args (either
+// "--flag value" or "--flag=value"), or the empty string when it is absent.
+func kvTransferConfigArg(args []string) string {
+	return flagValue(args, "--kv-transfer-config")
+}
+
+// lmcacheEnvValues picks the in-process LMCache settings out of a container's
+// env, for comparing the expected and the running Deployment.
+func lmcacheEnvValues(env []corev1.EnvVar) map[string]string {
+	values := map[string]string{}
+	for _, e := range env {
+		switch e.Name {
+		case "LMCACHE_USE_EXPERIMENTAL",
+			"LMCACHE_LOCAL_CPU", "LMCACHE_MAX_LOCAL_CPU_SIZE",
+			"LMCACHE_LOCAL_DISK", "LMCACHE_MAX_LOCAL_DISK_SIZE",
+			"LMCACHE_REMOTE_URL", "LMCACHE_REMOTE_SERDE":
+			values[e.Name] = e.Value
+		}
+	}
+	return values
+}
+
+// kvTransferConfig is the --kv-transfer-config document passed to vllm serve.
+type kvTransferConfig struct {
+	KVConnector string `json:"kv_connector"`
+	KVRole      string `json:"kv_role"`
+	// ExtraConfig is omitted for the local connectors, which take no extra
+	// configuration.
+	ExtraConfig map[string]any `json:"kv_connector_extra_config,omitempty"`
+}
+
+// isLMCacheMultiprocess reports whether the runtime attaches to a CacheServer
+// rather than keeping its LMCache in process. Multiprocess is the API default,
+// so an empty mode, from an object that bypassed defaulting, counts as
+// Multiprocess too; only an explicit InProcess keeps the cache in process.
+func isLMCacheMultiprocess(vllmRuntime *productionstackv1alpha1.VLLMRuntime) bool {
+	return vllmRuntime.Spec.LMCacheConfig.Mode != productionstackv1alpha1.LMCacheModeInProcess
+}
+
+// lmcacheKVTransferConfig renders the --kv-transfer-config value for a runtime.
+//
+// InProcess mode selects the in-process connector, LMCacheConnectorV1 or, for
+// the legacy engine, LMCacheConnector, and renders exactly the document main
+// always has, so existing runtimes do not roll. Multiprocess mode selects the
+// LMCacheMPConnector, with the cache server address and transfer mode in the
+// extra config.
+//
+// Args:
+//
+//	vllmRuntime: The runtime whose LMCacheConfig is rendered.
+//
+// Returns:
+//
+//	The JSON document.
+func lmcacheKVTransferConfig(
+	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
+) string {
+	lmCache := vllmRuntime.Spec.LMCacheConfig
+
+	if !isLMCacheMultiprocess(vllmRuntime) {
+		connector := "LMCacheConnector"
+		if vllmRuntime.Spec.VLLMConfig.V1 {
+			connector = "LMCacheConnectorV1"
+		}
+		// Marshalling cannot fail: both values are strings.
+		encoded, _ := json.Marshal(kvTransferConfig{KVConnector: connector, KVRole: "kv_both"})
+		return string(encoded)
+	}
+
+	mp := lmCache.Multiprocess
+	extra := map[string]any{}
+	if mp.Host != "" {
+		extra["lmcache.mp.host"] = mp.Host
+	}
+	if mp.Port > 0 {
+		extra["lmcache.mp.port"] = mp.Port
+	}
+	extra["lmcache.mp.mp_transfer_mode"] = mpTransferMode(mp.TransferMode)
+	if mp.IsolatedIPC {
+		extra["lmcache.mp.isolated_ipc"] = true
+	}
+	// User-supplied entries win, so an escape hatch exists for keys the spec
+	// does not model, including overrides of the generated ones.
+	for key, value := range mp.ExtraConfig {
+		extra[key] = value
+	}
+
+	config := kvTransferConfig{
+		KVConnector: "LMCacheMPConnector",
+		KVRole:      "kv_both",
+		ExtraConfig: extra,
+	}
+	// Marshalling cannot fail: every value is a string, an int32 or a bool.
+	encoded, _ := json.Marshal(config)
+	return string(encoded)
+}
+
+// inProcessLMCacheEnv renders the in-process LMCache settings as the
+// environment variables LMCache reads, in the same form main always has.
+func inProcessLMCacheEnv(lmCache productionstackv1alpha1.LMCacheConfig) []corev1.EnvVar {
+	var env []corev1.EnvVar
+	if lmCache.CPUOffloadingBufferSize != "" {
+		env = append(env,
+			corev1.EnvVar{Name: "LMCACHE_LOCAL_CPU", Value: "True"},
+			corev1.EnvVar{Name: "LMCACHE_MAX_LOCAL_CPU_SIZE", Value: lmCache.CPUOffloadingBufferSize},
+		)
+	}
+	if lmCache.DiskOffloadingBufferSize != "" {
+		env = append(env,
+			corev1.EnvVar{Name: "LMCACHE_LOCAL_DISK", Value: "True"},
+			corev1.EnvVar{Name: "LMCACHE_MAX_LOCAL_DISK_SIZE", Value: lmCache.DiskOffloadingBufferSize},
+		)
+	}
+	if lmCache.RemoteURL != "" {
+		env = append(env,
+			corev1.EnvVar{Name: "LMCACHE_REMOTE_URL", Value: lmCache.RemoteURL},
+			corev1.EnvVar{Name: "LMCACHE_REMOTE_SERDE", Value: lmCache.RemoteSerde},
+		)
+	}
+	return env
+}
+
 // deploymentForVLLMRuntime returns a VLLMRuntime Deployment object
 func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 	vllmRuntime *productionstackv1alpha1.VLLMRuntime,
@@ -458,6 +691,14 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		args = append(args, "--tool-call-parser", vllmRuntime.Spec.Model.ToolCallParser)
 	}
 
+	if vllmRuntime.Spec.Model.ReasoningParser != "" {
+		args = append(args, "--reasoning-parser", vllmRuntime.Spec.Model.ReasoningParser)
+	}
+
+	if vllmRuntime.Spec.Model.TrustRemoteCode {
+		args = append(args, "--trust-remote-code")
+	}
+
 	if vllmRuntime.Spec.VLLMConfig.EnableChunkedPrefill {
 		args = append(args, "--enable-chunked-prefill")
 	} else {
@@ -470,12 +711,8 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		args = append(args, "--no-enable-prefix-caching")
 	}
 
-	if vllmRuntime.Spec.Model.MaxModelLen > 0 {
-		args = append(
-			args,
-			"--max-model-len",
-			fmt.Sprintf("%d", vllmRuntime.Spec.Model.MaxModelLen),
-		)
+	if maxModelLen, ok := maxModelLenArg(vllmRuntime.Spec.Model.MaxModelLen); ok {
+		args = append(args, "--max-model-len", maxModelLen)
 	}
 
 	if vllmRuntime.Spec.Model.DType != "" {
@@ -506,12 +743,24 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 		args = append(args, "--max_loras", fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.MaxLoras))
 	}
 
+	if vllmRuntime.Spec.VLLMConfig.MaxNumBatchedTokens > 0 {
+		args = append(
+			args,
+			"--max-num-batched-tokens",
+			fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.MaxNumBatchedTokens),
+		)
+	}
+
 	if vllmRuntime.Spec.VLLMConfig.ExtraArgs != nil {
 		args = append(args, vllmRuntime.Spec.VLLMConfig.ExtraArgs...)
 	}
 
 	if vllmRuntime.Spec.Model.ChatTemplate != "" {
 		args = append(args, "--chat-template", "/etc/chat-template.json")
+	}
+
+	if kvEvents := kvEventsConfigArg(vllmRuntime); kvEvents != "" {
+		args = append(args, "--kv-events-config", kvEvents)
 	}
 
 	// Build environment variables
@@ -544,62 +793,26 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 				Name:  "LMCACHE_LOG_LEVEL",
 				Value: "DEBUG",
 			},
-			corev1.EnvVar{
+		)
+		if !isLMCacheMultiprocess(vllmRuntime) {
+			env = append(env, corev1.EnvVar{
 				Name:  "LMCACHE_USE_EXPERIMENTAL",
 				Value: "True",
-			},
-			corev1.EnvVar{
-				Name:  "VLLM_RPC_TIMEOUT",
-				Value: "1000000",
-			},
-		)
-
-		// Add KV transfer config based on V1 flag
-		var lmcache_config string
-		if vllmRuntime.Spec.VLLMConfig.V1 {
-			lmcache_config = `{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}`
-		} else {
-			lmcache_config = `{"kv_connector":"LMCacheConnector","kv_role":"kv_both"}`
+			})
 		}
-		args = append(args, "--kv-transfer-config", lmcache_config)
+		env = append(env, corev1.EnvVar{
+			Name:  "VLLM_RPC_TIMEOUT",
+			Value: "1000000",
+		})
 
-		if vllmRuntime.Spec.LMCacheConfig.CPUOffloadingBufferSize != "" {
-			env = append(env,
-				corev1.EnvVar{
-					Name:  "LMCACHE_LOCAL_CPU",
-					Value: "True",
-				},
-				corev1.EnvVar{
-					Name:  "LMCACHE_MAX_LOCAL_CPU_SIZE",
-					Value: vllmRuntime.Spec.LMCacheConfig.CPUOffloadingBufferSize,
-				},
-			)
-		}
+		args = append(args, "--kv-transfer-config", lmcacheKVTransferConfig(vllmRuntime))
 
-		if vllmRuntime.Spec.LMCacheConfig.DiskOffloadingBufferSize != "" {
-			env = append(env,
-				corev1.EnvVar{
-					Name:  "LMCACHE_LOCAL_DISK",
-					Value: "True",
-				},
-				corev1.EnvVar{
-					Name:  "LMCACHE_MAX_LOCAL_DISK_SIZE",
-					Value: vllmRuntime.Spec.LMCacheConfig.DiskOffloadingBufferSize,
-				},
-			)
-		}
-
-		if vllmRuntime.Spec.LMCacheConfig.RemoteURL != "" {
-			env = append(env,
-				corev1.EnvVar{
-					Name:  "LMCACHE_REMOTE_URL",
-					Value: vllmRuntime.Spec.LMCacheConfig.RemoteURL,
-				},
-				corev1.EnvVar{
-					Name:  "LMCACHE_REMOTE_SERDE",
-					Value: vllmRuntime.Spec.LMCacheConfig.RemoteSerde,
-				},
-			)
+		// The offloading and remote settings configure the cache inside the
+		// engine process. In Multiprocess mode the cache lives in the
+		// CacheServer instead, so they are not rendered even though the API
+		// still fills in their defaults.
+		if !isLMCacheMultiprocess(vllmRuntime) {
+			env = append(env, inProcessLMCacheEnv(vllmRuntime.Spec.LMCacheConfig)...)
 		}
 	}
 
@@ -741,7 +954,11 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 	// Mount an emptyDir (medium=Memory) at /dev/shm when a size is requested.
 	// Tensor parallelism communicates over shared memory, and the container
 	// default /dev/shm is usually too small for it.
-	if vllmRuntime.Spec.DeploymentConfig.ShmSize != "" {
+	// hostIPC already replaces /dev/shm with the host's tmpfs, which is the
+	// point of enabling it, so an emptyDir would mask the segment the cache
+	// server shares.
+	if vllmRuntime.Spec.DeploymentConfig.ShmSize != "" &&
+		!vllmRuntime.Spec.DeploymentConfig.HostIPC {
 		shmSource := corev1.VolumeSource{
 			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
 		}
@@ -782,17 +999,12 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 			Command:         []string{"/opt/venv/bin/vllm", "serve"},
 			Args:            args,
 			Env:             env,
-			Ports: []corev1.ContainerPort{
-				{
-					Name:          "http",
-					ContainerPort: vllmRuntime.Spec.VLLMConfig.Port,
-				},
-			},
-			Resources:      resources,
-			VolumeMounts:   volumeMounts,
-			ReadinessProbe: readinessProbe,
-			StartupProbe:   startupProbe,
-			LivenessProbe:  livenessProbe,
+			Ports:           vllmContainerPorts(vllmRuntime),
+			Resources:       resources,
+			VolumeMounts:    volumeMounts,
+			ReadinessProbe:  readinessProbe,
+			StartupProbe:    startupProbe,
+			LivenessProbe:   livenessProbe,
 		},
 	}
 
@@ -821,7 +1033,8 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 					Annotations: vllmRuntime.Spec.DeploymentConfig.PodAnnotations,
 				},
 				Spec: corev1.PodSpec{
-					RuntimeClassName: &vllmRuntime.Spec.DeploymentConfig.RuntimeClass,
+					RuntimeClassName: runtimeClassOrNil(vllmRuntime.Spec.DeploymentConfig.RuntimeClass),
+					HostIPC:          vllmRuntime.Spec.DeploymentConfig.HostIPC,
 					Affinity:         affinity,
 					Tolerations:      vllmRuntime.Spec.DeploymentConfig.Toleration,
 					ImagePullSecrets: imagePullSecrets,
@@ -962,6 +1175,16 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 ) bool {
 
 	log := log.FromContext(ctx)
+
+	// Every comparison below reads the first container, and the port check
+	// its first port. A live Deployment edited to drop either cannot be
+	// compared, so rewrite it from the spec rather than index out of range.
+	if len(dep.Spec.Template.Spec.Containers) == 0 ||
+		len(dep.Spec.Template.Spec.Containers[0].Ports) == 0 {
+		log.Info("Deployment has no vLLM container or port to compare; updating it")
+		return true
+	}
+
 	// Generate the expected deployment
 	expectedDep := r.deploymentForVLLMRuntime(vr)
 
@@ -1010,57 +1233,76 @@ func (r *VLLMRuntimeReconciler) deploymentNeedsUpdate(
 		return true
 	}
 
-	// Compare LM Cache configuration
-	expectedLMCacheConfig := vr.Spec.LMCacheConfig
-	actualLMCacheConfig := dep.Spec.Template.Spec.Containers[0].Env
-
-	// Extract actual values from environment variables
-	actualEnabled := false
-	actualCPUOffloadingBufferSize := ""
-	actualDiskOffloadingBufferSize := ""
-	actualRemoteURL := ""
-	actualRemoteSerde := ""
-
-	for _, env := range actualLMCacheConfig {
-		switch env.Name {
-		case "LMCACHE_USE_EXPERIMENTAL":
-			actualEnabled = env.Value == "True"
-		case "LMCACHE_MAX_LOCAL_CPU_SIZE":
-			actualCPUOffloadingBufferSize = env.Value
-		case "LMCACHE_MAX_LOCAL_DISK_SIZE":
-			actualDiskOffloadingBufferSize = env.Value
-		case "LMCACHE_REMOTE_URL":
-			actualRemoteURL = env.Value
-		case "LMCACHE_REMOTE_SERDE":
-			actualRemoteSerde = env.Value
-		}
-	}
-
-	// Compare specific fields
-	if expectedLMCacheConfig.Enabled != actualEnabled ||
-		expectedLMCacheConfig.CPUOffloadingBufferSize != actualCPUOffloadingBufferSize ||
-		expectedLMCacheConfig.DiskOffloadingBufferSize != actualDiskOffloadingBufferSize ||
-		expectedLMCacheConfig.RemoteURL != actualRemoteURL ||
-		expectedLMCacheConfig.RemoteSerde != actualRemoteSerde {
+	// Compare the rendered KV connector configuration. It carries the
+	// connector, so it catches a mode switch; in Multiprocess mode it also
+	// carries the cache server address and transfer mode. It is absent when
+	// LMCache is disabled, so it also catches LMCache being turned on or off.
+	expectedKVConfig := kvTransferConfigArg(expectedDep.Spec.Template.Spec.Containers[0].Args)
+	actualKVConfig := kvTransferConfigArg(dep.Spec.Template.Spec.Containers[0].Args)
+	if expectedKVConfig != actualKVConfig {
 		log.Info(
-			"LM Cache configuration mismatch",
-			"expected",
-			expectedLMCacheConfig,
-			"actual",
-			actualLMCacheConfig,
+			"KV transfer config mismatch",
+			"expected", expectedKVConfig,
+			"actual", actualKVConfig,
 		)
 		return true
 	}
 
-	actualAdditionalArgs := dep.Spec.Template.Spec.Affinity.NodeAffinity
-	expectedAdditionalArgs := expectedDep.Spec.Template.Spec.Affinity.NodeAffinity
-	if !reflect.DeepEqual(expectedAdditionalArgs, actualAdditionalArgs) {
+	// Compare the KV event publisher settings: the flag and the port that the
+	// router connects to.
+	expectedKVEvents := flagValue(expectedDep.Spec.Template.Spec.Containers[0].Args, "--kv-events-config")
+	actualKVEvents := flagValue(dep.Spec.Template.Spec.Containers[0].Args, "--kv-events-config")
+	if expectedKVEvents != actualKVEvents {
+		log.Info("KV events config mismatch", "expected", expectedKVEvents, "actual", actualKVEvents)
+		return true
+	}
+
+	// Compare the in-process LMCache settings, which are rendered as env vars
+	// rather than args. Only in InProcess mode: in Multiprocess mode they are
+	// not rendered, and comparing their API defaults against nothing would
+	// report drift that no update can resolve, rolling the engine on every
+	// reconcile.
+	if vr.Spec.LMCacheConfig.Enabled && !isLMCacheMultiprocess(vr) {
+		expectedEnv := lmcacheEnvValues(expectedDep.Spec.Template.Spec.Containers[0].Env)
+		actualEnv := lmcacheEnvValues(dep.Spec.Template.Spec.Containers[0].Env)
+		if !maps.Equal(expectedEnv, actualEnv) {
+			log.Info(
+				"In-process LMCache configuration mismatch",
+				"expected", expectedEnv,
+				"actual", actualEnv,
+			)
+			return true
+		}
+	}
+
+	// Compare the whole affinity rather than dereferencing its node half:
+	// a runtime without nodeSelectorTerms renders no affinity at all, so both
+	// sides are nil. Semantic equality treats nil and empty lists as equal, as
+	// the API server's round trip does.
+	expectedAffinity := expectedDep.Spec.Template.Spec.Affinity
+	actualAffinity := dep.Spec.Template.Spec.Affinity
+	if !equality.Semantic.DeepEqual(expectedAffinity, actualAffinity) {
 		log.Info(
-			"Node affinity mismatch",
+			"Affinity mismatch",
 			"expected",
-			expectedAdditionalArgs,
+			expectedAffinity,
 			"actual",
-			actualAdditionalArgs,
+			actualAffinity,
+		)
+		return true
+	}
+
+	// hostIPC decides whether the engine shares the host /dev/shm with a cache
+	// server, so toggling it must roll the pods.
+	expectedHostIPC := expectedDep.Spec.Template.Spec.HostIPC
+	actualHostIPC := dep.Spec.Template.Spec.HostIPC
+	if expectedHostIPC != actualHostIPC {
+		log.Info(
+			"HostIPC mismatch",
+			"expected",
+			expectedHostIPC,
+			"actual",
+			actualHostIPC,
 		)
 		return true
 	}

@@ -31,6 +31,7 @@ from vllm_router.routers.routing_logic import (
     DisaggregatedPrefillOrchestratedRouter,
     DisaggregatedPrefillRouter,
     KvawareRouter,
+    KvEventAwareRouter,
     PrefixAwareRouter,
     PriorityRouter,
     SessionRouter,
@@ -596,7 +597,13 @@ async def route_general_request(
 
     elif isinstance(
         request.app.state.router,
-        (KvawareRouter, PrefixAwareRouter, SessionRouter, PriorityRouter),
+        (
+            KvawareRouter,
+            KvEventAwareRouter,
+            PrefixAwareRouter,
+            SessionRouter,
+            PriorityRouter,
+        ),
     ):
         server_url = await request.app.state.router.route_request(
             endpoints, engine_stats, request_stats, request, request_json
@@ -650,7 +657,13 @@ async def route_general_request(
                 server_url = remaining[0].url
             elif isinstance(
                 request.app.state.router,
-                (KvawareRouter, PrefixAwareRouter, SessionRouter, PriorityRouter),
+                (
+                    KvawareRouter,
+                    KvEventAwareRouter,
+                    PrefixAwareRouter,
+                    SessionRouter,
+                    PriorityRouter,
+                ),
             ):
                 server_url = await request.app.state.router.route_request(
                     remaining, engine_stats, request_stats, request, request_json
@@ -1307,6 +1320,7 @@ async def proxy_multipart_request(
         router,
         (
             KvawareRouter,
+            KvEventAwareRouter,
             PrefixAwareRouter,
             SessionRouter,
             DisaggregatedPrefillOrchestratedRouter,

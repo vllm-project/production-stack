@@ -52,7 +52,7 @@ type VLLMRouterSpec struct {
 	StaticModels string `json:"staticModels,omitempty"`
 
 	// RoutingLogic specifies the routing strategy
-	// +kubebuilder:validation:Enum=roundrobin;session;prefixaware;kvaware
+	// +kubebuilder:validation:Enum=roundrobin;session;prefixaware;kvaware;kvevents
 	// +kubebuilder:default=roundrobin
 	RoutingLogic string `json:"routingLogic,omitempty"`
 
@@ -65,6 +65,18 @@ type VLLMRouterSpec struct {
 	// Set explicitly when routingLogic is "kvaware" (typical value: 9000).
 	// +kubebuilder:validation:Maximum=65535
 	LmcacheControllerPort int32 `json:"lmcacheControllerPort,omitempty"`
+
+	// KVEventsPort is the port of each engine's vLLM KV event publisher, used
+	// with "kvevents" routing. It must match the engines'
+	// vllmConfig.kvEvents.port. Defaults to 5557 in the router.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=65535
+	// +optional
+	KVEventsPort int32 `json:"kvEventsPort,omitempty"`
+
+	// KVEventsTopic is the ZMQ topic the engines publish KV events on.
+	// +optional
+	KVEventsTopic string `json:"kvEventsTopic,omitempty"`
 
 	// EngineScrapeInterval for collecting engine statistics
 	EngineScrapeInterval int32 `json:"engineScrapeInterval,omitempty"`

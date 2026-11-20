@@ -1,0 +1,46 @@
+# Cache-aware routing for LMCache Multiprocess mode, driven by vLLM KV events.
+#
+# Each engine publishes its KV cache events (vLLM --kv-events-config); the
+# router subscribes to every engine pod and routes a request to the engine
+# holding the longest cached prefix, unless the engines' load is clearly
+# imbalanced. vLLM reports
+# its GPU prefix-cache blocks, and LMCache >= 0.5.6 adds the cache server's
+# CPU blocks.
+#
+# The engines must publish events. In the VLLMRuntime (and use an LMCache
+# >= 0.5.6 image on both the runtime and the CacheServer):
+#
+#   vllmConfig:
+#     enablePrefixCaching: true
+#     kvEvents:
+#       enabled: true
+#       port: 5557
+apiVersion: production-stack.vllm.ai/v1alpha1
+kind: VLLMRouter
+metadata:
+  labels:
+    app.kubernetes.io/name: production-stack
+    app.kubernetes.io/managed-by: kustomize
+  name: vllmrouter-kvevents-sample
+spec:
+  enableRouter: true
+  replicas: 1
+  serviceDiscovery: k8s
+  k8sLabelSelector: "app=vllmruntime-sample"
+  routingLogic: kvevents
+  # Must match the engines' vllmConfig.kvEvents.port
+  kvEventsPort: 5557
+  # Requests with no cached prefix anywhere stick to a session when this
+  # header is present, and are balanced by QPS otherwise.
+  sessionKey: "x-user-id"
+  engineScrapeInterval: 30
+  requestStatsWindow: 60
+  port: 80
+  serviceAccountName: vllmrouter-sa
+  image:
+    registry: docker.io
+    name: lmcache/lmstack-router
+    pullPolicy: IfNotPresent
+  resources:
+    cpu: "2"
+    memory: "8Gi"

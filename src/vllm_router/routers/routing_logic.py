@@ -23,9 +23,10 @@ import random
 import threading
 import time
 import uuid
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+import aiohttp
 import requests
 from fastapi import HTTPException, Request
 
@@ -62,6 +63,7 @@ class RoutingLogic(str, enum.Enum):
     DISAGGREGATED_PREFILL = "disaggregated_prefill"
     DISAGGREGATED_PREFILL_ORCHESTRATED = "disaggregated_prefill_orchestrated"
     PRIORITY = "priority"
+    KVEVENTS = "kvevents"
 
 
 # The single tunable of the `loadaware` routing logic. beta = 1.0 reads as: an
@@ -1223,6 +1225,318 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         return prefiller_endpoints[0].url
 
 
+DEFAULT_KV_EVENTS_PORT = 5557
+
+
+def _discovered_engine_urls() -> List[str]:
+    from vllm_router.service_discovery import get_service_discovery
+
+    return [
+        e.url
+        for e in get_service_discovery().get_endpoint_info()
+        if not getattr(e, "sleep", False)
+    ]
+
+
+class KvEventAwareRouter(RoutingInterface):
+    """Route to the engine holding the longest cached prefix, as reported by
+    the engines' own vLLM KV cache events.
+
+    Unlike ``kvaware``, which queries an LMCache controller that engines must
+    register with (in-process LMCache only), this router subscribes to each
+    engine's ``--kv-events-config`` ZMQ publisher. That covers vLLM's GPU
+    prefix cache on any engine, and LMCache's CPU tier in multiprocess mode
+    (LMCache >= 0.5.6 republishes the cache server's stores and evictions).
+
+    Cache affinity first: the request goes to the engine with the longest
+    cached prefix (GPU before CPU, then the less loaded engine). Load takes over
+    only when the fleet is clearly imbalanced, i.e. the busiest engine has more
+    than ``balance_abs_threshold`` in-flight requests over the idlest one *and*
+    more than ``balance_rel_threshold`` times as many; the request then goes to
+    the least-loaded engine. When no engine holds ``min_match_tokens``, the
+    request falls back to session affinity (when a session key is configured
+    and present) or QPS balancing.
+
+    A miss costs a full prefill, while one more in-flight request on the
+    holder costs little, so small load differences must not break affinity.
+    """
+
+    def __init__(
+        self,
+        kv_events_port: int = 5557,
+        kv_events_topic: str = "",
+        session_key: Optional[str] = None,
+        min_match_tokens: int = 1,
+        tokenize_timeout: float = 5.0,
+        balance_abs_threshold: int = 8,
+        balance_rel_threshold: float = 1.5,
+        tokenize_cooldown: float = 30.0,
+        reuse: Optional[Tuple[Any, Any]] = None,
+    ):
+        if hasattr(self, "_initialized"):
+            return
+        from vllm_router.routers.kv_event_index import (
+            KvEventIndex,
+            KvEventSubscriber,
+        )
+
+        self.session_key = session_key
+        self.hash_ring = HashRing()
+        self.min_match_tokens = max(1, int(min_match_tokens))
+        self.tokenize_timeout = tokenize_timeout
+        # An engine whose /tokenize failed is not asked again for this long, so
+        # a hung engine costs one timeout, not one per request routed to it.
+        self.tokenize_cooldown = tokenize_cooldown
+        self._tokenize_failed: Dict[str, float] = {}
+        self.balance_abs_threshold = balance_abs_threshold
+        self.balance_rel_threshold = balance_rel_threshold
+        if reuse is not None:
+            # Rebuilt by a dynamic reconfigure with the same port and topic:
+            # keep the live index. Blocks already cached (CPU ones especially)
+            # are never announced again, so a fresh index could not relearn
+            # them.
+            self.index, self.subscriber = reuse
+        else:
+            self.index = KvEventIndex()
+            self.subscriber = KvEventSubscriber(
+                self.index,
+                kv_events_port,
+                kv_events_topic,
+                endpoint_provider=_discovered_engine_urls,
+            )
+        self.decisions = {
+            "scored": 0,
+            "balanced": 0,
+            "fallback": 0,
+            "tokenize_error": 0,
+        }
+        self._initialized = True
+        logger.info(
+            f"Initialized KV event aware router (kv events port {kv_events_port}, "
+            f"topic {kv_events_topic!r}, min match {self.min_match_tokens} tokens, "
+            f"balance thresholds abs={balance_abs_threshold} "
+            f"rel={balance_rel_threshold})"
+        )
+
+    def close(self):
+        if self.subscriber is not None:
+            self.subscriber.close()
+
+    def detach(self) -> Tuple[Any, Any]:
+        """Hand the index and its subscriber to a replacement router; this
+        router's close() then leaves them running."""
+        reuse = (self.index, self.subscriber)
+        self.subscriber = None
+        return reuse
+
+    @staticmethod
+    def _tokenize_body(request_json: Dict, model: str) -> Optional[Dict]:
+        """Build a vLLM ``/tokenize`` body matching what the engine will run."""
+        if "messages" in request_json:
+            body = {
+                "model": model,
+                "messages": request_json["messages"],
+                "add_generation_prompt": request_json.get(
+                    "add_generation_prompt", True
+                ),
+                "continue_final_message": request_json.get(
+                    "continue_final_message", False
+                ),
+                "add_special_tokens": request_json.get("add_special_tokens", False),
+            }
+            for key in (
+                "tools",
+                "chat_template",
+                "chat_template_kwargs",
+                "mm_processor_kwargs",
+                "media_io_kwargs",
+            ):
+                if request_json.get(key) is not None:
+                    body[key] = request_json[key]
+            return body
+        prompt = request_json.get("prompt")
+        if isinstance(prompt, list) and prompt and isinstance(prompt[0], str):
+            prompt = prompt[0]  # batched prompts: route on the first one
+        if isinstance(prompt, str) and prompt:
+            body = {"model": model, "prompt": prompt}
+            if request_json.get("add_special_tokens") is not None:
+                body["add_special_tokens"] = request_json["add_special_tokens"]
+            return body
+        return None
+
+    def _tokenizer_endpoint(
+        self, endpoints: List[EndpointInfo], loads: Dict[str, int]
+    ) -> EndpointInfo:
+        """Least-loaded engine whose /tokenize has not failed recently."""
+        now = time.time()
+        self._tokenize_failed = {
+            u: t for u, t in self._tokenize_failed.items() if t > now
+        }
+        return min(
+            endpoints,
+            key=lambda e: (
+                e.url in self._tokenize_failed,
+                loads.get(e.url, 0),
+                random.random(),
+            ),
+        )
+
+    @staticmethod
+    def _lora_name(
+        endpoints: List[EndpointInfo], model: Optional[str]
+    ) -> Optional[str]:
+        """The requested model's name when it is a LoRA adapter, else None.
+
+        vLLM hashes an adapter's blocks with its LoRA name, which is the model
+        name requests use."""
+        if not model:
+            return None
+        for e in endpoints:
+            info = (getattr(e, "model_info", None) or {}).get(model)
+            if info is not None:
+                return model if info.is_adapter else None
+        return None
+
+    async def _prompt_tokens(
+        self,
+        endpoints: List[EndpointInfo],
+        request: Request,
+        request_json: Dict,
+        loads: Optional[Dict[str, int]] = None,
+    ) -> Optional[List[int]]:
+        prompt = request_json.get("prompt")
+        if isinstance(prompt, list) and prompt and isinstance(prompt[0], int):
+            return prompt
+        if (
+            isinstance(prompt, list)
+            and prompt
+            and isinstance(prompt[0], list)
+            and prompt[0]
+            and isinstance(prompt[0][0], int)
+        ):
+            return prompt[0]
+        model = request_json.get("model") or endpoints[0].model_names[0]
+        body = self._tokenize_body(request_json, model)
+        if body is None:
+            return None
+        headers = {"Content-Type": "application/json"}
+        auth = request.headers.get("Authorization")
+        if auth:
+            headers["Authorization"] = auth
+        client = request.app.state.aiohttp_client_wrapper()
+        # Any engine serving the model tokenizes identically.
+        engine = self._tokenizer_endpoint(endpoints, loads or {})
+        try:
+            async with client.post(
+                engine.url + "/tokenize",
+                json=body,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=self.tokenize_timeout),
+            ) as resp:
+                if resp.status in (400, 422):
+                    # The request itself cannot be tokenized (bad input): no
+                    # reason to avoid this engine.
+                    raise ValueError(
+                        f"/tokenize returned {resp.status}: {await resp.text()}"
+                    )
+                # Any other error (401/403/404/5xx) points at the engine or
+                # its configuration: put it on cooldown below.
+                resp.raise_for_status()
+                data = await resp.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            self._tokenize_failed[engine.url] = time.time() + self.tokenize_cooldown
+            raise
+        return data.get("tokens")
+
+    def _fallback(self, endpoints, request_stats, request, request_json) -> str:
+        session_id = self.extract_session_id(request, request_json)
+        if session_id is None:
+            return self._qps_routing(endpoints, request_stats)
+        self._update_hash_ring(endpoints)
+        return self.hash_ring.get_node(session_id)
+
+    async def route_request(
+        self,
+        endpoints: List[EndpointInfo],
+        engine_stats: Dict[str, EngineStats],
+        request_stats: Dict[str, RequestStats],
+        request: Request,
+        request_json: Dict,
+    ) -> str:
+        urls = [e.url for e in endpoints]
+        # Discovery owns the subscription set; this only covers engines it has
+        # not reported yet. ``endpoints`` is a subset (this model's engines, or
+        # the remaining ones on a failover retry), so it must not prune.
+        self.subscriber.add_endpoints(urls)
+        live = LoadAwareRouter.live_request_stats(request, request_stats)
+        loads = {u: LoadAwareRouter.load_penalty(live, u) for u in urls}
+
+        try:
+            token_ids = await self._prompt_tokens(
+                endpoints, request, request_json, loads
+            )
+        except Exception as e:
+            self.decisions["tokenize_error"] += 1
+            logger.warning(f"KV event router could not tokenize the prompt: {e}")
+            token_ids = None
+
+        if token_ids:
+            lora_name = self._lora_name(endpoints, request_json.get("model"))
+            matches = self.index.match(urls, token_ids, lora_name)
+            logger.debug(
+                f"KV event match for {len(token_ids)} prompt tokens"
+                f"{f' (LoRA {lora_name})' if lora_name else ''}: {matches}"
+            )
+            matched = {u: max(m["GPU"], m["CPU"]) for u, m in matches.items()}
+            lo, hi = min(loads.values()), max(loads.values())
+            imbalanced = (
+                hi - lo > self.balance_abs_threshold
+                and hi > self.balance_rel_threshold * lo
+            )
+            if imbalanced:
+                # Shortest queue; among equally idle engines, the best cache.
+                best = min(
+                    urls,
+                    key=lambda u: (
+                        loads[u],
+                        -matched[u],
+                        -matches[u]["GPU"],
+                        random.random(),
+                    ),
+                )
+                self.decisions["balanced"] += 1
+                logger.info(
+                    f"Routing request to {best} by load (in-flight {loads}); "
+                    f"cached gpu={matches[best]['GPU']} cpu={matches[best]['CPU']}"
+                )
+                return best
+            if max(matched.values(), default=0) >= self.min_match_tokens:
+                # Exact ties (e.g. a prefix every engine holds in a shared
+                # cache server, at equal load) are spread at random rather
+                # than all landing on the first endpoint.
+                best = max(
+                    urls,
+                    key=lambda u: (
+                        matched[u],
+                        matches[u]["GPU"],
+                        -loads[u],
+                        random.random(),
+                    ),
+                )
+                self.decisions["scored"] += 1
+                logger.info(
+                    f"Routing request to {best} found by kvevents router "
+                    f"(gpu={matches[best]['GPU']} cpu={matches[best]['CPU']} "
+                    f"of {len(token_ids)} tokens, in-flight {loads[best]})"
+                )
+                return best
+
+        self.decisions["fallback"] += 1
+        url = self._fallback(endpoints, request_stats, request, request_json)
+        logger.debug(f"KV event router fell back to {url}")
+        return url
+
+
 # Instead of managing a global _global_router, we can define the initialization functions as:
 def initialize_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
@@ -1285,6 +1599,23 @@ def initialize_routing_logic(
             priority_default=kwargs.get("priority_default", 0),
             priority_threshold=kwargs.get("priority_threshold"),
         )
+    elif routing_logic == RoutingLogic.KVEVENTS:
+        logger.info("Initializing KV event aware routing logic")
+
+        def opt(key, default):
+            # None means "not set"; 0 / "" are valid settings.
+            value = kwargs.get(key)
+            return default if value is None else value
+
+        router = KvEventAwareRouter(
+            kv_events_port=opt("kv_events_port", DEFAULT_KV_EVENTS_PORT),
+            kv_events_topic=opt("kv_events_topic", ""),
+            session_key=kwargs.get("session_key"),
+            min_match_tokens=opt("kv_events_min_match_tokens", 1),
+            balance_abs_threshold=opt("kv_events_balance_abs_threshold", 8),
+            balance_rel_threshold=opt("kv_events_balance_rel_threshold", 1.5),
+            reuse=kwargs.get("kv_events_reuse"),
+        )
     else:
         raise ValueError(f"Invalid routing logic {routing_logic}")
 
@@ -1297,6 +1628,17 @@ def initialize_routing_logic(
 def reconfigure_routing_logic(
     routing_logic: RoutingLogic, *args, **kwargs
 ) -> RoutingInterface:
+    if (
+        routing_logic == RoutingLogic.KVEVENTS
+        and KvEventAwareRouter in SingletonABCMeta._instances
+    ):
+        old = KvEventAwareRouter()
+        port = kwargs.get("kv_events_port")
+        port = DEFAULT_KV_EVENTS_PORT if port is None else port
+        topic = (kwargs.get("kv_events_topic") or "").encode("utf-8")
+        sub = old.subscriber
+        if sub is not None and sub.port == port and sub.topic == topic:
+            kwargs["kv_events_reuse"] = old.detach()
     # Remove the existing routers from the singleton registry
     cleanup_routing_logic()
     return initialize_routing_logic(routing_logic, *args, **kwargs)
@@ -1313,6 +1655,7 @@ def get_routing_logic() -> RoutingInterface:
         DisaggregatedPrefillRouter,
         DisaggregatedPrefillOrchestratedRouter,
         PriorityRouter,
+        KvEventAwareRouter,
     ):
         if cls in SingletonABCMeta._instances:
             return cls()
@@ -1330,6 +1673,7 @@ def cleanup_routing_logic():
         DisaggregatedPrefillRouter,
         DisaggregatedPrefillOrchestratedRouter,
         PriorityRouter,
+        KvEventAwareRouter,
     ):
         if cls in SingletonABCMeta._instances:
             instance = cls()
