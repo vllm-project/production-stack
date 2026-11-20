@@ -42,6 +42,7 @@ from vllm_router.services.request_service.rewriter import (
 )
 from vllm_router.utils import (
     replace_model_in_request_body,
+    resolve_model_alias,
     update_content_length,
 )
 
@@ -518,7 +519,7 @@ async def route_general_request(
 
     aliases = getattr(service_discovery, "aliases", None)
     if aliases and requested_model in aliases.keys():
-        requested_model = aliases[requested_model]
+        requested_model = resolve_model_alias(requested_model, aliases)
         request_body = replace_model_in_request_body(request_json, requested_model)
         update_content_length(request, request_body)
 
@@ -1192,6 +1193,10 @@ async def route_general_transcriptions(
             headers={"X-Request-Id": request_id},
         )
 
+    model = resolve_model_alias(
+        model, getattr(get_service_discovery(), "aliases", None)
+    )
+
     logger.debug("==== Enter audio_transcriptions ====")
     logger.debug("Received upload: %s (%s)", file.filename, file.content_type)
     logger.debug(
@@ -1262,7 +1267,40 @@ async def route_multipart_request(
 
     logger.debug("Routing multipart request with model %s", model)
 
-    return await proxy_multipart_request(body, model, endpoint, request)
+    resolved_model = resolve_model_alias(
+        model, getattr(get_service_discovery(), "aliases", None)
+    )
+    # Starlette selects the last model and aiohttp the first. Both must agree.
+    needs_rewrite = resolved_model != model or any(
+        value != model for value in form.getlist("model")
+    )
+    if not needs_rewrite:
+        return await proxy_multipart_request(body, model, endpoint, request)
+
+    # Keep UTF-8 names and filenames literal. With quote_fields=False aiohttp
+    # escapes backslashes and double quotes and rejects forbidden header controls.
+    rebuilt = aiohttp.FormData(quote_fields=False, default_to_multipart=True)
+    try:
+        for key, value in form.multi_items():
+            if key == "model":
+                rebuilt.add_field(key, resolved_model)
+            elif isinstance(value, str):
+                rebuilt.add_field(key, value)
+            else:
+                # Passing the spooled file itself would roll small uploads to disk
+                # when aiohttp calculates Content-Length.
+                rebuilt.add_field(
+                    key,
+                    await value.read(),
+                    filename=value.filename,
+                    content_type=value.content_type,
+                )
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid multipart/form-data request"},
+        )
+    return await proxy_multipart_request(rebuilt, resolved_model, endpoint, request)
 
 
 async def proxy_multipart_request(

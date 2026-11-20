@@ -224,6 +224,13 @@ def parse_static_aliases(static_aliases: str):
     return aliases
 
 
+def resolve_model_alias(model, aliases):
+    """Resolve one exact model alias, leaving other request values unchanged."""
+    if isinstance(model, str) and aliases and model in aliases:
+        return aliases[model]
+    return model
+
+
 def replace_model_in_request_body(request_json: dict, model: str):
     request_json["model"] = model
     request_body = json.dumps(request_json)
