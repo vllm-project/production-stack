@@ -4,6 +4,7 @@ import types
 
 import pytest
 from fastapi import HTTPException
+from starlette.datastructures import QueryParams
 
 from vllm_router.services.request_service import request as request_module
 from vllm_router.services.request_service.request import (
@@ -157,7 +158,7 @@ async def test_process_request_forwards_query_params_except_id(monitor):
 
     request = _fake_request(monitor, _OkRequestCM)
     request.method = "GET"
-    request.query_params = {"model": "my-tts", "id": "engine-1"}
+    request.query_params = QueryParams("model=my-tts&id=engine-1")
     request.app.state.aiohttp_client_wrapper = lambda: types.SimpleNamespace(
         request=lambda **kw: capturing_cm(**kw)
     )
@@ -174,8 +175,7 @@ async def test_process_request_forwards_query_params_except_id(monitor):
     async for _ in gen:
         pass
 
-    assert captured["params"] == {"model": "tts"}
-    assert "id" not in captured["params"]
+    assert captured["params"] == [("model", "tts")]
 
 
 @pytest.mark.asyncio

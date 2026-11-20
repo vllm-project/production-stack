@@ -229,22 +229,28 @@ def _build_backend_request_headers(
 
 def _backend_query_params(
     request: Request, *, resolved_model: Optional[str] = None
-) -> Optional[dict]:
-    """Query string to send upstream.
+) -> Optional[list[tuple[str, str]]]:
+    """Return query pairs in client order, omitting every router-only ``id``.
 
-    Drops router-only ``id`` (engine pin), matching the sleep/wake path.
-    If ``resolved_model`` is set and the client sent ``model``, replace it so
-    a body-less GET with an alias forwards the canonical name.
+    Preserve repeated keys. When supplied, ``resolved_model`` replaces all
+    ``model`` entries at the position of the first. Return ``None`` if empty.
     """
     query_params = getattr(request, "query_params", None)
     if not query_params:
         return None
-    params = {key: value for key, value in query_params.items() if key != "id"}
-    if not params:
-        return None
-    if resolved_model is not None and "model" in params:
-        params["model"] = resolved_model
-    return params
+
+    params = []
+    model_replaced = False
+    for key, value in query_params.multi_items():
+        if key == "id":
+            continue
+        if key == "model" and resolved_model is not None:
+            if model_replaced:
+                continue
+            value = resolved_model
+            model_replaced = True
+        params.append((key, value))
+    return params or None
 
 
 # TODO: (Brian) check if request is json beforehand

@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
+from starlette.datastructures import QueryParams
 
 from vllm_router.routers.routing_logic import RoundRobinRouter
 from vllm_router.services.request_service.request import _backend_query_params
@@ -57,7 +58,7 @@ def _make_request(
     *,
     method="GET",
     body=b"",
-    query_params=None,
+    query_params="",
     aliases=None,
     aiohttp_capture=None,
     endpoints=None,
@@ -83,7 +84,7 @@ def _make_request(
 
     req = MagicMock()
     req.headers = {}
-    req.query_params = query_params or {}
+    req.query_params = QueryParams(query_params)
     req.method = method
     req.url = "http://router/v1/audio/voices"
     req.app.state = state
@@ -139,22 +140,38 @@ def _json_backend(captured):
     return backend
 
 
-def test_backend_query_params_drops_id_and_rewrites_alias():
+def test_backend_query_params_preserves_repeated_keys_in_order():
     req = types.SimpleNamespace(
-        query_params={"model": "my-tts", "id": "engine-1", "foo": "bar"}
+        query_params=QueryParams("tag=a&id=one&lang=en&tag=b&id=two")
     )
-    assert _backend_query_params(req) == {"model": "my-tts", "foo": "bar"}
-    assert _backend_query_params(req, resolved_model="tts") == {
-        "model": "tts",
-        "foo": "bar",
-    }
+    assert _backend_query_params(req, resolved_model="tts") == [
+        ("tag", "a"),
+        ("lang", "en"),
+        ("tag", "b"),
+    ]
+
+
+def test_backend_query_params_rewrites_repeated_models_once_when_resolved():
+    req = types.SimpleNamespace(
+        query_params=QueryParams("lang=en&model=first&voice=aiden&model=my-tts")
+    )
+    assert _backend_query_params(req) == [
+        ("lang", "en"),
+        ("model", "first"),
+        ("voice", "aiden"),
+        ("model", "my-tts"),
+    ]
+    assert _backend_query_params(req, resolved_model="tts") == [
+        ("lang", "en"),
+        ("model", "tts"),
+        ("voice", "aiden"),
+    ]
 
 
 def test_backend_query_params_none_when_empty_or_id_only():
-    assert _backend_query_params(types.SimpleNamespace(query_params={})) is None
-    assert (
-        _backend_query_params(types.SimpleNamespace(query_params={"id": "e"})) is None
-    )
+    for query in ("", "id=one&id=two"):
+        req = types.SimpleNamespace(query_params=QueryParams(query))
+        assert _backend_query_params(req, resolved_model="tts") is None
     assert _backend_query_params(types.SimpleNamespace()) is None
 
 
@@ -266,7 +283,7 @@ async def test_get_voices_resolves_alias_without_rewriting_empty_body():
 async def test_get_voices_forwards_query_model_and_strips_router_id():
     aiohttp_kw = {}
     with _make_request(
-        query_params={"model": "tts", "id": "engine-1"},
+        query_params="tag=a&model=tts&id=engine-1&tag=b",
         aiohttp_capture=aiohttp_kw,
         endpoints=[EndpointInfo(url="http://tts-engine", Id="engine-1")],
     ) as (req, _):
@@ -277,15 +294,14 @@ async def test_get_voices_forwards_query_model_and_strips_router_id():
     assert resp.status_code == 200
     assert aiohttp_kw["method"] == "GET"
     assert aiohttp_kw["data"] is None
-    assert aiohttp_kw["params"] == {"model": "tts"}
-    assert "id" not in aiohttp_kw["params"]
+    assert aiohttp_kw["params"] == [("tag", "a"), ("model", "tts"), ("tag", "b")]
 
 
 @pytest.mark.asyncio
 async def test_get_voices_forwards_canonical_model_after_alias():
     aiohttp_kw = {}
     with _make_request(
-        query_params={"model": "my-tts"},
+        query_params="model=first&model=my-tts",
         aliases={"my-tts": "tts"},
         aiohttp_capture=aiohttp_kw,
     ) as (req, _):
@@ -294,4 +310,4 @@ async def test_get_voices_forwards_canonical_model_after_alias():
         resp = await route_general_request(req, "/v1/audio/voices", MagicMock())
 
     assert resp.status_code == 200
-    assert aiohttp_kw["params"] == {"model": "tts"}
+    assert aiohttp_kw["params"] == [("model", "tts")]
