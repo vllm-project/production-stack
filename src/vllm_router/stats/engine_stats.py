@@ -14,7 +14,7 @@
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Optional
 
 import requests
 from prometheus_client.parser import text_string_to_metric_families
@@ -40,7 +40,7 @@ class EngineStats:
     gpu_cache_usage_perc: float = 0.0
 
     @staticmethod
-    def from_vllm_scrape(vllm_scrape: str):
+    def from_vllm_scrape(vllm_scrape: str) -> Optional["EngineStats"]:
         """
         Parse the vllm scrape string and return a EngineStats object
 
@@ -48,7 +48,10 @@ class EngineStats:
             vllm_scrape (str): The vllm scrape string
 
         Returns:
-            EngineStats: The EngineStats object
+            Optional[EngineStats]: The EngineStats object, or None if the
+                scrape contains none of the metrics the router reads. An
+                all-zero EngineStats would look like an idle engine, so a
+                scrape we cannot interpret is reported as missing instead.
 
         Note:
             Assume vllm only runs a single model
@@ -59,6 +62,7 @@ class EngineStats:
         gpu_prefix_cache_hits_total = 0
         gpu_prefix_cache_queries_total = 0
         gpu_cache_usage_perc = 0.0
+        found_recognized_metric = False
 
         for family in text_string_to_metric_families(vllm_scrape):
             for sample in family.samples:
@@ -79,6 +83,12 @@ class EngineStats:
                     # vLLM renamed gpu_cache_usage_perc to kv_cache_usage_perc;
                     # newer releases only export the new name.
                     gpu_cache_usage_perc = sample.value
+                else:
+                    continue
+                found_recognized_metric = True
+
+        if not found_recognized_metric:
+            return None
 
         return EngineStats(
             num_running_requests=num_running_reqs,
@@ -135,6 +145,11 @@ class EngineStatsScraper(metaclass=SingletonMeta):
         except Exception as e:
             logger.error(f"Failed to scrape metrics from {url}: {e}")
             return None
+        if engine_stats is None:
+            logger.warning(
+                f"No recognized vLLM metrics in the /metrics scrape from {url}; "
+                "treating it as a failed scrape"
+            )
         return engine_stats
 
     def _scrape_metrics(self):
