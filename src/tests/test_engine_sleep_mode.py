@@ -11,8 +11,7 @@ from vllm_router.service_discovery import (
 )
 
 
-@pytest.mark.parametrize("command", [None, []])
-@pytest.mark.parametrize("args", [None, []])
+@pytest.mark.parametrize(("command", "args"), [(None, None), ([], ["--port", "8000"])])
 def test_image_defaults_allow_sleep_probe(command, args):
     container = SimpleNamespace(command=command, args=args)
     assert _container_enables_sleep_mode(container) is True
@@ -33,7 +32,7 @@ def test_truthy_assignment_enables_sleep_mode(value):
         "--enable-sleep-mode=0",
         "--enable-sleep-mode=",
         "--enable-sleep-mode=unknown",
-        "--no-enable-sleep-mode",
+        "--no_enable_sleep_mode",
     ],
 )
 def test_last_flag_in_args_disables_sleep_mode(flag):
@@ -46,7 +45,7 @@ def test_last_flag_in_args_disables_sleep_mode(flag):
 def test_last_flag_in_shell_wrapper_enables_sleep_mode():
     container = SimpleNamespace(
         command=["sh", "-c"],
-        args=["vllm serve my-model --enable-sleep-mode=false --enable-sleep-mode"],
+        args=["vllm serve my-model --enable-sleep-mode=false --enable_sleep_mode"],
     )
     assert _container_enables_sleep_mode(container) is True
 
@@ -55,8 +54,8 @@ def test_last_flag_in_shell_wrapper_enables_sleep_mode():
     ("args", "expected"),
     [
         (["--enable-sleep-mode"], True),
-        (["--model", "x"], False),
-        (["--enable-sleep-mode-foo"], False),
+        (["--model", "x"], True),
+        (["--no-enable-sleep-mode"], False),
     ],
 )
 def test_pod_ip_discovery_reads_image_entrypoint_args(args, expected):

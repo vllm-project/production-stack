@@ -51,7 +51,7 @@ def test_explicit_command_with_the_flag_enables_sleep_mode():
 
 
 def test_explicit_command_without_the_flag_disables_sleep_mode():
-    d = _make_discovery(["vllm", "serve"])
+    d = _make_discovery(["vllm", "serve"], ["--enable-sleep-mode-foo"])
     assert d._check_engine_sleep_mode("svc") is False
 
 

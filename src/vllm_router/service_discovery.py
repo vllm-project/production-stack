@@ -40,27 +40,20 @@ _SLEEP_MODE_TRUE_VALUES = frozenset({"true", "1", "yes", "on", "y", "t"})
 def _container_enables_sleep_mode(container) -> bool:
     """Return whether discovery should query the container's ``/is_sleeping`` endpoint.
 
-    When command and args are both missing or empty, probe because the image
-    defaults may enable sleep mode. Otherwise scan command followed by args,
-    splitting each entry on whitespace to handle shell wrappers.
-
-    The last matching token wins. Bare ``--enable-sleep-mode`` enables probing.
-    Its ``=value`` form enables probing for true, 1, yes, on, y or t (ignoring
-    case). All other values, including an empty value, disable probing, as does
-    ``--no-enable-sleep-mode``. Without a matching token, skip the probe.
+    With no explicit command, the image entrypoint may enable sleep mode.
+    An explicit flag in command or args overrides that fallback. Scan in
+    order so the last flag wins, including in a shell command string.
     """
     command = getattr(container, "command", None) or ()
     args = getattr(container, "args", None) or ()
-    if not command and not args:
-        return True
-
-    enabled = False
+    enabled = not command
     for part in chain(command, args):
         for token in str(part).split():
             flag, separator, value = token.partition("=")
+            flag = flag.replace("_", "-")
             if flag == _ENABLE_SLEEP_MODE_FLAG:
                 enabled = not separator or value.lower() in _SLEEP_MODE_TRUE_VALUES
-            elif token == "--no-enable-sleep-mode":
+            elif flag == "--no-enable-sleep-mode" and not separator:
                 enabled = False
     return enabled
 
