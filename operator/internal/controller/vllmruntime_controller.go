@@ -503,7 +503,7 @@ func (r *VLLMRuntimeReconciler) deploymentForVLLMRuntime(
 	}
 
 	if vllmRuntime.Spec.VLLMConfig.MaxLoras > 0 {
-		args = append(args, "--max_loras", fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.MaxLoras))
+		args = append(args, "--max-loras", fmt.Sprintf("%d", vllmRuntime.Spec.VLLMConfig.MaxLoras))
 	}
 
 	if vllmRuntime.Spec.VLLMConfig.ExtraArgs != nil {
