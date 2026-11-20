@@ -160,26 +160,40 @@ def test_backend_query_params_none_when_empty_or_id_only():
 
 @pytest.mark.asyncio
 async def test_get_voices_without_model_returns_400():
-    with _make_request(query_params={}) as (req, _):
+    with _make_request() as (req, _):
         from vllm_router.services.request_service.request import route_general_request
 
+        req.headers["X-Request-Id"] = "voices-request"
         resp = await route_general_request(req, "/v1/audio/voices", MagicMock())
     assert resp.status_code == 400
-    assert "model" in json.loads(resp.body)["error"]
+    assert (
+        json.loads(resp.body)["error"]
+        == "Invalid request: missing 'model' query parameter."
+    )
+    assert resp.headers["X-Request-Id"] == "voices-request"
 
 
+@pytest.mark.parametrize(
+    ("method", "body", "endpoint"),
+    [("POST", b"", "/v1/audio/speech"), ("GET", b"{}", "/v1/audio/voices")],
+    ids=["bodyless-post", "get-with-body"],
+)
 @pytest.mark.asyncio
-async def test_post_ignores_query_model_and_requires_body():
+async def test_missing_body_model_ignores_query_model(method, body, endpoint):
     with _make_request(
-        method="POST",
-        body=b"",
+        method=method,
+        body=body,
         query_params={"model": "tts"},
     ) as (req, _):
         from vllm_router.services.request_service.request import route_general_request
 
-        resp = await route_general_request(req, "/v1/audio/voices", MagicMock())
+        resp = await route_general_request(req, endpoint, MagicMock())
     assert resp.status_code == 400
-    assert "model" in json.loads(resp.body)["error"]
+    assert (
+        json.loads(resp.body)["error"]
+        == "Invalid request: missing 'model' in request body."
+    )
+    assert resp.headers["X-Request-Id"]
 
 
 @pytest.mark.asyncio

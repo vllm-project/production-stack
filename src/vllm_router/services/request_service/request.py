@@ -514,17 +514,19 @@ async def route_general_request(
         return response_overwrite
 
     requested_model = request_json.get("model", None)
+    missing_model_error = "Invalid request: missing 'model' in request body."
     # Body-less GET (e.g. /v1/audio/voices) cannot carry the model in JSON;
     # accept it from the query string. POST still requires a body field.
     if requested_model is None and not request_body:
         method = getattr(request, "method", "") or ""
-        if method.upper() == "GET" and request.query_params:
-            requested_model = request.query_params.get("model")
+        if method.upper() == "GET":
+            requested_model = (request.query_params or {}).get("model")
+            missing_model_error = "Invalid request: missing 'model' query parameter."
     if requested_model is None:
         end_span(span, status_code=400) if tracing_active else None
         return JSONResponse(
             status_code=400,
-            content={"error": "Invalid request: missing 'model' in request body."},
+            content={"error": missing_model_error},
             headers={"X-Request-Id": request_id},
         )
 
