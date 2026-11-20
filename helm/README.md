@@ -283,7 +283,7 @@ Set `servingEngineSpec.modelSpec[].raySpec.enabled: true` to deploy the model as
 | `routerSpec.affinity` | map | {} | (Optional) Affinity configuration. If specified, this takes precedence over `nodeSelectorTerms`. |
 | `routerSpec.nodeSelectorTerms` | list | `[]` | (Optional) Node selector terms. This is ignored if `affinity` is specified. |
 | `routerSpec.hf_token` | string | `""`| Hugging Face token for router |
-| `routerSpec.lmcacheControllerPort` | integer | `""` | LMCache controller port for `kvaware` and `loadaware` routing (e.g. `9000`) |
+| `routerSpec.lmcacheControllerPort` | string/integer | `""` | LMCache controller port for `kvaware` and `loadaware` routing (e.g. `9000`) |
 | `routerSpec.lmcacheConfig.logLevel` | string | `"INFO"` | LMCache log level for the router deployment |
 | `routerSpec.livenessProbe.initialDelaySeconds` | integer |`30`| Initial delay in seconds for router's liveness probe |
 | `routerSpec.livenessProbe.periodSeconds` | integer |`5`| Interval in seconds for router's liveness probe |
