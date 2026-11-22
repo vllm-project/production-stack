@@ -184,3 +184,41 @@ async def test_priority_threshold_defaults_to_priority_default():
     router = PriorityRouter(priority_default=5)
 
     assert router.priority_threshold == 5
+
+
+@pytest.mark.asyncio
+async def test_round_robin_state_is_bounded_when_endpoint_sets_change(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(PriorityRouter, "_MAX_CACHE_SIZE", 4)
+    router = PriorityRouter(priority_default=0)
+    request = Request()
+
+    for i in range(20):
+        endpoints = [
+            EndpointInfo(url="http://engine-a.com"),
+            EndpointInfo(url=f"http://engine-{i}.com"),
+        ]
+        await router.route_request(endpoints, None, {}, request, {})
+        assert len(router._next_index) <= 4
+
+
+@pytest.mark.asyncio
+async def test_round_robin_keeps_rotating_for_a_known_set_at_the_cap(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(PriorityRouter, "_MAX_CACHE_SIZE", 2)
+    router = PriorityRouter(priority_default=0)
+    request = Request()
+    endpoints = [
+        EndpointInfo(url="http://engine1.com"),
+        EndpointInfo(url="http://engine2.com"),
+    ]
+    other = [EndpointInfo(url="http://engine3.com")]
+
+    first = await router.route_request(endpoints, None, {}, request, {})
+    await router.route_request(other, None, {}, request, {})
+    # the cache is full, but this set is already tracked, so it must not reset
+    second = await router.route_request(endpoints, None, {}, request, {})
+
+    assert {first, second} == {"http://engine1.com", "http://engine2.com"}

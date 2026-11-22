@@ -969,6 +969,11 @@ class PriorityRouter(RoutingInterface):
     least-loaded one, so no engine is ever reserved and left idle.
     """
 
+    # Upper bound on cached endpoint-set entries, same as RoundRobinRouter,
+    # so the round-robin state does not grow without bound as the set of
+    # healthy engines changes over time (restarts, scaling, sleep/wake).
+    _MAX_CACHE_SIZE = 1024
+
     def __init__(
         self,
         priority_header: str = "x-request-priority",
@@ -1068,6 +1073,11 @@ class PriorityRouter(RoutingInterface):
             )
 
         idx = self._next_index.get(endpoint_urls, 0)
+        if (
+            len(self._next_index) >= self._MAX_CACHE_SIZE
+            and endpoint_urls not in self._next_index
+        ):
+            self._next_index.clear()
         self._next_index[endpoint_urls] = idx + 1
         return endpoint_urls[idx % len(endpoint_urls)]
 
