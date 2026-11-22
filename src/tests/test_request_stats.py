@@ -156,6 +156,35 @@ async def test_process_request_balances_counters_on_success(monitor):
 
 
 @pytest.mark.asyncio
+async def test_process_request_reuses_given_request_json(monitor, monkeypatch):
+    request = _fake_request(monitor, _OkRequestCM)
+    request_json = {"model": "test-model", "stream": False}
+    body = json.dumps(request_json).encode()
+    parsed = []
+    loads = json.loads
+    monkeypatch.setattr(
+        request_module.json,
+        "loads",
+        lambda s, *a, **kw: parsed.append(s) or loads(s, *a, **kw),
+    )
+
+    gen = process_request(
+        request,
+        body,
+        URL,
+        "req-1",
+        "/v1/chat/completions",
+        None,
+        request_json=request_json,
+    )
+    async for _ in gen:
+        pass
+
+    assert body not in parsed
+    assert monitor.get_request_stats(time.time())[URL].finished_requests == 1
+
+
+@pytest.mark.asyncio
 async def test_process_request_counts_overlapping_requests_sharing_an_id(monitor):
     # Clients can reuse an X-Request-Id; two overlapping requests that share it
     # must each release their own slot.

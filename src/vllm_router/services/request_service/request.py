@@ -237,6 +237,7 @@ async def process_request(
     background_tasks: BackgroundTasks,
     debug_request=None,
     parent_span_context=None,
+    request_json=None,
 ):
     """
     Process a request by sending it to the chosen backend.
@@ -293,15 +294,16 @@ async def process_request(
 
     try:
         # Check if this is a streaming request and extract model name
-        try:
-            request_json = json.loads(body)
-            is_streaming = request_json.get("stream", False)
-            model_name = request_json.get("model", "unknown")
-        except (JSONDecodeError, UnicodeDecodeError, ValueError):
-            # If we can't parse the body as JSON, assume it's not streaming
-            raise HTTPException(
-                status_code=400, detail="Request body is not JSON parsable."
-            )
+        if request_json is None:
+            try:
+                request_json = json.loads(body)
+            except (JSONDecodeError, UnicodeDecodeError, ValueError):
+                # If we can't parse the body as JSON, assume it's not streaming
+                raise HTTPException(
+                    status_code=400, detail="Request body is not JSON parsable."
+                )
+        is_streaming = request_json.get("stream", False)
+        model_name = request_json.get("model", "unknown")
 
         # Add streaming info to span after parsing
         if span is not None:
@@ -676,6 +678,7 @@ async def route_general_request(
                 endpoint,
                 background_tasks,
                 parent_span_context=span_context,
+                request_json=request_json,
             )
             headers, status = await anext(stream_generator)
             media_type = headers.get("content-type", "text/event-stream")
