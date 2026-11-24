@@ -137,3 +137,27 @@ async def test_non_streaming_response_reports_token_usage(monitor):
     after_out = REGISTRY.get_sample_value("vllm:output_tokens_total", labels)
     assert after_in - before_in == 11
     assert after_out - before_out == 22
+
+
+async def test_abandoned_response_is_recorded_as_aborted(monitor):
+    model = "abandoned-response-test-model"
+
+    def latency_count(status):
+        labels = {"server": URL, "model": model, "status": status}
+        return (
+            REGISTRY.get_sample_value("vllm:request_latency_seconds_count", labels) or 0
+        )
+
+    before = {status: latency_count(status) for status in ("success", "aborted")}
+    request = _fake_request(
+        monitor, [b"data: 1\n\n", b"data: 2\n\n"], "text/event-stream"
+    )
+    body = json.dumps({"model": model, "stream": True}).encode()
+    gen = process_request(request, body, URL, "req-1", "/v1/chat/completions", None)
+    await anext(gen)  # headers and status
+    await anext(gen)  # first chunk; then the client disconnects
+    await gen.aclose()
+
+    assert latency_count("aborted") == before["aborted"] + 1
+    assert latency_count("success") == before["success"]
+    assert monitor.in_decoding_requests.get(URL, 0) == 0
