@@ -15,8 +15,9 @@
 import json
 import threading
 import time
-from dataclasses import dataclass
-from typing import Literal, Optional
+from dataclasses import dataclass, fields
+from functools import lru_cache
+from typing import Any, Literal, Optional
 
 from fastapi import FastAPI
 
@@ -38,6 +39,14 @@ from vllm_router.utils import (
 )
 
 logger = init_logger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _router_flag_dests() -> frozenset[str]:
+    """Every argparse destination the router accepts on the command line."""
+    from vllm_router.parsers.parser import build_parser
+
+    return frozenset(action.dest for action in build_parser()._actions)
 
 
 @dataclass
@@ -115,16 +124,45 @@ class DynamicRouterConfig:
             callbacks=args.callbacks,
         )
 
+    @classmethod
+    def from_config_dict(cls, config: dict[str, Any]) -> "DynamicRouterConfig":
+        """Build a config from a dynamic-config file's keys.
+
+        The same file also sets startup-only flags at launch (for example
+        ``log_stats``). Those are ignored here instead of raising TypeError,
+        which used to stop every reload. Keys that are neither a field nor a
+        router flag are most likely typos; dropping one would silently reset
+        that field to its default, so they raise and the watcher keeps the
+        running configuration.
+        """
+        known_fields = {field.name for field in fields(cls)}
+        extra = [key for key in config if key not in known_fields]
+        flags = _router_flag_dests()
+        unknown = sorted(key for key in extra if key not in flags)
+        if unknown:
+            raise ValueError(
+                f"Unrecognized dynamic-config key(s) {unknown}: neither a "
+                "reloadable field nor a router flag; keeping the running config."
+            )
+        startup_only = sorted(key for key in extra if key in flags)
+        if startup_only:
+            logger.debug(
+                "DynamicConfigWatcher: ignoring startup-only keys %s", startup_only
+            )
+        return cls(
+            **{key: value for key, value in config.items() if key in known_fields}
+        )
+
     @staticmethod
     def from_yaml(yaml_path: str) -> "DynamicRouterConfig":
         config = read_and_process_yaml_config_file(yaml_path)
-        return DynamicRouterConfig(**config)
+        return DynamicRouterConfig.from_config_dict(config)
 
     @staticmethod
     def from_json(json_path: str) -> "DynamicRouterConfig":
         with open(json_path, "r") as f:
             config = json.load(f)
-        return DynamicRouterConfig(**config)
+        return DynamicRouterConfig.from_config_dict(config)
 
     def to_json_str(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)

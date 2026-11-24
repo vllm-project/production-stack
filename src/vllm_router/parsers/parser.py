@@ -122,7 +122,7 @@ def validate_args(args):
         )
 
 
-def parse_args():
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the FastAPI app.")
     parser.add_argument(
         "--host", type=str, default="0.0.0.0", help="The host to run the server on."
@@ -545,6 +545,11 @@ def parse_args():
         help="Path to a YAML file defining external LLM provider configurations (startup-time only).",
     )
 
+    return parser
+
+
+def parse_args():
+    parser = build_parser()
     args = parser.parse_args()
     args = load_initial_config_from_config_file_if_required(parser, args)
 
