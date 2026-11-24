@@ -160,7 +160,7 @@ class DynamicRouterConfig:
 
     @staticmethod
     def from_json(json_path: str) -> "DynamicRouterConfig":
-        with open(json_path, "r") as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             config = json.load(f)
         return DynamicRouterConfig.from_config_dict(config)
 
