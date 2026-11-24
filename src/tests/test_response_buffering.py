@@ -139,6 +139,7 @@ async def test_non_streaming_response_reports_token_usage(monitor):
     assert after_out - before_out == 22
 
 
+@pytest.mark.asyncio
 async def test_abandoned_response_is_recorded_as_aborted(monitor):
     model = "abandoned-response-test-model"
 
