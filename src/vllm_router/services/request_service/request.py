@@ -391,6 +391,11 @@ async def process_request(
         ).inc()
         end_span(span, error=e) if tracing_active else None
         raise
+    except BaseException:
+        # GeneratorExit or CancelledError: the client disconnected and the
+        # response was abandoned, so it must not be recorded as a success.
+        request_status = "aborted"
+        raise
     finally:
         # In finally so backend-error and client-disconnect paths also release
         # the in-flight slot; on_request_complete is idempotent.
