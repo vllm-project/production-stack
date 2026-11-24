@@ -251,17 +251,17 @@ async def _headers_unless_client_disconnects(request: Request, stream_generator)
     finishes. Cancelling the attempt closes the upstream connection, so the
     engine aborts the request too.
     """
-    headers_task = asyncio.ensure_future(anext(stream_generator))
-    disconnect_task = asyncio.ensure_future(_client_disconnected(request))
+    headers_task = asyncio.create_task(anext(stream_generator))
+    disconnect_task = asyncio.create_task(_client_disconnected(request))
     try:
         await asyncio.wait(
-            (headers_task, disconnect_task), return_when=asyncio.FIRST_COMPLETED
+            {headers_task, disconnect_task}, return_when=asyncio.FIRST_COMPLETED
         )
     finally:
         disconnect_task.cancel()
         if not headers_task.done():
             headers_task.cancel()
-            await asyncio.wait((headers_task,))
+            await asyncio.wait({headers_task})
     return None if headers_task.cancelled() else headers_task.result()
 
 
