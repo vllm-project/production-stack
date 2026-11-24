@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+import contextlib
 import json
 import os
 import time
@@ -228,6 +230,41 @@ def _build_backend_request_headers(
 
 
 # TODO: (Brian) check if request is json beforehand
+async def _client_disconnected(request: Request) -> None:
+    """Return once the client disconnects; otherwise wait until cancelled.
+
+    The body has been read, so the server's next message is http.disconnect.
+    A receive that replays the body or fails cannot report a disconnect: keep
+    waiting rather than spin on it or abort.
+    """
+    with contextlib.suppress(Exception):
+        if (await request.receive())["type"] == "http.disconnect":
+            return
+    await asyncio.get_running_loop().create_future()
+
+
+async def _headers_unless_client_disconnects(request: Request, stream_generator):
+    """Await the backend's response headers, or None if the client leaves first.
+
+    Like vLLM's @with_cancellation: nothing else watches the client until
+    headers arrive, and a non-streaming engine sends them only when generation
+    finishes. Cancelling the attempt closes the upstream connection, so the
+    engine aborts the request too.
+    """
+    headers_task = asyncio.ensure_future(anext(stream_generator))
+    disconnect_task = asyncio.ensure_future(_client_disconnected(request))
+    try:
+        await asyncio.wait(
+            (headers_task, disconnect_task), return_when=asyncio.FIRST_COMPLETED
+        )
+    finally:
+        disconnect_task.cancel()
+        if not headers_task.done():
+            headers_task.cancel()
+            await asyncio.wait((headers_task,))
+    return None if headers_task.cancelled() else headers_task.result()
+
+
 async def process_request(
     request: Request,
     body,
@@ -677,7 +714,16 @@ async def route_general_request(
                 background_tasks,
                 parent_span_context=span_context,
             )
-            headers, status = await anext(stream_generator)
+            first = await _headers_unless_client_disconnects(request, stream_generator)
+            if first is None:
+                logger.info(
+                    f"Client disconnected before headers: request {request_id} "
+                    f"to {server_url} aborted after "
+                    f"{time.time() - in_router_time:.1f}s"
+                )
+                end_span(span, status_code=499) if tracing_active else None
+                return Response(status_code=499)
+            headers, status = first
             media_type = headers.get("content-type", "text/event-stream")
             headers_dict = {
                 key: value
