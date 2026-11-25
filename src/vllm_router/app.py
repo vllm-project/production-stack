@@ -278,6 +278,8 @@ def initialize_all(app: FastAPI, args):
         lmcache_controller_heartbeat_port=args.lmcache_controller_heartbeat_port,
         prefill_model_labels=args.prefill_model_labels,
         decode_model_labels=args.decode_model_labels,
+        pd_endpoint_failure_threshold=args.pd_endpoint_failure_threshold,
+        pd_endpoint_cooldown_seconds=args.pd_endpoint_cooldown_seconds,
         kv_aware_threshold=args.kv_aware_threshold,
         loadaware_beta=args.loadaware_beta,
         prefix_min_match_length=args.prefix_min_match_length,

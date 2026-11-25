@@ -451,6 +451,24 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--pd-endpoint-failure-threshold",
+        type=int,
+        default=0,
+        help="Consecutive failures (connection error or 5xx) after which a "
+        "prefill or decode endpoint is skipped for "
+        "--pd-endpoint-cooldown-seconds. 0 disables the circuit breaker. "
+        "Only used when --routing-logic=disaggregated_prefill_orchestrated.",
+    )
+
+    parser.add_argument(
+        "--pd-endpoint-cooldown-seconds",
+        type=float,
+        default=30.0,
+        help="How long an endpoint is skipped once "
+        "--pd-endpoint-failure-threshold is reached, before it is tried again.",
+    )
+
+    parser.add_argument(
         "--kv-aware-threshold",
         type=int,
         default=2000,
@@ -521,7 +539,9 @@ def parse_args():
         "--max-instance-failover-reroute-attempts",
         type=int,
         default=0,
-        help="Number of reroute attempts per failed request",
+        help="Number of reroute attempts per failed request. With "
+        "--routing-logic=disaggregated_prefill_orchestrated, the prefill "
+        "request and the decode request each get this many.",
     )
 
     parser.add_argument(

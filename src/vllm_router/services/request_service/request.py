@@ -744,6 +744,84 @@ async def send_request_to_prefiller(
         return await response.json()
 
 
+async def _post_with_failover(
+    client: aiohttp.ClientSession,
+    router: DisaggregatedPrefillOrchestratedRouter,
+    request_id: str,
+    role: str,
+    url: str,
+    endpoints: list,
+    endpoint: str,
+    retry_errors: tuple = (aiohttp.ClientError,),
+    retry_server_errors: bool = True,
+    **kwargs,
+):
+    """
+    POST to a prefill or decode endpoint of the orchestrated disaggregated flow,
+    moving to another endpoint of the same role when the call fails before
+    response headers (a connection error or a 5xx).
+
+    Up to --max-instance-failover-reroute-attempts other endpoints are tried.
+    The response is returned as soon as one answers below 500; the last
+    attempt's 5xx response is returned and its connection error is raised, as
+    if there had been no failover. A total timeout is not retried.
+
+    Each outcome is reported to the router's circuit breaker, which makes the
+    endpoint pickers skip an endpoint that keeps failing.
+
+    Args:
+        role: "prefill" or "decode", selects the endpoint picker and labels logs.
+        url: The endpoint to try first.
+        endpoints: All endpoints of this role.
+        endpoint: The API path, e.g. /v1/chat/completions.
+        retry_errors: Exceptions that move the request to another endpoint.
+        retry_server_errors: Whether a 5xx response does so as well.
+        **kwargs: Passed to client.post().
+
+    Returns:
+        The response and the URL of the endpoint that sent it.
+    """
+    select_endpoint = (
+        router.select_prefill_endpoint
+        if role == "prefill"
+        else router.select_decode_endpoint
+    )
+    max_attempts = getattr(router, "max_instance_failover_reroute_attempts", 0) + 1
+    circuit_breaker = getattr(router, "circuit_breaker", None)
+    error_urls = set()
+
+    for attempt in range(max_attempts):
+        error_urls.add(url)
+        remaining = [ep for ep in endpoints if ep.url not in error_urls]
+        can_reroute = attempt + 1 < max_attempts and bool(remaining)
+        try:
+            response = await client.post(f"{url}{endpoint}", **kwargs)
+        except aiohttp.ClientError as e:
+            if circuit_breaker:
+                circuit_breaker.record_failure(url)
+            if not can_reroute or not isinstance(e, retry_errors):
+                raise
+            error = repr(e)
+        else:
+            if circuit_breaker and response.status >= 500:
+                circuit_breaker.record_failure(url)
+            elif circuit_breaker:
+                circuit_breaker.record_success(url)
+            if response.status < 500 or not retry_server_errors or not can_reroute:
+                return response, url
+            error = f"HTTP {response.status}"
+            response.release()
+        logger.warning(
+            f"[{request_id}] {role.capitalize()} request failed on {url} "
+            f"(attempt {attempt + 1}/{max_attempts}): {error}"
+        )
+        url = select_endpoint(remaining).url
+        logger.info(
+            f"[{request_id}] Routing {role} request to {url} "
+            f"(attempt {attempt + 2}/{max_attempts})"
+        )
+
+
 async def send_request_to_decode(
     client: aiohttp.ClientSession, endpoint: str, req_data: dict, request_id: str
 ):
@@ -839,16 +917,24 @@ async def route_orchestrated_disaggregated_request(
         # Use the shared aiohttp client from app state
         client: aiohttp.ClientSession = request.app.state.aiohttp_client_wrapper()
 
-        # Send to Prefill
-        async with client.post(
-            prefill_api_url,
+        # Send to Prefill. Nothing has been sent to the client yet, so a
+        # prefill endpoint that fails is replaced by another one.
+        prefill_resp, prefill_url = await _post_with_failover(
+            client,
+            router,
+            request_id,
+            "prefill",
+            prefill_url,
+            prefiller_endpoints,
+            endpoint,
             json=prefill_request_json,
             headers={
                 "Content-Type": "application/json",
                 "X-Request-Id": request_id,
             },
             timeout=aiohttp.ClientTimeout(total=300),
-        ) as prefill_resp:
+        )
+        try:
             if prefill_resp.status != 200:
                 error_text = await prefill_resp.text()
                 logger.error(
@@ -866,6 +952,8 @@ async def route_orchestrated_disaggregated_request(
             logger.debug(
                 f"[{request_id}] Prefill response keys: {prefill_data.keys() if isinstance(prefill_data, dict) else 'not a dict'}"
             )
+        finally:
+            prefill_resp.release()
 
         # Step 2: Extract kv_transfer_params and send to Decode
         # kv_transfer_params is the vLLM/NxDI-supported field for KV cache handoff
@@ -886,8 +974,27 @@ async def route_orchestrated_disaggregated_request(
         decode_api_url = f"{decode_url}{endpoint}"
         logger.info(f"[{request_id}] Sending decode request to {decode_api_url}")
 
-        decode_resp = await client.post(
-            decode_api_url,
+        # A decode endpoint that fails before response headers is replaced by
+        # another one, with the same kv_transfer_params: the KV cache stays on
+        # the prefill endpoint until a decode endpoint pulls it. A streaming
+        # response sends its headers before generation starts, so any failure
+        # before them is safe to retry. A non-streaming response sends them
+        # after generation, when the KV cache may already have been pulled and
+        # freed, so only a connection that was never established is retried.
+        decode_resp, decode_url = await _post_with_failover(
+            client,
+            router,
+            request_id,
+            "decode",
+            decode_url,
+            decoder_endpoints,
+            endpoint,
+            retry_errors=(
+                (aiohttp.ClientError,)
+                if is_streaming
+                else (aiohttp.ClientConnectorError,)
+            ),
+            retry_server_errors=is_streaming,
             json=decode_request,
             headers={
                 "Content-Type": "application/json",
