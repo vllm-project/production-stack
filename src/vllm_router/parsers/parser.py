@@ -521,7 +521,9 @@ def parse_args():
         "--max-instance-failover-reroute-attempts",
         type=int,
         default=0,
-        help="Number of reroute attempts per failed request",
+        help="Number of reroute attempts per failed request. With "
+        "--routing-logic=disaggregated_prefill_orchestrated, the prefill "
+        "request and the decode request each get this many.",
     )
 
     parser.add_argument(

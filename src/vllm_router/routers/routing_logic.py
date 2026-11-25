@@ -1274,7 +1274,7 @@ def initialize_routing_logic(
         )
     elif routing_logic == RoutingLogic.DISAGGREGATED_PREFILL_ORCHESTRATED:
         logger.info("Initializing disaggregated prefill orchestrated routing logic")
-        return DisaggregatedPrefillOrchestratedRouter(
+        router = DisaggregatedPrefillOrchestratedRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
         )
     elif routing_logic == RoutingLogic.PRIORITY:
