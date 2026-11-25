@@ -1,5 +1,6 @@
 {{- if .Values.sharedPvcStorage.enabled }}
-{{- if or (.Values.sharedPvcStorage.hostPath) (and .Values.sharedPvcStorage.nfs.server .Values.sharedPvcStorage.nfs.path) }}
+{{- $staticVolume := or .Values.sharedPvcStorage.hostPath (and .Values.sharedPvcStorage.nfs.server .Values.sharedPvcStorage.nfs.path) }}
+{{- if $staticVolume }}
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -11,7 +12,7 @@ metadata:
     component: shared-pvc-storage
 spec:
   {{- if .Values.sharedPvcStorage.storageClass }}
-  storageClassName: {{ .Values.sharedPvcStorage.storageClass }}
+  storageClassName: {{ .Values.sharedPvcStorage.storageClass | quote }}
   {{- end }}
   capacity:
     storage: {{ .Values.sharedPvcStorage.size }}
@@ -38,9 +39,10 @@ metadata:
     app: {{ .Release.Name }}
     component: shared-pvc-storage
 spec:
-  {{- if .Values.sharedPvcStorage.storageClass }}
-  storageClassName: {{ .Values.sharedPvcStorage.storageClass }}
-  {{- end}}
+  {{- /* A pre-bound claim must opt out of the default class when its PV has no class. */}}
+  {{- if or $staticVolume .Values.sharedPvcStorage.storageClass }}
+  storageClassName: {{ .Values.sharedPvcStorage.storageClass | default "" | quote }}
+  {{- end }}
   accessModes:
   {{- with .Values.sharedPvcStorage.accessModes }}
     {{- toYaml . | nindent 4 }}
@@ -48,7 +50,7 @@ spec:
   resources:
     requests:
       storage: {{ .Values.sharedPvcStorage.size }}
-  {{- if or (.Values.sharedPvcStorage.hostPath) (and .Values.sharedPvcStorage.nfs.server .Values.sharedPvcStorage.nfs.path) }}
+  {{- if $staticVolume }}
   volumeName: {{ .Release.Name }}-shared-pvc-storage
   {{- end }}
 {{- end }}

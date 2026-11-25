@@ -52,12 +52,10 @@ tests:
         path: kind
         value: PersistentVolumeClaim
     - documentIndex: 1
-      notExists:
-        path: spec.storageClassName
-    - documentIndex: 1
       equal:
         path: spec
         value:
+          storageClassName: ""
           accessModes:
             - ReadWriteMany
           resources:
@@ -110,18 +108,36 @@ tests:
         path: kind
         value: PersistentVolumeClaim
     - documentIndex: 1
-      notExists:
-        path: spec.storageClassName
-    - documentIndex: 1
       equal:
         path: spec
         value:
+          storageClassName: ""
           accessModes:
             - ReadWriteMany
           resources:
             requests:
               storage: 50Gi
           volumeName: vllm-shared-pvc-storage
+
+  - it: should use the configured storage class for both static volume and claim
+    release:
+      name: vllm
+    set:
+      sharedPvcStorage:
+        enabled: true
+        hostPath: /data/shared
+        storageClass: custom-static-class
+    asserts:
+    - hasDocuments:
+        count: 2
+    - documentIndex: 0
+      equal:
+        path: spec.storageClassName
+        value: custom-static-class
+    - documentIndex: 1
+      equal:
+        path: spec.storageClassName
+        value: custom-static-class
 
   - it: should only render a PersistentVolumeClaim when using a CSI driver that dynamically provisions volumes (default storageClass)
     release:
