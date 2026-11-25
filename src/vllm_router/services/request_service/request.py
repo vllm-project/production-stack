@@ -766,6 +766,9 @@ async def _post_with_failover(
     attempt's 5xx response is returned and its connection error is raised, as
     if there had been no failover. A total timeout is not retried.
 
+    Each outcome is reported to the router's circuit breaker, which makes the
+    endpoint pickers skip an endpoint that keeps failing.
+
     Args:
         role: "prefill" or "decode", selects the endpoint picker and labels logs.
         url: The endpoint to try first.
@@ -784,6 +787,7 @@ async def _post_with_failover(
         else router.select_decode_endpoint
     )
     max_attempts = getattr(router, "max_instance_failover_reroute_attempts", 0) + 1
+    circuit_breaker = getattr(router, "circuit_breaker", None)
     error_urls = set()
 
     for attempt in range(max_attempts):
@@ -792,11 +796,17 @@ async def _post_with_failover(
         can_reroute = attempt + 1 < max_attempts and bool(remaining)
         try:
             response = await client.post(f"{url}{endpoint}", **kwargs)
-        except retry_errors as e:
-            if not can_reroute:
+        except aiohttp.ClientError as e:
+            if circuit_breaker:
+                circuit_breaker.record_failure(url)
+            if not can_reroute or not isinstance(e, retry_errors):
                 raise
             error = repr(e)
         else:
+            if circuit_breaker and response.status >= 500:
+                circuit_breaker.record_failure(url)
+            elif circuit_breaker:
+                circuit_breaker.record_success(url)
             if response.status < 500 or not retry_server_errors or not can_reroute:
                 return response, url
             error = f"HTTP {response.status}"

@@ -252,3 +252,53 @@ async def test_no_failover_by_default(cluster):
 
     assert response.status_code == 503
     assert pods.prefill[1].requests == []
+
+
+async def test_failing_prefill_endpoint_is_skipped_after_threshold(cluster):
+    pods = await cluster(
+        prefill=[503, "ok"], decode=["ok"], pd_endpoint_failure_threshold=2
+    )
+
+    statuses = [(await pods.request()).status_code for _ in range(6)]
+
+    assert statuses == [200] * 6
+    # Round-robin offered the failing endpoint twice; after that it is skipped.
+    assert len(pods.prefill[0].requests) == 2
+    assert len(pods.prefill[1].requests) == 6
+
+
+async def test_failing_decode_endpoint_is_skipped_after_threshold(cluster):
+    pods = await cluster(
+        prefill=["ok"], decode=["refuse", "ok"], pd_endpoint_failure_threshold=1
+    )
+
+    statuses = [(await pods.request()).status_code for _ in range(4)]
+
+    assert statuses == [200] * 4
+    assert pods.router.circuit_breaker.available(
+        [pod.endpoint_info() for pod in pods.decode]
+    ) == [pods.decode[1].endpoint_info()]
+
+
+async def test_circuit_breaker_works_without_failover(cluster):
+    pods = await cluster(
+        prefill=[503, "ok"],
+        decode=["ok"],
+        attempts=0,
+        pd_endpoint_failure_threshold=1,
+    )
+
+    statuses = [(await pods.request()).status_code for _ in range(4)]
+
+    assert statuses == [503, 200, 200, 200]
+    assert len(pods.prefill[0].requests) == 1
+
+
+async def test_client_error_does_not_open_the_circuit_breaker(cluster):
+    pods = await cluster(
+        prefill=[400, "ok"], decode=["ok"], pd_endpoint_failure_threshold=1
+    )
+
+    statuses = [(await pods.request()).status_code for _ in range(4)]
+
+    assert statuses == [400, 200, 400, 200]

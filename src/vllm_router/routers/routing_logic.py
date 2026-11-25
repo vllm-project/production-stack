@@ -1115,6 +1115,67 @@ class DisaggregatedPrefillRouter(RoutingInterface):
             return decoder_endpoints[0].url
 
 
+class EndpointCircuitBreaker:
+    """
+    Skips an endpoint that keeps failing, so requests stop paying for a failed
+    attempt on it.
+
+    After `failure_threshold` consecutive failures the endpoint is skipped for
+    `cooldown_seconds`. It is then tried again: a success closes the breaker,
+    another failure opens it for a new cooldown. A threshold of 0 disables it.
+    """
+
+    def __init__(self, failure_threshold: int = 0, cooldown_seconds: float = 30.0):
+        self.failure_threshold = failure_threshold
+        self.cooldown_seconds = cooldown_seconds
+        # url -> [consecutive failures, time of the last one]
+        self._failures: Dict[str, list] = {}
+
+    def _open_until(self, url: str) -> float:
+        failures, last_failure = self._failures.get(url, (0, 0.0))
+        if failures < self.failure_threshold:
+            return 0.0
+        return last_failure + self.cooldown_seconds
+
+    def record_failure(self, url: str):
+        """The endpoint refused the connection or answered with a 5xx."""
+        if self.failure_threshold <= 0:
+            return
+        now = time.monotonic()
+        # Forget endpoints that have not failed for a long time (removed pods).
+        horizon = now - max(600.0, 10 * self.cooldown_seconds)
+        for stale in [u for u, f in self._failures.items() if f[1] < horizon]:
+            del self._failures[stale]
+        was_open = now < self._open_until(url)
+        entry = self._failures.setdefault(url, [0, now])
+        entry[0] += 1
+        entry[1] = now
+        if entry[0] >= self.failure_threshold and not was_open:
+            logger.warning(
+                f"Circuit breaker opened for {url}: {entry[0]} consecutive "
+                f"failures, skipping it for {self.cooldown_seconds:g}s"
+            )
+
+    def record_success(self, url: str):
+        """The endpoint answered (any status below 500)."""
+        failures, _ = self._failures.pop(url, (0, 0.0))
+        if self.failure_threshold > 0 and failures >= self.failure_threshold:
+            logger.info(f"Circuit breaker closed for {url}")
+
+    def available(self, endpoints: List[EndpointInfo]) -> List[EndpointInfo]:
+        """
+        The endpoints that are not being skipped. If all of them are, the one
+        whose cooldown ends first, so that a request is still attempted.
+        """
+        if not self._failures or not endpoints:
+            return endpoints
+        now = time.monotonic()
+        available = [e for e in endpoints if now >= self._open_until(e.url)]
+        if available:
+            return available
+        return [min(endpoints, key=lambda e: self._open_until(e.url))]
+
+
 class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
     """
     Orchestrates disaggregated inference in a single request by chaining Prefill → Decode.
@@ -1128,6 +1189,7 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
     5. Streams decode response back to client
 
     Load balancing: Uses round-robin across available prefill and decode pods.
+    Pods whose circuit breaker is open are skipped (see EndpointCircuitBreaker).
     """
 
     def __init__(self, prefill_model_labels: List[str], decode_model_labels: List[str]):
@@ -1138,6 +1200,8 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         # Round-robin counters for load balancing across xPyD pods
         self.prefill_idx = 0
         self.decode_idx = 0
+        # Disabled unless initialize_routing_logic() configures it
+        self.circuit_breaker = EndpointCircuitBreaker()
         self._initialized = True
         logger.info(
             f"Initialized DisaggregatedPrefillOrchestratedRouter with "
@@ -1187,6 +1251,7 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         """Select prefill endpoint using round-robin load balancing."""
         if not prefiller_endpoints:
             raise ValueError("No prefill endpoints available")
+        prefiller_endpoints = self.circuit_breaker.available(prefiller_endpoints)
         # Sort for consistency across requests
         sorted_endpoints = sorted(prefiller_endpoints, key=lambda e: e.url)
         selected = sorted_endpoints[self.prefill_idx % len(sorted_endpoints)]
@@ -1199,6 +1264,7 @@ class DisaggregatedPrefillOrchestratedRouter(RoutingInterface):
         """Select decode endpoint using round-robin load balancing."""
         if not decoder_endpoints:
             raise ValueError("No decode endpoints available")
+        decoder_endpoints = self.circuit_breaker.available(decoder_endpoints)
         # Sort for consistency across requests
         sorted_endpoints = sorted(decoder_endpoints, key=lambda e: e.url)
         selected = sorted_endpoints[self.decode_idx % len(sorted_endpoints)]
@@ -1276,6 +1342,10 @@ def initialize_routing_logic(
         logger.info("Initializing disaggregated prefill orchestrated routing logic")
         router = DisaggregatedPrefillOrchestratedRouter(
             kwargs.get("prefill_model_labels"), kwargs.get("decode_model_labels")
+        )
+        router.circuit_breaker = EndpointCircuitBreaker(
+            kwargs.get("pd_endpoint_failure_threshold", 0),
+            kwargs.get("pd_endpoint_cooldown_seconds", 30.0),
         )
     elif routing_logic == RoutingLogic.PRIORITY:
         logger.info(f"Initializing priority routing logic with kwargs: {kwargs}")
