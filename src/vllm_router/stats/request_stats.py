@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import threading
 from collections import deque
 from dataclasses import dataclass
 from typing import Deque, Dict, Tuple
@@ -139,6 +140,10 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
         self.swapped_requests: Dict[str, int] = {}
 
         self.first_query_time: float = None
+        # The event loop mutates this monitor while the --log-stats thread
+        # and the /metrics handler read it; every public method guards the
+        # shared dicts and sliding windows with this lock.
+        self._lock = threading.RLock()
         self._initialized = True
 
     def on_new_request(self, engine_url: str, request_id: str, timestamp: float):
@@ -150,25 +155,26 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             request_id: The global request ID
             timestamp: the timestamp when the request was created
         """
-        self.request_start_time[(engine_url, request_id)] = timestamp
+        with self._lock:
+            self.request_start_time[(engine_url, request_id)] = timestamp
 
-        if engine_url not in self.in_prefill_requests:
-            self.in_prefill_requests[engine_url] = 0
-        self.in_prefill_requests[engine_url] += 1
+            if engine_url not in self.in_prefill_requests:
+                self.in_prefill_requests[engine_url] = 0
+            self.in_prefill_requests[engine_url] += 1
 
-        if engine_url not in self.qps_monitors:
-            self.qps_monitors[engine_url] = MovingAverageMonitor(
-                self.sliding_window_size
-            )
-        self.qps_monitors[engine_url].update(timestamp, 1)
+            if engine_url not in self.qps_monitors:
+                self.qps_monitors[engine_url] = MovingAverageMonitor(
+                    self.sliding_window_size
+                )
+            self.qps_monitors[engine_url].update(timestamp, 1)
 
-        if engine_url not in self.latency_monitors:
-            self.latency_monitors[engine_url] = MovingAverageMonitor(
-                self.sliding_window_size
-            )
+            if engine_url not in self.latency_monitors:
+                self.latency_monitors[engine_url] = MovingAverageMonitor(
+                    self.sliding_window_size
+                )
 
-        if self.first_query_time is None:
-            self.first_query_time = timestamp
+            if self.first_query_time is None:
+                self.first_query_time = timestamp
 
     def on_request_response(self, engine_url: str, request_id: str, timestamp: float):
         """
@@ -179,25 +185,26 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             request_id: The global request ID
             timestamp: The timestamp when the response token was received
         """
-        if (engine_url, request_id) not in self.request_start_time:
-            return
-        # Record first token time (do not pop so we can compute overall latency later)
-        self.first_token_time[(engine_url, request_id)] = timestamp
+        with self._lock:
+            if (engine_url, request_id) not in self.request_start_time:
+                return
+            # Record first token time (do not pop so we can compute overall latency later)
+            self.first_token_time[(engine_url, request_id)] = timestamp
 
-        if engine_url not in self.in_decoding_requests:
-            self.in_decoding_requests[engine_url] = 0
-        self.in_prefill_requests[engine_url] = max(
-            0, self.in_prefill_requests.get(engine_url, 1) - 1
-        )
-        self.in_decoding_requests[engine_url] += 1
-
-        if engine_url not in self.ttft_monitors:
-            self.ttft_monitors[engine_url] = MovingAverageMonitor(
-                self.sliding_window_size
+            if engine_url not in self.in_decoding_requests:
+                self.in_decoding_requests[engine_url] = 0
+            self.in_prefill_requests[engine_url] = max(
+                0, self.in_prefill_requests.get(engine_url, 1) - 1
             )
-        # Update TTFT as time from request start to first token
-        ttft = timestamp - self.request_start_time[(engine_url, request_id)]
-        self.ttft_monitors[engine_url].update(timestamp, ttft)
+            self.in_decoding_requests[engine_url] += 1
+
+            if engine_url not in self.ttft_monitors:
+                self.ttft_monitors[engine_url] = MovingAverageMonitor(
+                    self.sliding_window_size
+                )
+            # Update TTFT as time from request start to first token
+            ttft = timestamp - self.request_start_time[(engine_url, request_id)]
+            self.ttft_monitors[engine_url].update(timestamp, ttft)
 
     def on_request_complete(self, engine_url: str, request_id: str, timestamp: float):
         """
@@ -208,31 +215,32 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             request_id: The global request ID
             timestamp: The timestamp when the request was completed
         """
-        key = (engine_url, request_id)
+        with self._lock:
+            key = (engine_url, request_id)
 
-        if key not in self.request_start_time:
-            return
+            if key not in self.request_start_time:
+                return
 
-        if engine_url not in self.finished_requests:
-            self.finished_requests[engine_url] = 0
+            if engine_url not in self.finished_requests:
+                self.finished_requests[engine_url] = 0
 
-        if (
-            key in self.first_token_time
-        ):  # first_token_time is set, so the request reached decode stage
-            self.in_decoding_requests[engine_url] = max(
-                0, self.in_decoding_requests.get(engine_url, 1) - 1
+            if (
+                key in self.first_token_time
+            ):  # first_token_time is set, so the request reached decode stage
+                self.in_decoding_requests[engine_url] = max(
+                    0, self.in_decoding_requests.get(engine_url, 1) - 1
+                )
+            else:  # failed in prefill stage
+                self.in_prefill_requests[engine_url] = max(
+                    0, self.in_prefill_requests.get(engine_url, 1) - 1
+                )
+            self.finished_requests[engine_url] += 1
+
+            request_start_time = self.request_start_time.pop(key)
+            self.first_token_time.pop(key, None)
+            self.latency_monitors[engine_url].update(
+                timestamp, timestamp - request_start_time
             )
-        else:  # failed in prefill stage
-            self.in_prefill_requests[engine_url] = max(
-                0, self.in_prefill_requests.get(engine_url, 1) - 1
-            )
-        self.finished_requests[engine_url] += 1
-
-        request_start_time = self.request_start_time.pop(key)
-        self.first_token_time.pop(key, None)
-        self.latency_monitors[engine_url].update(
-            timestamp, timestamp - request_start_time
-        )
 
     def on_request_swapped(self, engine_url: str, request_id: str, timestamp: float):
         # This function should be called if a request is determined to be swapped from GPU to CPU.
@@ -244,9 +252,10 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             request_id: The global request ID
             timestamp: The timestamp when the request was swapped
         """
-        if engine_url not in self.swapped_requests:
-            self.swapped_requests[engine_url] = 0
-        self.swapped_requests[engine_url] += 1
+        with self._lock:
+            if engine_url not in self.swapped_requests:
+                self.swapped_requests[engine_url] = 0
+            self.swapped_requests[engine_url] += 1
 
     def get_request_stats(self, current_time: float) -> Dict[str, RequestStats]:
         """
@@ -261,6 +270,12 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
             The TTFT and inter token latency will be -1 if there is no requests
             finished in the sliding window.
         """
+        with self._lock:
+            return self._get_request_stats_unlocked(current_time)
+
+    def _get_request_stats_unlocked(
+        self, current_time: float
+    ) -> Dict[str, RequestStats]:
         ret = {}
         urls = set(self.in_prefill_requests.keys()).union(
             set(self.in_decoding_requests.keys())
@@ -290,6 +305,10 @@ class RequestStatsMonitor(metaclass=SingletonMeta):
                 avg_dec_len = -1
 
             if engine_url in self.latency_monitors:
+                # Expire completed-request latencies with the sliding window,
+                # like the QPS and TTFT monitors, so a quiesced engine reports
+                # -1 instead of its last window's average forever.
+                self.latency_monitors[engine_url].update_no_value(current_time)
                 avg_lat = self.latency_monitors[engine_url].get_average()
             else:
                 avg_lat = -1
