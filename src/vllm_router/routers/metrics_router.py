@@ -97,7 +97,9 @@ async def metrics():
     """
     _clear_label_gauges()
 
-    cpu_percent = psutil.cpu_percent(interval=0.1)
+    # interval=None is non-blocking: it measures CPU since the previous
+    # call instead of sleeping ~100 ms inside the event loop.
+    cpu_percent = psutil.cpu_percent(interval=None)
     router_cpu_usage_percent.set(cpu_percent)
 
     memory_percent = psutil.virtual_memory().percent

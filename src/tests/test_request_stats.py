@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 import types
 
@@ -33,6 +34,68 @@ def test_request_failing_during_prefill_releases_prefill_slot(monitor):
     assert stats[URL].in_prefill_requests == 0
     assert stats[URL].in_decoding_requests == 0
     assert stats[URL].finished_requests == 1
+
+
+def test_avg_latency_expires_after_sliding_window(monitor):
+    # vllm:avg_latency kept reporting the last completed window forever when
+    # nothing completed; the QPS/TTFT windows already expire via
+    # update_no_value (#1236).
+    now = 1000.0
+    monitor.on_new_request(URL, "req-1", now)
+    monitor.on_request_complete(URL, "req-1", now + 2)
+
+    stats = monitor.get_request_stats(now + 3)
+    assert stats[URL].avg_latency == pytest.approx(2.0)
+
+    stats = monitor.get_request_stats(now + 100)
+    assert stats[URL].avg_latency == -1
+
+
+def test_get_request_stats_is_safe_against_concurrent_mutations():
+    # The --log-stats thread calls get_request_stats while the event loop
+    # mutates the same dicts and sliding windows. Both update() and
+    # update_no_value() prune with check-then-popleft, so concurrent prune
+    # and append can pop from an emptied window (#1236). A tiny sliding window
+    # ages every sample out immediately, compressing the quiescent-traffic
+    # interleaving where the two prunes collide.
+    SingletonMeta._instances.pop(RequestStatsMonitor, None)
+    monitor = RequestStatsMonitor(sliding_window_size=0.001)
+    try:
+        stop = threading.Event()
+        errors = []
+
+        def churn():
+            i = 0
+            while not stop.is_set():
+                now = time.time()
+                try:
+                    monitor.on_new_request(URL, f"req-{i}", now)
+                    monitor.on_request_response(URL, f"req-{i}", now)
+                    monitor.on_request_complete(URL, f"req-{i}", now)
+                except Exception as e:  # noqa: BLE001
+                    errors.append(e)
+                    return
+                i += 1
+
+        def poll():
+            while not stop.is_set():
+                try:
+                    monitor.get_request_stats(time.time())
+                except Exception as e:  # noqa: BLE001
+                    errors.append(e)
+                    return
+
+        threads = [threading.Thread(target=churn)]
+        threads += [threading.Thread(target=poll) for _ in range(2)]
+        for t in threads:
+            t.start()
+        time.sleep(1.0)
+        stop.set()
+        for t in threads:
+            t.join()
+        assert not errors, f"stats read raced with mutations: {errors!r}"
+    finally:
+        SingletonMeta._instances.pop(RequestStatsMonitor, None)
 
 
 def test_on_request_complete_is_idempotent(monitor):
